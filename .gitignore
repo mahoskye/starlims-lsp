@@ -1,0 +1,12 @@
+# Build artifacts
+/bin/
+*.exe
+*.test
+*.out
+*.cover
+
+# Editor/OS files
+.DS_Store
+
+# Local markers
+.qdrant-initialized
