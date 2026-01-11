@@ -4,6 +4,10 @@ A Language Server Protocol (LSP) implementation for STARLIMS Scripting Language 
 
 This LSP server provides intelligent code editing features for SSL files across any editor that supports the Language Server Protocol.
 
+## Disclaimer
+
+This is an unofficial community project and is not affiliated with, endorsed by, or sponsored by STARLIMS. STARLIMS and related trademarks are the property of their respective owners.
+
 ## Documentation
 
 See `DOCUMENTATION.md` for a deeper usage and configuration guide.
