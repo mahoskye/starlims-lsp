@@ -7,13 +7,29 @@
 
 ## Summary
 
-The starlims-lsp language server is now fully integrated with the VS Code SSL extension. The Windows binary compilation issue has been resolved, and the extension now conditionally uses the LSP for core language features.
+The starlims-lsp language server provides core SSL language features, including formatting, hover, completion, and diagnostics, with configuration support and open-document workspace symbols.
 
 ---
 
 ## Recent Changes
 
-### 1. Fixed Windows Binary Compilation
+### 1. Hungarian Notation Diagnostics (Opt-in)
+
+Added an opt-in warning for Hungarian notation in variable and parameter names.
+
+### 2. Workspace Symbol Support (Open Documents)
+
+Added workspace symbol support for procedures across currently open documents (no workspace indexing).
+
+### 3. Hover Documentation Improvements
+
+Function hover now includes signature detail and parameter descriptions from internal signatures.
+
+### 4. Configuration Change Test Coverage
+
+Added a server test that verifies `workspace/didChangeConfiguration` applies settings and revalidates open documents.
+
+### 5. Fixed Windows Binary Compilation
 
 **Problem:** The `github.com/tliron/glsp` library depended on `github.com/tliron/kutil v0.3.11`, which had broken Windows terminal color methods due to API changes in `muesli/termenv`.
 
@@ -30,11 +46,7 @@ The starlims-lsp language server is now fully integrated with the VS Code SSL ex
 - `starlims-lsp-darwin-arm64`
 - `starlims-lsp-windows-amd64.exe`
 
-### 2. Binaries Copied to VS Code Extension
-
-All binaries have been copied to `/home/maho/dev/vs-code-ssl-formatter/server/` for bundling with the extension.
-
-### 3. Internal Refactoring Cleanup
+### 6. Internal Refactoring Cleanup
 
 Refactored server/provider utilities to centralize protocol conversions, formatting helpers, and function documentation formatting without changing behavior.
 
@@ -55,7 +67,9 @@ The server currently provides these LSP features:
 | `foldingRangeProvider` | ✅ | `handleFoldingRange` - code folding |
 | `signatureHelpProvider` | ✅ | `handleSignatureHelp` - parameter hints |
 | `documentFormattingProvider` | ✅ | `handleFormatting` - SSL + SQL formatting |
-| `diagnosticsProvider` | ✅ | `validateDocument` - block matching, parens |
+| `documentRangeFormattingProvider` | ✅ | `handleRangeFormatting` - range formatting |
+| `workspaceSymbolProvider` | ✅ | `handleWorkspaceSymbol` - open-document procedures |
+| `diagnosticsProvider` | ✅ | `validateDocument` - block matching, parens, opt-in Hungarian prefixes |
 
 ---
 
@@ -81,6 +95,10 @@ The server accepts these configuration settings via `workspace/didChangeConfigur
         "indentSize": 4,
         "maxLineLength": 90
       }
+    },
+    "diagnostics": {
+      "hungarianNotation": false,  // opt-in warning for Hungarian prefixes
+      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"]
     }
   }
 }
@@ -96,7 +114,7 @@ cd /home/maho/dev/starlims-lsp
 go test -v ./...
 ```
 
-Current test count: 23 tests (11 formatting, 12 SQL formatter)
+Current test count: 27+ tests (formatting, SQL formatter, providers, server)
 
 ### Manual LSP Testing
 ```bash
@@ -109,26 +127,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":1,"cap
 
 ## Next Steps
 
-### High Priority
-1. **Add configuration change tests** - verify `workspace/didChangeConfiguration` properly updates formatter settings
-2. **Test remaining LSP features in VS Code:**
-   - Go to Definition (Ctrl+Click)
-   - Find References
-   - Document Symbols (Ctrl+Shift+O)
-   - Folding Ranges
-   - Signature Help
-   - Diagnostics
-
-### Medium Priority
-3. **Add TextDocumentRangeFormatting** - currently only full document formatting is supported
-4. **Improve hover documentation** - add more detailed function signatures and examples
-5. **Add workspace symbol support** - for cross-file navigation
-
-### Low Priority (Deferred)
-- Extended diagnostics (Hungarian notation, SQL injection) - stays in extension for now
-- CodeLens support
-- Call hierarchy support
-- Rename provider
+- No pending LSP items. Revisit if workspace indexing model changes.
 
 ---
 
@@ -152,6 +151,4 @@ make clean
 
 ## Related Files
 
-- **VS Code Extension:** `/home/maho/dev/vs-code-ssl-formatter/`
-- **Extension integration doc:** `/home/maho/dev/vs-code-ssl-formatter/INTEGRATION_STATUS.md`
 - **Full roadmap:** `/home/maho/dev/starlims-lsp/ROADMAP.md`

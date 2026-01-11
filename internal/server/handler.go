@@ -1,6 +1,8 @@
 package server
 
 import (
+	"strings"
+
 	"starlims-lsp/internal/providers"
 
 	"github.com/tliron/glsp"
@@ -18,38 +20,9 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables)
 	snippets := providers.GetSnippetCompletions()
 
-	// Convert to protocol completion items
 	items := make([]protocol.CompletionItem, 0, len(completions)+len(snippets))
-
-	for _, c := range completions {
-		item := protocol.CompletionItem{
-			Label:  c.Label,
-			Kind:   ptrTo(protocol.CompletionItemKind(c.Kind)),
-			Detail: &c.Detail,
-			Documentation: &protocol.MarkupContent{
-				Kind:  protocol.MarkupKindMarkdown,
-				Value: c.Documentation,
-			},
-			InsertText:       &c.InsertText,
-			InsertTextFormat: ptrTo(protocol.InsertTextFormat(c.InsertTextFormat)),
-		}
-		items = append(items, item)
-	}
-
-	for _, c := range snippets {
-		item := protocol.CompletionItem{
-			Label:  c.Label,
-			Kind:   ptrTo(protocol.CompletionItemKind(c.Kind)),
-			Detail: &c.Detail,
-			Documentation: &protocol.MarkupContent{
-				Kind:  protocol.MarkupKindMarkdown,
-				Value: c.Documentation,
-			},
-			InsertText:       &c.InsertText,
-			InsertTextFormat: ptrTo(protocol.InsertTextFormat(c.InsertTextFormat)),
-		}
-		items = append(items, item)
-	}
+	items = append(items, toProtocolCompletionItems(completions)...)
+	items = append(items, toProtocolCompletionItems(snippets)...)
 
 	return items, nil
 }
@@ -148,12 +121,13 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 func (s *SSLServer) handleDocumentSymbol(context *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
 	uri := params.TextDocument.URI
 
-	content, ok := s.documents.GetDocument(uri)
-	if !ok {
+	if _, ok := s.documents.GetDocument(uri); !ok {
 		return nil, nil
 	}
 
-	symbols := providers.GetDocumentSymbols(content)
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+	symbols := providers.GetDocumentSymbolsFromTokens(cache.Tokens, cache.AST)
 
 	result := make([]protocol.DocumentSymbol, 0, len(symbols))
 	for _, sym := range symbols {
@@ -162,6 +136,70 @@ func (s *SSLServer) handleDocumentSymbol(context *glsp.Context, params *protocol
 	}
 
 	return result, nil
+}
+
+func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error) {
+	if params == nil {
+		return nil, nil
+	}
+
+	query := params.Query
+	results := make([]protocol.SymbolInformation, 0)
+
+	for _, uri := range s.documents.AllDocuments() {
+		version := s.documentVersion[uri]
+		cache := s.documents.ParseDocument(uri, version)
+		for _, proc := range cache.Procedures {
+			if query != "" && !containsSubstring(proc.Name, query) {
+				continue
+			}
+			rangeInfo := providers.Range{
+				Start: providers.Position{Line: proc.StartLine - 1, Character: 0},
+				End:   providers.Position{Line: proc.EndLine - 1, Character: 0},
+			}
+			results = append(results, protocol.SymbolInformation{
+				Name:     proc.Name,
+				Kind:     protocol.SymbolKindFunction,
+				Location: protocol.Location{URI: uri, Range: toProtocolRange(rangeInfo)},
+			})
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	return results, nil
+}
+
+func containsSubstring(value, query string) bool {
+	if query == "" {
+		return true
+	}
+
+	valueLower := strings.ToLower(value)
+	queryLower := strings.ToLower(query)
+
+	return strings.Contains(valueLower, queryLower)
+}
+
+func toProtocolCompletionItems(items []providers.CompletionItem) []protocol.CompletionItem {
+	result := make([]protocol.CompletionItem, 0, len(items))
+	for _, c := range items {
+		item := protocol.CompletionItem{
+			Label:  c.Label,
+			Kind:   ptrTo(protocol.CompletionItemKind(c.Kind)),
+			Detail: &c.Detail,
+			Documentation: &protocol.MarkupContent{
+				Kind:  protocol.MarkupKindMarkdown,
+				Value: c.Documentation,
+			},
+			InsertText:       &c.InsertText,
+			InsertTextFormat: ptrTo(protocol.InsertTextFormat(c.InsertTextFormat)),
+		}
+		result = append(result, item)
+	}
+	return result
 }
 
 // convertDocumentSymbol converts our DocumentSymbol to protocol.DocumentSymbol.
@@ -192,12 +230,13 @@ func convertDocumentSymbol(sym providers.DocumentSymbol) protocol.DocumentSymbol
 func (s *SSLServer) handleFoldingRange(context *glsp.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
 	uri := params.TextDocument.URI
 
-	content, ok := s.documents.GetDocument(uri)
-	if !ok {
+	if _, ok := s.documents.GetDocument(uri); !ok {
 		return nil, nil
 	}
 
-	ranges := providers.GetFoldingRanges(content)
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+	ranges := providers.GetFoldingRangesFromTokens(cache.Tokens, cache.AST)
 
 	result := make([]protocol.FoldingRange, 0, len(ranges))
 	for _, r := range ranges {
@@ -225,14 +264,16 @@ func (s *SSLServer) handleFoldingRange(context *glsp.Context, params *protocol.F
 func (s *SSLServer) handleSignatureHelp(context *glsp.Context, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
 	uri := params.TextDocument.URI
 
-	content, ok := s.documents.GetDocument(uri)
-	if !ok {
+	if _, ok := s.documents.GetDocument(uri); !ok {
 		return nil, nil
 	}
 
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+
 	// Get signature help - LSP positions are 0-based, our functions expect 1-based
-	help := providers.GetSignatureHelp(
-		content,
+	help := providers.GetSignatureHelpFromTokens(
+		cache.Tokens,
 		int(params.Position.Line)+1,
 		int(params.Position.Character)+1,
 	)

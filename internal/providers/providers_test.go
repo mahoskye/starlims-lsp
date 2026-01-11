@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -580,7 +581,7 @@ func TestGetDiagnostics_BlockDepth(t *testing.T) {
 :IF c;
 :IF d;
 :IF e;
-x := 1;
+ x := 1;
 :ENDIF;
 :ENDIF;
 :ENDIF;
@@ -605,6 +606,73 @@ x := 1;
 	}
 }
 
+func TestGetDiagnostics_HungarianNotationDisabled(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS nCount, sName;
+:DECLARE sValue;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Hungarian notation") {
+			t.Fatalf("did not expect Hungarian notation diagnostic: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_HungarianNotationEnabled(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS nCount, sName;
+:DECLARE sValue, goodName;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckHungarianNotation = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	var hungarianDiagnostics []Diagnostic
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Hungarian notation") {
+			hungarianDiagnostics = append(hungarianDiagnostics, d)
+		}
+	}
+
+	if len(hungarianDiagnostics) != 3 {
+		t.Fatalf("expected 3 Hungarian notation warnings, got %d", len(hungarianDiagnostics))
+	}
+
+	for _, d := range hungarianDiagnostics {
+		if d.Severity != SeverityWarning {
+			t.Errorf("expected warning severity, got %v", d.Severity)
+		}
+	}
+}
+
+func TestGetDiagnostics_HungarianNotationCustomPrefixes(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS xValue, yValue;
+:DECLARE sValue;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckHungarianNotation = true
+	opts.HungarianPrefixes = []string{"x", "y"}
+	diagnostics := GetDiagnostics(text, opts)
+
+	var hungarianDiagnostics []Diagnostic
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Hungarian notation") {
+			hungarianDiagnostics = append(hungarianDiagnostics, d)
+		}
+	}
+
+	if len(hungarianDiagnostics) != 2 {
+		t.Fatalf("expected 2 Hungarian notation warnings, got %d", len(hungarianDiagnostics))
+	}
+}
+
 // ==================== Default Options Tests ====================
 
 func TestDefaultDiagnosticOptions(t *testing.T) {
@@ -618,6 +686,12 @@ func TestDefaultDiagnosticOptions(t *testing.T) {
 	}
 	if opts.MaxBlockDepth != 10 {
 		t.Errorf("expected MaxBlockDepth to be 10, got %d", opts.MaxBlockDepth)
+	}
+	if opts.CheckHungarianNotation {
+		t.Error("expected CheckHungarianNotation to be false by default")
+	}
+	if !reflect.DeepEqual(opts.HungarianPrefixes, []string{"a", "b", "d", "n", "o", "s"}) {
+		t.Errorf("unexpected default Hungarian prefixes: %v", opts.HungarianPrefixes)
 	}
 }
 

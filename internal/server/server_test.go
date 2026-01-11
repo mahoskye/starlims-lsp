@@ -2,10 +2,67 @@ package server
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"starlims-lsp/internal/providers"
+
+	"github.com/tliron/glsp"
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
+
+func TestHandleDidChangeConfiguration_RevalidatesDocuments(t *testing.T) {
+	s := NewSSLServer()
+	uriA := "file:///alpha.ssl"
+	uriB := "file:///beta.ssl"
+
+	s.documents.SetDocument(uriA, ":PROCEDURE Alpha;:ENDPROC;", 1)
+	s.documents.SetDocument(uriB, ":PROCEDURE Beta;:ENDPROC;", 1)
+	s.documentVersion[uriA] = 1
+	s.documentVersion[uriB] = 1
+
+	diagnostics := make([]protocol.PublishDiagnosticsParams, 0)
+	ctx := &glsp.Context{
+		Notify: func(method string, params any) {
+			if method != protocol.ServerTextDocumentPublishDiagnostics {
+				return
+			}
+			if diagParams, ok := params.(protocol.PublishDiagnosticsParams); ok {
+				diagnostics = append(diagnostics, diagParams)
+			}
+		},
+	}
+
+	settings := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"format": map[string]interface{}{
+				"indentStyle": "space",
+			},
+		},
+	}
+
+	err := s.handleDidChangeConfiguration(ctx, &protocol.DidChangeConfigurationParams{Settings: settings})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.settings.Formatting.IndentStyle != "space" {
+		t.Errorf("expected indent style 'space', got %q", s.settings.Formatting.IndentStyle)
+	}
+
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected diagnostics for 2 documents, got %d", len(diagnostics))
+	}
+
+	seen := map[string]bool{}
+	for _, diag := range diagnostics {
+		seen[diag.URI] = true
+	}
+
+	if !seen[uriA] || !seen[uriB] {
+		t.Errorf("expected diagnostics for %s and %s", uriA, uriB)
+	}
+}
 
 func TestNewSSLServer(t *testing.T) {
 	s := NewSSLServer()
@@ -62,6 +119,10 @@ func TestApplySettings_FullSettings(t *testing.T) {
 					"maxLineLength": 80,
 				},
 			},
+			"diagnostics": map[string]interface{}{
+				"hungarianNotation": true,
+				"hungarianPrefixes": []string{"a", "b"},
+			},
 		},
 	}
 
@@ -106,6 +167,13 @@ func TestApplySettings_FullSettings(t *testing.T) {
 	if s.settings.Formatting.SQL.MaxLineLength != 80 {
 		t.Errorf("expected SQL max line length 80, got %d", s.settings.Formatting.SQL.MaxLineLength)
 	}
+
+	if !s.settings.Diagnostics.CheckHungarianNotation {
+		t.Error("expected hungarian notation diagnostics to be enabled")
+	}
+	if !reflect.DeepEqual(s.settings.Diagnostics.HungarianPrefixes, []string{"a", "b"}) {
+		t.Errorf("expected Hungarian prefixes [a b], got %v", s.settings.Diagnostics.HungarianPrefixes)
+	}
 }
 
 func TestApplySettings_PartialSettings(t *testing.T) {
@@ -147,13 +215,13 @@ func TestApplySettings_EmptySettings(t *testing.T) {
 	// Apply empty/nil settings - should not change anything
 	s.applySettings(nil)
 
-	if s.settings != originalSettings {
+	if !reflect.DeepEqual(s.settings, originalSettings) {
 		t.Error("settings should not change when nil is applied")
 	}
 
 	s.applySettings(map[string]interface{}{})
 
-	if s.settings.Formatting.IndentStyle != originalSettings.Formatting.IndentStyle {
+	if !reflect.DeepEqual(s.settings, originalSettings) {
 		t.Error("settings should not change when empty map is applied")
 	}
 }

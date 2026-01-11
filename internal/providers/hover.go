@@ -74,7 +74,7 @@ func getFunctionHover(word string) *Hover {
 			if sig, ok := constants.GetFunctionSignature(fnName); ok {
 				docInfo := buildFunctionDoc(sig)
 				return &Hover{
-					Contents: fmt.Sprintf("**%s**\n\nBuilt-in SSL function\n\n%s", docInfo.Label, docInfo.Documentation),
+					Contents: formatFunctionHover(docInfo),
 				}
 			}
 			return &Hover{
@@ -84,6 +84,45 @@ func getFunctionHover(word string) *Hover {
 	}
 
 	return nil
+}
+
+func formatFunctionHover(docInfo functionDoc) string {
+	sections := []string{
+		fmt.Sprintf("**%s**", docInfo.Label),
+		"Built-in SSL function",
+	}
+
+	if docInfo.Detail != "" {
+		sections = append(sections, fmt.Sprintf("`%s`", docInfo.Detail))
+	}
+
+	if docInfo.Documentation != "" {
+		sections = append(sections, docInfo.Documentation)
+	}
+
+	if len(docInfo.Parameters) > 0 {
+		sections = append(sections, formatFunctionParameters(docInfo.Parameters))
+	}
+
+	return strings.Join(sections, "\n\n")
+}
+
+func formatFunctionParameters(params []ParameterInformation) string {
+	var builder strings.Builder
+	builder.WriteString("**Parameters:**")
+
+	for _, param := range params {
+		builder.WriteString("\n- `")
+		builder.WriteString(param.Label)
+		builder.WriteString("`")
+		doc := strings.TrimSpace(param.Documentation)
+		if doc != "" {
+			builder.WriteString(": ")
+			builder.WriteString(doc)
+		}
+	}
+
+	return builder.String()
 }
 
 // getClassHover returns hover information for a built-in class.

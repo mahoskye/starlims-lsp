@@ -35,7 +35,10 @@ func GetSignatureHelp(text string, line, column int) *SignatureHelp {
 		return nil
 	}
 
-	// Look up the function signature
+	return buildSignatureHelp(funcName, activeParam)
+}
+
+func buildSignatureHelp(funcName string, activeParam int) *SignatureHelp {
 	sig, ok := constants.GetFunctionSignature(funcName)
 	if !ok {
 		return nil
@@ -129,25 +132,7 @@ func GetSignatureHelpFromTokens(tokens []lexer.Token, line, column int) *Signatu
 		return nil
 	}
 
-	// Look up the function signature
-	sig, ok := constants.GetFunctionSignature(funcName)
-	if !ok {
-		return nil
-	}
-
-	docInfo := buildFunctionDoc(sig)
-
-	return &SignatureHelp{
-		Signatures: []SignatureInformation{
-			{
-				Label:         docInfo.Label,
-				Documentation: docInfo.Documentation,
-				Parameters:    docInfo.Parameters,
-			},
-		},
-		ActiveSignature: 0,
-		ActiveParameter: activeParam,
-	}
+	return buildSignatureHelp(funcName, activeParam)
 }
 
 // findFunctionContextFromTokens finds function context using tokens.

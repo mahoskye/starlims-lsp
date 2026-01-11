@@ -1,22 +1,21 @@
 # starlims-lsp Integration Roadmap
 
-A comprehensive roadmap for integrating starlims-lsp with the VS Code extension. This document tracks progress across work sessions.
+A comprehensive roadmap for the starlims-lsp language server. This document tracks progress across work sessions.
 
 **Last Updated:** 2026-01-10
-**Status:** Phase 4 In Progress (Tests Complete)
+**Status:** Phase 4 In Progress (Tests Complete, Workspace Symbols Added)
 
 ---
 
 ## Overview
 
-**Goal:** Enable multi-editor support via starlims-lsp while simplifying the VS Code extension.
+**Goal:** Enable multi-editor support via starlims-lsp.
 
 **Scope:** Document-only operations (no workspace indexing)
 
 **Key Files:**
 - starlims-lsp: `/home/maho/dev/starlims-lsp/`
-- VS Code Extension: `/home/maho/dev/vs-code-ssl-formatter/`
-- Style Guide: `/home/maho/dev/silver-robot/DOCS/SSL Refactor Guidelines/STARLIMS_Style_Guide.md`
+- Style Guide: `/home/maho/dev/silver-robot/DOCS/abbot-starlims-style-guide.md`
 
 ---
 
@@ -81,120 +80,48 @@ SQL strings in SSL are detected inside these functions:
 
 ---
 
-## Phase 2: VS Code Extension LSP Client
+## Phase 2: Core LSP Features
 
-### 2.1 Add LSP Client Dependencies
-- [x] Add `vscode-languageclient` to `package.json`
-- [x] Add `vscode-languageserver-protocol` types (included with vscode-languageclient)
-- [x] Update npm dependencies
-
-### 2.2 Bundle starlims-lsp Binaries
-- [x] Create `server/` directory in extension
-- [x] Build binaries: `cd starlims-lsp && make build-all`
-- [x] Copy binaries to `server/` directory:
-  - `starlims-lsp-linux-amd64`
-  - `starlims-lsp-linux-arm64`
-  - `starlims-lsp-darwin-amd64`
-  - `starlims-lsp-darwin-arm64`
-  - `starlims-lsp-windows-amd64.exe`
-- [x] Update `.vscodeignore` to include binaries
-- [x] Update `package.json` to include binaries in package
-
-### 2.3 Implement LSP Client
-- [x] Create `src/lspClient.ts`
-- [x] Implement platform detection for binary selection
-- [x] Initialize `LanguageClient` in `extension.ts`
-- [x] Configure server spawn: `starlims-lsp --stdio`
-- [x] Handle client lifecycle (start, stop, restart)
-
-### 2.4 Configuration Bridge
-- [x] Map existing `ssl.format.*` settings to `sslLanguageServer.format.*`
-- [x] Sync configuration changes to LSP server
-- [x] Maintain backwards compatibility with existing settings
-
-**Note:** Windows binary build was previously blocked by an upstream issue in the `github.com/tliron/glsp` library's dependency on `github.com/tliron/kutil`. This was resolved by upgrading kutil from v0.3.11 to v0.3.27, which fixed the Windows terminal color method compatibility issue with `muesli/termenv`.
+### 2.1 LSP Feature Coverage
+- [x] Completion
+- [x] Hover
+- [x] Go to Definition
+- [x] Find References
+- [x] Document Symbols
+- [x] Folding Ranges
+- [x] Signature Help
+- [x] Document Formatting
+- [x] Basic Diagnostics (block matching, parens)
+- [x] Hungarian notation warnings (opt-in)
+- [x] Workspace Symbols (open documents only)
 
 ---
 
-## Phase 3: Migrate Features to LSP
+## Phase 3: Testing & Verification
 
-### 3.1 Features Handled by LSP (disable in extension)
-- [x] Completion (`sslCompletionProvider.ts`) - conditionally disabled when LSP active
-- [x] Hover (`sslHoverProvider.ts`) - conditionally disabled when LSP active
-- [x] Go to Definition (`sslDefinitionProvider.ts`) - conditionally disabled when LSP active
-- [x] Find References (`sslReferenceProvider.ts`) - conditionally disabled when LSP active
-- [x] Document Symbols (`sslSymbolProvider.ts`) - conditionally disabled when LSP active
-- [x] Folding Ranges (`sslFoldingProvider.ts`) - conditionally disabled when LSP active
-- [x] Signature Help (`sslSignatureHelpProvider.ts`) - conditionally disabled when LSP active
-- [x] Document Formatting (`sslFormatter.ts`) - conditionally disabled when LSP active
-- [x] Basic Diagnostics (block matching, parens) - conditionally disabled when LSP active
-
-**Implementation:** Added `ssl.languageServer.enabled` configuration option (default: `true`). When enabled, the extension skips registering native providers for the above features, allowing the LSP to handle them. When disabled or if the LSP fails to start, native providers are registered as fallback.
-
-### 3.2 Features Remaining in Extension
-These stay in the VS Code extension:
-- TextMate grammar (syntax highlighting)
-- CodeLens (reference counts)
-- Call Hierarchy
-- Inlay Hints
-- Rename Provider
-- Code Actions (quick fixes)
-- Document Highlight
-- Workspace Symbols
-- Extended Diagnostics (Hungarian notation, SQL injection)
-- Commands (format SQL selection, configure namespaces)
-
----
-
-## Phase 4: Testing & Verification
-
-### 4.1 Unit Tests (starlims-lsp)
+### 3.1 Unit Tests (starlims-lsp)
 - [x] Formatter tests for each indentation option (26 tests in formatting_test.go)
 - [x] SQL formatter tests for each style (11 tests in sql_formatter_test.go)
 - [x] Configuration change tests (in formatting_test.go and server_test.go)
 - [x] Range formatting tests (6 tests in formatting_test.go)
 - [x] Comprehensive provider tests (30+ tests in providers_test.go)
-- [x] Server and handler tests (15+ tests in server_test.go)
+- [x] Server and handler tests (16+ tests in server_test.go)
 
-### 4.2 Integration Tests
-- [x] LSP client initialization - verified via stdio protocol
+### 3.2 Integration Tests
 - [x] Feature parity checks (completion, hover, formatting) - verified via protocol tests
 - [x] Formatting via LSP produces correct indentation and operator spacing
-
-### 4.3 Manual Verification Checklist
-| Feature | Test | Status |
-|---------|------|--------|
-| Completion | Type `:` → keywords appear | ✅ Verified |
-| Hover | Hover function → docs shown | ✅ Verified |
-| Go to Definition | Ctrl+Click procedure | Pending |
-| Find References | Right-click → Find All References | Pending |
-| Document Symbols | Ctrl+Shift+O → outline | Pending |
-| Folding | Collapse/expand procedures | Pending |
-| Signature Help | Type `(` after function | Pending |
-| Diagnostics | Unclosed `:IF` → error | Pending |
-| Format (SSL) | Shift+Alt+F → proper indentation | ✅ Verified |
-| Format (SQL) | SQL strings formatted correctly | Pending |
-| Config | Change settings → immediate effect | Pending |
 
 ---
 
 ## Notes & Decisions
 
 ### Decided
-- Bundle binaries in extension (not separate download)
-- Formatter based on official STARLIMS Style Guide
+- Formatter defaults follow `/home/maho/dev/silver-robot/DOCS/abbot-starlims-style-guide.md`
 - SQL formatting with 4 styles: standard, canonicalCompact, compact, expanded
 - Default SQL style is "standard" (per style guide), canonicalCompact available via settings
 - Document-only scope (no workspace indexing)
 - Configurable formatting options with style guide defaults
-- Dropped VS Code extension's extra SQL styles (hangingOperators, knr, knrCompact, ormFriendly)
 - 2026-01-10: Internal refactor cleanup completed
-
-### Deferred
-- Workspace-wide features (rename, workspace symbols)
-- Extended diagnostics in LSP (Hungarian notation, SQL injection)
-- Call hierarchy in LSP
-- CodeLens in LSP
 
 ---
 
@@ -206,21 +133,3 @@ These stay in the VS Code extension:
 
 **starlims-lsp files to modify:**
 - `internal/server/server.go` (add formatting handler)
-
-**VS Code extension files to create:**
-- `src/lspClient.ts`
-- `server/` (binary directory)
-
-**VS Code extension files to modify:**
-- `package.json` (dependencies, bundled binaries)
-- `src/extension.ts` (LSP client init)
-
-**VS Code extension files to disable/remove:**
-- `src/sslCompletionProvider.ts`
-- `src/sslHoverProvider.ts`
-- `src/sslDefinitionProvider.ts`
-- `src/sslReferenceProvider.ts`
-- `src/sslSymbolProvider.ts`
-- `src/sslFoldingProvider.ts`
-- `src/sslSignatureHelpProvider.ts`
-- `src/formatting/formatter.ts`

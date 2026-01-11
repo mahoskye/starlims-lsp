@@ -4,8 +4,8 @@ package providers
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
-	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
@@ -42,30 +42,53 @@ type Diagnostic struct {
 
 // DiagnosticOptions configures diagnostic checking.
 type DiagnosticOptions struct {
-	CheckUnclosedBlocks  bool
-	CheckUnmatchedParens bool
-	CheckUndeclaredVars  bool
-	CheckUnusedVars      bool
-	MaxBlockDepth        int
+	CheckUnclosedBlocks    bool
+	CheckUnmatchedParens   bool
+	CheckUndeclaredVars    bool
+	CheckUnusedVars        bool
+	CheckHungarianNotation bool
+	HungarianPrefixes      []string
+	MaxBlockDepth          int
 }
 
 // DefaultDiagnosticOptions returns default diagnostic options.
 func DefaultDiagnosticOptions() DiagnosticOptions {
 	return DiagnosticOptions{
-		CheckUnclosedBlocks:  true,
-		CheckUnmatchedParens: true,
-		CheckUndeclaredVars:  false,
-		CheckUnusedVars:      false,
-		MaxBlockDepth:        10,
+		CheckUnclosedBlocks:    true,
+		CheckUnmatchedParens:   true,
+		CheckUndeclaredVars:    false,
+		CheckUnusedVars:        false,
+		CheckHungarianNotation: false,
+		HungarianPrefixes:      []string{"a", "b", "d", "n", "o", "s"},
+		MaxBlockDepth:          10,
 	}
 }
 
 // GetDiagnostics returns all diagnostics for a document.
 func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
-	var diagnostics []Diagnostic
-
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	return collectDiagnostics(tokens, ast, p, opts)
+}
+
+// GetDiagnosticsFromTokens returns diagnostics using cached tokens/AST.
+func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts DiagnosticOptions) []Diagnostic {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	p := parser.NewParser(tokens)
+	if ast == nil {
+		ast = p.Parse()
+	}
+
+	return collectDiagnostics(tokens, ast, p, opts)
+}
+
+func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, opts DiagnosticOptions) []Diagnostic {
+	var diagnostics []Diagnostic
 
 	// Check for lexer-level issues
 	diagnostics = append(diagnostics, checkTokenErrors(tokens)...)
@@ -75,10 +98,6 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 		diagnostics = append(diagnostics, checkUnmatchedDelimiters(tokens)...)
 	}
 
-	// Parse and check for structural issues
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-
 	// Check for unclosed blocks
 	if opts.CheckUnclosedBlocks {
 		diagnostics = append(diagnostics, checkUnclosedBlocks(tokens)...)
@@ -87,6 +106,12 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// Check block depth
 	if opts.MaxBlockDepth > 0 {
 		diagnostics = append(diagnostics, checkBlockDepth(ast, opts.MaxBlockDepth)...)
+	}
+
+	// Check for Hungarian notation (opt-in)
+	if opts.CheckHungarianNotation {
+		variables := p.ExtractVariables(ast)
+		diagnostics = append(diagnostics, checkHungarianNotation(variables, opts.HungarianPrefixes)...)
 	}
 
 	return diagnostics
@@ -299,6 +324,56 @@ func checkBlockDepth(ast *parser.Node, maxDepth int) []Diagnostic {
 	return diagnostics
 }
 
+func checkHungarianNotation(variables []parser.VariableInfo, prefixes []string) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	if len(prefixes) == 0 {
+		return diagnostics
+	}
+
+	for _, variable := range variables {
+		if prefix, ok := hasHungarianPrefix(variable.Name, prefixes); ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range: Range{
+					Start: Position{Line: variable.Line - 1, Character: variable.Column - 1},
+					End:   Position{Line: variable.Line - 1, Character: variable.Column - 1 + len(variable.Name)},
+				},
+				Message: fmt.Sprintf("Hungarian notation prefix '%s' detected in '%s'", prefix, variable.Name),
+				Source:  "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+func hasHungarianPrefix(name string, prefixes []string) (string, bool) {
+	trimmed := strings.TrimLeft(name, "_")
+	if trimmed == "" {
+		return "", false
+	}
+
+	lower := strings.ToLower(trimmed)
+	for _, prefix := range prefixes {
+		if !strings.HasPrefix(lower, prefix) {
+			continue
+		}
+
+		remainder := trimmed[len(prefix):]
+		remainder = strings.TrimLeft(remainder, "_")
+		if remainder == "" {
+			continue
+		}
+		firstRune := []rune(remainder)[0]
+		if unicode.IsUpper(firstRune) {
+			return prefix, true
+		}
+	}
+
+	return "", false
+}
+
 // tokenToRange converts a token to an LSP range.
 func tokenToRange(token lexer.Token) Range {
 	return Range{
@@ -321,9 +396,4 @@ func contains(slice []string, val string) bool {
 		}
 	}
 	return false
-}
-
-// Helper to check if a keyword is in constants
-func isBlockStartKeyword(s string) bool {
-	return constants.IsBlockStartKeyword(s)
 }

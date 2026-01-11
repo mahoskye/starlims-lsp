@@ -187,6 +187,33 @@ func TestHandleDocumentSymbol(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspaceSymbol_ProceduresOnly(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE ProcA;
+:ENDPROC;
+:PROCEDURE ProcB;
+:ENDPROC;`)
+	otherURI := "file:///other.ssl"
+	s.documents.SetDocument(otherURI, ":PROCEDURE ProcC;:ENDPROC;", 1)
+	s.documentVersion[otherURI] = 1
+
+	results, err := s.handleWorkspaceSymbol(nil, &protocol.WorkspaceSymbolParams{Query: "procb"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Name != "ProcB" {
+		t.Errorf("expected ProcB, got %q", results[0].Name)
+	}
+	if results[0].Location.URI != testURI {
+		t.Errorf("expected URI %s, got %s", testURI, results[0].Location.URI)
+	}
+	if results[0].Kind != protocol.SymbolKindFunction {
+		t.Errorf("expected function symbol kind, got %v", results[0].Kind)
+	}
+}
+
 func TestHandleFoldingRange(t *testing.T) {
 	s := newTestServerWithDocument(`/* region Sample;
 :PROCEDURE Test;

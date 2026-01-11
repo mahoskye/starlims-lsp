@@ -17,7 +17,14 @@ type ClientSettings struct {
 
 // SSLSettings represents SSL-specific settings from the client.
 type SSLSettings struct {
-	Format *FormatSettings `json:"format"`
+	Format      *FormatSettings      `json:"format"`
+	Diagnostics *DiagnosticsSettings `json:"diagnostics"`
+}
+
+// DiagnosticsSettings represents diagnostics settings from the client.
+type DiagnosticsSettings struct {
+	HungarianNotation *bool     `json:"hungarianNotation"`
+	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
 }
 
 // FormatSettings represents formatting settings from the client.
@@ -94,6 +101,7 @@ func NewSSLServer() *SSLServer {
 		TextDocumentDidSave:             s.handleDidSave,
 		TextDocumentFormatting:          s.handleFormatting,
 		TextDocumentRangeFormatting:     s.handleRangeFormatting,
+		WorkspaceSymbol:                 s.handleWorkspaceSymbol,
 		WorkspaceDidChangeConfiguration: s.handleDidChangeConfiguration,
 	}
 
@@ -125,6 +133,7 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	}
 	capabilities.DocumentFormattingProvider = true
 	capabilities.DocumentRangeFormattingProvider = true
+	capabilities.WorkspaceSymbolProvider = true
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
@@ -231,29 +240,38 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		return
 	}
 
-	if clientSettings.SSL == nil || clientSettings.SSL.Format == nil {
+	if clientSettings.SSL == nil {
 		return
 	}
 
-	fmt := clientSettings.SSL.Format
+	if clientSettings.SSL.Format != nil {
+		fmt := clientSettings.SSL.Format
 
-	// Apply formatting settings
-	applyOptional(&s.settings.Formatting.IndentStyle, fmt.IndentStyle)
-	applyOptional(&s.settings.Formatting.IndentSize, fmt.IndentSize)
-	applyOptional(&s.settings.Formatting.MaxLineLength, fmt.MaxLineLength)
-	applyOptional(&s.settings.Formatting.OperatorSpacing, fmt.OperatorSpacing)
-	applyOptional(&s.settings.Formatting.CommaSpacing, fmt.CommaSpacing)
-	applyOptional(&s.settings.Formatting.SemicolonEnforcement, fmt.SemicolonEnforcement)
-	applyOptional(&s.settings.Formatting.BlankLinesBetweenProcs, fmt.BlankLinesBetweenProcs)
+		// Apply formatting settings
+		applyOptional(&s.settings.Formatting.IndentStyle, fmt.IndentStyle)
+		applyOptional(&s.settings.Formatting.IndentSize, fmt.IndentSize)
+		applyOptional(&s.settings.Formatting.MaxLineLength, fmt.MaxLineLength)
+		applyOptional(&s.settings.Formatting.OperatorSpacing, fmt.OperatorSpacing)
+		applyOptional(&s.settings.Formatting.CommaSpacing, fmt.CommaSpacing)
+		applyOptional(&s.settings.Formatting.SemicolonEnforcement, fmt.SemicolonEnforcement)
+		applyOptional(&s.settings.Formatting.BlankLinesBetweenProcs, fmt.BlankLinesBetweenProcs)
 
-	// Apply SQL formatting settings
-	if fmt.SQL != nil {
-		sql := fmt.SQL
-		applyOptional(&s.settings.Formatting.SQL.Enabled, sql.Enabled)
-		applyOptional(&s.settings.Formatting.SQL.Style, sql.Style)
-		applyOptional(&s.settings.Formatting.SQL.KeywordCase, sql.KeywordCase)
-		applyOptional(&s.settings.Formatting.SQL.IndentSize, sql.IndentSize)
-		applyOptional(&s.settings.Formatting.SQL.MaxLineLength, sql.MaxLineLength)
+		// Apply SQL formatting settings
+		if fmt.SQL != nil {
+			sql := fmt.SQL
+			applyOptional(&s.settings.Formatting.SQL.Enabled, sql.Enabled)
+			applyOptional(&s.settings.Formatting.SQL.Style, sql.Style)
+			applyOptional(&s.settings.Formatting.SQL.KeywordCase, sql.KeywordCase)
+			applyOptional(&s.settings.Formatting.SQL.IndentSize, sql.IndentSize)
+			applyOptional(&s.settings.Formatting.SQL.MaxLineLength, sql.MaxLineLength)
+		}
+	}
+
+	// Apply diagnostics settings
+	if clientSettings.SSL.Diagnostics != nil {
+		diagnostics := clientSettings.SSL.Diagnostics
+		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
+		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 	}
 }
 
@@ -265,12 +283,13 @@ func applyOptional[T any](target *T, value *T) {
 
 // validateDocument validates a document and sends diagnostics.
 func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
-	content, ok := s.documents.GetDocument(uri)
-	if !ok {
+	if _, ok := s.documents.GetDocument(uri); !ok {
 		return
 	}
 
-	diagnostics := providers.GetDiagnostics(content, s.settings.Diagnostics)
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, s.settings.Diagnostics)
 
 	// Convert to protocol diagnostics
 	protocolDiags := make([]protocol.Diagnostic, 0, len(diagnostics))

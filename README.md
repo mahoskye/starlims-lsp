@@ -4,6 +4,10 @@ A Language Server Protocol (LSP) implementation for STARLIMS Scripting Language 
 
 This LSP server provides intelligent code editing features for SSL files across any editor that supports the Language Server Protocol.
 
+## Documentation
+
+See `DOCUMENTATION.md` for a deeper usage and configuration guide.
+
 ## Features
 
 - **Auto-completion** for keywords, built-in functions, classes, procedures, and variables
@@ -12,10 +16,12 @@ This LSP server provides intelligent code editing features for SSL files across 
 - **Go to Definition** for procedures and variables
 - **Find References** for all symbols
 - **Document Symbols** (outline) for procedures, variables, and regions
+- **Workspace Symbols** (open documents only; no workspace indexing)
 - **Diagnostics** including:
   - Unclosed block detection (`:IF` without `:ENDIF`, etc.)
   - Unmatched parentheses and brackets
   - Block nesting depth warnings
+  - Opt-in Hungarian notation warnings (configurable prefixes)
 - **Document formatting** for SSL and embedded SQL
 - **Folding Ranges** for procedures, regions, and comments
 - **Code Snippets** for common SSL patterns
@@ -122,12 +128,16 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
         "indentSize": 4,
         "maxLineLength": 90
       }
+    },
+    "diagnostics": {
+      "hungarianNotation": false,
+      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"]
     }
   }
 }
 ```
 
-Diagnostics settings are currently fixed to the server defaults.
+Diagnostics settings default to server defaults and can opt in to Hungarian notation warnings using the style guide prefixes (`a`, `b`, `d`, `n`, `o`, `s`).
 
 ## SSL Language Overview
 

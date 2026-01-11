@@ -71,7 +71,24 @@ func GetDocumentSymbols(text string) []DocumentSymbol {
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
+	return buildDocumentSymbols(tokens, ast, p)
+}
 
+// GetDocumentSymbolsFromTokens returns document symbols from cached tokens/AST.
+func GetDocumentSymbolsFromTokens(tokens []lexer.Token, ast *parser.Node) []DocumentSymbol {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	p := parser.NewParser(tokens)
+	if ast == nil {
+		ast = p.Parse()
+	}
+
+	return buildDocumentSymbols(tokens, ast, p)
+}
+
+func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []DocumentSymbol {
 	var symbols []DocumentSymbol
 
 	// Extract procedures
@@ -206,7 +223,24 @@ func GetFoldingRanges(text string) []FoldingRange {
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
+	return buildFoldingRanges(tokens, ast, p)
+}
 
+// GetFoldingRangesFromTokens returns folding ranges from cached tokens/AST.
+func GetFoldingRangesFromTokens(tokens []lexer.Token, ast *parser.Node) []FoldingRange {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	p := parser.NewParser(tokens)
+	if ast == nil {
+		ast = p.Parse()
+	}
+
+	return buildFoldingRanges(tokens, ast, p)
+}
+
+func buildFoldingRanges(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []FoldingRange {
 	var ranges []FoldingRange
 
 	// Get procedure ranges

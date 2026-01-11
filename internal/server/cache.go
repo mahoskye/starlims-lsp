@@ -10,6 +10,8 @@ import (
 // DocumentCache stores parsed document information.
 type DocumentCache struct {
 	Version    int
+	Tokens     []lexer.Token
+	AST        *parser.Node
 	Procedures []parser.ProcedureInfo
 	Variables  []parser.VariableInfo
 }
@@ -101,6 +103,8 @@ func (dm *DocumentManager) ParseDocument(uri string, version int) *DocumentCache
 
 	cache := &DocumentCache{
 		Version:    version,
+		Tokens:     tokens,
+		AST:        ast,
 		Procedures: p.ExtractProcedures(ast),
 		Variables:  p.ExtractVariables(ast),
 	}
