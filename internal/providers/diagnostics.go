@@ -211,7 +211,6 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 		"BEGINCASE": {"ENDCASE"},
 		"TRY":       {"ENDTRY"},
 		"PROCEDURE": {"ENDPROC"},
-		"CLASS":     {"ENDPROC"},
 		"REGION":    {"ENDREGION"},
 	}
 

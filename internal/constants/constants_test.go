@@ -16,8 +16,8 @@ func TestKeywordAndOperatorSets(t *testing.T) {
 		t.Error("expected NOT_A_KEYWORD to be false")
 	}
 
-	if len(SSLOperators) != 26 {
-		t.Fatalf("expected 26 operators, got %d", len(SSLOperators))
+	if len(SSLOperators) != 27 {
+		t.Fatalf("expected 27 operators, got %d", len(SSLOperators))
 	}
 	for _, op := range SSLLogicalOperators {
 		if !IsSSLOperator(op) {

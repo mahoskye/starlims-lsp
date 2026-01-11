@@ -202,13 +202,42 @@ func toProtocolCompletionItems(items []providers.CompletionItem) []protocol.Comp
 	return result
 }
 
+func ensureRangeContainsSelection(fullRange providers.Range, selectionRange providers.Range) providers.Range {
+	if isPositionBefore(selectionRange.Start, fullRange.Start) {
+		fullRange.Start = selectionRange.Start
+	}
+
+	if isPositionAfter(selectionRange.End, fullRange.End) {
+		fullRange.End = selectionRange.End
+	}
+
+	return fullRange
+}
+
+func isPositionBefore(left providers.Position, right providers.Position) bool {
+	if left.Line != right.Line {
+		return left.Line < right.Line
+	}
+	return left.Character < right.Character
+}
+
+func isPositionAfter(left providers.Position, right providers.Position) bool {
+	if left.Line != right.Line {
+		return left.Line > right.Line
+	}
+	return left.Character > right.Character
+}
+
 // convertDocumentSymbol converts our DocumentSymbol to protocol.DocumentSymbol.
 func convertDocumentSymbol(sym providers.DocumentSymbol) protocol.DocumentSymbol {
+	rangeToUse := ensureRangeContainsSelection(sym.Range, sym.SelectionRange)
+	selectionRange := sym.SelectionRange
+
 	docSym := protocol.DocumentSymbol{
 		Name:           sym.Name,
 		Kind:           protocol.SymbolKind(sym.Kind),
-		Range:          toProtocolRange(sym.Range),
-		SelectionRange: toProtocolRange(sym.SelectionRange),
+		Range:          toProtocolRange(rangeToUse),
+		SelectionRange: toProtocolRange(selectionRange),
 	}
 
 	if sym.Detail != "" {

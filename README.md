@@ -150,7 +150,7 @@ SSL (STARLIMS Scripting Language) is a procedural scripting language used in STA
 ### Key Features
 
 - Keywords prefixed with `:` (e.g., `:IF`, `:PROCEDURE`)
-- Comments: `/* comment text ;`
+- Comments: `/* comment text;`
 - Strings: `"double"`, `'single'`, or `[bracket]` notation
 - Boolean literals: `.T.`, `.F.`
 - Logical operators: `.AND.`, `.OR.`, `.NOT.`
@@ -159,18 +159,18 @@ SSL (STARLIMS Scripting Language) is a procedural scripting language used in STA
 ### Example
 
 ```ssl
-:PROCEDURE CalculateTotal
-:PARAMETERS nItems, nPrice
-:DECLARE nTotal, i
+:PROCEDURE CalculateTotal;
+:PARAMETERS nItems, nPrice;
+:DECLARE nTotal, i;
 
-nTotal := 0
+nTotal := 0;
 
-:FOR i := 1 :TO nItems
-    nTotal := nTotal + nPrice
-:NEXT
+:FOR i := 1 :TO nItems;
+    nTotal := nTotal + nPrice;
+:NEXT;
 
-:RETURN nTotal
-:ENDPROC
+:RETURN nTotal;
+:ENDPROC;
 ```
 
 ## Development

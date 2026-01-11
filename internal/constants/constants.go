@@ -43,7 +43,7 @@ var ProcedureLevelKeywords = []string{"PARAMETERS", "DEFAULT", "PUBLIC", "DECLAR
 // SSLOperators contains all SSL operators (27 total).
 var SSLOperators = []string{
 	// Logical operators
-	".AND.", ".OR.", ".NOT.",
+	".AND.", ".OR.", ".NOT.", "!",
 	// Assignment
 	":=",
 	// Compound assignment
@@ -246,7 +246,8 @@ var SSLOperatorDescriptions = map[string]string{
 	"%":     "Modulo operator",
 	"^":     "Power/exponentiation operator",
 	"$":     "String containment operator",
-	"#":     "Hash/number operator",
+	"#":     "Not equal operator (alternative to <>)",
+	"!":     "Logical NOT operator (alternative to .NOT.)",
 }
 
 // SSLLiteralDescriptions maps literals to their descriptions.
