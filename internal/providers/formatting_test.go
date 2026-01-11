@@ -97,12 +97,14 @@ func TestFormatDocument_NestedBlocks(t *testing.T) {
 	lines := strings.Split(formatted, "\n")
 
 	// Find the line with z:=1 and check indentation level
+	// z:=1 is nested 3 levels deep (PROCEDURE > IF > IF), expect at least 2 tabs
+	const minExpectedIndentLevels = 2
 	for _, line := range lines {
 		if strings.Contains(line, "z") {
 			tabCount := strings.Count(line, "\t")
-			// Should be indented 3 levels: PROCEDURE, IF, IF
-			if tabCount < 2 {
-				t.Errorf("nested statement should have at least 2 levels of indentation, got %d", tabCount)
+			if tabCount < minExpectedIndentLevels {
+				t.Errorf("nested statement should have at least %d levels of indentation, got %d",
+					minExpectedIndentLevels, tabCount)
 			}
 		}
 	}
@@ -479,8 +481,13 @@ func TestFormattingOptions_NoOperatorSpacing(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// With operator spacing disabled, := should not have extra spaces added
-	// Note: the input already has spaces, but new formatting shouldn't enforce them
+	// With operator spacing disabled, the formatter should not add or normalize
+	// spaces around operators. Verify the output contains the assignment.
+	if !strings.Contains(formatted, ":=") {
+		t.Error("formatted output should contain assignment operator")
+	}
+	// The formatter should not add extra spacing when disabled
+	// Note: existing spaces in input may be preserved, but no new spacing should be enforced
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
@@ -493,8 +500,14 @@ func TestFormattingOptions_NoCommaSpacing(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// With comma spacing disabled, no spaces should be added after commas
-	// Check that ", " pattern is not enforced
+	// With comma spacing disabled, commas should not have trailing space added
+	if strings.Contains(formatted, ", ") {
+		t.Error("expected no space after comma when CommaSpacing=false")
+	}
+	// Verify the declaration is still present
+	if !strings.Contains(formatted, "a") || !strings.Contains(formatted, "b") || !strings.Contains(formatted, "c") {
+		t.Error("expected all declared variables to be present")
+	}
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
@@ -512,10 +525,24 @@ func TestFormattingOptions_BlankLinesBetweenProcs(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// The formatter adds blank lines based on the BlankLinesBetweenProcs setting
-	// Check that multiple procedures are properly separated
+	// Verify both procedures are in output
 	if !strings.Contains(formatted, ":ENDPROC") || !strings.Contains(formatted, "Test2") {
-		t.Error("expected both procedures in output")
+		t.Fatal("expected both procedures in output")
+	}
+
+	// Count blank lines between :ENDPROC and :PROCEDURE Test2
+	endprocIdx := strings.Index(formatted, ":ENDPROC;")
+	test2Idx := strings.Index(formatted, ":PROCEDURE Test2")
+	if endprocIdx == -1 || test2Idx == -1 {
+		t.Fatal("expected both :ENDPROC and :PROCEDURE Test2 in output")
+	}
+	between := formatted[endprocIdx+len(":ENDPROC;") : test2Idx]
+	// Count newlines in the separator (blank lines = newlines - 1 for the line break itself)
+	newlineCount := strings.Count(between, "\n")
+	// We expect at least BlankLinesBetweenProcs blank lines, which means newlineCount >= BlankLinesBetweenProcs + 1
+	if newlineCount < opts.BlankLinesBetweenProcs {
+		t.Errorf("expected at least %d blank lines between procs, got %d newlines",
+			opts.BlankLinesBetweenProcs, newlineCount)
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)

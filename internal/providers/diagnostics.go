@@ -74,6 +74,9 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 }
 
 // GetDiagnosticsFromTokens returns diagnostics using cached tokens/AST.
+// Note: A parser instance is created even when AST is provided because
+// ExtractVariables requires parser helper methods to traverse the AST.
+// Parser creation is O(1) as it just stores a reference to the tokens.
 func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts DiagnosticOptions) []Diagnostic {
 	if len(tokens) == 0 {
 		return nil
@@ -300,11 +303,16 @@ func checkBlockDepth(ast *parser.Node, maxDepth int) []Diagnostic {
 	var checkNode func(node *parser.Node, depth int)
 	checkNode = func(node *parser.Node, depth int) {
 		if node.Type == parser.NodeBlock && depth > maxDepth {
+			// Guard against invalid line numbers
+			line := node.StartLine - 1
+			if line < 0 {
+				line = 0
+			}
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,
 				Range: Range{
-					Start: Position{Line: node.StartLine - 1, Character: 0},
-					End:   Position{Line: node.StartLine - 1, Character: 100},
+					Start: Position{Line: line, Character: 0},
+					End:   Position{Line: line, Character: 0},
 				},
 				Message: fmt.Sprintf("Block nesting depth (%d) exceeds maximum (%d)", depth, maxDepth),
 				Source:  "ssl-lsp",

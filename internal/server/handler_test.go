@@ -160,8 +160,10 @@ value := myVar + 1;
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(locations) < 2 {
-		t.Fatalf("expected references, got %d", len(locations))
+	// myVar appears 3 times: :DECLARE, assignment, and usage in value expression
+	const expectedReferences = 3
+	if len(locations) != expectedReferences {
+		t.Errorf("expected %d references to myVar, got %d", expectedReferences, len(locations))
 	}
 }
 
@@ -230,6 +232,19 @@ value := 1;
 	if len(ranges) == 0 {
 		t.Fatal("expected folding ranges")
 	}
+	// Should have at least 2 ranges: region block and procedure block
+	const minExpectedRanges = 2
+	if len(ranges) < minExpectedRanges {
+		t.Errorf("expected at least %d folding ranges (region + procedure), got %d",
+			minExpectedRanges, len(ranges))
+	}
+	// Verify all ranges have valid structure (start <= end)
+	for i, r := range ranges {
+		if r.StartLine > r.EndLine {
+			t.Errorf("folding range %d has invalid lines: start=%d > end=%d",
+				i, r.StartLine, r.EndLine)
+		}
+	}
 }
 
 func TestHandleSignatureHelp(t *testing.T) {
@@ -249,6 +264,18 @@ func TestHandleSignatureHelp(t *testing.T) {
 	}
 	if len(help.Signatures) == 0 {
 		t.Fatal("expected at least one signature")
+	}
+	// Verify signature has meaningful content
+	sig := help.Signatures[0]
+	if sig.Label == "" {
+		t.Error("expected non-empty signature label")
+	}
+	// Len function should have parameter information
+	if len(sig.Parameters) > 0 {
+		param := sig.Parameters[0]
+		if param.Label == nil {
+			t.Error("expected parameter to have a label")
+		}
 	}
 }
 

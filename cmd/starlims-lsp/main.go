@@ -35,7 +35,7 @@ func main() {
 		fmt.Println("The server communicates via stdin/stdout using the Language Server Protocol.")
 		fmt.Println()
 		fmt.Println("Editor integration:")
-		fmt.Println("  VS Code:  Use the ssl-vscode extension")
+		fmt.Println("  VS Code:  Use the vs-code-ssl-formatter extension")
 		fmt.Println("  Neovim:   Configure with nvim-lspconfig")
 		fmt.Println("  Other:    Any LSP-compatible editor can use this server")
 		os.Exit(0)

@@ -183,16 +183,22 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 	}
 	var regionStack []stackItem
 
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*)$`)
+	// Match region comments, handling optional trailing semicolon and whitespace
+	// SSL comments are: /* comment text ;
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
 	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion`)
 
 	for _, token := range tokens {
 		if token.Type == lexer.TokenComment {
+			// Normalize the text by trimming trailing semicolon and whitespace
 			text := strings.TrimSuffix(token.Text, ";")
 			text = strings.TrimSpace(text)
 
 			if matches := regionStartPattern.FindStringSubmatch(text); matches != nil {
 				name := strings.TrimSpace(matches[1])
+				// Also strip any trailing semicolon from the name itself
+				name = strings.TrimSuffix(name, ";")
+				name = strings.TrimSpace(name)
 				if name == "" {
 					name = "Region"
 				}

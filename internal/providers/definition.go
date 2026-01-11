@@ -67,9 +67,35 @@ func FindReferences(text string, line, column int, uri string, includeDeclaratio
 	// Simple text-based search for the word
 	wordRegex := regexp.MustCompile(`(?i)\b` + escapeRegex(word) + `\b`)
 
+	// Find the declaration position (first occurrence, typically where cursor is)
+	var declarationLine, declarationChar int
+	declarationFound := false
+
+	// Check if the cursor position is on a declaration keyword line
+	if line > 0 && line <= len(lines) {
+		cursorLineText := lines[line-1]
+		cursorLineLower := strings.ToLower(cursorLineText)
+		// Declaration keywords that indicate this is the definition site
+		if strings.Contains(cursorLineLower, ":declare") ||
+			strings.Contains(cursorLineLower, ":parameters") ||
+			strings.Contains(cursorLineLower, ":public") ||
+			strings.Contains(cursorLineLower, ":procedure") {
+			declarationLine = line - 1 // Convert to 0-based
+			declarationChar = column - 1
+			declarationFound = true
+		}
+	}
+
 	for i, lineText := range lines {
 		matches := wordRegex.FindAllStringIndex(lineText, -1)
 		for _, match := range matches {
+			// Skip declaration if not including it
+			if !includeDeclaration && declarationFound {
+				if i == declarationLine && match[0] <= declarationChar && declarationChar < match[1] {
+					continue
+				}
+			}
+
 			locations = append(locations, Location{
 				URI: uri,
 				Range: Range{

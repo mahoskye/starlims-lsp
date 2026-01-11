@@ -319,3 +319,60 @@ func TestParser_EdgeCase_LargeFile(t *testing.T) {
 		t.Errorf("expected %d statements, got %d", statementCount, len(root.Children))
 	}
 }
+
+// ==================== Benchmark Tests ====================
+
+// generateSSLDocument creates a test SSL document with the specified number of procedures
+func generateSSLDocument(procCount int) string {
+	var sb strings.Builder
+	for i := 0; i < procCount; i++ {
+		sb.WriteString(`:PROCEDURE Proc`)
+		sb.WriteString(string(rune('0' + i%10)))
+		sb.WriteString(`;
+:PARAMETERS param1, param2;
+:DECLARE localVar, result;
+:IF param1 > 0;
+	result := param1 * param2;
+:ELSE;
+	result := 0;
+:ENDIF;
+:RETURN result;
+:ENDPROC;
+
+`)
+	}
+	return sb.String()
+}
+
+func BenchmarkParser_Parse_Small(b *testing.B) {
+	text := generateSSLDocument(10)
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := NewParser(tokens)
+		_ = p.Parse()
+	}
+}
+
+func BenchmarkParser_Parse_Medium(b *testing.B) {
+	text := generateSSLDocument(100)
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := NewParser(tokens)
+		_ = p.Parse()
+	}
+}
+
+func BenchmarkParser_Parse_Large(b *testing.B) {
+	text := generateSSLDocument(1000)
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := NewParser(tokens)
+		_ = p.Parse()
+	}
+}

@@ -192,6 +192,53 @@ MyProc();
 	}
 }
 
+func TestFindReferences_ExcludeDeclaration_Declare(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE myVar;
+myVar := 1;
+x := myVar + 1;
+:ENDPROC;`
+
+	// Cursor on :DECLARE line, request without declaration
+	locations := FindReferences(text, 2, 10, "file:///test.ssl", false)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	// Should find 2 references (lines 3 and 4), excluding declaration on line 2
+	if len(locations) != 2 {
+		t.Errorf("expected 2 references excluding declaration, got %d", len(locations))
+	}
+	// Verify none are on declaration line (0-based index 1)
+	for _, loc := range locations {
+		if loc.Range.Start.Line == 1 {
+			t.Error("declaration should be excluded when includeDeclaration=false")
+		}
+	}
+}
+
+func TestFindReferences_ExcludeDeclaration_Parameters(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS param1;
+result := param1 + 1;
+:ENDPROC;`
+
+	// Cursor on :PARAMETERS line, request without declaration
+	locations := FindReferences(text, 2, 13, "file:///test.ssl", false)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	// Should find 1 reference (line 3), excluding declaration on line 2
+	if len(locations) != 1 {
+		t.Errorf("expected 1 reference excluding declaration, got %d", len(locations))
+	}
+	// Verify none are on :PARAMETERS line (0-based index 1)
+	for _, loc := range locations {
+		if loc.Range.Start.Line == 1 {
+			t.Error(":PARAMETERS declaration should be excluded")
+		}
+	}
+}
+
 // ==================== Document Symbols Tests ====================
 
 func TestGetDocumentSymbols_Procedures(t *testing.T) {

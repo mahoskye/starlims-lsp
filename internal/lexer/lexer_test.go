@@ -951,3 +951,54 @@ func TestTokenType_String(t *testing.T) {
 		})
 	}
 }
+
+// ==================== Benchmark Tests ====================
+
+// generateSSLDocument creates a test SSL document with the specified number of procedures
+func generateSSLDocument(procCount int) string {
+	var sb strings.Builder
+	for i := 0; i < procCount; i++ {
+		sb.WriteString(`:PROCEDURE Proc`)
+		sb.WriteString(string(rune('0' + i%10)))
+		sb.WriteString(`;
+:PARAMETERS param1, param2;
+:DECLARE localVar, result;
+:IF param1 > 0;
+	result := param1 * param2;
+:ELSE;
+	result := 0;
+:ENDIF;
+:RETURN result;
+:ENDPROC;
+
+`)
+	}
+	return sb.String()
+}
+
+func BenchmarkLexer_Tokenize_Small(b *testing.B) {
+	text := generateSSLDocument(10)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lex := NewLexer(text)
+		_ = lex.Tokenize()
+	}
+}
+
+func BenchmarkLexer_Tokenize_Medium(b *testing.B) {
+	text := generateSSLDocument(100)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lex := NewLexer(text)
+		_ = lex.Tokenize()
+	}
+}
+
+func BenchmarkLexer_Tokenize_Large(b *testing.B) {
+	text := generateSSLDocument(1000)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lex := NewLexer(text)
+		_ = lex.Tokenize()
+	}
+}

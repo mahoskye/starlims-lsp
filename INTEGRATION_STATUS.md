@@ -114,7 +114,7 @@ cd /home/maho/dev/starlims-lsp
 go test -v ./...
 ```
 
-Current test count: 27+ tests (formatting, SQL formatter, providers, server)
+Current test count: 160+ tests across all packages (lexer, parser, providers, server, constants)
 
 ### Manual LSP Testing
 ```bash

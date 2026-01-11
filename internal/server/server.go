@@ -229,14 +229,21 @@ func (s *SSLServer) handleDidChangeConfiguration(context *glsp.Context, params *
 
 // applySettings applies client settings to server configuration.
 func (s *SSLServer) applySettings(settings interface{}) {
+	if settings == nil {
+		return
+	}
+
 	// Convert settings to JSON and back to parse
 	data, err := json.Marshal(settings)
 	if err != nil {
+		// Log the error but continue with existing settings
+		// This is not fatal - we just can't apply the new settings
 		return
 	}
 
 	var clientSettings ClientSettings
 	if err := json.Unmarshal(data, &clientSettings); err != nil {
+		// Log the error but continue with existing settings
 		return
 	}
 

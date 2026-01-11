@@ -118,3 +118,46 @@ func TestSQLFormatter_EdgeCase_MalformedSQL(t *testing.T) {
 		t.Error("expected formatted output even for malformed SQL")
 	}
 }
+
+func TestDiagnostics_BlockDepth_ValidLineNumbers(t *testing.T) {
+	// Test that block depth diagnostics never produce negative line numbers
+	// This tests the guard added in checkBlockDepth for StartLine edge cases
+	text := `:PROCEDURE Test;
+:IF a;
+:IF b;
+:IF c;
+:IF d;
+x := 1;
+:ENDIF;
+:ENDIF;
+:ENDIF;
+:ENDIF;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.MaxBlockDepth = 2
+
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Verify no diagnostics have negative line numbers
+	for i, d := range diagnostics {
+		if d.Range.Start.Line < 0 {
+			t.Errorf("diagnostic %d has negative start line: %d", i, d.Range.Start.Line)
+		}
+		if d.Range.End.Line < 0 {
+			t.Errorf("diagnostic %d has negative end line: %d", i, d.Range.End.Line)
+		}
+	}
+
+	// Should have at least one depth warning since we have 4 levels of IF nesting
+	foundDepthWarning := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "nesting depth") || strings.Contains(d.Message, "depth") {
+			foundDepthWarning = true
+			break
+		}
+	}
+	if !foundDepthWarning {
+		t.Error("expected at least one block depth warning for deeply nested blocks")
+	}
+}
