@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Benchmark tests for lexer and parser (small/medium/large document sizes)
 - Test coverage for `FindReferences` with `includeDeclaration=false`
 - Edge case tests for block depth diagnostics
+- `ssl.diagnostics.globals` configuration for declaring pre-defined global variables that cannot be reassigned
 
 ### Changed
 - Improved `FindReferences` to properly respect `includeDeclaration` parameter

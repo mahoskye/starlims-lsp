@@ -101,7 +101,8 @@ Settings are provided via `workspace/didChangeConfiguration` under the `ssl` key
     },
     "diagnostics": {
       "hungarianNotation": false,
-      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"]
+      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
+      "globals": ["gCurrentUser", "gAppName"]
     }
   }
 }
@@ -129,6 +130,7 @@ Settings are provided via `workspace/didChangeConfiguration` under the `ssl` key
 
 - `hungarianNotation`: enable Hungarian notation warnings
 - `hungarianPrefixes`: allowable prefixes for warnings
+- `globals`: list of pre-declared global variable names (assignments to these will trigger an error)
 
 Defaults match the STARLIMS style guide and mirror the values above.
 

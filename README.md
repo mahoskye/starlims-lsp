@@ -135,13 +135,14 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
     },
     "diagnostics": {
       "hungarianNotation": false,
-      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"]
+      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
+      "globals": ["gCurrentUser", "gAppName"]
     }
   }
 }
 ```
 
-Diagnostics settings default to server defaults and can opt in to Hungarian notation warnings using the style guide prefixes (`a`, `b`, `d`, `n`, `o`, `s`).
+Diagnostics settings default to server defaults and can opt in to Hungarian notation warnings using the style guide prefixes (`a`, `b`, `d`, `n`, `o`, `s`). Global variables can be declared via `globals` array - assignments to these variables will trigger an error.
 
 ## SSL Language Overview
 
