@@ -25,6 +25,7 @@ type SSLSettings struct {
 type DiagnosticsSettings struct {
 	HungarianNotation *bool     `json:"hungarianNotation"`
 	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
+	Globals           *[]string `json:"globals"`
 }
 
 // FormatSettings represents formatting settings from the client.
@@ -279,6 +280,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		diagnostics := clientSettings.SSL.Diagnostics
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
+		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 	}
 }
 

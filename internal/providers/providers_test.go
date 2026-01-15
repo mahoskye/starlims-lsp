@@ -793,3 +793,262 @@ func TestFoldingRanges_EmptyText(t *testing.T) {
 		t.Log("GetFoldingRanges returns nil for empty text")
 	}
 }
+
+// ==================== SSL Language Rule Enforcement Tests ====================
+
+func TestGetDiagnostics_MissingExitCase(t *testing.T) {
+	text := `:PROCEDURE Test;
+:BEGINCASE;
+:CASE nVal == 1;
+	x := 1;
+:CASE nVal == 2;
+	x := 2;
+	:EXITCASE;
+:OTHERWISE;
+	x := 0;
+:ENDCASE;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find warnings for first :CASE (missing EXITCASE) and :OTHERWISE (missing EXITCASE)
+	missingExitCaseWarnings := 0
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "EXITCASE") {
+			missingExitCaseWarnings++
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for missing EXITCASE, got %v", d.Severity)
+			}
+		}
+	}
+
+	if missingExitCaseWarnings != 2 {
+		t.Errorf("expected 2 missing EXITCASE warnings (first CASE and OTHERWISE), got %d", missingExitCaseWarnings)
+	}
+}
+
+func TestGetDiagnostics_MissingExitCase_AllPresent(t *testing.T) {
+	text := `:PROCEDURE Test;
+:BEGINCASE;
+:CASE nVal == 1;
+	x := 1;
+	:EXITCASE;
+:CASE nVal == 2;
+	x := 2;
+	:EXITCASE;
+:OTHERWISE;
+	x := 0;
+	:EXITCASE;
+:ENDCASE;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find any EXITCASE warnings when all are present
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "EXITCASE") {
+			t.Errorf("unexpected EXITCASE warning when all present: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_BareLogicalOperators(t *testing.T) {
+	text := `:PROCEDURE Test;
+:IF x > 5 AND y < 10;
+	z := 1;
+:ENDIF;
+:IF a = 1 OR b = 2;
+	z := 2;
+:ENDIF;
+:IF NOT bFlag;
+	z := 3;
+:ENDIF;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find errors for bare AND, OR, NOT
+	bareOperatorErrors := 0
+	foundAND := false
+	foundOR := false
+	foundNOT := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, ".AND.") || strings.Contains(d.Message, ".OR.") || strings.Contains(d.Message, ".NOT.") {
+			bareOperatorErrors++
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity for bare logical operator, got %v", d.Severity)
+			}
+			if strings.Contains(d.Message, ".AND.") {
+				foundAND = true
+			}
+			if strings.Contains(d.Message, ".OR.") {
+				foundOR = true
+			}
+			if strings.Contains(d.Message, ".NOT.") {
+				foundNOT = true
+			}
+		}
+	}
+
+	if bareOperatorErrors != 3 {
+		t.Errorf("expected 3 bare logical operator errors, got %d", bareOperatorErrors)
+	}
+	if !foundAND || !foundOR || !foundNOT {
+		t.Errorf("expected to find AND, OR, and NOT errors: AND=%v, OR=%v, NOT=%v", foundAND, foundOR, foundNOT)
+	}
+}
+
+func TestGetDiagnostics_BareLogicalOperators_ValidSyntax(t *testing.T) {
+	text := `:PROCEDURE Test;
+:IF x > 5 .AND. y < 10;
+	z := 1;
+:ENDIF;
+:IF a = 1 .OR. b = 2;
+	z := 2;
+:ENDIF;
+:IF .NOT. bFlag;
+	z := 3;
+:ENDIF;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find errors for proper .AND., .OR., .NOT.
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "instead of") && (strings.Contains(d.Message, ".AND.") || strings.Contains(d.Message, ".OR.") || strings.Contains(d.Message, ".NOT.")) {
+			t.Errorf("unexpected bare operator error when using proper syntax: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DefaultOnDeclareLine(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sName; :DEFAULT sName, "";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find warning for :DEFAULT on same line as :DECLARE
+	foundDefaultWarning := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
+			foundDefaultWarning = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for DEFAULT on DECLARE line, got %v", d.Severity)
+			}
+		}
+	}
+
+	if !foundDefaultWarning {
+		t.Error("expected warning for :DEFAULT on same line as :DECLARE")
+	}
+}
+
+func TestGetDiagnostics_DefaultOnDeclareLine_ValidSyntax(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS sName;
+:DEFAULT sName, "";
+:DECLARE sLocal;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find warning - :DEFAULT is with :PARAMETERS (correct) and :DECLARE is separate
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
+			t.Errorf("unexpected DEFAULT/DECLARE warning when syntax is valid: %s", d.Message)
+		}
+	}
+}
+
+// ==================== Global Variable Assignment Tests ====================
+
+func TestGetDiagnostics_GlobalAssignment_Error(t *testing.T) {
+	text := `:PROCEDURE Test;
+gCurrentUser := "admin";
+x := gCurrentUser;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.GlobalVariables = []string{"gCurrentUser", "gAppName"}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find error for assigning to gCurrentUser
+	foundGlobalError := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Cannot assign to global variable") && strings.Contains(d.Message, "gCurrentUser") {
+			foundGlobalError = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity for global assignment, got %v", d.Severity)
+			}
+		}
+	}
+
+	if !foundGlobalError {
+		t.Error("expected error for assigning to global variable gCurrentUser")
+	}
+}
+
+func TestGetDiagnostics_GlobalUsage_NoError(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE x;
+x := gCurrentUser;
+Len(gCurrentUser);
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.GlobalVariables = []string{"gCurrentUser"}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find any global assignment errors - just reading the global, not assigning
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Cannot assign to global variable") {
+			t.Errorf("unexpected global assignment error when only reading: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_GlobalAssignment_CaseInsensitive(t *testing.T) {
+	text := `:PROCEDURE Test;
+GCURRENTUSER := "admin";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.GlobalVariables = []string{"gCurrentUser"} // lowercase definition
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find error even with different casing
+	foundGlobalError := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Cannot assign to global variable") {
+			foundGlobalError = true
+		}
+	}
+
+	if !foundGlobalError {
+		t.Error("expected case-insensitive match for global variable")
+	}
+}
+
+func TestGetDiagnostics_GlobalAssignment_NoGlobals(t *testing.T) {
+	text := `:PROCEDURE Test;
+x := 1;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	// No globals configured
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT have any global-related errors
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "global variable") {
+			t.Errorf("unexpected global variable error when no globals configured: %s", d.Message)
+		}
+	}
+}

@@ -176,6 +176,25 @@ func TestApplySettings_FullSettings(t *testing.T) {
 	}
 }
 
+func TestApplySettings_Globals(t *testing.T) {
+	s := NewSSLServer()
+
+	settings := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"diagnostics": map[string]interface{}{
+				"globals": []string{"gCurrentUser", "gAppName", "gDebugMode"},
+			},
+		},
+	}
+
+	s.applySettings(settings)
+
+	expectedGlobals := []string{"gCurrentUser", "gAppName", "gDebugMode"}
+	if !reflect.DeepEqual(s.settings.Diagnostics.GlobalVariables, expectedGlobals) {
+		t.Errorf("expected globals %v, got %v", expectedGlobals, s.settings.Diagnostics.GlobalVariables)
+	}
+}
+
 func TestApplySettings_PartialSettings(t *testing.T) {
 	s := NewSSLServer()
 

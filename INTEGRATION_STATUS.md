@@ -1,7 +1,7 @@
 # starlims-lsp Integration Status
 
-**Date:** 2026-01-10  
-**Status:** Phase 3 Complete, Phase 4 In Progress
+**Date:** 2026-01-11  
+**Status:** Phase 4 Complete (maintenance)
 
 ---
 
@@ -49,6 +49,10 @@ Added a server test that verifies `workspace/didChangeConfiguration` applies set
 ### 6. Internal Refactoring Cleanup
 
 Refactored server/provider utilities to centralize protocol conversions, formatting helpers, and function documentation formatting without changing behavior.
+
+### 7. Document Symbol Range Compatibility
+
+Ensured document symbols always return a selection range within the full range to satisfy VS Code validation.
 
 ---
 
@@ -127,7 +131,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":1,"cap
 
 ## Next Steps
 
-- No pending LSP items. Revisit if workspace indexing model changes.
+- Rebuild non-Linux binaries when ready to distribute.
+- Revisit if workspace indexing model changes.
 
 ---
 

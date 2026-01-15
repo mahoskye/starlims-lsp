@@ -2,8 +2,8 @@
 
 A comprehensive roadmap for the starlims-lsp language server. This document tracks progress across work sessions.
 
-**Last Updated:** 2026-01-10
-**Status:** Phase 4 Complete
+**Last Updated:** 2026-01-11
+**Status:** Phase 4 Complete (maintenance)
 
 ---
 
@@ -113,6 +113,13 @@ SQL strings in SSL are detected inside these functions:
 
 ---
 
+## Phase 4: Integration Polish
+
+- [x] Ensure document symbol selection ranges are contained in full ranges for VS Code compatibility.
+- [x] Validate integration tests against VS Code extension behavior.
+
+---
+
 ## Notes & Decisions
 
 ### Decided
@@ -122,6 +129,7 @@ SQL strings in SSL are detected inside these functions:
 - Document-only scope (no workspace indexing)
 - Configurable formatting options with style guide defaults
 - 2026-01-10: Internal refactor cleanup completed
+- 2026-01-11: Document symbol range validation fix completed
 
 ---
 

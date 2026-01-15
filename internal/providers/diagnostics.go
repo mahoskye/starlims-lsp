@@ -48,6 +48,7 @@ type DiagnosticOptions struct {
 	CheckUnusedVars        bool
 	CheckHungarianNotation bool
 	HungarianPrefixes      []string
+	GlobalVariables        []string
 	MaxBlockDepth          int
 }
 
@@ -115,6 +116,16 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	if opts.CheckHungarianNotation {
 		variables := p.ExtractVariables(ast)
 		diagnostics = append(diagnostics, checkHungarianNotation(variables, opts.HungarianPrefixes)...)
+	}
+
+	// SSL language rule enforcement (always enabled)
+	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
+	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
+	diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
+
+	// Check for assignment to global variables
+	if len(opts.GlobalVariables) > 0 {
+		diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
 	}
 
 	return diagnostics
@@ -403,4 +414,175 @@ func contains(slice []string, val string) bool {
 		}
 	}
 	return false
+}
+
+// checkMissingExitCase checks that every :CASE and :OTHERWISE block ends with :EXITCASE.
+// This is a mandatory SSL rule per ssl_agent_instructions.md (Gotcha #7).
+func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Track state within BEGINCASE/ENDCASE blocks
+	inBeginCase := false
+	var currentCaseToken *lexer.Token
+	hasExitCase := false
+
+	for i := range tokens {
+		token := &tokens[i]
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+
+		switch normalized {
+		case "BEGINCASE":
+			inBeginCase = true
+			currentCaseToken = nil
+			hasExitCase = false
+
+		case "CASE", "OTHERWISE":
+			if inBeginCase {
+				// If we had a previous CASE/OTHERWISE without EXITCASE, report it
+				if currentCaseToken != nil && !hasExitCase {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(*currentCaseToken),
+						Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(currentCaseToken.Text, ":"))),
+						Source:   "ssl-lsp",
+					})
+				}
+				currentCaseToken = token
+				hasExitCase = false
+			}
+
+		case "EXITCASE":
+			hasExitCase = true
+
+		case "ENDCASE":
+			if inBeginCase {
+				// Check the last CASE/OTHERWISE block
+				if currentCaseToken != nil && !hasExitCase {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(*currentCaseToken),
+						Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(currentCaseToken.Text, ":"))),
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+			inBeginCase = false
+			currentCaseToken = nil
+			hasExitCase = false
+		}
+	}
+
+	return diagnostics
+}
+
+// checkBareLogicalOperators checks for AND, OR, NOT without enclosing periods.
+// SSL requires .AND., .OR., .NOT. - bare operators are an error.
+func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Bare logical operators that should be .AND., .OR., .NOT.
+	bareOperators := map[string]string{
+		"AND": ".AND.",
+		"OR":  ".OR.",
+		"NOT": ".NOT.",
+	}
+
+	for _, token := range tokens {
+		// Only check identifiers - the lexer tokenizes bare AND/OR/NOT as identifiers
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		upper := strings.ToUpper(token.Text)
+		if correct, isBare := bareOperators[upper]; isBare {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkDefaultOnDeclareLine checks for :DEFAULT appearing on the same line as :DECLARE.
+// Per ssl_agent_instructions.md (Gotcha #1), these must be separate statements.
+func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Track lines where :DECLARE appears
+	declareLines := make(map[int]lexer.Token)
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+
+		if normalized == "DECLARE" {
+			declareLines[token.Line] = token
+		} else if normalized == "DEFAULT" {
+			if declareToken, found := declareLines[token.Line]; found {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(declareToken),
+					Message:  "':DEFAULT' cannot be used with ':DECLARE' - use ':PARAMETERS' with ':DEFAULT' instead",
+					Source:   "ssl-lsp",
+				})
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkGlobalAssignment checks for assignment to global variables.
+// Global variables are pre-declared and should not be assigned to.
+func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Build a case-insensitive set of global variable names
+	globalSet := make(map[string]bool)
+	for _, g := range globals {
+		globalSet[strings.ToUpper(g)] = true
+	}
+
+	// Look for assignment patterns: identifier := value
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+
+		// Skip non-identifiers
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// Check if this identifier is a global
+		if !globalSet[strings.ToUpper(token.Text)] {
+			continue
+		}
+
+		// Look ahead for := assignment operator
+		j := i + 1
+		for j < len(tokens) && tokens[j].Type == lexer.TokenWhitespace {
+			j++
+		}
+
+		if j < len(tokens) && tokens[j].Type == lexer.TokenOperator && tokens[j].Text == ":=" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("Cannot assign to global variable '%s'", token.Text),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
 }
