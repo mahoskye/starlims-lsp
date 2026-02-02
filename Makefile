@@ -3,12 +3,16 @@ VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 
-.PHONY: all build clean test install build-all build-linux build-darwin build-windows
+.PHONY: all build build-validator clean test install build-all build-linux build-darwin build-windows
 
 all: build
 
 build:
 	go build ${LDFLAGS} -o bin/${BINARY_NAME} ./cmd/starlims-lsp
+
+build-validator:
+	@echo "Building ssl-validator..."
+	@go build ${LDFLAGS} -o bin/ssl-validator ./cmd/ssl-validator
 
 build-all: build-linux build-darwin build-windows
 

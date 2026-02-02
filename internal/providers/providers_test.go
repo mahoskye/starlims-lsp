@@ -1052,3 +1052,256 @@ x := 1;
 		}
 	}
 }
+
+// ==================== Undeclared Variable Tests ====================
+// These tests verify the fix for GitHub issues #55, #56, #2, #53
+
+func TestGetDiagnostics_UndeclaredVariable_Basic(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE x;
+x := 1;
+y := undeclaredVar + x;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find warning for 'undeclaredVar'
+	foundUndeclaredWarning := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "undeclaredVar") && strings.Contains(d.Message, "not declared") {
+			foundUndeclaredWarning = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for undeclared variable, got %v", d.Severity)
+			}
+		}
+	}
+
+	if !foundUndeclaredWarning {
+		t.Error("expected warning for undeclared variable 'undeclaredVar'")
+	}
+}
+
+func TestGetDiagnostics_UndeclaredVariable_DeclaredVarsNotFlagged(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE x, y;
+:PARAMETERS param1;
+x := 1;
+y := param1 + x;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find any undeclared variable warnings
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "not declared") {
+			t.Errorf("unexpected undeclared variable warning for declared variable: %s", d.Message)
+		}
+	}
+}
+
+// Issue #55: Globals config should recognize variables as pre-declared
+func TestGetDiagnostics_UndeclaredVariable_GlobalsRecognized(t *testing.T) {
+	text := `:PROCEDURE Test;
+x := gCurrentUser;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	opts.GlobalVariables = []string{"gCurrentUser", "gAppName"}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warning for gCurrentUser - it's a configured global
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "gCurrentUser") && strings.Contains(d.Message, "not declared") {
+			t.Errorf("globals should be recognized as pre-declared (Issue #55): %s", d.Message)
+		}
+	}
+}
+
+// Issue #56: :INCLUDE paths should be skipped from undeclared variable checking
+func TestGetDiagnostics_UndeclaredVariable_IncludePathSkipped(t *testing.T) {
+	text := `:INCLUDE File_Helpers.FileWork;
+
+:PROCEDURE Test;
+:DECLARE x;
+x := 1;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings for 'File_Helpers' or 'FileWork'
+	for _, d := range diagnostics {
+		// Only check "not declared" messages, not lexer unknown token warnings
+		if strings.Contains(d.Message, "not declared") &&
+			(strings.Contains(d.Message, "File_Helpers") || strings.Contains(d.Message, "FileWork")) {
+			t.Errorf(":INCLUDE paths should not be flagged as undeclared (Issue #56): %s", d.Message)
+		}
+	}
+}
+
+// Issue #2: 'Me' should be recognized as a built-in identifier
+func TestGetDiagnostics_UndeclaredVariable_MeRecognized(t *testing.T) {
+	text := `:CLASS MyClass;
+:PROCEDURE Initialize;
+Me:bActive := .T.;
+Me:nCounter := 0;
+:ENDPROC;
+:ENDCLASS;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warning for 'Me'
+	for _, d := range diagnostics {
+		if strings.Contains(strings.ToUpper(d.Message), "ME") && strings.Contains(d.Message, "not declared") {
+			t.Errorf("'Me' should be recognized as built-in identifier (Issue #2): %s", d.Message)
+		}
+	}
+}
+
+// Issue #53: Function calls should be skipped from undefined variable checking
+func TestGetDiagnostics_UndeclaredVariable_FunctionCallsSkipped(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE result;
+result := MyCustomProc(1, 2);
+result := Calculate(result);
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings for 'MyCustomProc' or 'Calculate' - they're function calls
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "MyCustomProc") || strings.Contains(d.Message, "Calculate") {
+			t.Errorf("function calls should not be flagged as undeclared (Issue #53): %s", d.Message)
+		}
+	}
+}
+
+// Test that built-in functions are not flagged as undeclared
+func TestGetDiagnostics_UndeclaredVariable_BuiltinFunctionsSkipped(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sql, result;
+sql := "SELECT * FROM users";
+result := SQLExecute(sql, "ds");
+result := Len("hello");
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings for SQLExecute or Len
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQLExecute") || strings.Contains(d.Message, "Len") {
+			t.Errorf("built-in functions should not be flagged as undeclared: %s", d.Message)
+		}
+	}
+}
+
+// Test that dynamic assignment declares the variable
+func TestGetDiagnostics_UndeclaredVariable_DynamicAssignment(t *testing.T) {
+	text := `:PROCEDURE Test;
+x := 1;
+y := x + 1;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings - x is dynamically declared by assignment
+	for _, d := range diagnostics {
+		if (strings.Contains(d.Message, "'x'") || strings.Contains(d.Message, "'y'")) &&
+			strings.Contains(d.Message, "not declared") {
+			t.Errorf("dynamically assigned variables should be treated as declared: %s", d.Message)
+		}
+	}
+}
+
+// Test that property access is skipped
+func TestGetDiagnostics_UndeclaredVariable_PropertyAccessSkipped(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE oData;
+oData:Value := 10;
+oData:Name := "test";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings for 'Value' or 'Name' - they're property access
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Value") || strings.Contains(d.Message, "Name") {
+			t.Errorf("property access should not be flagged as undeclared: %s", d.Message)
+		}
+	}
+}
+
+// Test that NIL is not flagged as undeclared
+func TestGetDiagnostics_UndeclaredVariable_NILNotFlagged(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE x;
+x := NIL;
+:IF x = NIL;
+:ENDIF;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warning for NIL
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "NIL") && strings.Contains(d.Message, "not declared") {
+			t.Errorf("NIL should not be flagged as undeclared: %s", d.Message)
+		}
+	}
+}
+
+// Test that SSL classes are not flagged as undeclared
+func TestGetDiagnostics_UndeclaredVariable_ClassesNotFlagged(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE oExpando, oDataset;
+oExpando := SSLExpando();
+oDataset := SSLDataset();
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find undeclared warnings for SSLExpando or SSLDataset
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SSLExpando") || strings.Contains(d.Message, "SSLDataset") {
+			t.Errorf("SSL built-in classes should not be flagged as undeclared: %s", d.Message)
+		}
+	}
+}
+
+// Test undeclared variable checking is disabled by default
+func TestGetDiagnostics_UndeclaredVariable_DisabledByDefault(t *testing.T) {
+	text := `:PROCEDURE Test;
+x := undeclaredVar;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	// CheckUndeclaredVars is false by default
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find any undeclared variable warnings when feature is disabled
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "not declared") {
+			t.Errorf("undeclared variable checking should be disabled by default: %s", d.Message)
+		}
+	}
+}

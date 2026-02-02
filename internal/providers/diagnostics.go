@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
@@ -126,6 +127,11 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for assignment to global variables
 	if len(opts.GlobalVariables) > 0 {
 		diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
+	}
+
+	// Check for undeclared variable usage (opt-in)
+	if opts.CheckUndeclaredVars {
+		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables)...)
 	}
 
 	return diagnostics
@@ -585,4 +591,198 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 	}
 
 	return diagnostics
+}
+
+// checkUndeclaredVariables checks for usage of undeclared variables.
+// This implements the logic specified in DIAGNOSTICS_SPECIFICATION.md Section 5.
+// It addresses GitHub issues:
+//   - Issue #55: Globals config should recognize variables as pre-declared
+//   - Issue #56: :INCLUDE paths should be skipped from checking
+//   - Issue #2: 'Me' should be recognized as a built-in identifier
+//   - Issue #53: Function calls (identifier followed by '(') should be skipped
+func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Build set of declared variables from the AST
+	declaredVars := make(map[string]bool)
+	variables := p.ExtractVariables(ast)
+	for _, v := range variables {
+		declaredVars[strings.ToUpper(v.Name)] = true
+	}
+
+	// Add configured globals to declared variables (Issue #55)
+	for _, g := range globals {
+		declaredVars[strings.ToUpper(g)] = true
+	}
+
+	// Build set of built-in identifiers to skip
+	builtins := buildBuiltinSet()
+
+	// Track which undeclared variables we've already reported (once per scope)
+	reported := make(map[string]bool)
+
+	// Track if we're inside an :INCLUDE statement (Issue #56)
+	inInclude := false
+
+	// Process tokens
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+
+		// Skip whitespace and comments
+		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+			continue
+		}
+
+		// Detect :INCLUDE keyword and skip until semicolon (Issue #56)
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "INCLUDE" {
+				inInclude = true
+				continue
+			}
+			// Other keywords are not variables
+			continue
+		}
+
+		// End of :INCLUDE statement
+		if inInclude {
+			if token.Type == lexer.TokenPunctuation && token.Text == ";" {
+				inInclude = false
+			}
+			// Skip all tokens in :INCLUDE path
+			continue
+		}
+
+		// Only check identifiers
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		upperName := strings.ToUpper(token.Text)
+
+		// Skip built-in identifiers (functions, classes, literals, operators)
+		if builtins[upperName] {
+			continue
+		}
+
+		// Skip 'Me' - class self-reference (Issue #2)
+		if upperName == "ME" {
+			continue
+		}
+
+		// Check if preceded by ':' (property access, e.g., object:property)
+		if i > 0 {
+			prevIdx := i - 1
+			for prevIdx > 0 && tokens[prevIdx].Type == lexer.TokenWhitespace {
+				prevIdx--
+			}
+			if prevIdx >= 0 && tokens[prevIdx].Type == lexer.TokenPunctuation && tokens[prevIdx].Text == ":" {
+				continue
+			}
+		}
+
+		// Check if followed by '(' (function call) (Issue #53)
+		nextIdx := i + 1
+		for nextIdx < len(tokens) && tokens[nextIdx].Type == lexer.TokenWhitespace {
+			nextIdx++
+		}
+		if nextIdx < len(tokens) && tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == "(" {
+			continue
+		}
+
+		// Check if on left side of ':=' (assignment target - this declares the variable)
+		if nextIdx < len(tokens) && tokens[nextIdx].Type == lexer.TokenOperator && tokens[nextIdx].Text == ":=" {
+			// This is a dynamic declaration, add to declared set
+			declaredVars[upperName] = true
+			continue
+		}
+
+		// Check if on a declaration line (DECLARE, PARAMETERS, PUBLIC)
+		if isOnDeclarationLine(tokens, i) {
+			continue
+		}
+
+		// Check if declared
+		if declaredVars[upperName] {
+			continue
+		}
+
+		// Report undeclared variable (once per name)
+		if !reported[upperName] {
+			reported[upperName] = true
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("Variable '%s' is not declared", token.Text),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// buildBuiltinSet creates a case-insensitive set of all built-in identifiers.
+func buildBuiltinSet() map[string]bool {
+	builtins := make(map[string]bool)
+
+	// Add all SSL function names
+	for _, fn := range constants.SSLFunctionNames {
+		builtins[strings.ToUpper(fn)] = true
+	}
+
+	// Add all SSL class names
+	for _, cls := range constants.SSLClassNames {
+		builtins[strings.ToUpper(cls)] = true
+	}
+
+	// Add SSL literals
+	for _, lit := range constants.SSLLiterals {
+		builtins[strings.ToUpper(lit)] = true
+	}
+
+	// Add SSL operators (the text form)
+	for _, op := range constants.SSLLogicalOperators {
+		builtins[strings.ToUpper(op)] = true
+	}
+
+	// Add special identifiers
+	builtins["ME"] = true  // Class self-reference (Issue #2)
+	builtins["NIL"] = true // Null value
+
+	return builtins
+}
+
+// isOnDeclarationLine checks if a token at position i is on a declaration line.
+func isOnDeclarationLine(tokens []lexer.Token, pos int) bool {
+	if pos < 0 || pos >= len(tokens) {
+		return false
+	}
+
+	line := tokens[pos].Line
+
+	// Search backward to find the first keyword on this line
+	for i := pos - 1; i >= 0; i-- {
+		if tokens[i].Line != line {
+			break
+		}
+		if tokens[i].Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(tokens[i].Text, ":"))
+			if normalized == "DECLARE" || normalized == "PARAMETERS" || normalized == "PUBLIC" || normalized == "PROCEDURE" {
+				return true
+			}
+		}
+	}
+
+	// Also check forward in case the keyword comes after position
+	for i := pos; i < len(tokens) && tokens[i].Line == line; i++ {
+		if tokens[i].Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(tokens[i].Text, ":"))
+			if normalized == "DECLARE" || normalized == "PARAMETERS" || normalized == "PUBLIC" || normalized == "PROCEDURE" {
+				return true
+			}
+		}
+	}
+
+	return false
 }
