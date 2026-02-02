@@ -568,3 +568,85 @@ func FindProcedureAtLine(procedures []ProcedureInfo, line int) *ProcedureInfo {
 	}
 	return nil
 }
+
+// ControlFlowBlock represents a control flow block (IF, WHILE, FOR, etc.).
+type ControlFlowBlock struct {
+	Kind      string // "IF", "WHILE", "FOR", "BEGINCASE", "TRY"
+	StartLine int
+	EndLine   int
+}
+
+// controlFlowPairs maps block start keywords to their corresponding end keywords.
+var controlFlowPairs = map[string]string{
+	"IF":        "ENDIF",
+	"WHILE":     "ENDWHILE",
+	"FOR":       "NEXT",
+	"BEGINCASE": "ENDCASE",
+	"TRY":       "ENDTRY",
+}
+
+// ExtractControlFlowBlocks extracts all control flow blocks from tokens.
+// Uses a stack-based approach to match start/end keyword pairs.
+func ExtractControlFlowBlocks(tokens []lexer.Token) []ControlFlowBlock {
+	var blocks []ControlFlowBlock
+
+	// Stack to track open blocks: each entry is {kind, startLine}
+	type stackItem struct {
+		kind      string
+		startLine int
+	}
+	var stack []stackItem
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+
+		// Normalize: remove leading colon and uppercase
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+
+		// Check if this is a block start keyword
+		if _, isStart := controlFlowPairs[normalized]; isStart {
+			stack = append(stack, stackItem{
+				kind:      normalized,
+				startLine: token.Line,
+			})
+			continue
+		}
+
+		// Check if this is a block end keyword
+		for startKw, endKw := range controlFlowPairs {
+			if normalized == endKw {
+				// Find matching start on stack (search from top)
+				for i := len(stack) - 1; i >= 0; i-- {
+					if stack[i].kind == startKw {
+						// Found match - create block and remove from stack
+						blocks = append(blocks, ControlFlowBlock{
+							Kind:      stack[i].kind,
+							StartLine: stack[i].startLine,
+							EndLine:   token.Line,
+						})
+						// Remove this item from stack
+						stack = append(stack[:i], stack[i+1:]...)
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// Any remaining items on stack are unclosed - extend to last token line
+	if len(stack) > 0 && len(tokens) > 0 {
+		lastLine := tokens[len(tokens)-1].Line
+		for _, item := range stack {
+			blocks = append(blocks, ControlFlowBlock{
+				Kind:      item.kind,
+				StartLine: item.startLine,
+				EndLine:   lastLine,
+			})
+		}
+	}
+
+	return blocks
+}

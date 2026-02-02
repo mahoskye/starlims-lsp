@@ -30,7 +30,7 @@ This document provides a quick overview of all LSP features and their current im
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file only |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Procedures, publics, regions |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
-| [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments |
+| [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
 | [Formatting](./features/formatting.md) | IMPLEMENTED | SSL + embedded SQL |
 | [Diagnostics](./features/diagnostics.md) | PARTIAL | See diagnostic gaps below |
 | [Snippets](./features/snippets.md) | IMPLEMENTED | 25+ code templates |

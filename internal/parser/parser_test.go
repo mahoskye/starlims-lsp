@@ -376,3 +376,153 @@ func BenchmarkParser_Parse_Large(b *testing.B) {
 		_ = p.Parse()
 	}
 }
+
+// ==================== Control Flow Block Extraction Tests ====================
+
+func TestExtractControlFlowBlocks_IfEndif(t *testing.T) {
+	input := `:IF condition;
+    x := 1;
+:ENDIF;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 control flow block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "IF" {
+		t.Errorf("expected kind IF, got %s", blocks[0].Kind)
+	}
+	if blocks[0].StartLine != 1 {
+		t.Errorf("expected start line 1, got %d", blocks[0].StartLine)
+	}
+	if blocks[0].EndLine != 3 {
+		t.Errorf("expected end line 3, got %d", blocks[0].EndLine)
+	}
+}
+
+func TestExtractControlFlowBlocks_WhileEndwhile(t *testing.T) {
+	input := `:WHILE x > 0;
+    x := x - 1;
+:ENDWHILE;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 control flow block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "WHILE" {
+		t.Errorf("expected kind WHILE, got %s", blocks[0].Kind)
+	}
+}
+
+func TestExtractControlFlowBlocks_ForNext(t *testing.T) {
+	input := `:FOR i := 1 :TO 10;
+    arr[i] := i;
+:NEXT;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 control flow block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "FOR" {
+		t.Errorf("expected kind FOR, got %s", blocks[0].Kind)
+	}
+}
+
+func TestExtractControlFlowBlocks_BegincaseEndcase(t *testing.T) {
+	input := `:BEGINCASE;
+:CASE x == 1;
+    y := 1;
+:ENDCASE;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 control flow block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "BEGINCASE" {
+		t.Errorf("expected kind BEGINCASE, got %s", blocks[0].Kind)
+	}
+}
+
+func TestExtractControlFlowBlocks_TryEndtry(t *testing.T) {
+	input := `:TRY;
+    RiskyOp();
+:CATCH;
+    HandleError();
+:ENDTRY;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 control flow block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "TRY" {
+		t.Errorf("expected kind TRY, got %s", blocks[0].Kind)
+	}
+}
+
+func TestExtractControlFlowBlocks_Nested(t *testing.T) {
+	input := `:IF x > 0;
+    :WHILE y < 10;
+        :FOR i := 1 :TO 5;
+            arr[i] := i;
+        :NEXT;
+    :ENDWHILE;
+:ENDIF;`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 control flow blocks, got %d", len(blocks))
+	}
+
+	// Blocks are returned in order they are closed
+	kinds := make(map[string]bool)
+	for _, b := range blocks {
+		kinds[b.Kind] = true
+	}
+
+	if !kinds["IF"] || !kinds["WHILE"] || !kinds["FOR"] {
+		t.Errorf("expected IF, WHILE, FOR blocks, got: %+v", blocks)
+	}
+}
+
+func TestExtractControlFlowBlocks_Unclosed(t *testing.T) {
+	input := `:IF x > 0;
+    DoSomething();`
+
+	lex := lexer.NewLexer(input)
+	tokens := lex.Tokenize()
+	blocks := ExtractControlFlowBlocks(tokens)
+
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 unclosed block, got %d", len(blocks))
+	}
+
+	if blocks[0].Kind != "IF" {
+		t.Errorf("expected kind IF, got %s", blocks[0].Kind)
+	}
+	// Unclosed block should extend to last line
+	if blocks[0].EndLine < 2 {
+		t.Errorf("unclosed block should extend to at least line 2, got %d", blocks[0].EndLine)
+	}
+}

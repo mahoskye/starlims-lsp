@@ -269,6 +269,19 @@ func buildFoldingRanges(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		})
 	}
 
+	// Get control flow block ranges (IF, WHILE, FOR, BEGINCASE, TRY)
+	controlFlowBlocks := parser.ExtractControlFlowBlocks(tokens)
+	for _, block := range controlFlowBlocks {
+		// Only include multi-line blocks (startLine != endLine)
+		if block.StartLine != block.EndLine {
+			ranges = append(ranges, FoldingRange{
+				StartLine: block.StartLine - 1,
+				EndLine:   block.EndLine - 1,
+				Kind:      "region",
+			})
+		}
+	}
+
 	// Get comment block ranges
 	commentRanges := findCommentBlocks(tokens)
 	for _, cr := range commentRanges {

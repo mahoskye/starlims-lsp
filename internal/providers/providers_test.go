@@ -1305,3 +1305,189 @@ x := undeclaredVar;
 		}
 	}
 }
+
+// ==================== Control Flow Folding Range Tests ====================
+
+func TestGetFoldingRanges_IfBlock(t *testing.T) {
+	text := `:IF condition;
+    DoSomething();
+    DoMore();
+:ENDIF;`
+
+	ranges := GetFoldingRanges(text)
+
+	// Should have at least one folding range for IF block
+	foundIFRange := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 3 && r.Kind == "region" {
+			foundIFRange = true
+		}
+	}
+
+	if !foundIFRange {
+		t.Errorf("expected folding range for IF block (0-3), got ranges: %+v", ranges)
+	}
+}
+
+func TestGetFoldingRanges_WhileBlock(t *testing.T) {
+	text := `:WHILE x > 0;
+    x := x - 1;
+    Process();
+:ENDWHILE;`
+
+	ranges := GetFoldingRanges(text)
+
+	foundWhileRange := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 3 && r.Kind == "region" {
+			foundWhileRange = true
+		}
+	}
+
+	if !foundWhileRange {
+		t.Errorf("expected folding range for WHILE block (0-3), got ranges: %+v", ranges)
+	}
+}
+
+func TestGetFoldingRanges_ForBlock(t *testing.T) {
+	text := `:FOR i := 1 :TO 10;
+    arr[i] := i;
+    Process(i);
+:NEXT;`
+
+	ranges := GetFoldingRanges(text)
+
+	foundForRange := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 3 && r.Kind == "region" {
+			foundForRange = true
+		}
+	}
+
+	if !foundForRange {
+		t.Errorf("expected folding range for FOR block (0-3), got ranges: %+v", ranges)
+	}
+}
+
+func TestGetFoldingRanges_BeginCaseBlock(t *testing.T) {
+	text := `:BEGINCASE;
+:CASE nVal == 1;
+    x := 1;
+    :EXITCASE;
+:CASE nVal == 2;
+    x := 2;
+    :EXITCASE;
+:OTHERWISE;
+    x := 0;
+    :EXITCASE;
+:ENDCASE;`
+
+	ranges := GetFoldingRanges(text)
+
+	foundCaseRange := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 10 && r.Kind == "region" {
+			foundCaseRange = true
+		}
+	}
+
+	if !foundCaseRange {
+		t.Errorf("expected folding range for BEGINCASE block (0-10), got ranges: %+v", ranges)
+	}
+}
+
+func TestGetFoldingRanges_TryBlock(t *testing.T) {
+	text := `:TRY;
+    RiskyOperation();
+:CATCH;
+    HandleError();
+:FINALLY;
+    Cleanup();
+:ENDTRY;`
+
+	ranges := GetFoldingRanges(text)
+
+	foundTryRange := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 6 && r.Kind == "region" {
+			foundTryRange = true
+		}
+	}
+
+	if !foundTryRange {
+		t.Errorf("expected folding range for TRY block (0-6), got ranges: %+v", ranges)
+	}
+}
+
+func TestGetFoldingRanges_NestedBlocks(t *testing.T) {
+	text := `:PROCEDURE Test;
+    :IF x > 0;
+        :WHILE y < 10;
+            y := y + 1;
+        :ENDWHILE;
+    :ENDIF;
+:ENDPROC;`
+
+	ranges := GetFoldingRanges(text)
+
+	// Should have folding ranges for: PROCEDURE (0-6), IF (1-5), WHILE (2-4)
+	foundProcedure := false
+	foundIF := false
+	foundWhile := false
+
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 6 {
+			foundProcedure = true
+		}
+		if r.StartLine == 1 && r.EndLine == 5 {
+			foundIF = true
+		}
+		if r.StartLine == 2 && r.EndLine == 4 {
+			foundWhile = true
+		}
+	}
+
+	if !foundProcedure {
+		t.Error("expected folding range for PROCEDURE (0-6)")
+	}
+	if !foundIF {
+		t.Error("expected folding range for IF (1-5)")
+	}
+	if !foundWhile {
+		t.Error("expected folding range for WHILE (2-4)")
+	}
+}
+
+func TestGetFoldingRanges_SingleLineNotFoldable(t *testing.T) {
+	text := `:IF x > 0; :RETURN x; :ENDIF;`
+
+	ranges := GetFoldingRanges(text)
+
+	// Single-line blocks should not be foldable
+	for _, r := range ranges {
+		if r.StartLine == r.EndLine {
+			t.Errorf("single-line block should not create folding range: %+v", r)
+		}
+	}
+}
+
+func TestGetFoldingRanges_UnclosedBlock(t *testing.T) {
+	text := `:PROCEDURE Test;
+    :IF x > 0;
+        DoSomething();`
+
+	ranges := GetFoldingRanges(text)
+
+	// Unclosed blocks should extend to end of file
+	foundIF := false
+	for _, r := range ranges {
+		// IF starts at line 1, should end at last line (2)
+		if r.StartLine == 1 && r.EndLine >= 2 {
+			foundIF = true
+		}
+	}
+
+	if !foundIF {
+		t.Errorf("unclosed IF block should have folding range extending to end, got: %+v", ranges)
+	}
+}
