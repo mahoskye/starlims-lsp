@@ -27,7 +27,7 @@ This document provides a quick overview of all LSP features and their current im
 | [Hover](./features/hover.md) | IMPLEMENTED | SQL placeholders not yet supported |
 | [Signature Help](./features/signature-help.md) | IMPLEMENTED | 367 built-in functions + user procedures |
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file only |
-| [Find References](./features/references.md) | IMPLEMENTED | Single-file only |
+| [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Procedures, publics, regions |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |

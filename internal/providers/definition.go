@@ -54,20 +54,59 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 }
 
 // FindReferences finds all references to a symbol.
+// This is a simple text-based search without scope awareness.
 func FindReferences(text string, line, column int, uri string, includeDeclaration bool) []Location {
+	return FindReferencesWithScope(text, line, column, uri, includeDeclaration, nil, nil)
+}
+
+// FindReferencesWithScope finds all references to a symbol with scope awareness.
+// For local variables and parameters, only returns references within the same procedure.
+// For public variables and procedures, returns all references in the document.
+func FindReferencesWithScope(text string, line, column int, uri string, includeDeclaration bool, procedures []parser.ProcedureInfo, variables []parser.VariableInfo) []Location {
 	word := lexer.GetWordAtPosition(text, line, column)
 
 	if word == "" {
 		return nil
 	}
 
-	var locations []Location
+	wordLower := strings.ToLower(word)
 	lines := strings.Split(text, "\n")
+
+	// Determine scope of the symbol we're searching for
+	scopeStart := 0
+	scopeEnd := len(lines)
+	isLocalScope := false
+
+	// Check if this is a local/parameter variable (scoped to a procedure)
+	if procedures != nil && variables != nil {
+		// Find which procedure contains the cursor position
+		cursorProc := parser.FindProcedureAtLine(procedures, line)
+
+		if cursorProc != nil {
+			// Check if this word is a local/parameter variable in this procedure
+			for _, v := range variables {
+				if strings.ToLower(v.Name) == wordLower {
+					// If it's a local or parameter variable, scope it to the procedure
+					if v.Scope == parser.ScopeLocal || v.Scope == parser.ScopeParameter {
+						// Check if this variable is declared within the cursor's procedure
+						if v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine {
+							scopeStart = cursorProc.StartLine - 1 // Convert to 0-based
+							scopeEnd = cursorProc.EndLine         // Keep as 1-based for comparison
+							isLocalScope = true
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	var locations []Location
 
 	// Simple text-based search for the word
 	wordRegex := regexp.MustCompile(`(?i)\b` + escapeRegex(word) + `\b`)
 
-	// Find the declaration position (first occurrence, typically where cursor is)
+	// Find the declaration position
 	var declarationLine, declarationChar int
 	declarationFound := false
 
@@ -87,6 +126,14 @@ func FindReferences(text string, line, column int, uri string, includeDeclaratio
 	}
 
 	for i, lineText := range lines {
+		// For local scope, skip lines outside the procedure
+		if isLocalScope {
+			lineNum := i + 1 // Convert to 1-based
+			if lineNum < scopeStart+1 || lineNum > scopeEnd {
+				continue
+			}
+		}
+
 		matches := wordRegex.FindAllStringIndex(lineText, -1)
 		for _, match := range matches {
 			// Skip declaration if not including it

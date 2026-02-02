@@ -97,12 +97,18 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 		return nil, nil
 	}
 
-	locations := providers.FindReferences(
+	// Get cached procedures and variables for scope-aware search
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+
+	locations := providers.FindReferencesWithScope(
 		content,
 		int(params.Position.Line)+1,
 		int(params.Position.Character)+1,
 		uri,
 		params.Context.IncludeDeclaration,
+		cache.Procedures,
+		cache.Variables,
 	)
 
 	if locations == nil {

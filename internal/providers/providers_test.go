@@ -240,6 +240,172 @@ result := param1 + 1;
 	}
 }
 
+func TestFindReferencesWithScope_LocalVariablesScopedToProcedure(t *testing.T) {
+	// Test case from documentation 6.6: Local variables in different procedures
+	text := `:PROCEDURE ProcA;
+:DECLARE localVar;
+x := localVar;
+:ENDPROC;
+
+:PROCEDURE ProcB;
+:DECLARE localVar;
+y := localVar;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+
+	// Find references to localVar in ProcA (line 2)
+	// Should only find references within ProcA, not ProcB
+	locations := FindReferencesWithScope(text, 2, 10, "file:///test.ssl", true, procedures, variables)
+
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+
+	// Should find 2 references in ProcA (declaration + usage)
+	if len(locations) != 2 {
+		t.Errorf("expected 2 references in ProcA scope, got %d", len(locations))
+	}
+
+	// Verify all references are within ProcA's line range (lines 1-4, 0-based: 0-3)
+	for _, loc := range locations {
+		if loc.Range.Start.Line > 3 {
+			t.Errorf("found reference outside ProcA scope at line %d", loc.Range.Start.Line)
+		}
+	}
+}
+
+func TestFindReferencesWithScope_PublicVariablesGlobalScope(t *testing.T) {
+	// Public variables should find references across entire document
+	text := `:PUBLIC gCounter;
+
+:PROCEDURE ProcA;
+gCounter := 1;
+:ENDPROC;
+
+:PROCEDURE ProcB;
+x := gCounter + 1;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+
+	// Find references to gCounter (line 1)
+	locations := FindReferencesWithScope(text, 1, 10, "file:///test.ssl", true, procedures, variables)
+
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+
+	// Should find 3 references: declaration + ProcA usage + ProcB usage
+	if len(locations) != 3 {
+		t.Errorf("expected 3 references for public variable, got %d", len(locations))
+	}
+}
+
+func TestFindReferencesWithScope_ParametersScopedToProcedure(t *testing.T) {
+	// Parameters should be scoped to their procedure
+	text := `:PROCEDURE ProcA;
+:PARAMETERS sName;
+x := sName;
+:ENDPROC;
+
+:PROCEDURE ProcB;
+:PARAMETERS sName;
+y := sName;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+
+	// Find references to sName in ProcA (line 2)
+	locations := FindReferencesWithScope(text, 2, 13, "file:///test.ssl", true, procedures, variables)
+
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+
+	// Should find 2 references in ProcA only
+	if len(locations) != 2 {
+		t.Errorf("expected 2 references in ProcA scope, got %d", len(locations))
+	}
+
+	// Verify all references are within ProcA's line range
+	for _, loc := range locations {
+		if loc.Range.Start.Line > 3 {
+			t.Errorf("found reference outside ProcA scope at line %d", loc.Range.Start.Line)
+		}
+	}
+}
+
+func TestFindReferencesWithScope_ProcedureReferencesGlobalScope(t *testing.T) {
+	// Procedure names should find references across entire document
+	text := `:PROCEDURE HelperProc;
+:ENDPROC;
+
+:PROCEDURE Main;
+HelperProc();
+x := HelperProc();
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+
+	// Find references to HelperProc (line 1)
+	locations := FindReferencesWithScope(text, 1, 12, "file:///test.ssl", true, procedures, variables)
+
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+
+	// Should find 3 references: definition + 2 calls
+	if len(locations) != 3 {
+		t.Errorf("expected 3 references for procedure, got %d", len(locations))
+	}
+}
+
+func TestFindReferencesWithScope_NilProceduresVariablesFallback(t *testing.T) {
+	// When procedures/variables are nil, should fall back to global search
+	text := `:PROCEDURE ProcA;
+:DECLARE localVar;
+x := localVar;
+:ENDPROC;
+
+:PROCEDURE ProcB;
+:DECLARE localVar;
+y := localVar;
+:ENDPROC;`
+
+	// Without scope info, should find all occurrences
+	locations := FindReferencesWithScope(text, 2, 10, "file:///test.ssl", true, nil, nil)
+
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+
+	// Should find 4 references (all occurrences without scope filtering)
+	if len(locations) != 4 {
+		t.Errorf("expected 4 references without scope info, got %d", len(locations))
+	}
+}
+
 // ==================== Document Symbols Tests ====================
 
 func TestGetDocumentSymbols_Procedures(t *testing.T) {
