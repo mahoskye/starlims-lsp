@@ -471,6 +471,91 @@ func GetTokenAtPosition(tokens []Token, line, column int) *Token {
 	return nil
 }
 
+// ContextType represents the type of context at a position.
+type ContextType int
+
+const (
+	ContextCode ContextType = iota
+	ContextString
+	ContextComment
+)
+
+// GetContextAtPosition returns the context type at a specific position.
+// This is useful for determining if completions/hover should be suppressed.
+func GetContextAtPosition(tokens []Token, line, column int) ContextType {
+	for i := range tokens {
+		token := &tokens[i]
+
+		// For multi-line tokens (strings, comments), we need to check if position
+		// falls within the token's range
+		tokenStartLine := token.Line
+		tokenStartCol := token.Column
+
+		// Calculate end position by counting newlines in the token text
+		tokenEndLine := tokenStartLine
+		tokenEndCol := tokenStartCol + len(token.Text)
+
+		for _, r := range token.Text {
+			if r == '\n' {
+				tokenEndLine++
+				tokenEndCol = 1
+			} else {
+				if tokenEndLine > tokenStartLine || tokenEndLine == tokenStartLine {
+					// Only increment if we're past the newline
+				}
+			}
+		}
+
+		// Recalculate properly
+		tokenEndLine = tokenStartLine
+		currentCol := tokenStartCol
+		for _, r := range token.Text {
+			if r == '\n' {
+				tokenEndLine++
+				currentCol = 1
+			} else {
+				currentCol++
+			}
+		}
+		tokenEndCol = currentCol
+
+		// Check if position is within this token
+		inToken := false
+		if line == tokenStartLine && line == tokenEndLine {
+			// Token is on a single line
+			inToken = column >= tokenStartCol && column <= tokenEndCol
+		} else if line == tokenStartLine {
+			// Position is on the start line of a multi-line token
+			inToken = column >= tokenStartCol
+		} else if line == tokenEndLine {
+			// Position is on the end line of a multi-line token
+			inToken = column <= tokenEndCol
+		} else if line > tokenStartLine && line < tokenEndLine {
+			// Position is in the middle of a multi-line token
+			inToken = true
+		}
+
+		if inToken {
+			switch token.Type {
+			case TokenString:
+				return ContextString
+			case TokenComment:
+				return ContextComment
+			default:
+				return ContextCode
+			}
+		}
+	}
+
+	return ContextCode
+}
+
+// IsInsideStringOrComment returns true if the position is inside a string or comment.
+func IsInsideStringOrComment(tokens []Token, line, column int) bool {
+	ctx := GetContextAtPosition(tokens, line, column)
+	return ctx == ContextString || ctx == ContextComment
+}
+
 // GetWordAtPosition returns the word at a specific position.
 func GetWordAtPosition(text string, line, column int) string {
 	lines := strings.Split(text, "\n")

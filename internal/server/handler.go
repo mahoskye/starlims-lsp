@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 
+	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/providers"
 
 	"github.com/tliron/glsp"
@@ -15,6 +16,14 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	version := s.documentVersion[uri]
 
 	cache := s.documents.ParseDocument(uri, version)
+
+	// Check if we're inside a string or comment - if so, return no completions
+	// LSP positions are 0-based, our functions expect 1-based
+	line := int(params.Position.Line) + 1
+	column := int(params.Position.Character) + 1
+	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
+		return []protocol.CompletionItem{}, nil
+	}
 
 	// Get all completions
 	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables)
@@ -40,10 +49,18 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	cache := s.documents.ParseDocument(uri, version)
 
 	// LSP positions are 0-based, our functions expect 1-based
+	line := int(params.Position.Line) + 1
+	column := int(params.Position.Character) + 1
+
+	// Check if we're inside a string or comment - if so, return no hover
+	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
+		return nil, nil
+	}
+
 	hover := providers.GetHover(
 		content,
-		int(params.Position.Line)+1,
-		int(params.Position.Character)+1,
+		line,
+		column,
 		cache.Procedures,
 		cache.Variables,
 	)

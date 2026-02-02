@@ -26,6 +26,9 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getKeywordHover(word); hover != nil {
 		return hover
 	}
+	if hover := getMeKeywordHover(word); hover != nil {
+		return hover
+	}
 	if hover := getFunctionHover(word); hover != nil {
 		return hover
 	}
@@ -62,6 +65,22 @@ func getKeywordHover(word string) *Hover {
 		}
 	}
 
+	return nil
+}
+
+// getMeKeywordHover returns hover information for the 'Me' keyword.
+func getMeKeywordHover(word string) *Hover {
+	if strings.EqualFold(word, "Me") {
+		return &Hover{
+			Contents: "**Me**\n\n" +
+				"*Self-reference keyword*\n\n" +
+				"Refers to the current object instance within a class definition.\n\n" +
+				"**Usage:**\n" +
+				"- Access class members: `Me:PropertyName`\n" +
+				"- Call class methods: `Me:MethodName()`\n" +
+				"- Pass self to other functions: `DoSomething(Me)`",
+		}
+	}
 	return nil
 }
 

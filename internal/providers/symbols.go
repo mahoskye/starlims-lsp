@@ -89,10 +89,13 @@ func GetDocumentSymbolsFromTokens(tokens []lexer.Token, ast *parser.Node) []Docu
 }
 
 func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []DocumentSymbol {
-	var symbols []DocumentSymbol
-
-	// Extract procedures
+	// Extract all elements first
 	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+	regions := extractRegions(tokens)
+
+	// Build procedure symbols
+	procSymbols := make([]DocumentSymbol, 0, len(procedures))
 	for _, proc := range procedures {
 		procSymbol := DocumentSymbol{
 			Name: proc.Name,
@@ -129,14 +132,14 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 			})
 		}
 
-		symbols = append(symbols, procSymbol)
+		procSymbols = append(procSymbols, procSymbol)
 	}
 
-	// Extract variables at module level
-	variables := p.ExtractVariables(ast)
+	// Build public variable symbols
+	varSymbols := make([]DocumentSymbol, 0)
 	for _, v := range variables {
 		if v.Scope == parser.ScopePublic {
-			symbols = append(symbols, DocumentSymbol{
+			varSymbols = append(varSymbols, DocumentSymbol{
 				Name: v.Name,
 				Kind: SymbolKindVariable,
 				Range: Range{
@@ -152,10 +155,12 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 		}
 	}
 
-	// Extract regions
-	regions := extractRegions(tokens)
+	// Build region symbols with procedures as children
+	regionSymbols := make([]DocumentSymbol, 0, len(regions))
+	usedProcs := make(map[int]bool) // Track which procedures are nested in regions
+
 	for _, region := range regions {
-		symbols = append(symbols, DocumentSymbol{
+		regionSymbol := DocumentSymbol{
 			Name: region.Name,
 			Kind: SymbolKindNamespace,
 			Range: Range{
@@ -166,9 +171,60 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 				Start: Position{Line: region.StartLine - 1, Character: 0},
 				End:   Position{Line: region.StartLine - 1, Character: len(region.Name)},
 			},
-			Detail: "region",
-		})
+			Detail:   "region",
+			Children: nil,
+		}
+
+		// Find procedures that fall within this region
+		for i, procSym := range procSymbols {
+			procStartLine := procSym.Range.Start.Line + 1 // Convert back to 1-based
+			procEndLine := procSym.Range.End.Line + 1
+
+			// Check if procedure is fully contained within region
+			if procStartLine >= region.StartLine && procEndLine <= region.EndLine {
+				regionSymbol.Children = append(regionSymbol.Children, procSym)
+				usedProcs[i] = true
+			}
+		}
+
+		// Find public variables that fall within this region
+		for _, varSym := range varSymbols {
+			varLine := varSym.Range.Start.Line + 1 // Convert back to 1-based
+			if varLine >= region.StartLine && varLine <= region.EndLine {
+				regionSymbol.Children = append(regionSymbol.Children, varSym)
+			}
+		}
+
+		regionSymbols = append(regionSymbols, regionSymbol)
 	}
+
+	// Build final result
+	var symbols []DocumentSymbol
+
+	// Add procedures that are not inside any region
+	for i, procSym := range procSymbols {
+		if !usedProcs[i] {
+			symbols = append(symbols, procSym)
+		}
+	}
+
+	// Add public variables that are not inside any region
+	for _, varSym := range varSymbols {
+		varLine := varSym.Range.Start.Line + 1
+		insideRegion := false
+		for _, region := range regions {
+			if varLine >= region.StartLine && varLine <= region.EndLine {
+				insideRegion = true
+				break
+			}
+		}
+		if !insideRegion {
+			symbols = append(symbols, varSym)
+		}
+	}
+
+	// Add regions (which now contain their children)
+	symbols = append(symbols, regionSymbols...)
 
 	return symbols
 }

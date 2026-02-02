@@ -15,6 +15,7 @@ type Location struct {
 }
 
 // FindDefinition finds the definition for a symbol.
+// Respects scope precedence: local/parameter variables take precedence over public variables.
 func FindDefinition(text string, line, column int, uri string, procedures []parser.ProcedureInfo, variables []parser.VariableInfo) *Location {
 	word := lexer.GetWordAtPosition(text, line, column)
 
@@ -37,7 +38,54 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 		}
 	}
 
-	// Check if it's a variable
+	// Find which procedure contains the cursor position (for scope awareness)
+	var cursorProc *parser.ProcedureInfo
+	if procedures != nil {
+		cursorProc = parser.FindProcedureAtLine(procedures, line)
+	}
+
+	// Check for variables with scope precedence:
+	// 1. First look for local/parameter variable in current procedure
+	// 2. Then look for public variable
+	// 3. Then fallback to any declared variable (for cases where procedures info isn't provided)
+
+	// Step 1: Look for local/parameter variable in current procedure
+	if cursorProc != nil {
+		for _, v := range variables {
+			if strings.ToLower(v.Name) == wordLower {
+				if v.Scope == parser.ScopeLocal || v.Scope == parser.ScopeParameter {
+					// Check if this variable is declared within the current procedure
+					if v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine {
+						return &Location{
+							URI: uri,
+							Range: Range{
+								Start: Position{Line: v.Line - 1, Character: v.Column - 1},
+								End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
+							},
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Step 2: Look for public variable
+	for _, v := range variables {
+		if strings.ToLower(v.Name) == wordLower {
+			if v.Scope == parser.ScopePublic {
+				return &Location{
+					URI: uri,
+					Range: Range{
+						Start: Position{Line: v.Line - 1, Character: v.Column - 1},
+						End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
+					},
+				}
+			}
+		}
+	}
+
+	// Step 3: Fallback - return any matching variable (for backward compatibility
+	// when procedures info isn't provided)
 	for _, v := range variables {
 		if strings.ToLower(v.Name) == wordLower {
 			return &Location{

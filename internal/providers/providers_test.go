@@ -1811,3 +1811,294 @@ func TestGetFoldingRanges_UnclosedBlock(t *testing.T) {
 		t.Errorf("unclosed IF block should have folding range extending to end, got: %+v", ranges)
 	}
 }
+
+// ==================== Me Keyword Hover Tests ====================
+
+func TestGetHover_MeKeyword(t *testing.T) {
+	text := `:CLASS MyClass;
+:PROCEDURE Test;
+    result := Me:Calculate();
+:ENDPROC;`
+
+	// Hover over Me
+	hover := GetHover(text, 3, 15, nil, nil)
+	if hover == nil {
+		t.Fatal("expected hover info for Me keyword")
+	}
+	if !strings.Contains(hover.Contents, "Me") {
+		t.Errorf("expected hover to contain 'Me', got: %s", hover.Contents)
+	}
+	if !strings.Contains(strings.ToLower(hover.Contents), "self-reference") {
+		t.Errorf("expected hover to explain Me is a self-reference, got: %s", hover.Contents)
+	}
+}
+
+func TestGetHover_MeKeyword_CaseInsensitive(t *testing.T) {
+	text := `result := ME:Property;`
+
+	// Hover over ME (uppercase)
+	hover := GetHover(text, 1, 11, nil, nil)
+	if hover == nil {
+		t.Fatal("expected hover info for ME keyword")
+	}
+	if !strings.Contains(hover.Contents, "Me") {
+		t.Errorf("expected hover to contain 'Me', got: %s", hover.Contents)
+	}
+}
+
+// ==================== Definition Scope Precedence Tests ====================
+
+func TestFindDefinition_LocalPrecedence(t *testing.T) {
+	text := `:PUBLIC globalVar;
+
+:PROCEDURE Test;
+:DECLARE globalVar;  /* Local shadows global;
+x := globalVar;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Test", StartLine: 3, EndLine: 6},
+	}
+	variables := []parser.VariableInfo{
+		{Name: "globalVar", Line: 1, Column: 9, Scope: parser.ScopePublic},
+		{Name: "globalVar", Line: 4, Column: 10, Scope: parser.ScopeLocal},
+	}
+
+	// Find definition of globalVar on line 5 - should find local (line 4), not public (line 1)
+	location := FindDefinition(text, 5, 7, "file:///test.ssl", procedures, variables)
+	if location == nil {
+		t.Fatal("expected to find definition for variable")
+	}
+	if location.Range.Start.Line != 3 { // 0-based, so line 4 = index 3
+		t.Errorf("expected definition on line 3 (local), got %d", location.Range.Start.Line)
+	}
+}
+
+func TestFindDefinition_PublicWhenNoLocal(t *testing.T) {
+	text := `:PUBLIC gGlobalVar;
+
+:PROCEDURE Test;
+x := gGlobalVar;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Test", StartLine: 3, EndLine: 5},
+	}
+	variables := []parser.VariableInfo{
+		{Name: "gGlobalVar", Line: 1, Column: 9, Scope: parser.ScopePublic},
+	}
+
+	// Find definition of gGlobalVar on line 4 - should find public (line 1)
+	location := FindDefinition(text, 4, 7, "file:///test.ssl", procedures, variables)
+	if location == nil {
+		t.Fatal("expected to find definition for variable")
+	}
+	if location.Range.Start.Line != 0 { // 0-based, so line 1 = index 0
+		t.Errorf("expected definition on line 0 (public), got %d", location.Range.Start.Line)
+	}
+}
+
+// ==================== Hierarchical Document Symbols Tests ====================
+
+func TestGetDocumentSymbols_RegionContainsProcedures(t *testing.T) {
+	text := `/* region Helpers;
+:PROCEDURE HelperOne;
+:ENDPROC;
+
+:PROCEDURE HelperTwo;
+:ENDPROC;
+/* endregion;`
+
+	symbols := GetDocumentSymbols(text)
+
+	// Find the region symbol
+	var regionSymbol *DocumentSymbol
+	for i := range symbols {
+		if symbols[i].Name == "Helpers" && symbols[i].Detail == "region" {
+			regionSymbol = &symbols[i]
+			break
+		}
+	}
+
+	if regionSymbol == nil {
+		t.Fatal("expected to find region symbol 'Helpers'")
+	}
+
+	// Region should have procedures as children
+	if len(regionSymbol.Children) != 2 {
+		t.Errorf("expected region to have 2 children (procedures), got %d", len(regionSymbol.Children))
+	}
+
+	// Verify children are the procedures
+	foundHelperOne := false
+	foundHelperTwo := false
+	for _, child := range regionSymbol.Children {
+		if child.Name == "HelperOne" && child.Kind == SymbolKindFunction {
+			foundHelperOne = true
+		}
+		if child.Name == "HelperTwo" && child.Kind == SymbolKindFunction {
+			foundHelperTwo = true
+		}
+	}
+
+	if !foundHelperOne {
+		t.Error("expected HelperOne procedure as child of region")
+	}
+	if !foundHelperTwo {
+		t.Error("expected HelperTwo procedure as child of region")
+	}
+}
+
+func TestGetDocumentSymbols_ProcedureOutsideRegion(t *testing.T) {
+	text := `:PROCEDURE OutsideProc;
+:ENDPROC;
+
+/* region Helpers;
+:PROCEDURE InsideProc;
+:ENDPROC;
+/* endregion;`
+
+	symbols := GetDocumentSymbols(text)
+
+	// OutsideProc should be a top-level symbol, not nested
+	foundOutside := false
+	for _, sym := range symbols {
+		if sym.Name == "OutsideProc" && sym.Kind == SymbolKindFunction {
+			foundOutside = true
+			break
+		}
+	}
+
+	if !foundOutside {
+		t.Error("expected OutsideProc to be a top-level symbol")
+	}
+
+	// Find the region and verify InsideProc is its child
+	var regionSymbol *DocumentSymbol
+	for i := range symbols {
+		if symbols[i].Name == "Helpers" {
+			regionSymbol = &symbols[i]
+			break
+		}
+	}
+
+	if regionSymbol == nil {
+		t.Fatal("expected to find region 'Helpers'")
+	}
+
+	foundInside := false
+	for _, child := range regionSymbol.Children {
+		if child.Name == "InsideProc" {
+			foundInside = true
+			break
+		}
+	}
+
+	if !foundInside {
+		t.Error("expected InsideProc to be a child of region Helpers")
+	}
+}
+
+// ==================== Unused Variables Diagnostic Tests ====================
+
+func TestCheckUnusedVariables_UnusedLocal(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE unusedVar;
+x := 1;
+:ENDPROC;`
+
+	opts := DiagnosticOptions{CheckUnusedVars: true}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find one unused variable
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "unusedVar") && strings.Contains(d.Message, "never used") {
+			found = true
+			if d.Severity != SeverityHint {
+				t.Errorf("expected SeverityHint, got %d", d.Severity)
+			}
+			break
+		}
+	}
+
+	if !found {
+		t.Error("expected diagnostic for unused variable 'unusedVar'")
+	}
+}
+
+func TestCheckUnusedVariables_UsedLocal(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE usedVar;
+usedVar := 1;
+x := usedVar + 1;
+:ENDPROC;`
+
+	opts := DiagnosticOptions{CheckUnusedVars: true}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find unused variable diagnostic for usedVar
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "usedVar") && strings.Contains(d.Message, "never used") {
+			t.Error("should not flag 'usedVar' as unused since it is used")
+		}
+	}
+}
+
+func TestCheckUnusedVariables_UnusedParameter(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS unusedParam;
+x := 1;
+:ENDPROC;`
+
+	opts := DiagnosticOptions{CheckUnusedVars: true}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should find unused parameter
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "unusedParam") && strings.Contains(d.Message, "never used") {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("expected diagnostic for unused parameter 'unusedParam'")
+	}
+}
+
+func TestCheckUnusedVariables_UsedParameter(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS usedParam;
+x := usedParam + 1;
+:ENDPROC;`
+
+	opts := DiagnosticOptions{CheckUnusedVars: true}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT find unused parameter diagnostic
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "usedParam") && strings.Contains(d.Message, "never used") {
+			t.Error("should not flag 'usedParam' as unused since it is used")
+		}
+	}
+}
+
+func TestCheckUnusedVariables_DisabledByDefault(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE unusedVar;
+x := 1;
+:ENDPROC;`
+
+	// Default options have CheckUnusedVars: false
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT report unused variables when disabled
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "never used") {
+			t.Error("should not check unused variables when disabled")
+		}
+	}
+}

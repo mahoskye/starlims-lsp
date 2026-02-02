@@ -1002,3 +1002,78 @@ func BenchmarkLexer_Tokenize_Large(b *testing.B) {
 		_ = lex.Tokenize()
 	}
 }
+
+// ==================== Context Detection Tests ====================
+
+func TestIsInsideStringOrComment_InsideString(t *testing.T) {
+	text := `x := "hello world";`
+	lex := NewLexer(text)
+	tokens := lex.Tokenize()
+
+	// Position inside the string (on "hello")
+	if !IsInsideStringOrComment(tokens, 1, 8) {
+		t.Error("expected position inside string to return true")
+	}
+}
+
+func TestIsInsideStringOrComment_OutsideString(t *testing.T) {
+	text := `x := "hello world";`
+	lex := NewLexer(text)
+	tokens := lex.Tokenize()
+
+	// Position on 'x' (outside string)
+	if IsInsideStringOrComment(tokens, 1, 1) {
+		t.Error("expected position outside string to return false")
+	}
+}
+
+func TestIsInsideStringOrComment_InsideComment(t *testing.T) {
+	text := `/* this is a comment;
+x := 1;`
+	lex := NewLexer(text)
+	tokens := lex.Tokenize()
+
+	// Position inside the comment
+	if !IsInsideStringOrComment(tokens, 1, 10) {
+		t.Error("expected position inside comment to return true")
+	}
+}
+
+func TestIsInsideStringOrComment_OutsideComment(t *testing.T) {
+	text := `/* this is a comment;
+x := 1;`
+	lex := NewLexer(text)
+	tokens := lex.Tokenize()
+
+	// Position on line 2 (outside comment)
+	if IsInsideStringOrComment(tokens, 2, 3) {
+		t.Error("expected position outside comment to return false")
+	}
+}
+
+func TestGetContextAtPosition(t *testing.T) {
+	text := `x := "hello"; /* comment;`
+	lex := NewLexer(text)
+	tokens := lex.Tokenize()
+
+	tests := []struct {
+		name     string
+		line     int
+		column   int
+		expected ContextType
+	}{
+		{"identifier", 1, 1, ContextCode},
+		{"inside_string", 1, 8, ContextString},
+		{"after_string", 1, 14, ContextCode},
+		{"inside_comment", 1, 20, ContextComment},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := GetContextAtPosition(tokens, tc.line, tc.column)
+			if ctx != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, ctx)
+			}
+		})
+	}
+}

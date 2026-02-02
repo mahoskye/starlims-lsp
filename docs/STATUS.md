@@ -2,7 +2,7 @@
 
 This document provides a quick overview of all LSP features and their current implementation status.
 
-**Last Updated:** 2025-02-02
+**Last Updated:** 2025-02-03
 
 ---
 
@@ -23,12 +23,12 @@ This document provides a quick overview of all LSP features and their current im
 
 | Feature | Status | Gaps/Notes |
 |---------|--------|------------|
-| [Completion](./features/completion.md) | IMPLEMENTED | Custom functions/classes not configurable |
-| [Hover](./features/hover.md) | IMPLEMENTED | SQL placeholders not yet supported |
+| [Completion](./features/completion.md) | IMPLEMENTED | Context-aware, excludes strings/comments |
+| [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword; SQL placeholders planned |
 | [Signature Help](./features/signature-help.md) | IMPLEMENTED | 367 built-in functions + user procedures |
-| [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file only |
+| [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence (local > public) |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
-| [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Procedures, publics, regions |
+| [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: regions contain procedures |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
 | [Formatting](./features/formatting.md) | IMPLEMENTED | SSL + embedded SQL |
@@ -69,7 +69,7 @@ This document provides a quick overview of all LSP features and their current im
 | Global assignment | IMPLEMENTED | Protect configured globals |
 | Hungarian notation | IMPLEMENTED | Optional style check |
 | Undeclared variables | IMPLEMENTED | Disabled by default (opt-in) |
-| Unused variables | PLANNED | Not yet implemented |
+| Unused variables | IMPLEMENTED | Disabled by default (opt-in) |
 | SQL parameter validation | PLANNED | Not yet implemented |
 
 ### Known Diagnostic Gaps
@@ -137,6 +137,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Operators | IMPLEMENTED | `.AND.`, `.OR.`, `.NOT.` |
 | Procedures | IMPLEMENTED | Signature with params |
 | Variables | IMPLEMENTED | Declaration location |
+| `Me` keyword | IMPLEMENTED | Self-reference in classes |
 | SQL `?param?` placeholders | PLANNED | Not yet implemented |
 | SQL `?` positional placeholders | PLANNED | Not yet implemented |
 
