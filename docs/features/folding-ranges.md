@@ -67,11 +67,11 @@ Nested blocks each get their own folding range:
 
 ```ssl
 :PROCEDURE Outer;
-    :IF condition;      /* Foldable */
-        :WHILE x > 0;   /* Foldable */
+    :IF condition;      /* Foldable;
+        :WHILE x > 0;   /* Foldable;
         :ENDWHILE;
     :ENDIF;
-:ENDPROC;              /* Foldable */
+:ENDPROC;              /* Foldable;
 ```
 
 ### 4.2 Unclosed Blocks
@@ -101,7 +101,7 @@ SSL comments start with `/*` and end with `;`. A multi-line comment is foldable:
 Elements that fit on a single line are not foldable:
 
 ```ssl
-:IF x > 0; :RETURN x; :ENDIF;  /* Not foldable - single line */
+:IF x > 0; :RETURN x; :ENDIF;  /* Not foldable - single line;
 ```
 
 ---
@@ -120,94 +120,94 @@ Elements that fit on a single line are not foldable:
 ### 6.1 Procedure Folding
 
 ```ssl
-/* Test: Procedure is foldable */
-:PROCEDURE MyProc;       /* Line 0 */
-:DECLARE x;              /* Line 1 */
-x := 1;                  /* Line 2 */
-:ENDPROC;                /* Line 3 */
+/* Test: Procedure is foldable;
+:PROCEDURE MyProc;       /* Line 0;
+:DECLARE x;              /* Line 1;
+x := 1;                  /* Line 2;
+:ENDPROC;                /* Line 3;
 /* Expected folding range:
    { startLine: 0, endLine: 3, kind: "region" }
-*/
+;
 ```
 
 ### 6.2 Region Folding
 
 ```ssl
-/* Test: Region is foldable */
-/* region Helpers ;      /* Line 0 */
-:PROCEDURE Helper;       /* Line 1 */
-:ENDPROC;                /* Line 2 */
-/* endregion ;           /* Line 3 */
+/* Test: Region is foldable;
+/* region Helpers;       /* Line 0;
+:PROCEDURE Helper;       /* Line 1;
+:ENDPROC;                /* Line 2;
+/* endregion;            /* Line 3;
 /* Expected folding ranges:
    { startLine: 0, endLine: 3, kind: "region" },  // Region
    { startLine: 1, endLine: 2, kind: "region" }   // Procedure
-*/
+;
 ```
 
 ### 6.3 Comment Folding
 
 ```ssl
-/* Test: Multi-line comment is foldable */
-/* This is a                /* Line 0 */
-   multi-line               /* Line 1 */
-   comment                  /* Line 2 */
-;                           /* Line 3 */
+/* Test: Multi-line comment is foldable;
+/* This is a                /* Line 0;
+   multi-line               /* Line 1;
+   comment                  /* Line 2;
+;                           /* Line 3;
 /* Expected folding range:
    { startLine: 0, endLine: 3, kind: "comment" }
-*/
+;
 ```
 
 ### 6.4 Control Flow Folding
 
 ```ssl
-/* Test: IF block is foldable */
-:IF condition;              /* Line 0 */
-    DoSomething();          /* Line 1 */
-    DoMore();               /* Line 2 */
-:ENDIF;                     /* Line 3 */
+/* Test: IF block is foldable;
+:IF condition;              /* Line 0;
+    DoSomething();          /* Line 1;
+    DoMore();               /* Line 2;
+:ENDIF;                     /* Line 3;
 /* Expected folding range:
    { startLine: 0, endLine: 3, kind: "region" }
-*/
+;
 ```
 
 ### 6.5 Nested Folding
 
 ```ssl
-/* Test: Nested blocks have separate ranges */
-:PROCEDURE Test;            /* Line 0 */
-    :IF x > 0;              /* Line 1 */
-        :WHILE y < 10;      /* Line 2 */
-            y := y + 1;     /* Line 3 */
-        :ENDWHILE;          /* Line 4 */
-    :ENDIF;                 /* Line 5 */
-:ENDPROC;                   /* Line 6 */
+/* Test: Nested blocks have separate ranges;
+:PROCEDURE Test;            /* Line 0;
+    :IF x > 0;              /* Line 1;
+        :WHILE y < 10;      /* Line 2;
+            y := y + 1;     /* Line 3;
+        :ENDWHILE;          /* Line 4;
+    :ENDIF;                 /* Line 5;
+:ENDPROC;                   /* Line 6;
 /* Expected folding ranges:
    { startLine: 0, endLine: 6, kind: "region" },  // Procedure
    { startLine: 1, endLine: 5, kind: "region" },  // IF
    { startLine: 2, endLine: 4, kind: "region" }   // WHILE
-*/
+;
 ```
 
 ### 6.6 Single-Line Block (Not Foldable)
 
 ```ssl
-/* Test: Single-line block not foldable */
+/* Test: Single-line block not foldable;
 :IF x > 0; :RETURN x; :ENDIF;
-/* Expected: No folding range for this line */
+/* Expected: No folding range for this line;
 ```
 
 ### 6.7 Unclosed Block
 
 ```ssl
-/* Test: Unclosed block extends to end */
-:PROCEDURE Test;            /* Line 0 */
-    :IF x > 0;              /* Line 1 */
-        DoSomething();      /* Line 2 */
-/* Missing :ENDIF and :ENDPROC */
+/* Test: Unclosed block extends to end;
+:PROCEDURE Test;            /* Line 0;
+    :IF x > 0;              /* Line 1;
+        DoSomething();      /* Line 2;
+/* Missing :ENDIF and :ENDPROC;
 /* Expected folding ranges:
    { startLine: 0, endLine: 2, kind: "region" },  // Procedure to EOF
    { startLine: 1, endLine: 2, kind: "region" }   // IF to EOF
-*/
+;
 ```
 
 ---

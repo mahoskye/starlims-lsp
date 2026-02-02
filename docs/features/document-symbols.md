@@ -65,10 +65,10 @@ Document
 Regions are defined by comment markers:
 
 ```ssl
-/* region MyRegion ;
+/* region MyRegion;
 :PROCEDURE Contained;
 :ENDPROC;
-/* endregion ;
+/* endregion;
 ```
 
 Symbols within a region are nested under the region symbol.
@@ -91,7 +91,7 @@ Each `:PUBLIC` declaration creates a separate symbol:
 
 ```ssl
 :PUBLIC gVar1;
-:PUBLIC gVar2, gVar3;  /* Creates two symbols */
+:PUBLIC gVar2, gVar3;  /* Creates two symbols;
 ```
 
 ---
@@ -111,7 +111,7 @@ Each `:PUBLIC` declaration creates a separate symbol:
 ### 6.1 Procedure Symbols
 
 ```ssl
-/* Test: Procedure appears in symbol list */
+/* Test: Procedure appears in symbol list;
 :PROCEDURE MyProcedure;
 :PARAMETERS param1, param2;
 :ENDPROC;
@@ -126,13 +126,13 @@ Each `:PUBLIC` declaration creates a separate symbol:
        { name: "param2", kind: Variable (13) }
      ]
    }]
-*/
+;
 ```
 
 ### 6.2 Public Variable Symbols
 
 ```ssl
-/* Test: Public variables in symbol list */
+/* Test: Public variables in symbol list;
 :PUBLIC gCounter;
 :PUBLIC gName, gVersion;
 
@@ -145,20 +145,20 @@ Each `:PUBLIC` declaration creates a separate symbol:
      { name: "gVersion", kind: Variable (13) },
      { name: "Test", kind: Function (12) }
    ]
-*/
+;
 ```
 
 ### 6.3 Region Symbols
 
 ```ssl
-/* Test: Region contains nested symbols */
-/* region Database Operations ;
+/* Test: Region contains nested symbols;
+/* region Database Operations;
 :PROCEDURE GetData;
 :ENDPROC;
 
 :PROCEDURE SaveData;
 :ENDPROC;
-/* endregion ;
+/* endregion;
 
 :PROCEDURE Main;
 :ENDPROC;
@@ -174,13 +174,13 @@ Each `:PUBLIC` declaration creates a separate symbol:
      },
      { name: "Main", kind: Function (12) }
    ]
-*/
+;
 ```
 
 ### 6.4 Procedure with No Parameters
 
 ```ssl
-/* Test: Procedure without parameters */
+/* Test: Procedure without parameters;
 :PROCEDURE SimpleProc;
 x := 1;
 :ENDPROC;
@@ -190,31 +190,31 @@ x := 1;
      kind: Function (12),
      children: []
    }]
-*/
+;
 ```
 
 ### 6.5 Selection Range Accuracy
 
 ```ssl
-/* Test: Selection range covers only the name */
-:PROCEDURE   VeryImportantProcedure  ;
+/* Test: Selection range covers only the name;
+:PROCEDURE   VeryImportantProcedure ;
 :ENDPROC;
 /* Expected:
    selectionRange should cover "VeryImportantProcedure" only,
    not the whitespace or semicolon
-*/
+;
 ```
 
 ### 6.6 Symbol Ordering
 
 ```ssl
-/* Test: Symbols ordered by position in file */
+/* Test: Symbols ordered by position in file;
 :PROCEDURE SecondProc;
 :ENDPROC;
 
 :PROCEDURE FirstProc;
 :ENDPROC;
-/* Expected: SecondProc before FirstProc (file order, not alphabetical) */
+/* Expected: SecondProc before FirstProc (file order, not alphabetical);
 ```
 
 ---

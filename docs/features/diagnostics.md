@@ -200,144 +200,144 @@ if previousChar == ':' {
 ### 6.1 Unclosed Blocks
 
 ```ssl
-/* Test: Unclosed IF block */
+/* Test: Unclosed IF block;
 :PROCEDURE Test;
 :IF .T.;
     x := 1;
 :ENDPROC;
-/* Expected: Error on line 2 - "Unclosed ':IF' - expected ':ENDIF'" */
+/* Expected: Error on line 2 - "Unclosed ':IF' - expected ':ENDIF'";
 
-/* Test: Mismatched blocks */
+/* Test: Mismatched blocks;
 :IF .T.;
 :ENDWHILE;
-/* Expected: Error on line 2 - "':ENDWHILE' does not match ':IF'" */
+/* Expected: Error on line 2 - "':ENDWHILE' does not match ':IF'";
 ```
 
 ### 6.2 Unmatched Delimiters
 
 ```ssl
-/* Test: Unmatched parenthesis */
+/* Test: Unmatched parenthesis;
 x := (a + b;
-/* Expected: Error on line 1 - "Unclosed '('" */
+/* Expected: Error on line 1 - "Unclosed '('";
 
-/* Test: Mismatched delimiters */
+/* Test: Mismatched delimiters;
 x := (a + b];
-/* Expected: Error - "Expected ')' but found ']'" */
+/* Expected: Error - "Expected ')' but found ']'";
 ```
 
 ### 6.3 Missing EXITCASE
 
 ```ssl
-/* Test: Case without EXITCASE */
+/* Test: Case without EXITCASE;
 :BEGINCASE;
 :CASE x = 1;
     DoSomething();
 :ENDCASE;
-/* Expected: Warning on line 2 - "':CASE' block should end with ':EXITCASE;'" */
+/* Expected: Warning on line 2 - "':CASE' block should end with ':EXITCASE;'";
 ```
 
 ### 6.4 Bare Logical Operators
 
 ```ssl
-/* Test: AND without periods */
+/* Test: AND without periods;
 :IF a AND b;
-/* Expected: Error on 'AND' - "Use '.AND.' instead of 'AND' for logical operations in SSL" */
+/* Expected: Error on 'AND' - "Use '.AND.' instead of 'AND' for logical operations in SSL";
 ```
 
 ### 6.5 DEFAULT on DECLARE
 
 ```ssl
-/* Test: DEFAULT with DECLARE */
+/* Test: DEFAULT with DECLARE;
 :DECLARE x :DEFAULT 10;
-/* Expected: Warning - "':DEFAULT' cannot be used with ':DECLARE' - use ':PARAMETERS' with ':DEFAULT' instead" */
+/* Expected: Warning - "':DEFAULT' cannot be used with ':DECLARE' - use ':PARAMETERS' with ':DEFAULT' instead";
 ```
 
 ### 6.6 Global Assignment Prevention
 
 ```ssl
-/* Test: Assignment to configured global */
-/* Config: globals = ["gCurrentUser"] */
+/* Test: Assignment to configured global;
+/* Config: globals = ["gCurrentUser"];
 gCurrentUser := "hacker";
-/* Expected: Error - "Cannot assign to global variable 'gCurrentUser'" */
+/* Expected: Error - "Cannot assign to global variable 'gCurrentUser'";
 
-/* Test: Using global is OK */
+/* Test: Using global is OK;
 sUser := gCurrentUser;
-/* Expected: No error */
+/* Expected: No error;
 ```
 
 ### 6.7 Hungarian Notation Detection
 
 ```ssl
-/* Test: Hungarian prefix detection */
-/* Config: hungarianNotation = true */
+/* Test: Hungarian prefix detection;
+/* Config: hungarianNotation = true;
 :DECLARE sName, nCount;
-/* Expected: Warning on 'sName' - "Hungarian notation prefix 's' detected in 'sName'" */
-/* Expected: Warning on 'nCount' - "Hungarian notation prefix 'n' detected in 'nCount'" */
+/* Expected: Warning on 'sName' - "Hungarian notation prefix 's' detected in 'sName'";
+/* Expected: Warning on 'nCount' - "Hungarian notation prefix 'n' detected in 'nCount'";
 
-/* Test: Not Hungarian (lowercase after prefix) */
+/* Test: Not Hungarian (lowercase after prefix);
 :DECLARE sample, number;
-/* Expected: No warning */
+/* Expected: No warning;
 ```
 
 ### 6.8 `:INCLUDE` Path Handling (Expected)
 
 ```ssl
-/* Test: Include paths not flagged */
+/* Test: Include paths not flagged;
 :INCLUDE File_Helpers.FileWork;
-/* Expected: No warnings on 'File_Helpers' or 'FileWork' */
+/* Expected: No warnings on 'File_Helpers' or 'FileWork';
 ```
 
 ### 6.9 `Me` Recognition (Expected)
 
 ```ssl
-/* Test: Me not flagged as undeclared */
+/* Test: Me not flagged as undeclared;
 :CLASS MyClass;
 :PROCEDURE Initialize;
     Me:bActive := .T.;
     Me:nCounter := 0;
 :ENDPROC;
 :ENDCLASS;
-/* Expected: No warnings on 'Me' */
+/* Expected: No warnings on 'Me';
 ```
 
 ### 6.10 Function Call Recognition (Expected)
 
 ```ssl
-/* Test: Function calls not flagged as variables */
+/* Test: Function calls not flagged as variables;
 :PROCEDURE Test;
     infomes("Hello");
     result := SQLExecute(sql, "ds");
     MyCustomProc(x, y);
 :ENDPROC;
-/* Expected: No warnings on 'infomes', 'SQLExecute', 'MyCustomProc' */
+/* Expected: No warnings on 'infomes', 'SQLExecute', 'MyCustomProc';
 ```
 
 ### 6.11 Configured Global Recognition (Expected)
 
 ```ssl
-/* Test: Configured globals recognized as declared */
-/* Config: globals = ["gCurrentUser", "gAppName"] */
+/* Test: Configured globals recognized as declared;
+/* Config: globals = ["gCurrentUser", "gAppName"];
 :PROCEDURE Test;
     sUser := gCurrentUser;
     sApp := gAppName;
 :ENDPROC;
-/* Expected: No warnings on 'gCurrentUser' or 'gAppName' */
+/* Expected: No warnings on 'gCurrentUser' or 'gAppName';
 ```
 
 ### 6.12 Block Depth Warning
 
 ```ssl
-/* Test: Excessive nesting warning */
-/* Config: maxBlockDepth = 3 */
+/* Test: Excessive nesting warning;
+/* Config: maxBlockDepth = 3;
 :IF a;
     :IF b;
         :IF c;
-            :IF d;  /* Depth 4 - exceeds limit */
+            :IF d;  /* Depth 4 - exceeds limit;
             :ENDIF;
         :ENDIF;
     :ENDIF;
 :ENDIF;
-/* Expected: Warning on line 4 - "Block nesting depth (4) exceeds maximum (3)" */
+/* Expected: Warning on line 4 - "Block nesting depth (4) exceeds maximum (3)";
 ```
 
 ---

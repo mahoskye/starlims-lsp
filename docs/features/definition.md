@@ -86,7 +86,7 @@ Currently, definition only works within the same file. `:INCLUDE` paths and `DoP
 **Expected Behavior:**
 ```ssl
 DoProc("Helpers.CalculateTotal", {args});
-/*      ^--- Ctrl+Click should navigate to CalculateTotal procedure */
+/*      ^--- Ctrl+Click should navigate to CalculateTotal procedure;
 ```
 
 Currently not implemented. Requires:
@@ -112,110 +112,110 @@ Currently not implemented. Requires:
 ### 6.1 Procedure Definition
 
 ```ssl
-/* Test: Navigate to procedure definition */
+/* Test: Navigate to procedure definition;
 :PROCEDURE HelperProc;
 :ENDPROC;
 
 :PROCEDURE Main;
     HelperProc();
-/*  ^ Go to definition here */
+/*  ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 1, character 11-21 (HelperProc) */
+/* Expected: Location of line 1, character 11-21 (HelperProc);
 ```
 
 ### 6.2 Variable Definition (DECLARE)
 
 ```ssl
-/* Test: Navigate to declared variable */
+/* Test: Navigate to declared variable;
 :PROCEDURE Test;
 :DECLARE counter;
 x := counter + 1;
-/*   ^ Go to definition here */
+/*   ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 2 (DECLARE line) */
+/* Expected: Location of line 2 (DECLARE line);
 ```
 
 ### 6.3 Variable Definition (PARAMETERS)
 
 ```ssl
-/* Test: Navigate to parameter */
+/* Test: Navigate to parameter;
 :PROCEDURE Calculate;
 :PARAMETERS nValue, sType;
 result := nValue * 2;
-/*        ^ Go to definition here */
+/*        ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 2 (PARAMETERS line) */
+/* Expected: Location of line 2 (PARAMETERS line);
 ```
 
 ### 6.4 Variable Definition (PUBLIC)
 
 ```ssl
-/* Test: Navigate to public variable */
+/* Test: Navigate to public variable;
 :PUBLIC gGlobalCounter;
 
 :PROCEDURE Test;
 x := gGlobalCounter;
-/*   ^ Go to definition here */
+/*   ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 1 (PUBLIC line) */
+/* Expected: Location of line 1 (PUBLIC line);
 ```
 
 ### 6.5 Variable Definition (Dynamic)
 
 ```ssl
-/* Test: Navigate to first assignment (dynamic declaration) */
+/* Test: Navigate to first assignment (dynamic declaration);
 :PROCEDURE Test;
 dynamicVar := 10;
 x := dynamicVar;
-/*   ^ Go to definition here */
+/*   ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 2 (first assignment) */
+/* Expected: Location of line 2 (first assignment);
 ```
 
 ### 6.6 Case Insensitivity
 
 ```ssl
-/* Test: Case-insensitive matching */
+/* Test: Case-insensitive matching;
 :PROCEDURE MyProcedure;
 :ENDPROC;
 
 :PROCEDURE Main;
     myprocedure();
-/*  ^ Go to definition here */
+/*  ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 1 (MyProcedure, despite case difference) */
+/* Expected: Location of line 1 (MyProcedure, despite case difference);
 ```
 
 ### 6.7 Built-in Function (No Definition)
 
 ```ssl
-/* Test: Built-in function returns null */
+/* Test: Built-in function returns null;
 result := SQLExecute(query, "ds");
-/*        ^ Go to definition here */
-/* Expected: null (no definition available) */
+/*        ^ Go to definition here;
+/* Expected: null (no definition available);
 ```
 
 ### 6.8 Keyword (No Definition)
 
 ```ssl
-/* Test: Keyword returns null */
+/* Test: Keyword returns null;
 :IF .T.;
-/* ^ Go to definition here */
-/* Expected: null */
+/* ^ Go to definition here;
+/* Expected: null;
 ```
 
 ### 6.9 Local vs Global Scope
 
 ```ssl
-/* Test: Local scope takes precedence */
+/* Test: Local scope takes precedence;
 :DECLARE globalVar;
 
 :PROCEDURE Test;
-:DECLARE globalVar;  /* Local shadows global */
+:DECLARE globalVar;  /* Local shadows global;
 x := globalVar;
-/*   ^ Go to definition here */
+/*   ^ Go to definition here;
 :ENDPROC;
-/* Expected: Location of line 4 (local DECLARE), not line 1 */
+/* Expected: Location of line 4 (local DECLARE), not line 1;
 ```
 
 ---

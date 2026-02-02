@@ -30,7 +30,7 @@ Keywords are prefixed with a colon:
 SSL uses block comments with semicolon termination:
 
 ```ssl
-/* This is a single-line comment ;
+/* This is a single-line comment;
 
 /* This is a
    multi-line
@@ -43,11 +43,11 @@ SSL uses block comments with semicolon termination:
 Declaration and assignment:
 
 ```ssl
-:DECLARE myVariable;           /* Explicit declaration ;
-myVariable := "value";         /* Assignment ;
+:DECLARE myVariable;           /* Explicit declaration;
+myVariable := "value";         /* Assignment;
 
-:PARAMETERS param1, param2;    /* Procedure parameters ;
-:PUBLIC globalVar;             /* Public/global scope ;
+:PARAMETERS param1, param2;    /* Procedure parameters;
+:PUBLIC globalVar;             /* Public/global scope;
 ```
 
 ### Operators
@@ -73,30 +73,30 @@ myVariable := "value";         /* Assignment ;
 ### Control Flow
 
 ```ssl
-/* IF/ELSE ;
+/* IF/ELSE;
 :IF condition;
-    /* then block ;
+    /* then block;
 :ELSE;
-    /* else block ;
+    /* else block;
 :ENDIF;
 
-/* WHILE loop ;
+/* WHILE loop;
 :WHILE condition;
-    /* body ;
+    /* body;
 :ENDWHILE;
 
-/* FOR loop ;
+/* FOR loop;
 :FOR i := 1 :TO 10 :STEP 1;
-    /* body ;
+    /* body;
 :NEXT;
 
-/* CASE statement ;
+/* CASE statement;
 :BEGINCASE;
 :CASE condition1;
-    /* action ;
+    /* action;
     :EXITCASE;
 :OTHERWISE;
-    /* default ;
+    /* default;
     :EXITCASE;
 :ENDCASE;
 ```
@@ -108,7 +108,7 @@ myVariable := "value";         /* Assignment ;
 :PARAMETERS param1, param2 :DEFAULT "";
 :DECLARE localVar;
 
-/* procedure body ;
+/* procedure body;
 
 :RETURN result;
 :ENDPROC;
@@ -118,20 +118,20 @@ myVariable := "value";         /* Assignment ;
 
 ```ssl
 :TRY;
-    /* risky code ;
+    /* risky code;
 :CATCH;
-    /* handle error ;
+    /* handle error;
 :FINALLY;
-    /* cleanup ;
+    /* cleanup;
 :ENDTRY;
 ```
 
 ### Property Access
 
 ```ssl
-object:PropertyName          /* Read property ;
-object:PropertyName := value /* Write property ;
-object:Method()              /* Call method ;
+object:PropertyName          /* Read property;
+object:PropertyName := value /* Write property;
+object:Method()              /* Call method;
 ```
 
 ---

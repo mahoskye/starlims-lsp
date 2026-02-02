@@ -357,7 +357,7 @@ When enabled, warns about variables using Hungarian notation prefixes.
 
 **Example Warning:**
 ```ssl
-:DECLARE sName;  /* Warning: Hungarian notation prefix 's' detected in 'sName' */
+:DECLARE sName;  /* Warning: Hungarian notation prefix 's' detected in 'sName';
 ```
 
 ### 5.2 ssl.diagnostics.hungarianPrefixes
@@ -417,7 +417,7 @@ List of global variable names. Assignment to these variables triggers an error.
 
 **Example Error:**
 ```ssl
-gCurrentUser := "test";  /* Error: Cannot assign to global variable 'gCurrentUser' */
+gCurrentUser := "test";  /* Error: Cannot assign to global variable 'gCurrentUser';
 ```
 
 **Future Enhancement:** These globals will also be recognized as "pre-declared" when undeclared variable checking is implemented.

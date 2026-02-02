@@ -11,14 +11,14 @@ This document highlights common pitfalls and mistakes when writing SSL code.
 **Problem:** Using `:DEFAULT` with `:DECLARE` has no effect.
 
 ```ssl
-/* WRONG - DEFAULT is ignored! ;
+/* WRONG - DEFAULT is ignored!;
 :DECLARE x :DEFAULT 10;
-/* x is NIL, not 10 ;
+/* x is NIL, not 10;
 
-/* CORRECT - Use with PARAMETERS ;
+/* CORRECT - Use with PARAMETERS;
 :PARAMETERS x :DEFAULT 10;
 
-/* CORRECT - Or assign after declare ;
+/* CORRECT - Or assign after declare;
 :DECLARE x;
 x := 10;
 ```
@@ -32,12 +32,12 @@ x := 10;
 **Problem:** Using `AND`, `OR`, `NOT` without periods creates logic errors.
 
 ```ssl
-/* WRONG - These are treated as identifiers! ;
+/* WRONG - These are treated as identifiers!;
 :IF condition1 AND condition2;
 :IF condition1 OR condition2;
 :IF NOT condition;
 
-/* CORRECT - Wrap in periods ;
+/* CORRECT - Wrap in periods;
 :IF condition1 .AND. condition2;
 :IF condition1 .OR. condition2;
 :IF .NOT. condition;
@@ -49,13 +49,13 @@ x := 10;
 
 ## Gotcha #3: Comments End with Semicolon
 
-**Problem:** SSL uses `/* ... ;` for comments, not `/* ... */`.
+**Problem:** SSL uses `/* ... ;` for comments, not `/* ...;`.
 
 ```ssl
-/* WRONG - This doesn't end the comment! */
+/* WRONG - This doesn't end the comment!;
 More code here;
 
-/* CORRECT - Semicolon ends the comment ;
+/* CORRECT - Semicolon ends the comment;
 More code here;
 ```
 
@@ -72,17 +72,17 @@ More code here;
 **Problem:** Unlike C/C++, SSL `CASE` blocks DO fall through without `:EXITCASE`.
 
 ```ssl
-/* WRONG - Falls through to next case! ;
+/* WRONG - Falls through to next case!;
 :BEGINCASE;
 :CASE x = 1;
     DoOne();
-    /* Missing :EXITCASE causes fallthrough! ;
+    /* Missing :EXITCASE causes fallthrough!;
 :CASE x = 2;
     DoTwo();
     :EXITCASE;
 :ENDCASE;
 
-/* CORRECT - Always use :EXITCASE ;
+/* CORRECT - Always use :EXITCASE;
 :BEGINCASE;
 :CASE x = 1;
     DoOne();
@@ -102,14 +102,14 @@ More code here;
 **Problem:** `:=` is assignment, `=` is comparison.
 
 ```ssl
-/* WRONG - This assigns, not compares! ;
+/* WRONG - This assigns, not compares!;
 :IF x := 5;
-    /* Always executes because x is now 5 (truthy) ;
+    /* Always executes because x is now 5 (truthy);
 :ENDIF;
 
-/* CORRECT - Use = for comparison ;
+/* CORRECT - Use = for comparison;
 :IF x = 5;
-    /* Only executes if x equals 5 ;
+    /* Only executes if x equals 5;
 :ENDIF;
 ```
 
@@ -120,13 +120,13 @@ More code here;
 **Problem:** SSL strings do NOT use backslash escapes.
 
 ```ssl
-/* WRONG - Backslash is literal! ;
-path := "C:\Users\Name";  /* This is fine, \ is just a character ;
-newline := "\n";           /* This is literally backslash-n, not a newline ;
+/* WRONG - Backslash is literal!;
+path := "C:\Users\Name";  /* This is fine, \ is just a character;
+newline := "\n";           /* This is literally backslash-n, not a newline;
 
-/* Use Chr() for special characters ;
-newline := Chr(10);        /* ASCII 10 = newline ;
-tab := Chr(9);             /* ASCII 9 = tab ;
+/* Use Chr() for special characters;
+newline := Chr(10);        /* ASCII 10 = newline;
+tab := Chr(9);             /* ASCII 9 = tab;
 ```
 
 ---
@@ -136,13 +136,13 @@ tab := Chr(9);             /* ASCII 9 = tab ;
 **Problem:** Type coercion issues with `+` operator.
 
 ```ssl
-/* Works fine ;
+/* Works fine;
 sResult := "Hello " + "World";
 
-/* Numeric + String may cause issues ;
-sResult := "Count: " + nCount;  /* May need explicit conversion ;
+/* Numeric + String may cause issues;
+sResult := "Count: " + nCount;  /* May need explicit conversion;
 
-/* SAFER - Use Str() for numbers ;
+/* SAFER - Use Str() for numbers;
 sResult := "Count: " + Str(nCount);
 ```
 
@@ -153,18 +153,18 @@ sResult := "Count: " + Str(nCount);
 **Problem:** Variables are accessible in ways you might not expect.
 
 ```ssl
-/* Variables in a procedure are local ;
+/* Variables in a procedure are local;
 :PROCEDURE ProcA;
 :DECLARE x;
 x := 10;
 :ENDPROC;
 
 :PROCEDURE ProcB;
-x := 20;  /* This creates a NEW local variable x, not the one from ProcA ;
+x := 20;  /* This creates a NEW local variable x, not the one from ProcA;
 :ENDPROC;
 
-/* PUBLIC makes it global ;
-:PUBLIC gCounter;  /* Visible everywhere ;
+/* PUBLIC makes it global;
+:PUBLIC gCounter;  /* Visible everywhere;
 ```
 
 ---
@@ -175,13 +175,13 @@ x := 20;  /* This creates a NEW local variable x, not the one from ProcA ;
 
 ```ssl
 :DECLARE x;
-/* x is NIL (uninitialized) ;
+/* x is NIL (uninitialized);
 
 x := "";
-/* x is now empty string, NOT NIL ;
+/* x is now empty string, NOT NIL;
 
-:IF x = NIL;  /* True before assignment, false after ;
-:IF Empty(x); /* True for both NIL and "" ;
+:IF x = NIL;  /* True before assignment, false after;
+:IF Empty(x); /* True for both NIL and "";
 ```
 
 ---
@@ -194,8 +194,8 @@ x := "";
 :DECLARE a;
 a := {10, 20, 30};
 
-a[1];  /* 10 - First element ;
-a[0];  /* ERROR - Invalid index! ;
+a[1];  /* 10 - First element;
+a[0];  /* ERROR - Invalid index!;
 ```
 
 ---
@@ -207,7 +207,7 @@ a[0];  /* ERROR - Invalid index! ;
 ```ssl
 :CLASS MyClass;
 :PROCEDURE Initialize;
-    /* Use Me to refer to instance properties ;
+    /* Use Me to refer to instance properties;
     Me:Counter := 0;
     Me:Name := "";
 :ENDPROC;
@@ -230,7 +230,7 @@ a[0];  /* ERROR - Invalid index! ;
 ```ssl
 :PARAMETERS sCustomerID;
 
-/* All of these work ;
+/* All of these work;
 sSQL := "SELECT * FROM t WHERE id = ?sCustomerID?";
 sSQL := "SELECT * FROM t WHERE id = ?SCUSTOMERID?";
 sSQL := "SELECT * FROM t WHERE id = ?scustomerid?";

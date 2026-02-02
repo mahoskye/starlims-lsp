@@ -584,3 +584,262 @@ func TestFormattingOptions_SQLKeywordCaseLower(t *testing.T) {
 
 	t.Logf("Formatted output:\n%s", formatted)
 }
+
+func TestFormatDocument_CaseStatementIndentation(t *testing.T) {
+	// Test CASE statement formatting per docs/features/formatting.md Section 7.4
+	input := `:BEGINCASE;
+:CASE x=1;
+DoOne();
+:EXITCASE;
+:OTHERWISE;
+DoDefault();
+:EXITCASE;
+:ENDCASE;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Expected: :CASE and :OTHERWISE at same level as :BEGINCASE
+	// Content inside :CASE/:OTHERWISE indented one level
+	// :EXITCASE indented at content level (inside CASE block)
+
+	lines := strings.Split(formatted, "\n")
+
+	// Track indentation levels
+	var beginCaseIndent, caseIndent, caseContentIndent int
+	var otherwiseIndent, exitCaseIndent, endCaseIndent int
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+
+		switch {
+		case strings.HasPrefix(trimmed, ":BEGINCASE"):
+			beginCaseIndent = indent
+		case strings.HasPrefix(trimmed, ":CASE"):
+			caseIndent = indent
+		case strings.HasPrefix(trimmed, "DoOne"):
+			caseContentIndent = indent
+		case strings.HasPrefix(trimmed, ":OTHERWISE"):
+			otherwiseIndent = indent
+		case strings.HasPrefix(trimmed, ":EXITCASE"):
+			exitCaseIndent = indent
+		case strings.HasPrefix(trimmed, ":ENDCASE"):
+			endCaseIndent = indent
+		}
+	}
+
+	// :CASE should be at same level as :BEGINCASE (dedent then indent pattern)
+	if caseIndent != beginCaseIndent {
+		t.Errorf(":CASE should be at same level as :BEGINCASE, got CASE=%d BEGINCASE=%d", caseIndent, beginCaseIndent)
+	}
+
+	// :OTHERWISE should be at same level as :CASE
+	if otherwiseIndent != caseIndent {
+		t.Errorf(":OTHERWISE should be at same level as :CASE, got OTHERWISE=%d CASE=%d", otherwiseIndent, caseIndent)
+	}
+
+	// Content inside CASE should be indented one level from CASE
+	if caseContentIndent != caseIndent+1 {
+		t.Errorf("CASE content should be indented one level from :CASE, got content=%d CASE=%d", caseContentIndent, caseIndent)
+	}
+
+	// :EXITCASE should be at content level (indented inside CASE)
+	if exitCaseIndent != caseContentIndent {
+		t.Errorf(":EXITCASE should be at content level, got EXITCASE=%d content=%d", exitCaseIndent, caseContentIndent)
+	}
+
+	// :ENDCASE should be at same level as :BEGINCASE
+	if endCaseIndent != beginCaseIndent {
+		t.Errorf(":ENDCASE should be at same level as :BEGINCASE, got ENDCASE=%d BEGINCASE=%d", endCaseIndent, beginCaseIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_TryCatchFinallyIndentation(t *testing.T) {
+	// Test TRY/CATCH/FINALLY formatting per docs/features/formatting.md Section 7.5
+	input := `:TRY;
+DoRisky();
+:CATCH;
+HandleError();
+:FINALLY;
+Cleanup();
+:ENDTRY;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+
+	var tryIndent, tryContentIndent int
+	var catchIndent, catchContentIndent int
+	var finallyIndent, finallyContentIndent int
+	var endTryIndent int
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+
+		switch {
+		case strings.HasPrefix(trimmed, ":TRY"):
+			tryIndent = indent
+		case strings.HasPrefix(trimmed, "DoRisky"):
+			tryContentIndent = indent
+		case strings.HasPrefix(trimmed, ":CATCH"):
+			catchIndent = indent
+		case strings.HasPrefix(trimmed, "HandleError"):
+			catchContentIndent = indent
+		case strings.HasPrefix(trimmed, ":FINALLY"):
+			finallyIndent = indent
+		case strings.HasPrefix(trimmed, "Cleanup"):
+			finallyContentIndent = indent
+		case strings.HasPrefix(trimmed, ":ENDTRY"):
+			endTryIndent = indent
+		}
+	}
+
+	// :CATCH should be at same level as :TRY (dedent then indent)
+	if catchIndent != tryIndent {
+		t.Errorf(":CATCH should be at same level as :TRY, got CATCH=%d TRY=%d", catchIndent, tryIndent)
+	}
+
+	// :FINALLY should be at same level as :TRY
+	if finallyIndent != tryIndent {
+		t.Errorf(":FINALLY should be at same level as :TRY, got FINALLY=%d TRY=%d", finallyIndent, tryIndent)
+	}
+
+	// Content inside TRY should be indented
+	if tryContentIndent != tryIndent+1 {
+		t.Errorf("TRY content should be indented, got content=%d TRY=%d", tryContentIndent, tryIndent)
+	}
+
+	// Content inside CATCH should be indented
+	if catchContentIndent != catchIndent+1 {
+		t.Errorf("CATCH content should be indented, got content=%d CATCH=%d", catchContentIndent, catchIndent)
+	}
+
+	// Content inside FINALLY should be indented
+	if finallyContentIndent != finallyIndent+1 {
+		t.Errorf("FINALLY content should be indented, got content=%d FINALLY=%d", finallyContentIndent, finallyIndent)
+	}
+
+	// :ENDTRY should be at same level as :TRY
+	if endTryIndent != tryIndent {
+		t.Errorf(":ENDTRY should be at same level as :TRY, got ENDTRY=%d TRY=%d", endTryIndent, tryIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_IfElseIndentation(t *testing.T) {
+	// Test IF/ELSE formatting - ELSE should be at same level as IF
+	input := `:IF x=1;
+DoOne();
+:ELSE;
+DoTwo();
+:ENDIF;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+
+	var ifIndent, ifContentIndent int
+	var elseIndent, elseContentIndent int
+	var endIfIndent int
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+
+		switch {
+		case strings.HasPrefix(trimmed, ":IF"):
+			ifIndent = indent
+		case strings.HasPrefix(trimmed, "DoOne"):
+			ifContentIndent = indent
+		case strings.HasPrefix(trimmed, ":ELSE"):
+			elseIndent = indent
+		case strings.HasPrefix(trimmed, "DoTwo"):
+			elseContentIndent = indent
+		case strings.HasPrefix(trimmed, ":ENDIF"):
+			endIfIndent = indent
+		}
+	}
+
+	// :ELSE should be at same level as :IF
+	if elseIndent != ifIndent {
+		t.Errorf(":ELSE should be at same level as :IF, got ELSE=%d IF=%d", elseIndent, ifIndent)
+	}
+
+	// Content inside IF should be indented
+	if ifContentIndent != ifIndent+1 {
+		t.Errorf("IF content should be indented, got content=%d IF=%d", ifContentIndent, ifIndent)
+	}
+
+	// Content inside ELSE should be indented
+	if elseContentIndent != elseIndent+1 {
+		t.Errorf("ELSE content should be indented, got content=%d ELSE=%d", elseContentIndent, elseIndent)
+	}
+
+	// :ENDIF should be at same level as :IF
+	if endIfIndent != ifIndent {
+		t.Errorf(":ENDIF should be at same level as :IF, got ENDIF=%d IF=%d", endIfIndent, ifIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_NestedCaseInProcedure(t *testing.T) {
+	// Test CASE nested inside a procedure
+	input := `:PROCEDURE Test;
+:BEGINCASE;
+:CASE x=1;
+DoOne();
+:ENDCASE;
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+
+	var procIndent, beginCaseIndent, caseIndent, contentIndent int
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+
+		switch {
+		case strings.HasPrefix(trimmed, ":PROCEDURE"):
+			procIndent = indent
+		case strings.HasPrefix(trimmed, ":BEGINCASE"):
+			beginCaseIndent = indent
+		case strings.HasPrefix(trimmed, ":CASE"):
+			caseIndent = indent
+		case strings.HasPrefix(trimmed, "DoOne"):
+			contentIndent = indent
+		}
+	}
+
+	// :BEGINCASE should be indented inside procedure
+	if beginCaseIndent != procIndent+1 {
+		t.Errorf(":BEGINCASE should be indented inside procedure, got BEGINCASE=%d PROC=%d", beginCaseIndent, procIndent)
+	}
+
+	// :CASE should be at same level as :BEGINCASE
+	if caseIndent != beginCaseIndent {
+		t.Errorf(":CASE should be at same level as :BEGINCASE, got CASE=%d BEGINCASE=%d", caseIndent, beginCaseIndent)
+	}
+
+	// Content should be indented inside CASE
+	if contentIndent != caseIndent+1 {
+		t.Errorf("Content should be indented inside :CASE, got content=%d CASE=%d", contentIndent, caseIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}

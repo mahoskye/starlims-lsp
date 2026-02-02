@@ -131,64 +131,64 @@ When a snippet trigger matches a keyword, both appear in completion:
 ### 6.1 Procedure Snippet
 
 ```ssl
-/* Test: Procedure snippet expands correctly */
-/* Type: :proc<Tab> */
-/* Expected expansion: */
+/* Test: Procedure snippet expands correctly;
+/* Type: :proc<Tab>;
+/* Expected expansion:;
 :PROCEDURE |ProcedureName|;
-    |/* body */|
+    |/* body;|
 :ENDPROC;
-/* Where |...| are tab stop positions */
+/* Where |...| are tab stop positions;
 ```
 
 ### 6.2 IF/ELSE Snippet
 
 ```ssl
-/* Test: IF/ELSE snippet */
-/* Type: :IFELSE<Tab> */
-/* Expected expansion: */
+/* Test: IF/ELSE snippet;
+/* Type: :IFELSE<Tab>;
+/* Expected expansion:;
 :IF |condition|;
-    |/* then body */|
+    |/* then body;|
 :ELSE;
-    |/* else body */|
+    |/* else body;|
 :ENDIF;
 ```
 
 ### 6.3 FOR Loop Snippet
 
 ```ssl
-/* Test: FOR loop snippet */
-/* Type: :FOR<Tab> */
-/* Expected expansion: */
+/* Test: FOR loop snippet;
+/* Type: :FOR<Tab>;
+/* Expected expansion:;
 :FOR |i| := |1| :TO |10|;
-    |/* body */|
+    |/* body;|
 :NEXT;
 ```
 
 ### 6.4 TRY/CATCH Snippet
 
 ```ssl
-/* Test: TRY/CATCH snippet */
-/* Type: :TRY<Tab> */
-/* Expected expansion: */
+/* Test: TRY/CATCH snippet;
+/* Type: :TRY<Tab>;
+/* Expected expansion:;
 :TRY;
-    |/* code */|
+    |/* code;|
 :CATCH;
-    |/* handle error */|
+    |/* handle error;|
 :ENDTRY;
 ```
 
 ### 6.5 BEGINCASE Snippet
 
 ```ssl
-/* Test: BEGINCASE snippet */
-/* Type: :BEGINCASE<Tab> */
-/* Expected expansion: */
+/* Test: BEGINCASE snippet;
+/* Type: :BEGINCASE<Tab>;
+/* Expected expansion:;
 :BEGINCASE;
 :CASE |condition1|;
-    |/* action */|
+    |/* action;|
     :EXITCASE;
 :OTHERWISE;
-    |/* default */|
+    |/* default;|
     :EXITCASE;
 :ENDCASE;
 ```
@@ -196,22 +196,22 @@ When a snippet trigger matches a keyword, both appear in completion:
 ### 6.6 SQL Snippet
 
 ```ssl
-/* Test: SQLExecute snippet */
-/* Type: sqlexec<Tab> */
-/* Expected expansion: */
+/* Test: SQLExecute snippet;
+/* Type: sqlexec<Tab>;
+/* Expected expansion:;
 |dsResult| := SQLExecute("|SELECT * FROM table|", "|dsName|");
 ```
 
 ### 6.7 Indentation Preservation
 
 ```ssl
-/* Test: Snippet respects current indentation */
+/* Test: Snippet respects current indentation;
 :PROCEDURE Test;
     :IF x > 0;
-        :FOR<Tab>  /* Trigger snippet here */
-/* Expected: FOR loop indented to match context */
+        :FOR<Tab>  /* Trigger snippet here;
+/* Expected: FOR loop indented to match context;
         :FOR i := 1 :TO 10;
-            /* body */
+            /* body;
         :NEXT;
 ```
 

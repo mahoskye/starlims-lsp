@@ -231,7 +231,19 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 
 	normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 
+	// Handle block end keywords - dedent before
 	if constants.IsBlockEndKeyword(normalized) {
+		s.indent--
+		if s.indent < 0 {
+			s.indent = 0
+		}
+	}
+
+	// Handle middle keywords (ELSE, CASE, CATCH, etc.) - dedent before
+	// They will re-indent in finalizeToken if they're in BlockStartKeywords
+	// (EXITCASE is in BlockMiddleKeywords but NOT in BlockStartKeywords,
+	// so it will dedent here but not re-indent after)
+	if constants.IsBlockMiddleKeyword(normalized) {
 		s.indent--
 		if s.indent < 0 {
 			s.indent = 0

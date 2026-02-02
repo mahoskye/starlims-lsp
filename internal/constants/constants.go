@@ -21,9 +21,10 @@ var SSLKeywords = []string{
 	"WHILE",
 }
 
-// BlockStartKeywords are keywords that start a block.
+// BlockStartKeywords are keywords that start a block (increase indent after).
+// Includes middle keywords like ELSE, CASE, CATCH that start new indented content.
 var BlockStartKeywords = []string{
-	"IF", "WHILE", "FOR", "BEGINCASE", "TRY", "PROCEDURE", "CLASS", "REGION", "BEGININLINECODE",
+	"IF", "ELSE", "WHILE", "FOR", "BEGINCASE", "CASE", "OTHERWISE", "TRY", "CATCH", "FINALLY", "PROCEDURE", "CLASS", "REGION", "BEGININLINECODE",
 }
 
 // BlockEndKeywords are keywords that end a block.
@@ -32,6 +33,7 @@ var BlockEndKeywords = []string{
 }
 
 // BlockMiddleKeywords are keywords that appear in the middle of blocks.
+// These dedent before themselves, then indent after (dedent-then-indent pattern).
 var BlockMiddleKeywords = []string{"ELSE", "CATCH", "FINALLY", "CASE", "OTHERWISE"}
 
 // CaseKeywords are keywords used in CASE statements.

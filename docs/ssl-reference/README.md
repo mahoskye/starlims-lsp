@@ -68,7 +68,7 @@ STARLIMS Scripting Language (SSL) is a domain-specific language used within the 
 nTotal := nPrice * nQuantity;
 
 :IF nTotal > 1000;
-    nTotal := nTotal * 0.9;  /* 10% discount ;
+    nTotal := nTotal * 0.9;  /* 10% discount;
 :ENDIF;
 
 :RETURN nTotal;

@@ -88,9 +88,9 @@ Current gaps or constraints.
 
 ### 6.1 Test Category
 \`\`\`ssl
-/* Test: Description */
+/* Test: Description;
 <ssl code>
-/* Expected: <LSP response or diagnostic> */
+/* Expected: <LSP response or diagnostic>;
 \`\`\`
 
 ## 7. Related Issues

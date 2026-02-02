@@ -122,94 +122,94 @@ Completions should NOT be offered inside comments (`/* ... ;`).
 ### 6.1 Keyword Completion
 
 ```ssl
-/* Test: Keyword completion after colon */
+/* Test: Keyword completion after colon;
 :I|
-/* Expected: CompletionList containing :IF, :INCLUDE, :INHERIT */
+/* Expected: CompletionList containing :IF, :INCLUDE, :INHERIT;
 
-/* Test: Keyword completion mid-word */
+/* Test: Keyword completion mid-word;
 :WHIL|
-/* Expected: CompletionList containing :WHILE */
+/* Expected: CompletionList containing :WHILE;
 ```
 
 ### 6.2 Function Completion
 
 ```ssl
-/* Test: Built-in function completion */
+/* Test: Built-in function completion;
 SQLEx|
-/* Expected: CompletionList containing SQLExecute, SQLExecDirect, etc. */
+/* Expected: CompletionList containing SQLExecute, SQLExecDirect, etc.;
 /* Each item should have:
    - kind: Function (3)
    - detail: Signature
    - documentation: Full description
-*/
+;
 ```
 
 ### 6.3 Literal Completion
 
 ```ssl
-/* Test: Boolean literal completion */
+/* Test: Boolean literal completion;
 x := .|
-/* Expected: CompletionList containing .T., .F. */
+/* Expected: CompletionList containing .T., .F.;
 
-/* Test: NIL literal */
+/* Test: NIL literal;
 x := NI|
-/* Expected: CompletionList containing NIL */
+/* Expected: CompletionList containing NIL;
 ```
 
 ### 6.4 Operator Completion
 
 ```ssl
-/* Test: Logical operator completion */
+/* Test: Logical operator completion;
 :IF x .A|
-/* Expected: CompletionList containing .AND. */
+/* Expected: CompletionList containing .AND.;
 ```
 
 ### 6.5 Variable Completion
 
 ```ssl
-/* Test: Declared variable completion */
+/* Test: Declared variable completion;
 :PROCEDURE Test;
 :DECLARE myVariable;
 myV|
-/* Expected: CompletionList containing myVariable */
+/* Expected: CompletionList containing myVariable;
 :ENDPROC;
 ```
 
 ### 6.6 Procedure Completion
 
 ```ssl
-/* Test: User procedure completion */
+/* Test: User procedure completion;
 :PROCEDURE HelperFunction;
 :ENDPROC;
 
 :PROCEDURE Main;
 Hel|
-/* Expected: CompletionList containing HelperFunction */
+/* Expected: CompletionList containing HelperFunction;
 :ENDPROC;
 ```
 
 ### 6.7 Context Exclusion
 
 ```ssl
-/* Test: No completion in strings */
+/* Test: No completion in strings;
 x := "some text SQL|";
-/* Expected: No completions */
+/* Expected: No completions;
 
-/* Test: No completion in comments */
-/* This is a comment SQL| ;
-/* Expected: No completions */
+/* Test: No completion in comments;
+/* This is a comment SQL|;
+/* Expected: No completions;
 ```
 
 ### 6.8 Snippet Completion
 
 ```ssl
-/* Test: Snippet for IF block */
+/* Test: Snippet for IF block;
 :IF|
 /* Expected: CompletionList containing snippet:
    - label: ":IF...:ENDIF"
    - insertText: ":IF ${1:condition};\n\t$0\n:ENDIF;"
    - insertTextFormat: Snippet (2)
-*/
+;
 ```
 
 ---

@@ -93,7 +93,7 @@ Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "Calculat
 ### 6.1 Basic Search
 
 ```ssl
-/* File: helpers.ssl (open) */
+/* File: helpers.ssl (open);
 :PROCEDURE CalculateTotal;
 :ENDPROC;
 
@@ -102,69 +102,69 @@ Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "Calculat
 ```
 
 ```
-/* Test: Search for "Calculate" */
+/* Test: Search for "Calculate";
 Query: "Calculate"
 /* Expected:
    [
      { name: "CalculateTotal", kind: 12, containerName: "helpers.ssl" },
      { name: "CalculateAverage", kind: 12, containerName: "helpers.ssl" }
    ]
-*/
+;
 ```
 
 ### 6.2 Case Insensitive Search
 
 ```
-/* Test: Lowercase query matches */
+/* Test: Lowercase query matches;
 Query: "calculate"
-/* Expected: Same results as above */
+/* Expected: Same results as above;
 ```
 
 ### 6.3 Partial Match
 
 ```
-/* Test: Substring match */
+/* Test: Substring match;
 Query: "age"
-/* Expected: Matches "CalculateAverage" (contains "age") */
+/* Expected: Matches "CalculateAverage" (contains "age");
 ```
 
 ### 6.4 Empty Query
 
 ```
-/* Test: Empty query returns all */
+/* Test: Empty query returns all;
 Query: ""
-/* Expected: All procedures from all open documents */
+/* Expected: All procedures from all open documents;
 ```
 
 ### 6.5 No Matches
 
 ```
-/* Test: No matching procedures */
+/* Test: No matching procedures;
 Query: "xyz123"
-/* Expected: [] (empty array) */
+/* Expected: [] (empty array);
 ```
 
 ### 6.6 Multiple Open Documents
 
 ```
-/* File: file1.ssl (open) */
+/* File: file1.ssl (open);
 :PROCEDURE ProcA;
 :ENDPROC;
 
-/* File: file2.ssl (open) */
+/* File: file2.ssl (open);
 :PROCEDURE ProcB;
 :ENDPROC;
 ```
 
 ```
-/* Test: Search across open documents */
+/* Test: Search across open documents;
 Query: "Proc"
 /* Expected:
    [
      { name: "ProcA", containerName: "file1.ssl" },
      { name: "ProcB", containerName: "file2.ssl" }
    ]
-*/
+;
 ```
 
 ---

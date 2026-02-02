@@ -77,22 +77,22 @@ The starlims-lsp provides completion and hover support for these built-in classe
 ### Creating Objects
 
 ```ssl
-/* Using CreateUDObject ;
+/* Using CreateUDObject;
 oExpando := CreateUDObject("SSLExpando");
 oExpando:PropertyName := "value";
 
-/* Direct instantiation (where supported) ;
+/* Direct instantiation (where supported);
 oDataset := CreateUDObject("SSLDataset");
 ```
 
 ### Accessing Properties and Methods
 
 ```ssl
-/* Property access ;
+/* Property access;
 value := oObject:PropertyName;
 oObject:PropertyName := newValue;
 
-/* Method calls ;
+/* Method calls;
 result := oObject:MethodName(param1, param2);
 ```
 
@@ -110,11 +110,11 @@ oData:Name := "John Doe";
 oData:Age := 30;
 oData:Items := {1, 2, 3};
 
-/* Add property dynamically ;
+/* Add property dynamically;
 oData:AddProperty("NewProperty");
 oData:NewProperty := "value";
 
-/* Check if property exists ;
+/* Check if property exists;
 bExists := oData:HasProperty("Name");
 ```
 
@@ -127,17 +127,17 @@ For tabular data manipulation:
 ```ssl
 :DECLARE oDS;
 
-/* Create from SQL ;
+/* Create from SQL;
 oDS := GetDataSet("SELECT * FROM customers", "dsCustomers");
 
-/* Navigate ;
+/* Navigate;
 oDS:First();
 :WHILE .NOT. oDS:Eof();
     sName := oDS:Fields("customer_name"):Value;
     oDS:Next();
 :ENDWHILE;
 
-/* Modify ;
+/* Modify;
 oDS:Edit();
 oDS:Fields("status"):Value := "active";
 oDS:Post();

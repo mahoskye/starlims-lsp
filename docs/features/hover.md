@@ -136,18 +136,18 @@ Hovering over `?` should show:
 ### 6.1 Keyword Hover
 
 ```ssl
-/* Test: Hover over keyword */
+/* Test: Hover over keyword;
 :IF .T.;
-/* Hover position: line 1, character 1 (over "IF") */
-/* Expected: Markdown content describing :IF usage */
+/* Hover position: line 1, character 1 (over "IF");
+/* Expected: Markdown content describing :IF usage;
 ```
 
 ### 6.2 Built-in Function Hover
 
 ```ssl
-/* Test: Hover over built-in function */
+/* Test: Hover over built-in function;
 result := SQLExecute(query, "ds");
-/* Hover position: line 1, character 12 (over "SQLExecute") */
+/* Hover position: line 1, character 12 (over "SQLExecute");
 /* Expected:
    ```ssl
    function SQLExecute(cSQL: String, cDSName: String): Dataset
@@ -159,122 +159,122 @@ result := SQLExecute(query, "ds");
    - `cDSName`: ...
    
    **Returns:** Dataset
-*/
+;
 ```
 
 ### 6.3 Built-in Class Hover
 
 ```ssl
-/* Test: Hover over built-in class */
+/* Test: Hover over built-in class;
 obj := CreateUDObject("SSLExpando");
-/* Hover position: over "SSLExpando" */
-/* Expected: Description of SSLExpando class */
+/* Hover position: over "SSLExpando";
+/* Expected: Description of SSLExpando class;
 ```
 
 ### 6.4 Literal Hover
 
 ```ssl
-/* Test: Hover over boolean literal */
+/* Test: Hover over boolean literal;
 bFlag := .T.;
-/* Hover position: over ".T." */
-/* Expected: ".T. - Boolean true value" */
+/* Hover position: over ".T.";
+/* Expected: ".T. - Boolean true value";
 
-/* Test: Hover over NIL */
+/* Test: Hover over NIL;
 x := NIL;
-/* Hover position: over "NIL" */
-/* Expected: "NIL - Null/empty value" */
+/* Hover position: over "NIL";
+/* Expected: "NIL - Null/empty value";
 ```
 
 ### 6.5 Operator Hover
 
 ```ssl
-/* Test: Hover over logical operator */
+/* Test: Hover over logical operator;
 :IF a .AND. b;
-/* Hover position: over ".AND." */
-/* Expected: ".AND. - Logical AND operator" */
+/* Hover position: over ".AND.";
+/* Expected: ".AND. - Logical AND operator";
 ```
 
 ### 6.6 User Procedure Hover
 
 ```ssl
-/* Test: Hover over user-defined procedure */
+/* Test: Hover over user-defined procedure;
 :PROCEDURE CalculateTotal;
 :PARAMETERS nPrice, nQuantity;
 :ENDPROC;
 
 :PROCEDURE Main;
     CalculateTotal(10, 5);
-/* Hover position: over "CalculateTotal" on line 6 */
+/* Hover position: over "CalculateTotal" on line 6;
 /* Expected:
    ```ssl
    procedure CalculateTotal(nPrice, nQuantity)
    ```
    Defined at line 1
-*/
+;
 :ENDPROC;
 ```
 
 ### 6.7 Variable Hover
 
 ```ssl
-/* Test: Hover over declared variable */
+/* Test: Hover over declared variable;
 :PROCEDURE Test;
 :DECLARE myCounter;
 x := myCounter + 1;
-/* Hover position: over "myCounter" on line 4 */
-/* Expected: "myCounter - Declared at line 3" */
+/* Hover position: over "myCounter" on line 4;
+/* Expected: "myCounter - Declared at line 3";
 :ENDPROC;
 ```
 
 ### 6.8 DoProc Signature Hover
 
 ```ssl
-/* Test: Hover over DoProc shows correct signature */
+/* Test: Hover over DoProc shows correct signature;
 DoProc("MyProcedure", {arg1, arg2});
-/* Hover position: over "DoProc" */
+/* Hover position: over "DoProc";
 /* Expected:
    ```ssl
    function DoProc(cProcedureName: String, aArgs: Array): Any
    ```
    (First parameter is procedure name, not just "any[] args")
-*/
+;
 ```
 
 ### 6.9 Context Exclusion
 
 ```ssl
-/* Test: No hover inside strings (for non-SQL content) */
+/* Test: No hover inside strings (for non-SQL content);
 x := "SQLExecute is a function";
-/* Hover position: over "SQLExecute" inside the string */
-/* Expected: No hover (or null response) */
+/* Hover position: over "SQLExecute" inside the string;
+/* Expected: No hover (or null response);
 
-/* Test: No hover inside comments */
-/* SQLExecute would be here ;
-/* Hover position: over "SQLExecute" inside comment */
-/* Expected: No hover (or null response) */
+/* Test: No hover inside comments;
+/* SQLExecute would be here;
+/* Hover position: over "SQLExecute" inside comment;
+/* Expected: No hover (or null response);
 ```
 
 ### 6.10 SQL Placeholder Hover (PLANNED)
 
 ```ssl
-/* Test: Hover over named SQL parameter */
+/* Test: Hover over named SQL parameter;
 :DECLARE sCustomer;
 sCustomer := "ACME";
 sSQL := "SELECT * FROM customers WHERE name = ?sCustomer?";
-/* Hover position: over "sCustomer" inside the ?...? */
+/* Hover position: over "sCustomer" inside the ?...?;
 /* Expected:
    **SQL Parameter:** `sCustomer`
    **Value:** "ACME"
    Declared at line 2
-*/
+;
 
-/* Test: Hover over positional SQL placeholder */
+/* Test: Hover over positional SQL placeholder;
 RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
-/* Hover position: over second "?" */
+/* Hover position: over second "?";
 /* Expected:
    **Positional SQL Placeholder**
    Parameter 2
-*/
+;
 ```
 
 ---

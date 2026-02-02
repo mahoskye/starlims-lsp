@@ -69,7 +69,7 @@ STARLIMS conventionally uses Hungarian notation prefixes:
 :PARAMETERS param1, param2 :DEFAULT "";
 :DECLARE localVar1, localVar2;
 
-/* Main logic here ;
+/* Main logic here;
 
 :RETURN result;
 :ENDPROC;
@@ -89,10 +89,10 @@ Recommended order:
 :BEGINCASE;
 :CASE condition;
     DoSomething();
-    :EXITCASE;  /* Required! ;
+    :EXITCASE;  /* Required!;
 :OTHERWISE;
     DoDefault();
-    :EXITCASE;  /* Required! ;
+    :EXITCASE;  /* Required!;
 :ENDCASE;
 ```
 
@@ -123,7 +123,7 @@ Recommended order:
  *   nPrice    - Unit price
  *   nQuantity - Number of items
  * Returns:   Numeric total
- ;
+;
 :PROCEDURE CalculateTotal;
 ```
 
@@ -158,14 +158,14 @@ ds := SQLExecute(sSQL, "dsCustomers");
 
 ```ssl
 :TRY;
-    /* Risky operation ;
+    /* Risky operation;
     result := PerformOperation();
 :CATCH;
-    /* Handle error ;
+    /* Handle error;
     LogError(Error():Message);
     result := NIL;
 :FINALLY;
-    /* Cleanup ;
+    /* Cleanup;
     CloseResources();
 :ENDTRY;
 ```

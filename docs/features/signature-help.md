@@ -68,7 +68,7 @@ When functions are nested, signature help shows the innermost function:
 
 ```ssl
 OuterFunc(InnerFunc(|))
-/*                  ^ Cursor here shows InnerFunc signature */
+/*                  ^ Cursor here shows InnerFunc signature;
 ```
 
 ### 4.2 Optional Parameters
@@ -77,7 +77,7 @@ Optional parameters are indicated in the signature:
 
 ```ssl
 function DoProc(cProcName: String, aArgs?: Array): Any
-/*                                 ^--- Optional indicator */
+/*                                 ^--- Optional indicator;
 ```
 
 ### 4.3 No Signature Found
@@ -90,7 +90,7 @@ For user-defined procedures, parameters are extracted from `:PARAMETERS` declara
 
 ```ssl
 procedure MyProc(param1, param2)
-/* No type info - SSL is dynamically typed */
+/* No type info - SSL is dynamically typed;
 ```
 
 ---
@@ -110,9 +110,9 @@ procedure MyProc(param1, param2)
 ### 6.1 Basic Signature Help
 
 ```ssl
-/* Test: Opening parenthesis triggers signature */
+/* Test: Opening parenthesis triggers signature;
 SQLExecute(|
-/* Position: after '(' */
+/* Position: after '(';
 /* Expected:
    signatures: [{
      label: "SQLExecute(cSQL: String, cDSName: String): Dataset",
@@ -122,51 +122,51 @@ SQLExecute(|
      ]
    }],
    activeParameter: 0
-*/
+;
 ```
 
 ### 6.2 Active Parameter Tracking
 
 ```ssl
-/* Test: First parameter active */
+/* Test: First parameter active;
 SQLExecute(query|
-/* Expected: activeParameter: 0 */
+/* Expected: activeParameter: 0;
 
-/* Test: Second parameter active after comma */
+/* Test: Second parameter active after comma;
 SQLExecute(query, |
-/* Expected: activeParameter: 1 */
+/* Expected: activeParameter: 1;
 
-/* Test: Second parameter still active mid-argument */
+/* Test: Second parameter still active mid-argument;
 SQLExecute(query, dsName|
-/* Expected: activeParameter: 1 */
+/* Expected: activeParameter: 1;
 ```
 
 ### 6.3 Nested Function Calls
 
 ```ssl
-/* Test: Innermost function signature shown */
+/* Test: Innermost function signature shown;
 Upper(Trim(|))
-/* Expected: Signature for Trim, not Upper */
-/* activeParameter: 0 for Trim */
+/* Expected: Signature for Trim, not Upper;
+/* activeParameter: 0 for Trim;
 
-/* Test: Outer function after closing inner */
+/* Test: Outer function after closing inner;
 Upper(Trim(x)|)
-/* Expected: Signature for Upper */
-/* activeParameter: 0 (the Trim(x) result) */
+/* Expected: Signature for Upper;
+/* activeParameter: 0 (the Trim(x) result);
 ```
 
 ### 6.4 Multiple Commas
 
 ```ssl
-/* Test: Third parameter */
+/* Test: Third parameter;
 SomeFunc(a, b, |)
-/* Expected: activeParameter: 2 */
+/* Expected: activeParameter: 2;
 ```
 
 ### 6.5 User Procedure Signature
 
 ```ssl
-/* Test: User procedure with parameters */
+/* Test: User procedure with parameters;
 :PROCEDURE Calculate;
 :PARAMETERS nValue, sType, bFlag;
 :ENDPROC;
@@ -183,24 +183,24 @@ Calculate(|
      ]
    }],
    activeParameter: 0
-*/
+;
 :ENDPROC;
 ```
 
 ### 6.6 Unknown Function
 
 ```ssl
-/* Test: Unknown function returns null */
+/* Test: Unknown function returns null;
 UnknownFunc(|
-/* Expected: null (no signature help) */
+/* Expected: null (no signature help);
 ```
 
 ### 6.7 Outside Function Call
 
 ```ssl
-/* Test: No signature help outside parens */
+/* Test: No signature help outside parens;
 x := 5;|
-/* Expected: null */
+/* Expected: null;
 ```
 
 ---

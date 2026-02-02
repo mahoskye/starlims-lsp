@@ -104,7 +104,7 @@ Currently, references are found only within the same file.
 ### 6.1 Procedure References
 
 ```ssl
-/* Test: Find all references to procedure */
+/* Test: Find all references to procedure;
 :PROCEDURE HelperProc;
 :ENDPROC;
 
@@ -112,88 +112,88 @@ Currently, references are found only within the same file.
     HelperProc();
     x := HelperProc();
 :ENDPROC;
-/* Find references on: HelperProc (line 1) */
+/* Find references on: HelperProc (line 1);
 /* Expected (includeDeclaration: true):
    - Line 1, "HelperProc" (definition)
    - Line 5, "HelperProc" (call)
    - Line 6, "HelperProc" (call)
-*/
+;
 ```
 
 ### 6.2 Variable References
 
 ```ssl
-/* Test: Find all references to variable */
+/* Test: Find all references to variable;
 :PROCEDURE Test;
 :DECLARE counter;
 counter := 0;
 counter := counter + 1;
 x := counter;
 :ENDPROC;
-/* Find references on: counter (line 2) */
+/* Find references on: counter (line 2);
 /* Expected (includeDeclaration: true):
    - Line 2, "counter" (declaration)
    - Line 3, "counter" (assignment target)
    - Line 4, "counter" (twice - target and usage)
    - Line 5, "counter" (usage)
-*/
+;
 ```
 
 ### 6.3 Exclude Declaration
 
 ```ssl
-/* Test: Find references without declaration */
+/* Test: Find references without declaration;
 :PROCEDURE Test;
 :DECLARE myVar;
 x := myVar;
 :ENDPROC;
-/* Find references on: myVar, includeDeclaration: false */
+/* Find references on: myVar, includeDeclaration: false;
 /* Expected:
    - Line 3, "myVar" (usage only)
    NOT line 2 (declaration excluded)
-*/
+;
 ```
 
 ### 6.4 Case Insensitivity
 
 ```ssl
-/* Test: Case-insensitive matching */
+/* Test: Case-insensitive matching;
 :PROCEDURE Test;
 :DECLARE MyVariable;
 x := myvariable;
 y := MYVARIABLE;
 :ENDPROC;
-/* Find references on: MyVariable (line 2) */
+/* Find references on: MyVariable (line 2);
 /* Expected:
    - Line 2, "MyVariable"
    - Line 3, "myvariable"
    - Line 4, "MYVARIABLE"
-*/
+;
 ```
 
 ### 6.5 Whole Word Matching
 
 ```ssl
-/* Test: Only whole word matches */
+/* Test: Only whole word matches;
 :PROCEDURE Test;
 :DECLARE count;
 x := count;
 y := countAll;
 z := recount;
 :ENDPROC;
-/* Find references on: count (line 2) */
+/* Find references on: count (line 2);
 /* Expected:
    - Line 2, "count"
    - Line 3, "count"
    NOT line 4 (countAll is different identifier)
    NOT line 5 (recount is different identifier)
-*/
+;
 ```
 
 ### 6.6 Scoped References
 
 ```ssl
-/* Test: References respect scope */
+/* Test: References respect scope;
 :PROCEDURE ProcA;
 :DECLARE localVar;
 x := localVar;
@@ -203,46 +203,46 @@ x := localVar;
 :DECLARE localVar;
 y := localVar;
 :ENDPROC;
-/* Find references on: localVar in ProcA (line 2) */
+/* Find references on: localVar in ProcA (line 2);
 /* Expected:
    - Line 2, "localVar" (ProcA's declaration)
    - Line 3, "localVar" (ProcA's usage)
    NOT line 7 or 8 (different scope)
-*/
+;
 ```
 
 ### 6.7 Context Exclusion (Expected Behavior)
 
 ```ssl
-/* Test: Exclude references in comments */
+/* Test: Exclude references in comments;
 :PROCEDURE Test;
-/* This mentions myVar but shouldn't count ;
+/* This mentions myVar but shouldn't count;
 :DECLARE myVar;
 x := myVar;
 :ENDPROC;
-/* Find references on: myVar (line 3) */
+/* Find references on: myVar (line 3);
 /* Expected (ideally):
    - Line 3, "myVar" (declaration)
    - Line 4, "myVar" (usage)
    NOT line 2 (inside comment)
-*/
+;
 ```
 
 ### 6.8 DoProc String Reference (PLANNED)
 
 ```ssl
-/* Test: Find procedure reference in DoProc string */
+/* Test: Find procedure reference in DoProc string;
 :PROCEDURE TargetProc;
 :ENDPROC;
 
 :PROCEDURE Main;
     DoProc("TargetProc", {});
 :ENDPROC;
-/* Find references on: TargetProc (line 1) */
+/* Find references on: TargetProc (line 1);
 /* Expected (when implemented):
    - Line 1, "TargetProc" (definition)
    - Line 5, "TargetProc" inside string (procedure call reference)
-*/
+;
 ```
 
 ---

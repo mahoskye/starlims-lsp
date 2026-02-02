@@ -79,10 +79,12 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 `:IF`, `:ELSE`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:TRY`, `:CATCH`, `:FINALLY`, `:PROCEDURE`, `:CLASS`, `:REGION`
 
 **Decrease indent before:**
-`:ENDIF`, `:ENDWHILE`, `:NEXT`, `:ENDCASE`, `:ENDTRY`, `:ENDPROC`, `:ENDCLASS`, `:ENDREGION`
+`:ENDIF`, `:ENDWHILE`, `:NEXT`, `:ENDCASE`, `:ENDTRY`, `:ENDPROC`, `:ENDREGION`
 
 **Same level (dedent then indent):**
-`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY`, `:EXITCASE`
+`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY`
+
+**Note:** `:EXITCASE` is a regular statement (like `break`) that stays at content indentation level.
 
 ### 4.2 Parenthesis Alignment
 
@@ -115,11 +117,11 @@ result := CallFunction(
 **Expected Behavior:** Comments on the same line as code should remain on that line:
 
 ```ssl
-x := 5;  /* set x to 5 ;
+x := 5;  /* set x to 5;
 
-/* Should NOT become: */
+/* Should NOT become:;
 x := 5;
-/* set x to 5 ;
+/* set x to 5;
 ```
 
 **Status:** Known gap, tracked for v1.3.
@@ -131,7 +133,7 @@ x := 5;
 **Expected Behavior:** Preserve user's intentional line breaks:
 
 ```ssl
-/* User wrote: */
+/* User wrote:;
 result := OuterFunction(
     InnerFunction(
         arg1,
@@ -140,7 +142,7 @@ result := OuterFunction(
     arg3
 );
 
-/* Should NOT become: */
+/* Should NOT become:;
 result := OuterFunction(InnerFunction(arg1, arg2), arg3);
 ```
 
@@ -157,7 +159,7 @@ Comment content should NEVER be modified:
     block
 ;
 
-/* Should remain exactly as written, not collapsed */
+/* Should remain exactly as written, not collapsed;
 ```
 
 ### 5.4 SQL Function Casing
@@ -210,15 +212,15 @@ DoProc("MyProc", {
 ### 7.1 Basic Indentation
 
 ```ssl
-/* Test: Block indentation */
-/* Before: */
+/* Test: Block indentation;
+/* Before:;
 :PROCEDURE Test;
 :IF .T.;
 x := 1;
 :ENDIF;
 :ENDPROC;
 
-/* After: */
+/* After:;
 :PROCEDURE Test;
     :IF .T.;
         x := 1;
@@ -229,13 +231,13 @@ x := 1;
 ### 7.2 Operator Spacing
 
 ```ssl
-/* Test: Spacing around operators */
-/* Before: */
+/* Test: Spacing around operators;
+/* Before:;
 x:=1;
 y:=x+y*z;
 :IF a>b.AND.c<d;
 
-/* After: */
+/* After:;
 x := 1;
 y := x + y * z;
 :IF a > b .AND. c < d;
@@ -244,19 +246,19 @@ y := x + y * z;
 ### 7.3 Comma Spacing
 
 ```ssl
-/* Test: Spacing after commas */
-/* Before: */
+/* Test: Spacing after commas;
+/* Before:;
 DoSomething(a,b,c);
 
-/* After: */
+/* After:;
 DoSomething(a, b, c);
 ```
 
 ### 7.4 CASE Statement Indentation
 
 ```ssl
-/* Test: CASE block formatting */
-/* Before: */
+/* Test: CASE block formatting;
+/* Before:;
 :BEGINCASE;
 :CASE x=1;
 DoOne();
@@ -266,7 +268,7 @@ DoDefault();
 :EXITCASE;
 :ENDCASE;
 
-/* After: */
+/* After:;
 :BEGINCASE;
 :CASE x = 1;
     DoOne();
@@ -280,8 +282,8 @@ DoDefault();
 ### 7.5 TRY/CATCH Formatting
 
 ```ssl
-/* Test: TRY block formatting */
-/* Before: */
+/* Test: TRY block formatting;
+/* Before:;
 :TRY;
 DoRisky();
 :CATCH;
@@ -290,7 +292,7 @@ HandleError();
 Cleanup();
 :ENDTRY;
 
-/* After: */
+/* After:;
 :TRY;
     DoRisky();
 :CATCH;
@@ -303,11 +305,11 @@ Cleanup();
 ### 7.6 SQL Formatting (standard)
 
 ```ssl
-/* Test: SQL string formatting */
-/* Before: */
+/* Test: SQL string formatting;
+/* Before:;
 ds := GetDataSet("select id,name from users where active=1 and status='open'", "ds");
 
-/* After: */
+/* After:;
 ds := GetDataSet("
     SELECT id, name
     FROM users
@@ -318,12 +320,12 @@ ds := GetDataSet("
 ### 7.7 SQL Formatting (canonicalCompact)
 
 ```ssl
-/* Test: SQL with indented AND/OR */
-/* Config: sql.style = "canonicalCompact" */
-/* Before: */
+/* Test: SQL with indented AND/OR;
+/* Config: sql.style = "canonicalCompact";
+/* Before:;
 ds := GetDataSet("select * from users where a=1 and b=2 and c=3", "ds");
 
-/* After: */
+/* After:;
 ds := GetDataSet("
     SELECT *
     FROM users
@@ -336,8 +338,8 @@ ds := GetDataSet("
 ### 7.8 Range Formatting
 
 ```ssl
-/* Test: Format selected range preserves context */
-/* Document: */
+/* Test: Format selected range preserves context;
+/* Document:;
 :PROCEDURE Outer;
     :IF condition;
         x:=1;
@@ -345,8 +347,8 @@ ds := GetDataSet("
     :ENDIF;
 :ENDPROC;
 
-/* Select and format lines 3-4 only */
-/* Expected: Only those lines formatted, indentation preserved */
+/* Select and format lines 3-4 only;
+/* Expected: Only those lines formatted, indentation preserved;
         x := 1;
         y := 2;
 ```
@@ -354,30 +356,30 @@ ds := GetDataSet("
 ### 7.9 End-of-Line Comment Preservation (Expected)
 
 ```ssl
-/* Test: End-of-line comments stay on same line */
-/* Before: */
-x := 5;  /* initialize x ;
+/* Test: End-of-line comments stay on same line;
+/* Before:;
+x := 5;  /* initialize x;
 
-/* Expected After: */
-x := 5;  /* initialize x ;
+/* Expected After:;
+x := 5;  /* initialize x;
 
-/* Should NOT become: */
+/* Should NOT become:;
 x := 5;
-/* initialize x ;
+/* initialize x;
 ```
 
 ### 7.10 Blank Lines Between Procedures
 
 ```ssl
-/* Test: Configurable blank lines */
-/* Config: blankLinesBetweenProcs = 1 */
-/* Before: */
+/* Test: Configurable blank lines;
+/* Config: blankLinesBetweenProcs = 1;
+/* Before:;
 :PROCEDURE First;
 :ENDPROC;
 :PROCEDURE Second;
 :ENDPROC;
 
-/* After: */
+/* After:;
 :PROCEDURE First;
 :ENDPROC;
 
