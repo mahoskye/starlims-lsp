@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
 
@@ -404,6 +405,159 @@ func TestGetSignatureHelp_NestedCalls(t *testing.T) {
 				t.Error("expected non-empty signature label")
 			}
 		}
+	}
+}
+
+func TestGetSignatureHelpWithProcedures_UserDefinedProc(t *testing.T) {
+	// Test signature help for a user-defined procedure
+	text := `:PROCEDURE MyCustomProc;
+:PARAMETERS sName, nValue, bFlag;
+:ENDPROC;
+
+result := MyCustomProc(`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+
+	// Position cursor inside the call to MyCustomProc
+	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 24)
+
+	if help == nil {
+		t.Fatal("expected signature help for user-defined procedure")
+	}
+
+	if len(help.Signatures) != 1 {
+		t.Fatalf("expected 1 signature, got %d", len(help.Signatures))
+	}
+
+	sig := help.Signatures[0]
+	if !strings.Contains(sig.Label, "MyCustomProc") {
+		t.Errorf("expected label to contain 'MyCustomProc', got: %s", sig.Label)
+	}
+
+	if len(sig.Parameters) != 3 {
+		t.Errorf("expected 3 parameters, got %d", len(sig.Parameters))
+	}
+
+	expectedParams := []string{"sName", "nValue", "bFlag"}
+	for i, param := range sig.Parameters {
+		if param.Label != expectedParams[i] {
+			t.Errorf("parameter %d: expected '%s', got '%s'", i, expectedParams[i], param.Label)
+		}
+	}
+}
+
+func TestGetSignatureHelpWithProcedures_ActiveParameter(t *testing.T) {
+	// Test that active parameter is tracked correctly for user procedures
+	text := `:PROCEDURE Calculate;
+:PARAMETERS nA, nB, nC;
+:ENDPROC;
+
+result := Calculate(1, 2, `
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+
+	// Position cursor after the second comma (third parameter)
+	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 26)
+
+	if help == nil {
+		t.Fatal("expected signature help")
+	}
+
+	if help.ActiveParameter != 2 {
+		t.Errorf("expected active parameter 2 (third param), got %d", help.ActiveParameter)
+	}
+}
+
+func TestGetSignatureHelpWithProcedures_NoParams(t *testing.T) {
+	// Test procedure with no parameters
+	text := `:PROCEDURE DoSomething;
+:ENDPROC;
+
+result := DoSomething(`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+
+	// Position cursor after the opening paren (column 23)
+	help := GetSignatureHelpWithProcedures(tokens, procedures, 4, 23)
+
+	if help == nil {
+		t.Fatal("expected signature help for procedure with no params")
+	}
+
+	sig := help.Signatures[0]
+	if sig.Label != "DoSomething()" {
+		t.Errorf("expected 'DoSomething()', got: %s", sig.Label)
+	}
+
+	if len(sig.Parameters) != 0 {
+		t.Errorf("expected 0 parameters, got %d", len(sig.Parameters))
+	}
+}
+
+func TestGetSignatureHelpWithProcedures_BuiltInTakesPrecedence(t *testing.T) {
+	// Built-in functions should still work and take precedence
+	text := `:PROCEDURE Len;
+:PARAMETERS x;
+:ENDPROC;
+
+result := Len(`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+
+	// Position cursor after the opening paren
+	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 15)
+
+	if help == nil {
+		t.Fatal("expected signature help")
+	}
+
+	// Should get the built-in Len function, not the user-defined one
+	sig := help.Signatures[0]
+	// Built-in Len has a specific signature with type info
+	if strings.Contains(sig.Documentation, "User-defined") {
+		t.Error("expected built-in function signature, got user-defined")
+	}
+}
+
+func TestGetSignatureHelpWithProcedures_CaseInsensitive(t *testing.T) {
+	// Test case-insensitive matching for procedure names
+	text := `:PROCEDURE myproc;
+:PARAMETERS sValue;
+:ENDPROC;
+
+result := MYPROC(`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+
+	// Position cursor after the opening paren
+	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 18)
+
+	if help == nil {
+		t.Fatal("expected signature help with case-insensitive match")
+	}
+
+	if len(help.Signatures[0].Parameters) != 1 {
+		t.Error("expected 1 parameter from case-insensitive match")
 	}
 }
 

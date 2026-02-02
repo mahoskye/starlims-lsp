@@ -301,8 +301,9 @@ func (s *SSLServer) handleSignatureHelp(context *glsp.Context, params *protocol.
 	cache := s.documents.ParseDocument(uri, version)
 
 	// Get signature help - LSP positions are 0-based, our functions expect 1-based
-	help := providers.GetSignatureHelpFromTokens(
+	help := providers.GetSignatureHelpWithProcedures(
 		cache.Tokens,
+		cache.Procedures,
 		int(params.Position.Line)+1,
 		int(params.Position.Character)+1,
 	)
