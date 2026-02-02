@@ -10,7 +10,14 @@ This is an unofficial community project and is not affiliated with, endorsed by,
 
 ## Documentation
 
-See `DOCUMENTATION.md` for a deeper usage and configuration guide.
+For comprehensive documentation, see the [`docs/`](docs/) directory:
+
+| Document | Description |
+|----------|-------------|
+| [Documentation Hub](docs/README.md) | Complete documentation index |
+| [Feature Status](docs/STATUS.md) | Current implementation status |
+| [Configuration Reference](docs/configuration/CONFIGURATION.md) | All configuration options |
+| [Roadmap](docs/vision/ROADMAP.md) | Prioritized development plan |
 
 ## Features
 
