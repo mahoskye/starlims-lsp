@@ -258,3 +258,184 @@ func filterNonWSSQL(tokens []SQLToken) []SQLToken {
 	}
 	return result
 }
+
+// ============================================================================
+// SQL Function Casing Tests
+// ============================================================================
+
+func TestSQLLexer_RecognizesFunctions(t *testing.T) {
+	input := "SELECT COUNT(*) FROM users"
+	lexer := NewSQLLexer(input)
+	tokens := lexer.Tokenize()
+
+	// Find COUNT token
+	var countToken *SQLToken
+	for i := range tokens {
+		if strings.ToUpper(tokens[i].Text) == "COUNT" {
+			countToken = &tokens[i]
+			break
+		}
+	}
+
+	if countToken == nil {
+		t.Fatal("expected to find COUNT token")
+	}
+
+	if countToken.Type != SQLTokenFunction {
+		t.Errorf("expected COUNT to be SQLTokenFunction, got %v", countToken.Type)
+	}
+}
+
+func TestSQLFormatter_FunctionCasingUpper(t *testing.T) {
+	sql := "SELECT count(*), sum(amount), avg(price) FROM orders"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.KeywordCase = "upper" // default
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Functions should be uppercase
+	if !strings.Contains(formatted, "COUNT(") {
+		t.Errorf("expected COUNT to be uppercase, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, "SUM(") {
+		t.Errorf("expected SUM to be uppercase, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, "AVG(") {
+		t.Errorf("expected AVG to be uppercase, got: %s", formatted)
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_FunctionCasingLower(t *testing.T) {
+	sql := "SELECT COUNT(*), SUM(amount) FROM orders"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.KeywordCase = "lower"
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Functions should be lowercase
+	if !strings.Contains(formatted, "count(") {
+		t.Errorf("expected count to be lowercase, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, "sum(") {
+		t.Errorf("expected sum to be lowercase, got: %s", formatted)
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_FunctionCasingPreserve(t *testing.T) {
+	sql := "SELECT Count(*), Sum(amount) FROM orders"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.KeywordCase = "preserve"
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Functions should preserve original casing
+	if !strings.Contains(formatted, "Count(") {
+		t.Errorf("expected Count to be preserved, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, "Sum(") {
+		t.Errorf("expected Sum to be preserved, got: %s", formatted)
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_FunctionNoSpaceBeforeParen(t *testing.T) {
+	sql := "SELECT COUNT(*) FROM users"
+
+	opts := DefaultSQLFormattingOptions()
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Functions should NOT have space before parenthesis
+	if strings.Contains(formatted, "COUNT (") {
+		t.Errorf("expected no space between COUNT and (, got: %s", formatted)
+	}
+	if !strings.Contains(formatted, "COUNT(") {
+		t.Errorf("expected COUNT( without space, got: %s", formatted)
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_VariousFunctions(t *testing.T) {
+	sql := "SELECT MAX(id), MIN(id), COALESCE(name, 'N/A'), UPPER(status) FROM users"
+
+	opts := DefaultSQLFormattingOptions()
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// All functions should be uppercase
+	functions := []string{"MAX(", "MIN(", "COALESCE(", "UPPER("}
+	for _, fn := range functions {
+		if !strings.Contains(formatted, fn) {
+			t.Errorf("expected %s to be present and uppercase, got: %s", fn, formatted)
+		}
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_DateFunctions(t *testing.T) {
+	sql := "SELECT GETDATE(), DATEADD(day, 1, created_at), YEAR(created_at) FROM orders"
+
+	opts := DefaultSQLFormattingOptions()
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Date functions should be uppercase
+	functions := []string{"GETDATE(", "DATEADD(", "YEAR("}
+	for _, fn := range functions {
+		if !strings.Contains(formatted, fn) {
+			t.Errorf("expected %s to be present and uppercase, got: %s", fn, formatted)
+		}
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_MixedKeywordsAndFunctions(t *testing.T) {
+	sql := "select count(*) from users where status = 'active' group by role having count(*) > 1"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.KeywordCase = "upper"
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	// Keywords should be uppercase
+	if !strings.Contains(formatted, "SELECT") {
+		t.Error("expected SELECT to be uppercase")
+	}
+	if !strings.Contains(formatted, "FROM") {
+		t.Error("expected FROM to be uppercase")
+	}
+	if !strings.Contains(formatted, "WHERE") {
+		t.Error("expected WHERE to be uppercase")
+	}
+	if !strings.Contains(formatted, "GROUP") {
+		t.Error("expected GROUP to be uppercase")
+	}
+	if !strings.Contains(formatted, "HAVING") {
+		t.Error("expected HAVING to be uppercase")
+	}
+
+	// Function should also be uppercase
+	if !strings.Contains(formatted, "COUNT(") {
+		t.Error("expected COUNT to be uppercase")
+	}
+
+	t.Logf("Formatted SQL:\n%s", formatted)
+}
