@@ -249,7 +249,8 @@ func (f *SQLFormatter) isComplexSQL(tokens []SQLToken) bool {
 
 // applyKeywordCasing applies keyword casing rules.
 func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
-	if t.Type == SQLTokenKeyword {
+	// Apply casing to keywords and built-in functions
+	if t.Type == SQLTokenKeyword || t.Type == SQLTokenFunction {
 		switch f.opts.KeywordCase {
 		case "lower":
 			return strings.ToLower(t.Text)
@@ -260,6 +261,7 @@ func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
 		}
 	}
 
+	// Identifiers (table names, column names) stay lowercase
 	if t.Type == SQLTokenIdentifier {
 		return strings.ToLower(t.Text)
 	}
@@ -273,9 +275,14 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 		return false
 	}
 
-	// Keyword followed by (
+	// Keyword followed by ( - add space (e.g., "WHERE (")
 	if prev.Type == SQLTokenKeyword && curr.Text == "(" {
 		return true
+	}
+
+	// Function followed by ( - NO space (e.g., "COUNT(")
+	if prev.Type == SQLTokenFunction && curr.Text == "(" {
+		return false
 	}
 
 	// No space after ( or before )
@@ -307,9 +314,10 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 		return true
 	}
 
-	// Space between atoms (keywords, identifiers, numbers, strings, placeholders)
+	// Space between atoms (keywords, functions, identifiers, numbers, strings, placeholders)
 	isAtom := func(t *SQLToken) bool {
 		return t.Type == SQLTokenKeyword ||
+			t.Type == SQLTokenFunction ||
 			t.Type == SQLTokenIdentifier ||
 			t.Type == SQLTokenNumber ||
 			t.Type == SQLTokenString ||

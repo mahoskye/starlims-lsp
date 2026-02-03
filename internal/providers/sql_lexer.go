@@ -11,6 +11,7 @@ type SQLTokenType int
 
 const (
 	SQLTokenKeyword SQLTokenType = iota
+	SQLTokenFunction
 	SQLTokenIdentifier
 	SQLTokenString
 	SQLTokenNumber
@@ -224,6 +225,10 @@ func (l *SQLLexer) readIdentifierOrKeyword() SQLToken {
 
 	if SQLKeywords[upper] {
 		return SQLToken{Type: SQLTokenKeyword, Text: tokenText, Line: line, Column: col}
+	}
+
+	if SQLBuiltinFunctions[upper] {
+		return SQLToken{Type: SQLTokenFunction, Text: tokenText, Line: line, Column: col}
 	}
 
 	return SQLToken{Type: SQLTokenIdentifier, Text: tokenText, Line: line, Column: col}
