@@ -47,6 +47,7 @@ type DiagnosticOptions struct {
 	CheckUnmatchedParens   bool
 	CheckUndeclaredVars    bool
 	CheckUnusedVars        bool
+	CheckSQLParams         bool
 	CheckHungarianNotation bool
 	HungarianPrefixes      []string
 	GlobalVariables        []string
@@ -60,6 +61,7 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 		CheckUnmatchedParens:   true,
 		CheckUndeclaredVars:    false,
 		CheckUnusedVars:        false,
+		CheckSQLParams:         false,
 		CheckHungarianNotation: false,
 		HungarianPrefixes:      []string{"a", "b", "d", "n", "o", "s"},
 		MaxBlockDepth:          10,
@@ -137,6 +139,11 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for unused variable declarations (opt-in)
 	if opts.CheckUnusedVars {
 		diagnostics = append(diagnostics, checkUnusedVariables(tokens, ast, p)...)
+	}
+
+	// Check for SQL parameter validation (opt-in)
+	if opts.CheckSQLParams {
+		diagnostics = append(diagnostics, checkSQLParameterValidation(tokens, ast, p, opts.GlobalVariables)...)
 	}
 
 	return diagnostics
@@ -878,4 +885,92 @@ func countVariableUsages(tokens []lexer.Token, v parser.VariableInfo, procedures
 	}
 
 	return usageCount
+}
+
+// checkSQLParameterValidation checks that SQL parameters (?param?) match declared variables.
+// This validation ensures that named parameters in SQL strings reference variables
+// that are actually declared in the current scope (case-insensitive).
+func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Build set of all declared variables (case-insensitive)
+	declaredVars := make(map[string]bool)
+	variables := p.ExtractVariables(ast)
+	for _, v := range variables {
+		declaredVars[strings.ToUpper(v.Name)] = true
+	}
+
+	// Add configured globals
+	for _, g := range globals {
+		declaredVars[strings.ToUpper(g)] = true
+	}
+
+	// Add procedure parameters to declared vars
+	procedures := p.ExtractProcedures(ast)
+	for _, proc := range procedures {
+		for _, param := range proc.Parameters {
+			declaredVars[strings.ToUpper(param)] = true
+		}
+	}
+
+	// Track reported parameters to avoid duplicate warnings
+	reported := make(map[string]map[int]bool) // paramName -> line -> reported
+
+	// Scan all string tokens for SQL parameters
+	for _, token := range tokens {
+		if token.Type != lexer.TokenString {
+			continue
+		}
+
+		// Extract string content (remove quotes)
+		content := token.Text
+		if len(content) < 2 {
+			continue
+		}
+		content = content[1 : len(content)-1]
+
+		// Parse SQL placeholders from the string
+		placeholders := ParseSQLPlaceholders(content)
+
+		for _, ph := range placeholders {
+			// Only validate named parameters
+			if !ph.IsNamed {
+				continue
+			}
+
+			paramUpper := strings.ToUpper(ph.Name)
+
+			// Initialize reported map for this parameter if needed
+			if reported[paramUpper] == nil {
+				reported[paramUpper] = make(map[int]bool)
+			}
+
+			// Skip if already reported on this line
+			if reported[paramUpper][token.Line] {
+				continue
+			}
+
+			// Check if the parameter matches a declared variable
+			if !declaredVars[paramUpper] {
+				reported[paramUpper][token.Line] = true
+
+				// Calculate the position of the parameter within the string token
+				// token.Column is 1-based, ph.Start is 0-based offset in content
+				// +1 for the opening quote
+				paramColumn := token.Column + 1 + ph.Start
+
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range: Range{
+						Start: Position{Line: token.Line - 1, Character: paramColumn - 1},
+						End:   Position{Line: token.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2}, // +2 for surrounding ?
+					},
+					Message: fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
+					Source:  "ssl-lsp",
+				})
+			}
+		}
+	}
+
+	return diagnostics
 }
