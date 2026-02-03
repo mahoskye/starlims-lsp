@@ -2,7 +2,7 @@
 
 This document outlines the prioritized feature roadmap for the starlims-lsp project.
 
-**Last Updated:** 2025-02-02
+**Last Updated:** 2026-02-02
 
 ---
 
@@ -14,94 +14,80 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 
 ---
 
-## Current Release: v1.0
+## Current Release: v1.1
 
 ### Implemented Features
 
 | Category | Feature | Status |
 |----------|---------|--------|
-| Completion | Keywords, functions, classes, snippets | Complete |
-| Hover | Function signatures, keyword docs | Complete |
-| Signature Help | 367 built-in functions | Complete |
-| Navigation | Go to definition, find references | Single-file |
-| Symbols | Document symbols, folding ranges | Complete |
-| Formatting | SSL code + embedded SQL | Complete |
-| Diagnostics | Block matching, basic checks | Partial |
+| Completion | Keywords, functions, classes, snippets | ✅ Complete |
+| Hover | Function signatures, keyword docs, SQL placeholders, `Me` keyword | ✅ Complete |
+| Signature Help | 367 built-in functions + user procedures | ✅ Complete |
+| Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
+| Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
+| Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
+| Diagnostics | Full suite with opt-in undeclared/unused/SQL param checks | ✅ Complete |
 
 ---
 
-## v1.1 - Diagnostic Improvements
+## v1.1 - Diagnostic Improvements (COMPLETED)
 
 **Goal:** Fix known diagnostic gaps and improve accuracy.
 
-**Target:** Q1 2025
+**Status:** ✅ COMPLETED
 
-### High Priority
+### High Priority (All Resolved)
 
-| Issue | Description | Effort |
+| Issue | Description | Status |
 |-------|-------------|--------|
-| #56 | `:INCLUDE` paths flagged as undeclared | Small |
-| #55 | Configured globals not recognized as declared | Small |
-| #2 | `Me` keyword flagged as undeclared | Small |
-| #53 | Function calls flagged as undeclared | Small |
+| #56 | `:INCLUDE` paths flagged as undeclared | ✅ Handled |
+| #55 | Configured globals not recognized as declared | ✅ Handled |
+| #2 | `Me` keyword flagged as undeclared | ✅ Handled |
+| #53 | Function calls flagged as undeclared | ✅ Handled |
 
-**Implementation Notes:**
+### Medium Priority (All Resolved)
 
-For undeclared variable checking, skip these patterns:
-- Lines starting with `:INCLUDE`
-- The `Me` identifier (class self-reference)
-- Identifiers followed by `(` (function calls)
-- Identifiers preceded by `:` (property access)
-- Variables in configured `globals` list
-
-### Medium Priority
-
-| Issue | Description | Effort |
+| Issue | Description | Status |
 |-------|-------------|--------|
-| #47, #25 | SQL parameter case-insensitive matching | Medium |
-| #22 | Property access confused with variables | Small |
-| #52 | Comment block semicolon edge cases | Medium |
+| #47, #25 | SQL parameter case-insensitive matching | ✅ Resolved |
+| #22 | Property access confused with variables | ✅ Handled |
+| #52 | Comment block semicolon edge cases | Deferred |
 
 ---
 
-## v1.2 - Hover Enhancements
+## v1.2 - Hover Enhancements (COMPLETED)
 
 **Goal:** Improve hover information for SQL and special contexts.
 
-**Target:** Q2 2025
+**Status:** ✅ COMPLETED
 
-### Features
+### Features (All Implemented)
 
-| Issue | Description | Effort |
+| Issue | Description | Status |
 |-------|-------------|--------|
-| #15 | Hover for named SQL parameters (`?varName?`) | Medium |
-| #13 | Hover for positional SQL placeholders (`?`) | Medium |
-| #27 | Skip hover in strings/comments | Small |
-| #30 | Verify DoProc signature correctness | Small |
-
-**Implementation Notes:**
-
-SQL parameter hover should show:
-- Parameter name
-- Value (if statically determinable)
-- Declaration location
+| #15 | Hover for named SQL parameters (`?varName?`) | ✅ Implemented |
+| #13 | Hover for positional SQL placeholders (`?`) | ✅ Implemented |
+| #27 | Skip hover in strings/comments | ✅ Context filtering implemented |
+| #30 | Verify DoProc signature correctness | ✅ Implemented |
 
 ---
 
-## v1.3 - Formatting Refinements
+## v1.3 - Formatting Refinements (COMPLETED)
 
 **Goal:** Improve formatting edge cases.
 
-**Target:** Q2 2025
+**Status:** ✅ COMPLETED
 
-### Features
+### Features (All Implemented)
 
-| Issue | Description | Effort |
+| Issue | Description | Status |
 |-------|-------------|--------|
-| #11 | Preserve end-of-line comments | Medium |
-| #33 | Preserve multi-line function structure | Medium |
-| #8 | Don't modify comment content | Small |
-| #31 | Better continuation line indentation | Medium |
+| #11 | Preserve end-of-line comments | ✅ Implemented |
+| #33 | Preserve multi-line function structure | ✅ Implemented |
+| #8 | Don't modify comment content | ✅ Implemented |
+| #31 | Better continuation line indentation | ✅ Implemented |
+| - | SQL function casing (COUNT, SUM, etc.) | ✅ Implemented |
+| - | SQL string auto-detection | ✅ Implemented |
 
 ---
 
@@ -109,7 +95,7 @@ SQL parameter hover should show:
 
 **Goal:** Enable cross-file analysis and navigation.
 
-**Target:** Q3-Q4 2025
+**Target:** 2026
 
 ### Major Features
 
@@ -129,11 +115,11 @@ SQL parameter hover should show:
 
 ### Additional Features
 
-| Feature | Description | Effort |
+| Feature | Description | Status |
 |---------|-------------|--------|
-| #16 | Go-to-definition for `ExecFunction`/`DoProc` | Medium |
-| #36 | Context-aware reference finding | Medium |
-| #40 | Scope-aware rename | Large |
+| #16 | Go-to-definition for `ExecFunction`/`DoProc` | ✅ Same-file implemented |
+| #36 | Context-aware reference finding | ✅ Implemented |
+| #40 | Scope-aware rename | Pending |
 
 ---
 
@@ -213,4 +199,5 @@ See the [main README](../../README.md) for:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-02 | 1.1 | Updated to reflect completed v1.1, v1.2, v1.3 features |
 | 2025-02-02 | 1.0 | Initial roadmap from ISSUE_ALIGNMENT analysis |

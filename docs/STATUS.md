@@ -82,7 +82,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Configured globals not recognized | #55 | Handled |
 | `Me` keyword flagged as undeclared | #2 | Handled |
 | Function calls flagged as undeclared | #53 | Handled |
-| SQL parameter case-insensitive matching | #47, #25 | Open |
+| SQL parameter case-insensitive matching | #47, #25 | Resolved |
 | Property access confused with variables | #22 | Handled |
 
 ---

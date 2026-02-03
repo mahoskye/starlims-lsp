@@ -158,13 +158,13 @@ if previousChar == ':' {
 }
 ```
 
-### 4.6 SQL Parameter Case Sensitivity
+### 4.6 SQL Parameter Case Sensitivity (Resolved)
 
 **Issues #47, #25:** SQL parameters not matching declared variables due to case.
 
-**Current Behavior:** `?sRunno?` may not match `sRUNNO` declared in `:PARAMETERS`.
+**Status:** ✅ RESOLVED
 
-**Expected Behavior:** SQL parameter matching should be case-insensitive (SSL is case-insensitive).
+SQL parameter matching is now case-insensitive. `?sRunno?` correctly matches `sRUNNO` declared in `:PARAMETERS`.
 
 ### 4.7 Comment Block Edge Cases
 
@@ -183,14 +183,14 @@ if previousChar == ':' {
 
 | Limitation | Notes |
 |------------|-------|
-| `:INCLUDE` paths flagged | #56 - Priority fix |
-| Globals not recognized | #55 - Priority fix |
-| `Me` flagged as undeclared | #2 - Priority fix |
-| Functions flagged as variables | #53 - Priority fix |
-| SQL parameter case | #47, #25 - Medium priority |
-| Property access confusion | #22 - Medium priority |
-| Undeclared variable checking | Not yet implemented |
-| Unused variable checking | Not yet implemented |
+| `:INCLUDE` paths flagged | #56 - Handled when undeclared checking enabled |
+| Globals not recognized | #55 - Handled via configuration |
+| `Me` flagged as undeclared | #2 - Handled |
+| Functions flagged as variables | #53 - Handled |
+| SQL parameter case | #47, #25 - ✅ Resolved |
+| Property access confusion | #22 - Handled |
+| Undeclared variable checking | ✅ Implemented (opt-in) |
+| Unused variable checking | ✅ Implemented (opt-in) |
 
 ---
 
@@ -365,15 +365,15 @@ sSQL := "SELECT * FROM orders WHERE status = ?sStatus?";
 
 | Issue | Description | Priority | Status |
 |-------|-------------|----------|--------|
-| #56 | `:INCLUDE` paths flagged | High | Open |
-| #55 | Globals not recognized | High | Open |
-| #2 | `Me` flagged as undeclared | High | Open |
-| #53 | Functions flagged as variables | High | Open |
-| #8 | SQL parameter validation | Medium | Fixed |
-| #47 | SQL param case sensitivity | Medium | Closed |
-| #25 | SQL param case (duplicate) | Medium | Closed |
-| #22 | Property access confusion | Medium | Closed |
-| #52 | Comment semicolon edge case | Medium | Closed |
+| #56 | `:INCLUDE` paths flagged | High | Handled |
+| #55 | Globals not recognized | High | Handled |
+| #2 | `Me` flagged as undeclared | High | Handled |
+| #53 | Functions flagged as variables | High | Handled |
+| #8 | SQL parameter validation | Medium | ✅ Implemented |
+| #47 | SQL param case sensitivity | Medium | ✅ Resolved |
+| #25 | SQL param case (duplicate) | Medium | ✅ Resolved |
+| #22 | Property access confusion | Medium | Handled |
+| #52 | Comment semicolon edge case | Medium | Deferred |
 | #4 | Duplicate diagnostics | Low | Closed |
 | #3 | Multi-line expression semicolons | Low | Closed |
 
