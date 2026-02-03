@@ -29,6 +29,7 @@ This document provides a quick overview of all LSP features and their current im
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Rename](./features/rename.md) | IMPLEMENTED | Single-file, scope-aware, validates new name |
+| [Inlay Hints](./features/inlay-hints.md) | IMPLEMENTED | Parameter name hints for function calls |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: regions contain procedures |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
@@ -50,7 +51,7 @@ This document provides a quick overview of all LSP features and their current im
 |---------|--------|
 | `textDocument/codeAction` | No quick fixes defined |
 | `textDocument/codeLens` | Not needed for SSL |
-| `textDocument/inlayHint` | Future enhancement |
+| `textDocument/inlayHint` | IMPLEMENTED |
 | `textDocument/semanticTokens` | Future enhancement |
 | `callHierarchy/*` | Future enhancement |
 
@@ -193,5 +194,3 @@ The following behaviors are handled when undeclared variable checking is enabled
 ### v2.0 (Future)
 - Workspace indexing
 - Cross-file navigation
-- Inlay hints
-- Rename support

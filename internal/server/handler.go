@@ -501,3 +501,49 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 		Changes: changes,
 	}, nil
 }
+
+// handleInlayHint handles textDocument/inlayHint requests.
+func (s *SSLServer) handleInlayHint(context *glsp.Context, params *InlayHintParams) ([]InlayHint, error) {
+	uri := params.TextDocument.URI
+
+	if _, ok := s.documents.GetDocument(uri); !ok {
+		return nil, nil
+	}
+
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+
+	// Convert 0-based LSP range to 1-based internal range
+	startLine := int(params.Range.Start.Line) + 1
+	endLine := int(params.Range.End.Line) + 1
+
+	// Get inlay hints from provider
+	hints := providers.GetInlayHints(
+		cache.Tokens,
+		cache.Procedures,
+		startLine,
+		endLine,
+		s.settings.InlayHints,
+	)
+
+	if len(hints) == 0 {
+		return nil, nil
+	}
+
+	// Convert to protocol format
+	result := make([]InlayHint, 0, len(hints))
+	kind := InlayHintKindParameter
+	for _, h := range hints {
+		result = append(result, InlayHint{
+			Position: InlayHintPosition{
+				Line:      uint32(h.Line - 1),      // Convert to 0-based
+				Character: uint32(h.Character - 1), // Convert to 0-based
+			},
+			Label:        h.Label + ":",
+			Kind:         &kind,
+			PaddingRight: true,
+		})
+	}
+
+	return result, nil
+}

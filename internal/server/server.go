@@ -19,6 +19,7 @@ type ClientSettings struct {
 type SSLSettings struct {
 	Format      *FormatSettings      `json:"format"`
 	Diagnostics *DiagnosticsSettings `json:"diagnostics"`
+	InlayHints  *InlayHintsSettings  `json:"inlayHints"`
 }
 
 // DiagnosticsSettings represents diagnostics settings from the client.
@@ -26,6 +27,12 @@ type DiagnosticsSettings struct {
 	HungarianNotation *bool     `json:"hungarianNotation"`
 	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
 	Globals           *[]string `json:"globals"`
+}
+
+// InlayHintsSettings represents inlay hint settings from the client.
+type InlayHintsSettings struct {
+	Enabled           *bool `json:"enabled"`
+	MinParameterCount *int  `json:"minParameterCount"`
 }
 
 // FormatSettings represents formatting settings from the client.
@@ -54,6 +61,19 @@ const serverName = "starlims-lsp"
 
 var version = "0.1.0"
 
+// ExtendedServerCapabilities embeds the standard capabilities and adds LSP 3.17 features.
+type ExtendedServerCapabilities struct {
+	protocol.ServerCapabilities
+	// InlayHintProvider indicates inlay hint support (LSP 3.17).
+	InlayHintProvider bool `json:"inlayHintProvider,omitempty"`
+}
+
+// ExtendedInitializeResult is the initialize result with extended capabilities.
+type ExtendedInitializeResult struct {
+	Capabilities ExtendedServerCapabilities           `json:"capabilities"`
+	ServerInfo   *protocol.InitializeResultServerInfo `json:"serverInfo,omitempty"`
+}
+
 // SSLServer is the SSL language server.
 type SSLServer struct {
 	documents       *DocumentManager
@@ -67,6 +87,7 @@ type Settings struct {
 	MaxNumberOfProblems int
 	Diagnostics         providers.DiagnosticOptions
 	Formatting          providers.FormattingOptions
+	InlayHints          providers.InlayHintOptions
 }
 
 // DefaultSettings returns default settings.
@@ -75,6 +96,7 @@ func DefaultSettings() Settings {
 		MaxNumberOfProblems: 100,
 		Diagnostics:         providers.DefaultDiagnosticOptions(),
 		Formatting:          providers.DefaultFormattingOptions(),
+		InlayHints:          providers.DefaultInlayHintOptions(),
 	}
 }
 
@@ -114,7 +136,8 @@ func NewSSLServer() *SSLServer {
 
 // Run starts the language server.
 func (s *SSLServer) Run() error {
-	srv := server.NewServer(&s.handler, serverName, false)
+	wrapper := NewWrapperHandler(&s.handler, s)
+	srv := server.NewServer(wrapper, serverName, false)
 	return srv.RunStdio()
 }
 
@@ -142,8 +165,12 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 		PrepareProvider: ptrTo(true),
 	}
 
-	return protocol.InitializeResult{
-		Capabilities: capabilities,
+	// Return extended capabilities with inlay hint support
+	return ExtendedInitializeResult{
+		Capabilities: ExtendedServerCapabilities{
+			ServerCapabilities: capabilities,
+			InlayHintProvider:  true,
+		},
 		ServerInfo: &protocol.InitializeResultServerInfo{
 			Name:    serverName,
 			Version: &version,
@@ -288,6 +315,13 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
+	}
+
+	// Apply inlay hints settings
+	if clientSettings.SSL.InlayHints != nil {
+		inlayHints := clientSettings.SSL.InlayHints
+		applyOptional(&s.settings.InlayHints.Enabled, inlayHints.Enabled)
+		applyOptional(&s.settings.InlayHints.MinParameterCount, inlayHints.MinParameterCount)
 	}
 }
 

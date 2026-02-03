@@ -28,6 +28,8 @@ Each feature document includes:
 | Signature Help | IMPLEMENTED | [signature-help.md](./signature-help.md) |
 | Go to Definition | IMPLEMENTED | [definition.md](./definition.md) |
 | Find References | IMPLEMENTED | [references.md](./references.md) |
+| Rename | IMPLEMENTED | [rename.md](./rename.md) |
+| Inlay Hints | IMPLEMENTED | [inlay-hints.md](./inlay-hints.md) |
 | Document Symbols | IMPLEMENTED | [document-symbols.md](./document-symbols.md) |
 | Workspace Symbols | PARTIAL | [workspace-symbols.md](./workspace-symbols.md) |
 | Folding Ranges | IMPLEMENTED | [folding-ranges.md](./folding-ranges.md) |

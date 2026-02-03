@@ -2,257 +2,397 @@
 
 This document highlights common pitfalls and mistakes when writing SSL code.
 
-**Primary Source:** [`ssl-style-guide/reference/ssl_agent_instructions.md`](../../ssl-style-guide/reference/ssl_agent_instructions.md) (Gotchas section)
+> **See also:** [AGENTS.md](../../AGENTS.md) for quick reference on avoiding these issues.
 
 ---
 
-## Gotcha #1: `:DEFAULT` Only Works with `:PARAMETERS`
+## Gotcha #1: Direct Procedure Calls Don't Work
+
+**Problem:** SSL does not support calling custom procedures directly.
+
+```ssl
+/* WRONG - will not work!;
+CalculateTotal(5, 10);
+MyProcedure();
+```
+
+**Solution:** Use `DoProc` for same-file calls, `ExecFunction` for cross-file calls.
+
+```ssl
+/* CORRECT - same file;
+result := DoProc("CalculateTotal", {5, 10});
+
+/* CORRECT - different file;
+result := ExecFunction("Module.CalculateTotal", {5, 10});
+
+/* Skip parameters with empty array positions;
+result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
+```
+
+**LSP Support:** Not currently detected.
+
+---
+
+## Gotcha #2: Missing :EXITCASE Causes Fall-Through
+
+**Problem:** Without `:EXITCASE`, execution falls through to the next case.
+
+```ssl
+/* WRONG - falls through!;
+:BEGINCASE;
+:CASE nVal == 1;
+    DoOne();
+    /* Missing :EXITCASE - DoTwo() will also execute!;
+:CASE nVal == 2;
+    DoTwo();
+    :EXITCASE;
+:ENDCASE;
+```
+
+**Solution:** Always include `:EXITCASE` at the end of every case block.
+
+```ssl
+/* CORRECT;
+:BEGINCASE;
+:CASE nVal == 1;
+    DoOne();
+    :EXITCASE;  /* Required!;
+:CASE nVal == 2;
+    DoTwo();
+    :EXITCASE;  /* Required!;
+:OTHERWISE;
+    DoDefault();
+    :EXITCASE;  /* Required!;
+:ENDCASE;
+```
+
+**LSP Support:** Yes — warns about missing `:EXITCASE`.
+
+---
+
+## Gotcha #3: :DEFAULT Only Works with :PARAMETERS
 
 **Problem:** Using `:DEFAULT` with `:DECLARE` has no effect.
 
 ```ssl
 /* WRONG - DEFAULT is ignored!;
-:DECLARE x :DEFAULT 10;
-/* x is NIL, not 10;
+:DECLARE x;
+:DEFAULT x, 10;
+/* x is still empty string "", not 10;
+```
 
-/* CORRECT - Use with PARAMETERS;
-:PARAMETERS x :DEFAULT 10;
+**Solution:** Use `:DEFAULT` only after `:PARAMETERS`, or assign after declare.
 
-/* CORRECT - Or assign after declare;
+```ssl
+/* CORRECT - with parameters;
+:PARAMETERS x;
+:DEFAULT x, 10;
+
+/* CORRECT - assign after declare;
 :DECLARE x;
 x := 10;
 ```
 
-**LSP Support:** The diagnostics provider warns about this pattern.
+**LSP Support:** Yes — warns about this pattern.
 
 ---
 
-## Gotcha #2: Logical Operators Need Periods
+## Gotcha #4: Logical Operators Need Periods
 
-**Problem:** Using `AND`, `OR`, `NOT` without periods creates logic errors.
+**Problem:** Using `AND`, `OR`, `NOT` without periods treats them as identifiers.
 
 ```ssl
-/* WRONG - These are treated as identifiers!;
+/* WRONG - these don't work as expected!;
 :IF condition1 AND condition2;
 :IF condition1 OR condition2;
 :IF NOT condition;
+```
 
-/* CORRECT - Wrap in periods;
+**Solution:** Wrap logical operators in periods.
+
+```ssl
+/* CORRECT;
 :IF condition1 .AND. condition2;
 :IF condition1 .OR. condition2;
 :IF .NOT. condition;
 ```
 
-**LSP Support:** The diagnostics provider reports bare logical operators as errors.
+**LSP Support:** Yes — reports bare logical operators as errors.
 
 ---
 
-## Gotcha #3: Comments End with Semicolon
+## Gotcha #5: Arrays Are 1-Based
 
-**Problem:** SSL uses `/* ... ;` for comments, not `/* ...;`.
-
-```ssl
-/* WRONG - This doesn't end the comment!;
-More code here;
-
-/* CORRECT - Semicolon ends the comment;
-More code here;
-```
-
-**Important:** A semicolon inside a comment terminates it:
+**Problem:** SSL arrays start at index 1, not 0.
 
 ```ssl
-/* This comment has a semicolon; this is CODE now!
+aItems := {"first", "second", "third"};
+
+/* WRONG - index 0 is invalid!;
+sFirst := aItems[0];  /* Error or unexpected behavior;
+
+/* CORRECT;
+sFirst := aItems[1];  /* "first";
+sLast := aItems[Len(aItems)];  /* "third";
 ```
+
+**LSP Support:** Not currently detected.
 
 ---
 
-## Gotcha #4: Case Fallthrough in BEGINCASE
+## Gotcha #6: Comments End with Semicolon
 
-**Problem:** Unlike C/C++, SSL `CASE` blocks DO fall through without `:EXITCASE`.
+**Problem:** A semicolon inside a comment terminates it.
 
 ```ssl
-/* WRONG - Falls through to next case!;
-:BEGINCASE;
-:CASE x = 1;
-    DoOne();
-    /* Missing :EXITCASE causes fallthrough!;
-:CASE x = 2;
-    DoTwo();
-    :EXITCASE;
-:ENDCASE;
-
-/* CORRECT - Always use :EXITCASE;
-:BEGINCASE;
-:CASE x = 1;
-    DoOne();
-    :EXITCASE;
-:CASE x = 2;
-    DoTwo();
-    :EXITCASE;
-:ENDCASE;
+/* This comment ends here; this is CODE now!
+DoSomething();  /* This line is actually outside the comment;
 ```
 
-**LSP Support:** The diagnostics provider warns about missing `:EXITCASE`.
+**Solution:** Be careful with semicolons in comments.
+
+```ssl
+/* This is a proper comment without embedded semicolons
+   that spans multiple lines
+;
+```
+
+**LSP Support:** Partial.
 
 ---
 
-## Gotcha #5: Assignment vs Equality
+## Gotcha #7: SQLExecute vs Other Database Functions
 
-**Problem:** `:=` is assignment, `=` is comparison.
+**Problem:** Only `SQLExecute` supports `?varName?` syntax.
 
 ```ssl
-/* WRONG - This assigns, not compares!;
+/* WRONG - RunSQL doesn't support named parameters;
+RunSQL("UPDATE Table SET Field = ?sValue?", "", {});
+
+/* WRONG - LSearch doesn't support named parameters;
+sResult := LSearch("SELECT Name FROM T WHERE ID = ?nID?", "");
+```
+
+**Solution:** Use positional `?` with value arrays for RunSQL, LSearch, etc.
+
+```ssl
+/* CORRECT - SQLExecute with named params;
+aResults := SQLExecute("SELECT * FROM T WHERE Field = ?sValue?");
+
+/* CORRECT - RunSQL with positional params;
+RunSQL("UPDATE T SET Field = ? WHERE ID = ?", "", {sValue, nID});
+
+/* CORRECT - LSearch with positional params;
+sResult := LSearch("SELECT Name FROM T WHERE ID = ?", "",, {nID});
+```
+
+**LSP Support:** Planned.
+
+---
+
+## Gotcha #8: Property Access Uses Colon, Not Dot
+
+**Problem:** SSL uses colon `:` for property access, not dot `.`.
+
+```ssl
+/* WRONG - dot notation doesn't work;
+oEmail.Subject := "Test";
+nCount := oDataset.RowCount;
+```
+
+**Solution:** Use colon notation.
+
+```ssl
+/* CORRECT;
+oEmail:Subject := "Test";
+nCount := oDataset:RowCount;
+sValue := oDataset:GetValue(1, "FieldName");
+```
+
+**LSP Support:** Not currently detected.
+
+---
+
+## Gotcha #9: Assignment vs Equality
+
+**Problem:** `:=` is assignment, `=` is comparison. Using wrong one in conditions.
+
+```ssl
+/* WRONG - this assigns, not compares!;
 :IF x := 5;
-    /* Always executes because x is now 5 (truthy);
+    /* Always executes because x becomes 5 (truthy);
 :ENDIF;
+```
 
-/* CORRECT - Use = for comparison;
+**Solution:** Use `=` or `==` for comparison.
+
+```ssl
+/* CORRECT;
 :IF x = 5;
-    /* Only executes if x equals 5;
+    /* Executes only if x equals 5;
+:ENDIF;
+
+/* Strict equality;
+:IF sName == "Test";
+    /* Exact match only;
 :ENDIF;
 ```
 
+**Note:** For strings, `=` is loose (true if left starts with right or right is empty), `==` is strict.
+
+**LSP Support:** Not currently detected.
+
 ---
 
-## Gotcha #6: No Backslash Escapes in Strings
+## Gotcha #10: String Equality Is Loose
 
-**Problem:** SSL strings do NOT use backslash escapes.
+**Problem:** The `=` operator for strings has unexpected behavior.
 
 ```ssl
-/* WRONG - Backslash is literal!;
-path := "C:\Users\Name";  /* This is fine, \ is just a character;
-newline := "\n";           /* This is literally backslash-n, not a newline;
+sName := "Hello";
 
-/* Use Chr() for special characters;
-newline := Chr(10);        /* ASCII 10 = newline;
-tab := Chr(9);             /* ASCII 9 = tab;
+sName = "Hello"    /* .T. - exact match;
+sName = "Hell"     /* .T. - left starts with right!;
+sName = ""         /* .T. - right is empty!;
 ```
 
----
-
-## Gotcha #7: String Concatenation with +
-
-**Problem:** Type coercion issues with `+` operator.
+**Solution:** Use `==` for strict string comparison.
 
 ```ssl
-/* Works fine;
-sResult := "Hello " + "World";
-
-/* Numeric + String may cause issues;
-sResult := "Count: " + nCount;  /* May need explicit conversion;
-
-/* SAFER - Use Str() for numbers;
-sResult := "Count: " + Str(nCount);
+sName == "Hello"   /* .T. - exact match only;
+sName == "Hell"    /* .F. - not exact;
+sName == ""        /* .F. - not exact;
 ```
+
+**LSP Support:** Not currently detected.
 
 ---
 
-## Gotcha #8: Variable Scope
+## Gotcha #11: NIL vs Empty
 
-**Problem:** Variables are accessible in ways you might not expect.
-
-```ssl
-/* Variables in a procedure are local;
-:PROCEDURE ProcA;
-:DECLARE x;
-x := 10;
-:ENDPROC;
-
-:PROCEDURE ProcB;
-x := 20;  /* This creates a NEW local variable x, not the one from ProcA;
-:ENDPROC;
-
-/* PUBLIC makes it global;
-:PUBLIC gCounter;  /* Visible everywhere;
-```
-
----
-
-## Gotcha #9: NIL vs Empty
-
-**Problem:** NIL and empty are different.
+**Problem:** NIL and empty string are different but both considered "empty".
 
 ```ssl
 :DECLARE x;
-/* x is NIL (uninitialized);
+/* x is "" (empty string), not NIL;
 
-x := "";
-/* x is now empty string, NOT NIL;
+x := NIL;
+/* Now x is NIL;
 
-:IF x = NIL;  /* True before assignment, false after;
-:IF Empty(x); /* True for both NIL and "";
+/* Testing;
+Empty(x);      /* .T. for both NIL and "";
+x = NIL;       /* Only true for NIL;
+x = "";        /* Only true for empty string;
 ```
+
+**Solution:** Use `Empty()` to check for both, or explicit comparisons for specific cases.
+
+```ssl
+:IF Empty(sValue);
+    /* Handles NIL, "", and 0;
+:ENDIF;
+
+:IF sValue = NIL;
+    /* Only handles NIL;
+:ENDIF;
+```
+
+**LSP Support:** Not currently detected.
 
 ---
 
-## Gotcha #10: Array Indexing Starts at 1
+## Gotcha #12: Keywords Are Case-Sensitive (UPPERCASE)
 
-**Problem:** Arrays are 1-indexed, not 0-indexed.
+**Problem:** Keywords must be uppercase.
 
 ```ssl
-:DECLARE a;
-a := {10, 20, 30};
-
-a[1];  /* 10 - First element;
-a[0];  /* ERROR - Invalid index!;
+/* WRONG - lowercase keywords don't work;
+:if condition;
+:while x < 10;
+:procedure MyProc;
 ```
+
+**Solution:** Always use UPPERCASE keywords.
+
+```ssl
+/* CORRECT;
+:IF condition;
+:WHILE x < 10;
+:PROCEDURE MyProc;
+```
+
+**LSP Support:** Yes — syntax highlighting and parsing expect uppercase.
 
 ---
 
-## Gotcha #11: `Me` in Classes
+## Gotcha #13: Object Property Assignment Looks Like Undeclared Variable
 
-**Problem:** `Me` is the self-reference in classes.
+**Problem:** `oObject:Property := value` might look like an undeclared variable to tools.
 
 ```ssl
-:CLASS MyClass;
-:PROCEDURE Initialize;
-    /* Use Me to refer to instance properties;
-    Me:Counter := 0;
-    Me:Name := "";
-:ENDPROC;
-
-:PROCEDURE Increment;
-    Me:Counter := Me:Counter + 1;
-    :RETURN Me:Counter;
-:ENDPROC;
-:ENDCLASS;
+oLogger:LogError := GetLastSQLError();
+/* LogError is a property, not a variable that needs declaring;
 ```
 
-**LSP Support:** `Me` should never be flagged as undeclared.
+**Solution:** This is correct SSL syntax. Object property assignments don't require declaration.
+
+**LSP Support:** Yes — property assignments are recognized.
 
 ---
 
-## Gotcha #12: SQL Parameter Case
+## Gotcha #14: LimsString() Not Str()
 
-**Problem:** SQL `?param?` placeholders are case-insensitive.
+**Problem:** SSL doesn't have a `Str()` function — use `LimsString()`.
 
 ```ssl
-:PARAMETERS sCustomerID;
+/* WRONG - Str() doesn't exist;
+sNumber := Str(123);
 
-/* All of these work;
-sSQL := "SELECT * FROM t WHERE id = ?sCustomerID?";
-sSQL := "SELECT * FROM t WHERE id = ?SCUSTOMERID?";
-sSQL := "SELECT * FROM t WHERE id = ?scustomerid?";
+/* CORRECT;
+sNumber := LimsString(123);
 ```
 
-**Recommendation:** Use consistent casing for readability.
+**LSP Support:** Not currently detected.
+
+---
+
+## Gotcha #15: Built-in Class Instantiation Uses Curly Braces
+
+**Problem:** Built-in SSL classes use `{}` not `()` for instantiation.
+
+```ssl
+/* WRONG - parentheses for class instantiation;
+oEmail := Email();
+oRegex := SSLRegex('\d+');
+
+/* CORRECT - curly braces for built-in classes;
+oEmail := Email{};
+oRegex := SSLRegex{'\d+'};
+
+/* User-defined classes use CreateUdObject;
+oCustom := CreateUdObject("MyClass", {params});
+```
+
+**LSP Support:** Not currently detected.
 
 ---
 
 ## Summary Table
 
-| Gotcha | Issue | LSP Detects |
-|--------|-------|-------------|
-| #1 | `:DEFAULT` with `:DECLARE` | Yes |
-| #2 | Bare logical operators | Yes |
-| #3 | Comment syntax | Partial |
-| #4 | Missing `:EXITCASE` | Yes |
-| #5 | `:=` vs `=` confusion | No |
-| #6 | Backslash in strings | No |
-| #7 | String concatenation | No |
-| #8 | Variable scope | No |
-| #9 | NIL vs Empty | No |
-| #10 | Array indexing | No |
-| #11 | `Me` in classes | Yes (planned) |
-| #12 | SQL param case | Planned |
+| # | Gotcha | LSP Detects |
+|---|--------|-------------|
+| 1 | Direct procedure calls | No |
+| 2 | Missing `:EXITCASE` | Yes |
+| 3 | `:DEFAULT` with `:DECLARE` | Yes |
+| 4 | Bare logical operators | Yes |
+| 5 | 0-based array indexing | No |
+| 6 | Semicolon in comments | Partial |
+| 7 | Named params with RunSQL | Planned |
+| 8 | Dot property notation | No |
+| 9 | `:=` in conditions | No |
+| 10 | Loose string equality | No |
+| 11 | NIL vs Empty | No |
+| 12 | Lowercase keywords | Yes |
+| 13 | Property as undeclared | Yes |
+| 14 | Str() instead of LimsString() | No |
+| 15 | Parentheses for class instantiation | No |

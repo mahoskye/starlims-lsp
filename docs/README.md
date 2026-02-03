@@ -13,6 +13,7 @@ Welcome to the starlims-lsp documentation. This language server provides rich ed
 | [SSL Reference](./ssl-reference/) | SSL language syntax, grammar, and conventions |
 | [Configuration](./configuration/) | All available configuration options |
 | [Status Dashboard](./STATUS.md) | Current implementation status at a glance |
+| [AGENTS.md](../AGENTS.md) | SSL coding conventions for AI agents |
 
 ---
 

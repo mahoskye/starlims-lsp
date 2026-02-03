@@ -1,37 +1,21 @@
 # SSL Language Reference
 
-This section provides reference documentation for the STARLIMS Scripting Language (SSL). Rather than duplicating content, these documents point to comprehensive reference materials maintained in the `ssl-style-guide` directory.
+This section provides reference documentation for the STARLIMS Scripting Language (SSL).
+
+> **Quick Reference:** See [AGENTS.md](../../AGENTS.md) in the project root for AI agent coding conventions.
 
 ---
 
 ## Quick Reference
 
-| Topic | Document | Source |
-|-------|----------|--------|
-| [Syntax Overview](./syntax.md) | SSL syntax rules | `ssl_agent_instructions.md` |
-| [Formal Grammar](./grammar.md) | EBNF specification | `ssl-ebnf-grammar-complete.md` |
-| [Style Guide](./style-guide.md) | Coding conventions | `abbot-starlims-style-guide.md` |
-| [Built-in Functions](./functions.md) | Function reference | `ssl-unified-master-source-complete.json` |
-| [Built-in Classes](./classes.md) | Class reference | Various sources |
-| [Common Gotchas](./gotchas.md) | SSL pitfalls | `ssl_agent_instructions.md` |
-
----
-
-## Source Materials
-
-The comprehensive SSL reference materials are located in:
-
-```
-ssl-style-guide/
-├── reference/
-│   ├── ssl_agent_instructions.md      # Complete SSL v11 reference
-│   ├── abbot-starlims-style-guide.md  # Official STARLIMS conventions
-│   ├── ssl-ebnf-grammar-complete.md   # Formal EBNF grammar
-│   └── ssl-unified-master-source-complete.json  # Function signatures
-└── ssl-style-guide/
-    ├── ssl-style-guide.schema.yaml    # Machine-readable style rules
-    └── tree-sitter-ssl/               # Tree-sitter grammar
-```
+| Topic | Document | Description |
+|-------|----------|-------------|
+| [Syntax Overview](./syntax.md) | SSL syntax rules | Keywords, operators, control flow |
+| [Formal Grammar](./grammar.md) | EBNF specification | Complete grammar definition |
+| [Style Guide](./style-guide.md) | Coding conventions | Naming, formatting, best practices |
+| [Built-in Functions](./functions.md) | Function reference | 367+ built-in functions |
+| [Built-in Classes](./classes.md) | Class reference | 30 built-in classes |
+| [Common Gotchas](./gotchas.md) | SSL pitfalls | Common mistakes and how to avoid them |
 
 ---
 
@@ -50,19 +34,21 @@ STARLIMS Scripting Language (SSL) is a domain-specific language used within the 
 
 | Feature | Description |
 |---------|-------------|
-| Case Sensitivity | Case-insensitive (keywords, identifiers) |
-| Statement Terminator | Semicolon (`;`) |
+| Case Sensitivity | Keywords: UPPERCASE. Identifiers: case-insensitive |
+| Statement Terminator | Semicolon (`;`) — everything including comments |
 | Keywords | Colon-prefixed (`:IF`, `:WHILE`, `:PROCEDURE`) |
 | Logical Operators | Period-wrapped (`.AND.`, `.OR.`, `.NOT.`) |
 | Comments | Block style: `/* comment text ;` |
-| String Literals | Single or double quotes (`"text"` or `'text'`) |
+| String Literals | Double, single, or bracket quotes |
 | Property Access | Colon notation (`object:property`) |
+| Array Indexing | 1-based (first element is `[1]`) |
 
 ### Example Code
 
 ```ssl
 :PROCEDURE CalculateTotal;
 :PARAMETERS nPrice, nQuantity;
+:DEFAULT nQuantity, 1;
 :DECLARE nTotal;
 
 nTotal := nPrice * nQuantity;
@@ -74,6 +60,74 @@ nTotal := nPrice * nQuantity;
 :RETURN nTotal;
 :ENDPROC;
 ```
+
+---
+
+## Quick Syntax Reference
+
+### Essential Patterns
+
+```ssl
+/* Variable declaration and assignment;
+:DECLARE sName, nCount;
+sName := "Test";
+nCount := 0;
+
+/* Procedure parameters with defaults;
+:PARAMETERS sInput, nValue;
+:DEFAULT sInput, "";
+:DEFAULT nValue, 0;
+
+/* Conditional;
+:IF condition .AND. otherCondition;
+    /* code;
+:ELSE;
+    /* code;
+:ENDIF;
+
+/* Loop with 1-based array;
+:FOR i := 1 :TO Len(aItems);
+    DoProc("ProcessItem", {aItems[i]});
+:NEXT;
+
+/* Case statement (EXITCASE required);
+:BEGINCASE;
+:CASE nVal == 1;
+    DoOne();
+    :EXITCASE;
+:OTHERWISE;
+    DoDefault();
+    :EXITCASE;
+:ENDCASE;
+
+/* Error handling;
+:TRY;
+    aResults := SQLExecute(sSQL);
+:CATCH;
+    oErr := GetLastSSLError();
+:ENDTRY;
+
+/* Procedure call (never direct);
+result := DoProc("MyProcedure", {param1, param2});
+result := ExecFunction("Module.MyProcedure", {param1});
+
+/* Object property access;
+oEmail:Subject := "Test";
+nCount := oDataset:RowCount;
+```
+
+---
+
+## LSP Source Files
+
+The Language Server Protocol implementation sources:
+
+| Purpose | File |
+|---------|------|
+| Function signatures | `internal/constants/signatures.go` |
+| Built-in classes | `internal/constants/constants.go` |
+| Parser | `internal/parser/parser.go` |
+| Diagnostics | `internal/analysis/diagnostics.go` |
 
 ---
 
