@@ -2,7 +2,7 @@
 
 This document provides a quick overview of all LSP features and their current implementation status.
 
-**Last Updated:** 2025-02-03
+**Last Updated:** 2025-02-04
 
 ---
 
@@ -24,15 +24,15 @@ This document provides a quick overview of all LSP features and their current im
 | Feature | Status | Gaps/Notes |
 |---------|--------|------------|
 | [Completion](./features/completion.md) | IMPLEMENTED | Context-aware, excludes strings/comments |
-| [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword; SQL placeholders planned |
+| [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword and SQL placeholders |
 | [Signature Help](./features/signature-help.md) | IMPLEMENTED | 367 built-in functions + user procedures |
-| [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence (local > public) |
+| [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: regions contain procedures |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
 | [Formatting](./features/formatting.md) | IMPLEMENTED | SSL + embedded SQL |
-| [Diagnostics](./features/diagnostics.md) | PARTIAL | See diagnostic gaps below |
+| [Diagnostics](./features/diagnostics.md) | IMPLEMENTED | Full diagnostic suite with opt-in checks |
 | [Snippets](./features/snippets.md) | IMPLEMENTED | 25+ code templates |
 
 ### Workspace Features
@@ -70,7 +70,7 @@ This document provides a quick overview of all LSP features and their current im
 | Hungarian notation | IMPLEMENTED | Optional style check |
 | Undeclared variables | IMPLEMENTED | Disabled by default (opt-in) |
 | Unused variables | IMPLEMENTED | Disabled by default (opt-in) |
-| SQL parameter validation | PLANNED | Not yet implemented |
+| SQL parameter validation | IMPLEMENTED | Disabled by default (opt-in) |
 
 ### Known Diagnostic Gaps
 
@@ -98,13 +98,13 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Line wrapping | IMPLEMENTED | Configurable max length |
 | Blank lines between procs | IMPLEMENTED | Configurable count |
 | SQL formatting | IMPLEMENTED | Multiple styles available |
+| End-of-line comments | IMPLEMENTED | Preserved on same line |
+| Multi-line structure | IMPLEMENTED | Continuation indentation |
 
 ### Known Formatting Gaps
 
 | Gap | Issue | Priority |
 |-----|-------|----------|
-| End-of-line comments moved | #11 | Medium |
-| Multi-line structure collapsed | #33 | Medium |
 | SQL function casing incorrect | #28 | Low |
 
 ---
@@ -138,8 +138,8 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Procedures | IMPLEMENTED | Signature with params |
 | Variables | IMPLEMENTED | Declaration location |
 | `Me` keyword | IMPLEMENTED | Self-reference in classes |
-| SQL `?param?` placeholders | PLANNED | Not yet implemented |
-| SQL `?` positional placeholders | PLANNED | Not yet implemented |
+| SQL `?param?` placeholders | IMPLEMENTED | Named parameter hover |
+| SQL `?` positional placeholders | IMPLEMENTED | Position-aware hover |
 
 ---
 
@@ -147,7 +147,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 | Capability | Status | Notes |
 |------------|--------|-------|
-| Go to definition (same file) | IMPLEMENTED | Works |
+| Go to definition (same file) | IMPLEMENTED | Variables, procedures, DoProc/ExecFunction targets |
 | Go to definition (other files) | NOT IMPLEMENTED | No workspace indexing |
 | Find references (same file) | IMPLEMENTED | Works |
 | Find references (workspace) | NOT IMPLEMENTED | No workspace indexing |
@@ -185,9 +185,8 @@ The following behaviors are handled when undeclared variable checking is enabled
 - SSL + SQL formatting
 
 ### v1.1 (Planned)
-- Fix diagnostic gaps (undeclared variable handling)
-- SQL placeholder hover support
-- Improved formatting edge cases
+- Enhanced formatting (end-of-line comments, multi-line structure) - COMPLETED
+- Workspace indexing improvements
 
 ### v2.0 (Future)
 - Workspace indexing
