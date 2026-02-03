@@ -52,8 +52,23 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	line := int(params.Position.Line) + 1
 	column := int(params.Position.Character) + 1
 
-	// Check if we're inside a string or comment - if so, return no hover
-	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
+	// Check if we're inside a string or comment
+	ctx := lexer.GetContextAtPosition(cache.Tokens, line, column)
+	if ctx == lexer.ContextString {
+		// Inside a string - check for SQL placeholder hover
+		hover := providers.GetSQLPlaceholderHoverFromToken(cache.Tokens, line, column)
+		if hover != nil {
+			return &protocol.Hover{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.MarkupKindMarkdown,
+					Value: hover.Contents,
+				},
+			}, nil
+		}
+		// No SQL placeholder found, return no hover for strings
+		return nil, nil
+	} else if ctx == lexer.ContextComment {
+		// Inside a comment - return no hover
 		return nil, nil
 	}
 

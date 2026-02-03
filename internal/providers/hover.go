@@ -2,6 +2,8 @@ package providers
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 
 	"starlims-lsp/internal/constants"
@@ -253,4 +255,171 @@ func GetHoverForToken(token *lexer.Token, procedures []parser.ProcedureInfo, var
 	default:
 		return nil
 	}
+}
+
+// SQLPlaceholder represents a SQL parameter placeholder.
+type SQLPlaceholder struct {
+	Name     string // Parameter name (empty for positional)
+	Position int    // Position index (1-based) for positional parameters
+	Start    int    // Start position within the string (0-based, relative to string content)
+	End      int    // End position within the string (exclusive)
+	IsNamed  bool   // True if this is a named parameter (?name?)
+}
+
+// namedParamPattern matches named SQL parameters like ?paramName?
+var namedParamPattern = regexp.MustCompile(`\?([a-zA-Z_][a-zA-Z0-9_]*)\?`)
+
+// ParseSQLPlaceholders extracts all SQL placeholders from a string.
+// It handles both named parameters (?paramName?) and positional parameters (?).
+func ParseSQLPlaceholders(sqlString string) []SQLPlaceholder {
+	var placeholders []SQLPlaceholder
+	positionalIndex := 0
+
+	// First, find all named parameters and their positions
+	namedMatches := namedParamPattern.FindAllStringSubmatchIndex(sqlString, -1)
+	namedPositions := make(map[int]bool)
+	for _, match := range namedMatches {
+		if len(match) >= 4 {
+			namedPositions[match[0]] = true
+			placeholders = append(placeholders, SQLPlaceholder{
+				Name:    sqlString[match[2]:match[3]], // Capture group 1
+				Start:   match[0],
+				End:     match[1],
+				IsNamed: true,
+			})
+		}
+	}
+
+	// Then find positional parameters (? not followed by alphanumeric)
+	// We need to manually scan to avoid matching the ? in ?name?
+	for i := 0; i < len(sqlString); i++ {
+		if sqlString[i] == '?' {
+			// Check if this is the start of a named parameter
+			if namedPositions[i] {
+				continue
+			}
+			// Check if this is the ending ? of a named parameter
+			if i > 0 {
+				// Look back to see if this is closing a named param
+				isClosing := false
+				for j := i - 1; j >= 0; j-- {
+					if sqlString[j] == '?' {
+						// Check if there's a valid name between j and i
+						between := sqlString[j+1 : i]
+						if len(between) > 0 && namedParamPattern.MatchString("?"+between+"?") {
+							isClosing = true
+						}
+						break
+					}
+					// If we hit a non-identifier char, stop looking
+					c := sqlString[j]
+					if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+						break
+					}
+				}
+				if isClosing {
+					continue
+				}
+			}
+			// This is a positional parameter
+			positionalIndex++
+			placeholders = append(placeholders, SQLPlaceholder{
+				Position: positionalIndex,
+				Start:    i,
+				End:      i + 1,
+				IsNamed:  false,
+			})
+		}
+	}
+
+	// Sort placeholders by their position in the string
+	sort.Slice(placeholders, func(i, j int) bool {
+		return placeholders[i].Start < placeholders[j].Start
+	})
+
+	return placeholders
+}
+
+// GetSQLPlaceholderHover returns hover information for a SQL placeholder at the given position.
+// The column is relative to the start of the string content (after the opening quote).
+func GetSQLPlaceholderHover(stringContent string, columnInString int) *Hover {
+	placeholders := ParseSQLPlaceholders(stringContent)
+
+	for _, p := range placeholders {
+		// Check if the cursor position is within this placeholder
+		if columnInString >= p.Start && columnInString < p.End {
+			if p.IsNamed {
+				return &Hover{
+					Contents: fmt.Sprintf("**SQL Parameter: %s**\n\n"+
+						"*Named parameter placeholder*\n\n"+
+						"This placeholder will be replaced with the value of `%s` at runtime.\n\n"+
+						"**Syntax:** `?parameterName?`",
+						p.Name, p.Name),
+				}
+			}
+			// Positional parameter
+			ordinal := getOrdinal(p.Position)
+			return &Hover{
+				Contents: fmt.Sprintf("**SQL Parameter #%d**\n\n"+
+					"*Positional parameter placeholder*\n\n"+
+					"This is the %s parameter in the query. It will be replaced with "+
+					"the corresponding value from the parameters array at runtime.\n\n"+
+					"**Syntax:** `?`",
+					p.Position, ordinal),
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetSQLPlaceholderHoverFromToken returns hover for a SQL placeholder when the cursor is inside a string token.
+// line and column are 1-based positions in the document.
+func GetSQLPlaceholderHoverFromToken(tokens []lexer.Token, line, column int) *Hover {
+	// Find the string token containing the cursor
+	for _, token := range tokens {
+		if token.Type != lexer.TokenString {
+			continue
+		}
+
+		// Check if position is within this token
+		tokenEnd := token.Column + len(token.Text)
+		if token.Line == line && column >= token.Column && column < tokenEnd {
+			// Found the string token - extract content without quotes
+			content := token.Text
+			if len(content) >= 2 {
+				// Remove surrounding quotes
+				content = content[1 : len(content)-1]
+			}
+
+			// Calculate position within the string content
+			// column is 1-based, token.Column is 1-based
+			// We need to account for the opening quote
+			columnInString := column - token.Column - 1
+
+			if columnInString < 0 || columnInString >= len(content) {
+				return nil
+			}
+
+			return GetSQLPlaceholderHover(content, columnInString)
+		}
+	}
+
+	return nil
+}
+
+// getOrdinal returns the ordinal string for a number (1st, 2nd, 3rd, etc.)
+func getOrdinal(n int) string {
+	suffix := "th"
+	if n%100 < 10 || n%100 > 20 {
+		switch n % 10 {
+		case 1:
+			suffix = "st"
+		case 2:
+			suffix = "nd"
+		case 3:
+			suffix = "rd"
+		}
+	}
+	return fmt.Sprintf("%d%s", n, suffix)
 }
