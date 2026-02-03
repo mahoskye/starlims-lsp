@@ -843,3 +843,186 @@ DoOne();
 
 	t.Logf("Formatted output:\n%s", formatted)
 }
+
+// ============================================================================
+// End-of-Line Comment Preservation Tests
+// ============================================================================
+
+func TestFormatDocument_EndOfLineCommentPreserved(t *testing.T) {
+	input := `x := 5;  /* set x to 5;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// The comment should stay on the same line as the code
+	lines := strings.Split(strings.TrimSuffix(formatted, "\n"), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 line (comment on same line as code), got %d lines:\n%s", len(lines), formatted)
+	}
+
+	if !strings.Contains(formatted, "x := 5;") || !strings.Contains(formatted, "/* set x to 5;") {
+		t.Errorf("expected code and comment on same line, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_EndOfLineCommentAfterStatement(t *testing.T) {
+	input := `:PROCEDURE Test;
+x := 5;  /* initialize x;
+y := 10; /* initialize y;
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(strings.TrimSuffix(formatted, "\n"), "\n")
+
+	// Check that comments appear on same lines as their code
+	foundXComment := false
+	foundYComment := false
+	for _, line := range lines {
+		if strings.Contains(line, "x := 5") && strings.Contains(line, "/* initialize x") {
+			foundXComment = true
+		}
+		if strings.Contains(line, "y := 10") && strings.Contains(line, "/* initialize y") {
+			foundYComment = true
+		}
+	}
+
+	if !foundXComment {
+		t.Error("comment for x should be on same line as x := 5")
+	}
+	if !foundYComment {
+		t.Error("comment for y should be on same line as y := 10")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_MultiLineCommentNotEndOfLine(t *testing.T) {
+	input := `/* This is a block comment
+that spans multiple lines;
+x := 5;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Multi-line block comments should be preserved as-is, not treated as end-of-line
+	if !strings.Contains(formatted, "/* This is a block comment") {
+		t.Error("multi-line comment should be preserved")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// ============================================================================
+// Multi-Line Structure Preservation Tests
+// ============================================================================
+
+func TestFormatDocument_MultiLineStructurePreserved(t *testing.T) {
+	input := `result := OuterFunction(
+    InnerFunction(
+        arg1,
+        arg2
+    ),
+    arg3
+);`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// The multi-line structure should be preserved
+	lines := strings.Split(strings.TrimSuffix(formatted, "\n"), "\n")
+	if len(lines) < 5 {
+		t.Errorf("expected multi-line structure to be preserved (at least 5 lines), got %d lines:\n%s", len(lines), formatted)
+	}
+
+	// Check that InnerFunction is on its own line
+	foundInnerFunction := false
+	for _, line := range lines {
+		if strings.Contains(line, "InnerFunction") && !strings.Contains(line, "OuterFunction") {
+			foundInnerFunction = true
+			break
+		}
+	}
+	if !foundInnerFunction {
+		t.Error("InnerFunction should be on its own line, not collapsed with OuterFunction")
+	}
+
+	// Verify indentation levels:
+	// Line 1: result := OuterFunction( - 0 tabs
+	// Line 2: InnerFunction( - 1 tab (inside 1 paren)
+	// Line 3: arg1, - 2 tabs (inside 2 parens)
+	// Line 4: arg2 - 2 tabs (inside 2 parens)
+	// Line 5: ), - 1 tab (closing inner paren)
+	// Line 6: arg3 - 1 tab (inside 1 paren)
+	// Line 7: ); - 0 tabs (closing outer paren)
+	expectedIndents := []int{0, 1, 2, 2, 1, 1, 0}
+	for i, line := range lines {
+		if i >= len(expectedIndents) {
+			break
+		}
+		tabCount := 0
+		for _, r := range line {
+			if r == '\t' {
+				tabCount++
+			} else {
+				break
+			}
+		}
+		if tabCount != expectedIndents[i] {
+			t.Errorf("line %d: expected %d tabs, got %d: %q", i+1, expectedIndents[i], tabCount, line)
+		}
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_MultiLineArrayPreserved(t *testing.T) {
+	input := `arr := {
+    "first",
+    "second",
+    "third"
+};`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// The multi-line array should be preserved
+	lines := strings.Split(strings.TrimSuffix(formatted, "\n"), "\n")
+	if len(lines) < 4 {
+		t.Errorf("expected multi-line array to be preserved (at least 4 lines), got %d lines:\n%s", len(lines), formatted)
+	}
+
+	// Verify indentation levels:
+	// Line 1: arr := { - 0 tabs
+	// Line 2: "first", - 1 tab (inside brace)
+	// Line 3: "second", - 1 tab (inside brace)
+	// Line 4: "third" - 1 tab (inside brace)
+	// Line 5: }; - 0 tabs (closing brace)
+	expectedIndents := []int{0, 1, 1, 1, 0}
+	for i, line := range lines {
+		if i >= len(expectedIndents) {
+			break
+		}
+		tabCount := 0
+		for _, r := range line {
+			if r == '\t' {
+				tabCount++
+			} else {
+				break
+			}
+		}
+		if tabCount != expectedIndents[i] {
+			t.Errorf("line %d: expected %d tabs, got %d: %q", i+1, expectedIndents[i], tabCount, line)
+		}
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}

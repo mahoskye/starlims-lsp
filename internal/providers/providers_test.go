@@ -1898,6 +1898,120 @@ x := gGlobalVar;
 	}
 }
 
+// ==================== DoProc/ExecFunction Definition Tests ====================
+
+func TestFindDefinition_DoProc(t *testing.T) {
+	text := `:PROCEDURE Main;
+result := DoProc("Helper", {param1, param2});
+:ENDPROC;
+
+:PROCEDURE Helper;
+:PARAMETERS p1, p2;
+x := p1 + p2;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Main", StartLine: 1, EndLine: 3},
+		{Name: "Helper", StartLine: 5, EndLine: 8},
+	}
+
+	// Cursor on "Helper" inside the DoProc string (around column 20)
+	location := FindDefinition(text, 2, 20, "file:///test.ssl", procedures, nil)
+	if location == nil {
+		t.Fatal("expected to find definition for DoProc target")
+	}
+	if location.Range.Start.Line != 4 { // 0-based, so line 5 = index 4
+		t.Errorf("expected definition on line 4 (Helper procedure), got %d", location.Range.Start.Line)
+	}
+}
+
+func TestFindDefinition_ExecFunction(t *testing.T) {
+	text := `:PROCEDURE Main;
+result := ExecFunction("Calculate", {10, 20});
+:ENDPROC;
+
+:PROCEDURE Calculate;
+:PARAMETERS a, b;
+:RETURN a * b;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Main", StartLine: 1, EndLine: 3},
+		{Name: "Calculate", StartLine: 5, EndLine: 8},
+	}
+
+	// Cursor on "Calculate" inside the ExecFunction string
+	location := FindDefinition(text, 2, 28, "file:///test.ssl", procedures, nil)
+	if location == nil {
+		t.Fatal("expected to find definition for ExecFunction target")
+	}
+	if location.Range.Start.Line != 4 { // 0-based, so line 5 = index 4
+		t.Errorf("expected definition on line 4 (Calculate procedure), got %d", location.Range.Start.Line)
+	}
+}
+
+func TestFindDefinition_DoProc_SingleQuotes(t *testing.T) {
+	text := `:PROCEDURE Main;
+result := DoProc('Helper', {});
+:ENDPROC;
+
+:PROCEDURE Helper;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Main", StartLine: 1, EndLine: 3},
+		{Name: "Helper", StartLine: 5, EndLine: 6},
+	}
+
+	// Cursor on 'Helper' with single quotes
+	location := FindDefinition(text, 2, 20, "file:///test.ssl", procedures, nil)
+	if location == nil {
+		t.Fatal("expected to find definition for DoProc target with single quotes")
+	}
+	if location.Range.Start.Line != 4 {
+		t.Errorf("expected definition on line 4, got %d", location.Range.Start.Line)
+	}
+}
+
+func TestFindDefinition_DoProc_NotFound(t *testing.T) {
+	text := `:PROCEDURE Main;
+result := DoProc("NonExistent", {});
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Main", StartLine: 1, EndLine: 3},
+	}
+
+	// Cursor on "NonExistent" - procedure doesn't exist
+	location := FindDefinition(text, 2, 20, "file:///test.ssl", procedures, nil)
+	if location != nil {
+		t.Error("expected no definition for non-existent procedure")
+	}
+}
+
+func TestFindDefinition_DoProc_CaseInsensitive(t *testing.T) {
+	text := `:PROCEDURE Main;
+result := DoProc("helper", {});
+:ENDPROC;
+
+:PROCEDURE Helper;
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{Name: "Main", StartLine: 1, EndLine: 3},
+		{Name: "Helper", StartLine: 5, EndLine: 6},
+	}
+
+	// Cursor on "helper" (lowercase) should find Helper (PascalCase)
+	location := FindDefinition(text, 2, 20, "file:///test.ssl", procedures, nil)
+	if location == nil {
+		t.Fatal("expected to find definition with case-insensitive matching")
+	}
+	if location.Range.Start.Line != 4 {
+		t.Errorf("expected definition on line 4, got %d", location.Range.Start.Line)
+	}
+}
+
 // ==================== Hierarchical Document Symbols Tests ====================
 
 func TestGetDocumentSymbols_RegionContainsProcedures(t *testing.T) {
@@ -2099,6 +2213,357 @@ x := 1;
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "never used") {
 			t.Error("should not check unused variables when disabled")
+		}
+	}
+}
+
+// ============================================================================
+// SQL Parameter Validation Tests
+// ============================================================================
+
+func TestCheckSQLParameterValidation_UndeclaredParameter(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE userId;
+sql := "SELECT * FROM users WHERE id = ?userId? AND name = ?userName?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should report ?userName? as undeclared (userId is declared)
+	foundUserName := false
+	foundUserId := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "userName") && strings.Contains(d.Message, "does not match") {
+			foundUserName = true
+		}
+		if strings.Contains(d.Message, "userId") && strings.Contains(d.Message, "does not match") {
+			foundUserId = true
+		}
+	}
+
+	if !foundUserName {
+		t.Error("expected warning for undeclared SQL parameter 'userName'")
+	}
+	if foundUserId {
+		t.Error("should not warn about 'userId' since it is declared")
+	}
+}
+
+func TestCheckSQLParameterValidation_CaseInsensitive(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS sRunno;
+sql := "SELECT * FROM samples WHERE runno = ?sRUNNO?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT report ?sRUNNO? - it matches sRunno (case-insensitive)
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sRUNNO") || strings.Contains(d.Message, "sRunno") {
+			t.Errorf("should not warn about case-insensitive match: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckSQLParameterValidation_GlobalVariable(t *testing.T) {
+	text := `:PROCEDURE Test;
+sql := "SELECT * FROM users WHERE user_id = ?gCurrentUser?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	opts.GlobalVariables = []string{"gCurrentUser", "gAppName"}
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT report ?gCurrentUser? - it's a configured global
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "gCurrentUser") {
+			t.Errorf("should not warn about global variable: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckSQLParameterValidation_PositionalNotValidated(t *testing.T) {
+	text := `:PROCEDURE Test;
+sql := "SELECT * FROM users WHERE id = ? AND name = ?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Positional parameters (?) should not trigger validation warnings
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL parameter") {
+			t.Errorf("positional parameters should not be validated: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckSQLParameterValidation_DisabledByDefault(t *testing.T) {
+	text := `:PROCEDURE Test;
+sql := "SELECT * FROM users WHERE id = ?undeclared?";
+:ENDPROC;`
+
+	// Default options have CheckSQLParams: false
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT report SQL parameter issues when disabled
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL parameter") {
+			t.Error("should not check SQL parameters when disabled")
+		}
+	}
+}
+
+func TestCheckSQLParameterValidation_MultipleStrings(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE userId, orderId;
+sql1 := "SELECT * FROM users WHERE id = ?userId?";
+sql2 := "SELECT * FROM orders WHERE id = ?orderId? AND user = ?missing?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should only report ?missing? as undeclared
+	foundMissing := false
+	foundOther := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL parameter") {
+			if strings.Contains(d.Message, "missing") {
+				foundMissing = true
+			} else {
+				foundOther = true
+			}
+		}
+	}
+
+	if !foundMissing {
+		t.Error("expected warning for undeclared SQL parameter 'missing'")
+	}
+	if foundOther {
+		t.Error("should not warn about declared parameters")
+	}
+}
+
+func TestCheckSQLParameterValidation_ProcedureParameters(t *testing.T) {
+	text := `:PROCEDURE GetUser;
+:PARAMETERS userId, userName;
+sql := "SELECT * FROM users WHERE id = ?userId? AND name = ?userName?";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Should NOT report - both parameters are declared via :PARAMETERS
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL parameter") {
+			t.Errorf("should not warn about procedure parameters: %s", d.Message)
+		}
+	}
+}
+
+// ============================================================================
+// SQL Placeholder Hover Tests
+// ============================================================================
+
+func TestParseSQLPlaceholders_NamedParameters(t *testing.T) {
+	sql := "SELECT * FROM users WHERE id = ?userId? AND name = ?userName?"
+
+	placeholders := ParseSQLPlaceholders(sql)
+
+	if len(placeholders) != 2 {
+		t.Fatalf("expected 2 placeholders, got %d", len(placeholders))
+	}
+
+	// First placeholder: ?userId?
+	if placeholders[0].Name != "userId" {
+		t.Errorf("expected first placeholder name 'userId', got '%s'", placeholders[0].Name)
+	}
+	if !placeholders[0].IsNamed {
+		t.Error("expected first placeholder to be named")
+	}
+
+	// Second placeholder: ?userName?
+	if placeholders[1].Name != "userName" {
+		t.Errorf("expected second placeholder name 'userName', got '%s'", placeholders[1].Name)
+	}
+}
+
+func TestParseSQLPlaceholders_PositionalParameters(t *testing.T) {
+	sql := "INSERT INTO users (name, age) VALUES (?, ?)"
+
+	placeholders := ParseSQLPlaceholders(sql)
+
+	if len(placeholders) != 2 {
+		t.Fatalf("expected 2 positional placeholders, got %d", len(placeholders))
+	}
+
+	// First positional parameter
+	if placeholders[0].Position != 1 {
+		t.Errorf("expected first placeholder position 1, got %d", placeholders[0].Position)
+	}
+	if placeholders[0].IsNamed {
+		t.Error("expected first placeholder to be positional, not named")
+	}
+
+	// Second positional parameter
+	if placeholders[1].Position != 2 {
+		t.Errorf("expected second placeholder position 2, got %d", placeholders[1].Position)
+	}
+}
+
+func TestParseSQLPlaceholders_MixedParameters(t *testing.T) {
+	sql := "SELECT * FROM t WHERE a = ? AND b = ?name? AND c = ?"
+
+	placeholders := ParseSQLPlaceholders(sql)
+
+	// Should have: 1 positional, 1 named, 1 positional
+	if len(placeholders) != 3 {
+		t.Fatalf("expected 3 placeholders, got %d", len(placeholders))
+	}
+
+	// First: positional ?
+	if placeholders[0].IsNamed || placeholders[0].Position != 1 {
+		t.Errorf("expected first placeholder to be positional #1, got named=%v pos=%d", placeholders[0].IsNamed, placeholders[0].Position)
+	}
+
+	// Second: named ?name?
+	if !placeholders[1].IsNamed || placeholders[1].Name != "name" {
+		t.Errorf("expected second placeholder to be named 'name', got named=%v name='%s'", placeholders[1].IsNamed, placeholders[1].Name)
+	}
+
+	// Third: positional ?
+	if placeholders[2].IsNamed || placeholders[2].Position != 2 {
+		t.Errorf("expected third placeholder to be positional #2, got named=%v pos=%d", placeholders[2].IsNamed, placeholders[2].Position)
+	}
+}
+
+func TestGetSQLPlaceholderHover_NamedParameter(t *testing.T) {
+	content := "SELECT * FROM users WHERE id = ?userId?"
+
+	// Cursor on 'userId' (position within the ?userId? range)
+	// ?userId? starts at position 32, ends at 41
+	hover := GetSQLPlaceholderHover(content, 33) // On 'u' of userId
+
+	if hover == nil {
+		t.Fatal("expected hover for named parameter, got nil")
+	}
+
+	if !strings.Contains(hover.Contents, "SQL Parameter: userId") {
+		t.Errorf("expected hover to contain 'SQL Parameter: userId', got: %s", hover.Contents)
+	}
+
+	if !strings.Contains(hover.Contents, "Named parameter") {
+		t.Errorf("expected hover to mention 'Named parameter', got: %s", hover.Contents)
+	}
+}
+
+func TestGetSQLPlaceholderHover_PositionalParameter(t *testing.T) {
+	content := "INSERT INTO t VALUES (?, ?)"
+
+	// Cursor on first ?
+	hover := GetSQLPlaceholderHover(content, 22) // On first ?
+
+	if hover == nil {
+		t.Fatal("expected hover for positional parameter, got nil")
+	}
+
+	if !strings.Contains(hover.Contents, "SQL Parameter #1") {
+		t.Errorf("expected hover to contain 'SQL Parameter #1', got: %s", hover.Contents)
+	}
+
+	if !strings.Contains(hover.Contents, "1st parameter") {
+		t.Errorf("expected hover to mention '1st parameter', got: %s", hover.Contents)
+	}
+}
+
+func TestGetSQLPlaceholderHover_SecondPositionalParameter(t *testing.T) {
+	content := "INSERT INTO t VALUES (?, ?)"
+
+	// Cursor on second ?
+	hover := GetSQLPlaceholderHover(content, 25) // On second ?
+
+	if hover == nil {
+		t.Fatal("expected hover for second positional parameter, got nil")
+	}
+
+	if !strings.Contains(hover.Contents, "SQL Parameter #2") {
+		t.Errorf("expected hover to contain 'SQL Parameter #2', got: %s", hover.Contents)
+	}
+
+	if !strings.Contains(hover.Contents, "2nd parameter") {
+		t.Errorf("expected hover to mention '2nd parameter', got: %s", hover.Contents)
+	}
+}
+
+func TestGetSQLPlaceholderHover_OutsidePlaceholder(t *testing.T) {
+	content := "SELECT * FROM users WHERE id = ?userId?"
+
+	// Cursor on 'SELECT' - not on a placeholder
+	hover := GetSQLPlaceholderHover(content, 3)
+
+	if hover != nil {
+		t.Errorf("expected no hover outside placeholder, got: %s", hover.Contents)
+	}
+}
+
+func TestGetSQLPlaceholderHoverFromToken(t *testing.T) {
+	text := `result := SQLExecute("SELECT * FROM users WHERE id = ?userId?", "ds");`
+
+	l := lexer.NewLexer(text)
+	tokens := l.Tokenize()
+
+	// Find position on the userId parameter
+	// The string starts at column 22 (0-based: 21)
+	// "SELECT * FROM users WHERE id = ?userId?"
+	// The string content starts at column 23 (after opening quote)
+	// ?userId? is at offset 32 within the string content
+	// So in the document, it's around column 22 + 1 + 32 = 55
+
+	hover := GetSQLPlaceholderHoverFromToken(tokens, 1, 55) // Line 1, column ~55
+
+	if hover == nil {
+		t.Fatal("expected hover for SQL placeholder from token, got nil")
+	}
+
+	if !strings.Contains(hover.Contents, "userId") {
+		t.Errorf("expected hover to contain 'userId', got: %s", hover.Contents)
+	}
+}
+
+func TestGetOrdinal(t *testing.T) {
+	tests := []struct {
+		n        int
+		expected string
+	}{
+		{1, "1st"},
+		{2, "2nd"},
+		{3, "3rd"},
+		{4, "4th"},
+		{5, "5th"},
+		{11, "11th"},
+		{12, "12th"},
+		{13, "13th"},
+		{21, "21st"},
+		{22, "22nd"},
+		{23, "23rd"},
+		{100, "100th"},
+		{101, "101st"},
+	}
+
+	for _, tc := range tests {
+		result := getOrdinal(tc.n)
+		if result != tc.expected {
+			t.Errorf("getOrdinal(%d) = %s, expected %s", tc.n, result, tc.expected)
 		}
 	}
 }
