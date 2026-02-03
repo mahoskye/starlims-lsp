@@ -100,12 +100,11 @@ The following behaviors are handled when undeclared variable checking is enabled
 | SQL formatting | IMPLEMENTED | Multiple styles available |
 | End-of-line comments | IMPLEMENTED | Preserved on same line |
 | Multi-line structure | IMPLEMENTED | Continuation indentation |
+| SQL function casing | IMPLEMENTED | COUNT, SUM, AVG, etc. |
 
 ### Known Formatting Gaps
 
-| Gap | Issue | Priority |
-|-----|-------|----------|
-| SQL function casing incorrect | #28 | Low |
+*No known formatting gaps at this time.*
 
 ---
 
