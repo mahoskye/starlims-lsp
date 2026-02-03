@@ -439,3 +439,221 @@ func TestSQLFormatter_MixedKeywordsAndFunctions(t *testing.T) {
 
 	t.Logf("Formatted SQL:\n%s", formatted)
 }
+
+// ============================================================================
+// SQL String Detection Tests
+// ============================================================================
+
+func TestIsSQLString_ValidSelectStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Valid SELECT statements
+		{"SELECT with FROM", "SELECT * FROM users", true},
+		{"SELECT with columns and FROM", "SELECT id, name FROM users", true},
+		{"SELECT with WHERE", "SELECT * FROM users WHERE id = 1", true},
+		{"SELECT 1", "SELECT 1", true},
+		{"SELECT expression", "SELECT GETDATE()", true},
+		{"SELECT star only", "SELECT *", true},
+		{"SELECT variable", "SELECT ?userId?", true},
+		{"SELECT lowercase", "select * from users", true},
+		{"SELECT mixed case", "Select * From Users", true},
+		{"SELECT with JOIN", "SELECT u.name FROM users u INNER JOIN orders o ON u.id = o.user_id", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_InvalidSelectStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Invalid SELECT - nothing between SELECT and FROM
+		{"SELECT FROM without columns", "SELECT FROM users", false},
+		// SELECT without anything after
+		{"SELECT alone", "SELECT", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_ValidDMLStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// INSERT
+		{"INSERT INTO", "INSERT INTO users VALUES (1)", true},
+		{"INSERT with columns", "INSERT INTO users (id, name) VALUES (1, 'John')", true},
+		// UPDATE
+		{"UPDATE with SET", "UPDATE users SET name = 'Jane'", true},
+		{"UPDATE with WHERE", "UPDATE users SET name = 'Jane' WHERE id = 1", true},
+		// DELETE
+		{"DELETE FROM", "DELETE FROM users", true},
+		{"DELETE with WHERE", "DELETE FROM users WHERE id = 1", true},
+		// MERGE
+		{"MERGE INTO", "MERGE INTO target USING source ON condition", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_InvalidDMLStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Invalid INSERT - no INTO
+		{"INSERT without INTO", "Insert the record", false},
+		// Invalid UPDATE - no SET
+		{"UPDATE without SET", "Update your settings", false},
+		// Invalid DELETE - no FROM
+		{"DELETE without FROM", "Delete this item", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_ValidDDLStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// CREATE
+		{"CREATE TABLE", "CREATE TABLE users (id INT)", true},
+		{"CREATE VIEW", "CREATE VIEW active_users AS SELECT * FROM users", true},
+		{"CREATE INDEX", "CREATE INDEX idx_users ON users(name)", true},
+		{"CREATE PROCEDURE", "CREATE PROCEDURE sp_GetUsers AS SELECT * FROM users", true},
+		// ALTER
+		{"ALTER TABLE", "ALTER TABLE users ADD email VARCHAR(255)", true},
+		// DROP
+		{"DROP TABLE", "DROP TABLE users", true},
+		{"DROP INDEX", "DROP INDEX idx_users", true},
+		// TRUNCATE
+		{"TRUNCATE TABLE", "TRUNCATE TABLE users", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_InvalidDDLStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Invalid CREATE - no DDL object
+		{"CREATE without object", "Create a new report", false},
+		// Invalid DROP - no DDL object
+		{"DROP without object", "Drop the ball", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_ValidOtherStatements(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// WITH (CTE)
+		{"WITH CTE", "WITH cte AS (SELECT * FROM users) SELECT * FROM cte", true},
+		// EXEC/EXECUTE
+		{"EXEC procedure", "EXEC sp_GetUsers", true},
+		{"EXECUTE procedure", "EXECUTE sp_GetUsers @id = 1", true},
+		// CALL
+		{"CALL procedure", "CALL sp_GetUsers()", true},
+		// GRANT/REVOKE
+		{"GRANT", "GRANT SELECT ON users TO public", true},
+		{"REVOKE", "REVOKE SELECT ON users FROM public", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSQLString_NotSQL(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		// Regular English sentences
+		{"Hello world", "Hello world", false},
+		{"English sentence", "This is a regular sentence", false},
+		// SQL fragments (not complete statements)
+		{"WHERE clause only", "WHERE id = 1", false},
+		{"FROM clause only", "FROM users", false},
+		{"ORDER BY only", "ORDER BY name", false},
+		// Empty
+		{"Empty string", "", false},
+		// Other non-SQL
+		{"JSON", "{\"key\": \"value\"}", false},
+		{"Path", "/path/to/file", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSQLString(tt.input)
+			if got != tt.want {
+				t.Errorf("IsSQLString(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}

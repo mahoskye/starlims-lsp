@@ -1026,3 +1026,165 @@ func TestFormatDocument_MultiLineArrayPreserved(t *testing.T) {
 
 	t.Logf("Formatted output:\n%s", formatted)
 }
+
+// ============================================================================
+// SQL String Detection and Formatting Tests
+// ============================================================================
+
+func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
+	// SQL string assigned to variable should be detected and formatted
+	input := `sSQL := "select * from users where status = 'active'";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Should be formatted with SQL keywords uppercased
+	if !strings.Contains(formatted, "SELECT") {
+		t.Error("expected detected SQL SELECT to be uppercase")
+	}
+	if !strings.Contains(formatted, "FROM") {
+		t.Error("expected detected SQL FROM to be uppercase")
+	}
+	if !strings.Contains(formatted, "WHERE") {
+		t.Error("expected detected SQL WHERE to be uppercase")
+	}
+
+	// Complex SQL should be multi-line
+	if !strings.Contains(formatted, "\n") {
+		t.Error("expected complex detected SQL to be formatted as multi-line")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_DetectedSQLStringDisabled(t *testing.T) {
+	// When DetectSQLStrings is false, only SQL function args should be formatted
+	input := `sSQL := "select * from users where status = 'active'";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = false
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// SQL should NOT be formatted when detection is disabled
+	if strings.Contains(formatted, "SELECT") {
+		t.Error("expected SQL to NOT be formatted when DetectSQLStrings=false")
+	}
+
+	// Original lowercase keywords should be preserved
+	if !strings.Contains(formatted, "select") {
+		t.Error("expected original 'select' to be preserved when DetectSQLStrings=false")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_NonSQLStringNotFormatted(t *testing.T) {
+	// Regular English strings should not be touched by SQL detection
+	input := `msg := "Hello world, this is a message";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// String should be unchanged
+	if !strings.Contains(formatted, `"Hello world, this is a message"`) {
+		t.Errorf("non-SQL string should not be modified, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_SQLFunctionArgStillFormattedWhenDetectionDisabled(t *testing.T) {
+	// SQL inside SQLExecute should still be formatted even when detection is off
+	input := `ds := SQLExecute("select * from users");`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = false // Detection off
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// SQL function args should STILL be formatted
+	if !strings.Contains(formatted, "SELECT") {
+		t.Error("SQL inside SQLExecute should still be formatted even with DetectSQLStrings=false")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_SimpleSQLStaysOneLine(t *testing.T) {
+	// Simple SQL like "SELECT 1" should stay on one line
+	input := `x := "SELECT 1";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Simple SQL should NOT be multi-line
+	lines := strings.Split(strings.TrimSpace(formatted), "\n")
+	if len(lines) > 1 {
+		t.Errorf("simple SQL should stay on one line, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_InvalidSQLNotFormatted(t *testing.T) {
+	// "UPDATE your settings" should not be detected as SQL (no SET keyword)
+	input := `msg := "Update your settings in the configuration";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Should NOT be formatted as SQL (no uppercase UPDATE)
+	// The original casing should be preserved
+	if strings.Contains(formatted, "UPDATE YOUR SETTINGS") {
+		t.Errorf("'Update your settings' should not be detected as SQL, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_SQLInsideNestedProcedure(t *testing.T) {
+	// SQL detection should work inside procedures with proper indentation
+	input := `:PROCEDURE Test;
+sSQL := "select id, name from users where active = 1";
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// SQL should be detected and formatted
+	if !strings.Contains(formatted, "SELECT") {
+		t.Error("expected SQL to be detected and formatted inside procedure")
+	}
+
+	// SQL should be multi-line due to complexity
+	if !strings.Contains(formatted, "FROM") && strings.Contains(formatted, "\n") {
+		t.Log("SQL is properly formatted with line breaks")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}

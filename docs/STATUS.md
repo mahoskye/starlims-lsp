@@ -2,7 +2,7 @@
 
 This document provides a quick overview of all LSP features and their current implementation status.
 
-**Last Updated:** 2025-02-04
+**Last Updated:** 2026-02-02
 
 ---
 
@@ -101,6 +101,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | End-of-line comments | IMPLEMENTED | Preserved on same line |
 | Multi-line structure | IMPLEMENTED | Continuation indentation |
 | SQL function casing | IMPLEMENTED | COUNT, SUM, AVG, etc. |
+| SQL string detection | IMPLEMENTED | Auto-detect SQL in any string |
 
 ### Known Formatting Gaps
 
@@ -169,6 +170,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | `ssl.format.sql.enabled` | IMPLEMENTED | `true` |
 | `ssl.format.sql.style` | IMPLEMENTED | `"standard"` |
 | `ssl.format.sql.keywordCase` | IMPLEMENTED | `"upper"` |
+| `ssl.format.sql.detectSQLStrings` | IMPLEMENTED | `true` |
 | `ssl.diagnostics.hungarianNotation` | IMPLEMENTED | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | IMPLEMENTED | `["a","b","d","n","o","s"]` |
 | `ssl.diagnostics.globals` | PARTIAL | `[]` |
@@ -185,6 +187,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 ### v1.1 (Planned)
 - Enhanced formatting (end-of-line comments, multi-line structure) - COMPLETED
+- SQL string detection and formatting - COMPLETED
 - Workspace indexing improvements
 
 ### v2.0 (Future)

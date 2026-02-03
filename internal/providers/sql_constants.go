@@ -78,3 +78,34 @@ var SQLFunctions = map[string]bool{
 	"LSELECTC":                       true,
 	"GETDATASETEX":                   true,
 }
+
+// SQLCommandKeywords are SQL statement-starting keywords used for detection.
+var SQLCommandKeywords = map[string]bool{
+	"SELECT":   true,
+	"INSERT":   true,
+	"UPDATE":   true,
+	"DELETE":   true,
+	"MERGE":    true,
+	"WITH":     true,
+	"CREATE":   true,
+	"ALTER":    true,
+	"DROP":     true,
+	"TRUNCATE": true,
+	"EXEC":     true,
+	"EXECUTE":  true,
+	"CALL":     true,
+	"GRANT":    true,
+	"REVOKE":   true,
+}
+
+// SQLDDLObjects are object types used in DDL statements (CREATE, ALTER, DROP).
+var SQLDDLObjects = map[string]bool{
+	"TABLE":     true,
+	"VIEW":      true,
+	"INDEX":     true,
+	"PROCEDURE": true,
+	"FUNCTION":  true,
+	"TRIGGER":   true,
+	"SCHEMA":    true,
+	"DATABASE":  true,
+}

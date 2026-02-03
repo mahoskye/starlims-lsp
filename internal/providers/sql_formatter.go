@@ -7,11 +7,12 @@ import (
 
 // SQLFormattingOptions configures SQL formatting.
 type SQLFormattingOptions struct {
-	Enabled       bool   // Enable SQL formatting
-	Style         string // "standard", "canonicalCompact", "compact", "expanded"
-	KeywordCase   string // "upper", "lower", "preserve"
-	IndentSize    int    // Spaces per indent level
-	MaxLineLength int    // Max line length for wrapping
+	Enabled          bool   // Enable SQL formatting
+	Style            string // "standard", "canonicalCompact", "compact", "expanded"
+	KeywordCase      string // "upper", "lower", "preserve"
+	IndentSize       int    // Spaces per indent level
+	MaxLineLength    int    // Max line length for wrapping
+	DetectSQLStrings bool   // Auto-detect SQL in any string literal
 }
 
 // SQL formatting styles:
@@ -24,11 +25,12 @@ type SQLFormattingOptions struct {
 // Default follows the official STARLIMS Style Guide.
 func DefaultSQLFormattingOptions() SQLFormattingOptions {
 	return SQLFormattingOptions{
-		Enabled:       true,
-		Style:         "standard",
-		KeywordCase:   "upper",
-		IndentSize:    4,
-		MaxLineLength: 90,
+		Enabled:          true,
+		Style:            "standard",
+		KeywordCase:      "upper",
+		IndentSize:       4,
+		MaxLineLength:    90,
+		DetectSQLStrings: true,
 	}
 }
 
@@ -368,4 +370,130 @@ func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseInd
 	}
 
 	return string(quoteChar) + formatted + string(quoteChar)
+}
+
+// IsSQLString checks if a string content appears to be a complete SQL statement.
+// It uses structural validation to distinguish SQL from English sentences.
+func IsSQLString(content string) bool {
+	if len(content) == 0 {
+		return false
+	}
+
+	// Tokenize the content
+	lexer := NewSQLLexer(content)
+	tokens := lexer.Tokenize()
+
+	// Filter out whitespace tokens
+	var nonWSTokens []SQLToken
+	for _, t := range tokens {
+		if t.Type != SQLTokenWhitespace {
+			nonWSTokens = append(nonWSTokens, t)
+		}
+	}
+
+	if len(nonWSTokens) == 0 {
+		return false
+	}
+
+	// Get the first token and check if it's a SQL command keyword
+	firstToken := nonWSTokens[0]
+	firstUpper := strings.ToUpper(firstToken.Text)
+
+	if !SQLCommandKeywords[firstUpper] {
+		return false
+	}
+
+	// Apply structural validation based on the command
+	return validateSQLStructure(firstUpper, nonWSTokens)
+}
+
+// validateSQLStructure validates that tokens form a complete SQL statement.
+func validateSQLStructure(command string, tokens []SQLToken) bool {
+	switch command {
+	case "SELECT":
+		return validateSelectStatement(tokens)
+	case "INSERT":
+		return containsKeyword(tokens, "INTO")
+	case "UPDATE":
+		return containsKeyword(tokens, "SET")
+	case "DELETE":
+		return containsKeyword(tokens, "FROM")
+	case "MERGE":
+		return containsKeyword(tokens, "INTO")
+	case "WITH":
+		// CTE - must contain a DML statement
+		return containsKeyword(tokens, "SELECT") ||
+			containsKeyword(tokens, "INSERT") ||
+			containsKeyword(tokens, "UPDATE") ||
+			containsKeyword(tokens, "DELETE")
+	case "CREATE", "ALTER", "DROP":
+		return containsDDLObject(tokens)
+	case "TRUNCATE":
+		return containsKeyword(tokens, "TABLE")
+	case "EXEC", "EXECUTE", "CALL":
+		// Must have content after the keyword
+		return len(tokens) > 1
+	case "GRANT", "REVOKE":
+		// Must have content after the keyword
+		return len(tokens) > 1
+	default:
+		return false
+	}
+}
+
+// validateSelectStatement checks if tokens form a valid SELECT statement.
+func validateSelectStatement(tokens []SQLToken) bool {
+	// Find SELECT and FROM positions
+	selectIdx := -1
+	fromIdx := -1
+
+	for i, t := range tokens {
+		upper := strings.ToUpper(t.Text)
+		if upper == "SELECT" && selectIdx == -1 {
+			selectIdx = i
+		} else if upper == "FROM" && fromIdx == -1 {
+			fromIdx = i
+		}
+	}
+
+	// If there's a FROM, there must be at least one token between SELECT and FROM
+	if fromIdx > 0 {
+		return fromIdx > selectIdx+1
+	}
+
+	// SELECT without FROM is valid if there's a valid expression after SELECT
+	// Examples: SELECT 1, SELECT GETDATE(), SELECT *, SELECT @variable
+	if selectIdx >= 0 && len(tokens) > selectIdx+1 {
+		nextToken := tokens[selectIdx+1]
+		// Valid expressions: numbers, strings, functions, *, identifiers, placeholders
+		validTypes := nextToken.Type == SQLTokenNumber ||
+			nextToken.Type == SQLTokenString ||
+			nextToken.Type == SQLTokenFunction ||
+			nextToken.Type == SQLTokenIdentifier ||
+			nextToken.Type == SQLTokenPlaceholder ||
+			nextToken.Text == "*"
+		return validTypes
+	}
+
+	return false
+}
+
+// containsKeyword checks if tokens contain a specific keyword.
+func containsKeyword(tokens []SQLToken, keyword string) bool {
+	for _, t := range tokens {
+		if strings.ToUpper(t.Text) == keyword {
+			return true
+		}
+	}
+	return false
+}
+
+// containsDDLObject checks if tokens contain a DDL object type.
+func containsDDLObject(tokens []SQLToken) bool {
+	for _, t := range tokens {
+		if SQLDDLObjects[strings.ToUpper(t.Text)] {
+			return true
+		}
+	}
+	return false
 }

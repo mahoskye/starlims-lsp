@@ -427,7 +427,7 @@ func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 }
 
 func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
-	if token.Type != lexer.TokenString || !s.inSQLFunction || s.sqlArgCount != 0 || s.parenDepth != s.sqlFunctionParenDepth {
+	if token.Type != lexer.TokenString {
 		return false
 	}
 
@@ -440,6 +440,17 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 
 	quoteChar := content[0]
 	innerContent := content[1 : len(content)-1]
+
+	// Check if we should format this string as SQL:
+	// 1. If inside a SQL function call (first argument)
+	// 2. Or if DetectSQLStrings is enabled and the string looks like SQL
+	inSQLFunctionArg := s.inSQLFunction && s.sqlArgCount == 0 && s.parenDepth == s.sqlFunctionParenDepth
+	shouldFormat := inSQLFunctionArg ||
+		(s.opts.SQL.DetectSQLStrings && IsSQLString(innerContent))
+
+	if !shouldFormat {
+		return false
+	}
 
 	baseIndent := strings.Repeat("\t", s.indent)
 	if s.opts.IndentStyle == "space" {

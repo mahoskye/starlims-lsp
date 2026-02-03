@@ -42,11 +42,12 @@ type FormatSettings struct {
 
 // SQLFormatSettings represents SQL formatting settings from the client.
 type SQLFormatSettings struct {
-	Enabled       *bool   `json:"enabled"`
-	Style         *string `json:"style"`
-	KeywordCase   *string `json:"keywordCase"`
-	IndentSize    *int    `json:"indentSize"`
-	MaxLineLength *int    `json:"maxLineLength"`
+	Enabled          *bool   `json:"enabled"`
+	Style            *string `json:"style"`
+	KeywordCase      *string `json:"keywordCase"`
+	IndentSize       *int    `json:"indentSize"`
+	MaxLineLength    *int    `json:"maxLineLength"`
+	DetectSQLStrings *bool   `json:"detectSQLStrings"`
 }
 
 const serverName = "starlims-lsp"
@@ -272,6 +273,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 			applyOptional(&s.settings.Formatting.SQL.KeywordCase, sql.KeywordCase)
 			applyOptional(&s.settings.Formatting.SQL.IndentSize, sql.IndentSize)
 			applyOptional(&s.settings.Formatting.SQL.MaxLineLength, sql.MaxLineLength)
+			applyOptional(&s.settings.Formatting.SQL.DetectSQLStrings, sql.DetectSQLStrings)
 		}
 	}
 
