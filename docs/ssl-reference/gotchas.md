@@ -29,7 +29,7 @@ result := ExecFunction("Module.CalculateTotal", {5, 10});
 result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — detects direct calls to procedures defined in the same file.
 
 ---
 
@@ -136,7 +136,7 @@ sFirst := aItems[1];  /* "first";
 sLast := aItems[Len(aItems)];  /* "third";
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — detects `[0]` array access patterns.
 
 ---
 
@@ -186,7 +186,7 @@ RunSQL("UPDATE T SET Field = ? WHERE ID = ?", "", {sValue, nID});
 sResult := LSearch("SELECT Name FROM T WHERE ID = ?", "",, {nID});
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — warns about `?varName?` syntax in functions that don't support it.
 
 ---
 
@@ -209,7 +209,7 @@ nCount := oDataset:RowCount;
 sValue := oDataset:GetValue(1, "FieldName");
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — detects dot notation and suggests colon notation.
 
 ---
 
@@ -240,7 +240,7 @@ sValue := oDataset:GetValue(1, "FieldName");
 
 **Note:** For strings, `=` is loose (true if left starts with right or right is empty), `==` is strict.
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — warns when `:=` is used in IF/WHILE/CASE conditions.
 
 ---
 
@@ -340,17 +340,20 @@ oLogger:LogError := GetLastSQLError();
 
 ---
 
-## Gotcha #14: LimsString() Not Str()
+## Gotcha #14: Str() vs LimsString()
 
-**Problem:** SSL doesn't have a `Str()` function — use `LimsString()`.
+**Problem:** `Str()` and `LimsString()` have different purposes and may be confused.
 
 ```ssl
-/* WRONG - Str() doesn't exist;
-sNumber := Str(123);
+/* Str() - formats numbers with length and decimal places;
+sNum := Str(123, 6, 2);      /* "123.00" (6 chars, 2 decimals);
 
-/* CORRECT;
-sNumber := LimsString(123);
+/* LimsString() - general value-to-string conversion;
+sNum := LimsString(123);     /* "123";
+sDate := LimsString(dDate);  /* Converts date to string;
 ```
+
+**Solution:** Use `Str()` for number formatting with specific length/decimals, use `LimsString()` for general conversion.
 
 **LSP Support:** Not currently detected.
 
@@ -373,7 +376,7 @@ oRegex := SSLRegex{'\d+'};
 oCustom := CreateUdObject("MyClass", {params});
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Yes — detects `ClassName()` patterns for built-in classes.
 
 ---
 
@@ -381,18 +384,18 @@ oCustom := CreateUdObject("MyClass", {params});
 
 | # | Gotcha | LSP Detects |
 |---|--------|-------------|
-| 1 | Direct procedure calls | No |
+| 1 | Direct procedure calls | Yes |
 | 2 | Missing `:EXITCASE` | Yes |
 | 3 | `:DEFAULT` with `:DECLARE` | Yes |
 | 4 | Bare logical operators | Yes |
-| 5 | 0-based array indexing | No |
+| 5 | 0-based array indexing | Yes |
 | 6 | Semicolon in comments | Partial |
-| 7 | Named params with RunSQL | Planned |
-| 8 | Dot property notation | No |
-| 9 | `:=` in conditions | No |
+| 7 | Named params with RunSQL | Yes |
+| 8 | Dot property notation | Yes |
+| 9 | `:=` in conditions | Yes |
 | 10 | Loose string equality | No |
 | 11 | NIL vs Empty | No |
 | 12 | Lowercase keywords | Yes |
 | 13 | Property as undeclared | Yes |
-| 14 | Str() instead of LimsString() | No |
-| 15 | Parentheses for class instantiation | No |
+| 14 | Str() vs LimsString() | No |
+| 15 | Parentheses for class instantiation | Yes |

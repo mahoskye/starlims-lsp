@@ -1592,8 +1592,8 @@ x := NIL;
 func TestGetDiagnostics_UndeclaredVariable_ClassesNotFlagged(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE oExpando, oDataset;
-oExpando := SSLExpando();
-oDataset := SSLDataset();
+oExpando := SSLExpando{};
+oDataset := SSLDataset{};
 :ENDPROC;`
 
 	opts := DefaultDiagnosticOptions()
@@ -2565,5 +2565,536 @@ func TestGetOrdinal(t *testing.T) {
 		if result != tc.expected {
 			t.Errorf("getOrdinal(%d) = %s, expected %s", tc.n, result, tc.expected)
 		}
+	}
+}
+
+// ==================== Gotcha Diagnostic Tests ====================
+
+// Test Gotcha #9: Assignment in conditions
+func TestGetDiagnostics_AssignmentInCondition(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		wantMsg string
+	}{
+		{
+			name:    "assignment in IF",
+			code:    `:IF x := 5;`,
+			wantMsg: "Assignment ':=' used in IF condition",
+		},
+		{
+			name:    "assignment in WHILE",
+			code:    `:WHILE y := 1;`,
+			wantMsg: "Assignment ':=' used in WHILE condition",
+		},
+		{
+			name:    "assignment in CASE",
+			code:    `:BEGINCASE; :CASE z := 3;`,
+			wantMsg: "Assignment ':=' used in CASE condition",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, tc.wantMsg) {
+					found = true
+					if d.Severity != SeverityWarning {
+						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected diagnostic containing %q, got: %v", tc.wantMsg, diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_AssignmentInCondition_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "comparison with equals",
+			code: `:IF x = 5;`,
+		},
+		{
+			name: "comparison with double equals",
+			code: `:IF x == 5;`,
+		},
+		{
+			name: "assignment outside condition",
+			code: `x := 5; :IF x = 5;`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "Assignment ':='") && strings.Contains(d.Message, "condition") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test Gotcha #15: Class instantiation with parentheses
+func TestGetDiagnostics_ClassInstantiationSyntax(t *testing.T) {
+	tests := []struct {
+		name      string
+		code      string
+		className string
+	}{
+		{
+			name:      "Email with parentheses",
+			code:      `oEmail := Email();`,
+			className: "Email",
+		},
+		{
+			name:      "SSLRegex with parentheses",
+			code:      `oRegex := SSLRegex('\d+');`,
+			className: "SSLRegex",
+		},
+		{
+			name:      "SSLDataset with parentheses",
+			code:      `oDs := SSLDataset();`,
+			className: "SSLDataset",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, tc.className) && strings.Contains(d.Message, "curly braces") {
+					found = true
+					if d.Severity != SeverityError {
+						t.Errorf("expected SeverityError, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected diagnostic for %s(), got: %v", tc.className, diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_ClassInstantiationSyntax_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "Email with curly braces",
+			code: `oEmail := Email{};`,
+		},
+		{
+			name: "SSLRegex with curly braces",
+			code: `oRegex := SSLRegex{'\d+'};`,
+		},
+		{
+			name: "CreateUdObject function call",
+			code: `oObj := CreateUdObject();`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "curly braces") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test Gotcha #5: Zero-based array indexing
+func TestGetDiagnostics_ZeroBasedArrayIndex(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "array access with 0",
+			code: `x := aItems[0];`,
+		},
+		{
+			name: "string access with 0",
+			code: `c := sText[0];`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "1-based") && strings.Contains(d.Message, "index 0") {
+					found = true
+					if d.Severity != SeverityError {
+						t.Errorf("expected SeverityError, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected zero-index diagnostic, got: %v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_ZeroBasedArrayIndex_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "array access with 1",
+			code: `x := aItems[1];`,
+		},
+		{
+			name: "array access with variable",
+			code: `x := aItems[nIdx];`,
+		},
+		{
+			name: "array access with expression",
+			code: `x := aItems[0 + 1];`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "1-based") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test Gotcha #7: Named SQL params with wrong function
+func TestGetDiagnostics_NamedSQLParamsWithWrongFunction(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		funcName string
+	}{
+		{
+			name:     "RunSQL with named param",
+			code:     `RunSQL("UPDATE T SET X = ?sValue?", "", {});`,
+			funcName: "RunSQL",
+		},
+		{
+			name:     "LSearch with named param",
+			code:     `result := LSearch("SELECT * FROM T WHERE ID = ?nID?", "");`,
+			funcName: "LSearch",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "Named SQL parameter") && strings.Contains(d.Message, tc.funcName) {
+					found = true
+					if d.Severity != SeverityWarning {
+						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected named param diagnostic for %s, got: %v", tc.funcName, diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_NamedSQLParamsWithWrongFunction_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "RunSQL with positional param",
+			code: `RunSQL("UPDATE T SET X = ?", "", {sValue});`,
+		},
+		{
+			name: "SQLExecute with named param",
+			code: `result := SQLExecute("SELECT * FROM T WHERE ID = ?nID?");`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "Named SQL parameter") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test Gotcha #1: Direct procedure calls
+func TestGetDiagnostics_DirectProcedureCalls(t *testing.T) {
+	code := `:PROCEDURE MyHelper;
+:ENDPROC;
+
+:PROCEDURE Main;
+result := MyHelper();
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(code, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "direct procedure calls") && strings.Contains(d.Message, "DoProc") {
+			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected SeverityError, got %d", d.Severity)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected direct procedure call diagnostic, got: %v", diagnostics)
+	}
+}
+
+func TestGetDiagnostics_DirectProcedureCalls_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "DoProc call",
+			code: `:PROCEDURE MyHelper;
+:ENDPROC;
+:PROCEDURE Main;
+result := DoProc("MyHelper", {});
+:ENDPROC;`,
+		},
+		{
+			name: "procedure declaration",
+			code: `:PROCEDURE MyHelper;
+:ENDPROC;`,
+		},
+		{
+			name: "reference without call",
+			code: `:PROCEDURE MyHelper;
+:ENDPROC;
+:PROCEDURE Main;
+x := MyHelper;
+:ENDPROC;`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "direct procedure calls") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test Gotcha #8: Dot property access instead of colon
+func TestGetDiagnostics_DotPropertyAccess(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		propName string
+	}{
+		{
+			name:     "object dot property",
+			code:     `x := oEmail.Subject;`,
+			propName: "Subject",
+		},
+		{
+			name:     "object dot method",
+			code:     `oDataset.RowCount;`,
+			propName: "RowCount",
+		},
+		{
+			name:     "chained dot access",
+			code:     `val := oObj.Property;`,
+			propName: "Property",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "colon ':'") && strings.Contains(d.Message, tc.propName) {
+					found = true
+					if d.Severity != SeverityWarning {
+						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected dot property access diagnostic for .%s, got: %v", tc.propName, diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_DotPropertyAccess_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "colon property access",
+			code: `x := oEmail:Subject;`,
+		},
+		{
+			name: "colon method call",
+			code: `n := oDataset:RowCount;`,
+		},
+		{
+			name: "logical operator .AND.",
+			code: `:IF a .AND. b;`,
+		},
+		{
+			name: "boolean true .T.",
+			code: `x := .T.;`,
+		},
+		{
+			name: "boolean false .F.",
+			code: `x := .F.;`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "colon ':'") && strings.Contains(d.Message, "property access") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
+// Test missing quotes in ExecFunction/DoProc
+func TestGetDiagnostics_MissingQuotesInExecFunction(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		funcName string
+	}{
+		{
+			name:     "ExecFunction without quotes",
+			code:     `result := ExecFunction(Module.Procedure, {});`,
+			funcName: "ExecFunction",
+		},
+		{
+			name:     "DoProc without quotes",
+			code:     `result := DoProc(Helper.Func, {});`,
+			funcName: "DoProc",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			found := false
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "must be quoted") && strings.Contains(d.Message, tc.funcName) {
+					found = true
+					if d.Severity != SeverityError {
+						t.Errorf("expected SeverityError, got %d", d.Severity)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected missing quotes diagnostic for %s, got: %v", tc.funcName, diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_MissingQuotesInExecFunction_ValidSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "ExecFunction with double quotes",
+			code: `result := ExecFunction("Module.Procedure", {});`,
+		},
+		{
+			name: "DoProc with single quotes",
+			code: `result := DoProc('Helper.Func', {});`,
+		},
+		{
+			name: "ExecFunction with simple name",
+			code: `result := ExecFunction("SimpleName", {});`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(tc.code, opts)
+
+			for _, d := range diagnostics {
+				if strings.Contains(d.Message, "must be quoted") {
+					t.Errorf("should not flag valid syntax: %s", d.Message)
+				}
+			}
+		})
 	}
 }

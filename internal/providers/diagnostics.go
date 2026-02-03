@@ -146,21 +146,513 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		diagnostics = append(diagnostics, checkSQLParameterValidation(tokens, ast, p, opts.GlobalVariables)...)
 	}
 
+	// SSL gotcha detection (always enabled)
+	diagnostics = append(diagnostics, checkAssignmentInCondition(tokens)...)
+	diagnostics = append(diagnostics, checkDotPropertyAccess(tokens)...)
+	diagnostics = append(diagnostics, checkClassInstantiationSyntax(tokens)...)
+	diagnostics = append(diagnostics, checkZeroBasedArrayIndex(tokens)...)
+	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
+	diagnostics = append(diagnostics, checkDirectProcedureCalls(tokens, ast, p)...)
+	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
+
 	return diagnostics
 }
 
 // checkTokenErrors checks for token-level errors.
+// Skips TokenUnknown that look like dot property access (handled by checkDotPropertyAccess).
 func checkTokenErrors(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	for _, token := range tokens {
+	for i, token := range tokens {
 		if token.Type == lexer.TokenUnknown {
+			// Skip dot property access patterns - they have their own diagnostic
+			if strings.HasPrefix(token.Text, ".") && len(token.Text) > 1 {
+				rest := token.Text[1:]
+				// Check if at least the start of rest looks like an identifier
+				if len(rest) > 0 && len(extractIdentifier(rest)) > 0 {
+					// Check if preceded by identifier
+					isPropAccess := false
+					for j := i - 1; j >= 0; j-- {
+						if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+							continue
+						}
+						if tokens[j].Type == lexer.TokenIdentifier {
+							isPropAccess = true
+						}
+						break
+					}
+					if isPropAccess {
+						continue // Skip - will be reported by checkDotPropertyAccess
+					}
+				}
+			}
+
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Unknown token: '%s'", token.Text),
 				Source:   "ssl-lsp",
 			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkAssignmentInCondition detects := assignment operator used in IF/WHILE/CASE conditions.
+// This is usually a mistake - the developer likely meant = or == for comparison.
+// Gotcha #9 in gotchas.md.
+func checkAssignmentInCondition(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Track when we're inside a condition (between IF/WHILE/CASE and semicolon)
+	inCondition := false
+	var conditionKeyword *lexer.Token
+
+	for i := range tokens {
+		token := &tokens[i]
+
+		// Skip whitespace and comments
+		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+			continue
+		}
+
+		// Detect condition-starting keywords
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "IF" || normalized == "WHILE" || normalized == "CASE" {
+				inCondition = true
+				conditionKeyword = token
+				continue
+			}
+		}
+
+		// End of condition
+		if token.Type == lexer.TokenPunctuation && token.Text == ";" {
+			inCondition = false
+			conditionKeyword = nil
+			continue
+		}
+
+		// Detect := in condition
+		if inCondition && token.Type == lexer.TokenOperator && token.Text == ":=" {
+			keywordName := "condition"
+			if conditionKeyword != nil {
+				keywordName = strings.ToUpper(strings.TrimPrefix(conditionKeyword.Text, ":"))
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(*token),
+				Message:  fmt.Sprintf("Assignment ':=' used in %s condition - did you mean '=' or '=='?", keywordName),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkDotPropertyAccess detects identifier.identifier patterns that look like
+// property access using dot notation (common in other languages).
+// SSL uses colon notation: object:property instead of object.property.
+// Gotcha #8 in gotchas.md.
+func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		// Look for TokenUnknown that starts with a dot followed by identifier chars
+		if token.Type != lexer.TokenUnknown {
+			continue
+		}
+
+		// Check if it looks like .identifier
+		if !strings.HasPrefix(token.Text, ".") {
+			continue
+		}
+
+		rest := token.Text[1:]
+		if len(rest) == 0 {
+			continue
+		}
+
+		// Extract identifier portion from rest (may have trailing non-identifier chars like semicolons)
+		propName := extractIdentifier(rest)
+		if len(propName) == 0 {
+			continue
+		}
+
+		// Look back to see if preceded by an identifier (skip whitespace)
+		precedingIsIdent := false
+		for j := i - 1; j >= 0; j-- {
+			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenIdentifier {
+				precedingIsIdent = true
+			}
+			break
+		}
+
+		if precedingIsIdent {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("SSL uses colon ':' for property access, not dot '.'. Use 'object:%s' instead of 'object.%s'", propName, propName),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// isIdentifierPattern checks if a string looks like an identifier.
+func isIdentifierPattern(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	// First char must be letter or underscore
+	first := rune(s[0])
+	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
+		return false
+	}
+	// Rest can be letter, digit, or underscore
+	for _, ch := range s[1:] {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// extractIdentifier extracts the identifier portion from the start of a string.
+func extractIdentifier(s string) string {
+	var result strings.Builder
+	for i, ch := range s {
+		if i == 0 {
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' {
+				result.WriteRune(ch)
+			} else {
+				break
+			}
+		} else {
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
+				result.WriteRune(ch)
+			} else {
+				break
+			}
+		}
+	}
+	return result.String()
+}
+
+// checkClassInstantiationSyntax detects ClassName() patterns for SSL built-in classes.
+// SSL uses curly braces for class instantiation: Email{}, SSLRegex{}, etc.
+// Gotcha #15 in gotchas.md.
+func checkClassInstantiationSyntax(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Build a case-insensitive set of class names
+	classNames := make(map[string]string) // uppercase -> original
+	for _, cls := range constants.SSLClassNames {
+		classNames[strings.ToUpper(cls)] = cls
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// Check if this identifier is a class name
+		originalName, isClass := classNames[strings.ToUpper(token.Text)]
+		if !isClass {
+			continue
+		}
+
+		// Look ahead for '(' (skip whitespace)
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "(" {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(token),
+					Message:  fmt.Sprintf("SSL built-in class '%s' uses curly braces for instantiation: '%s{}' not '%s()'", originalName, originalName, originalName),
+					Source:   "ssl-lsp",
+				})
+			}
+			break
+		}
+	}
+
+	return diagnostics
+}
+
+// checkZeroBasedArrayIndex detects [0] array access patterns.
+// SSL arrays are 1-based, so index 0 is invalid.
+// Gotcha #5 in gotchas.md.
+func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		// Look for '[' punctuation
+		if token.Type != lexer.TokenPunctuation || token.Text != "[" {
+			continue
+		}
+
+		// Check if preceded by an identifier (array variable)
+		hasPrecedingIdent := false
+		for j := i - 1; j >= 0; j-- {
+			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenIdentifier {
+				hasPrecedingIdent = true
+			}
+			break
+		}
+
+		if !hasPrecedingIdent {
+			continue
+		}
+
+		// Look ahead for pattern: 0 followed by ]
+		foundZero := false
+		var zeroToken *lexer.Token
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenNumber && tokens[j].Text == "0" {
+				foundZero = true
+				zeroToken = &tokens[j]
+				continue
+			}
+			if foundZero && tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "]" {
+				// Found [0] pattern
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(*zeroToken),
+					Message:  "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.",
+					Source:   "ssl-lsp",
+				})
+			}
+			break
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNamedSQLParamsWithWrongFunction detects ?varName? syntax used with
+// functions that don't support named parameters (RunSQL, LSearch, etc.).
+// Only SQLExecute and similar inline SQL functions support ?varName? syntax.
+// Gotcha #7 in gotchas.md.
+func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Build set of functions that DON'T support named params
+	parameterizedFuncs := make(map[string]bool)
+	for _, fn := range constants.ParameterizedSQLFunctions {
+		parameterizedFuncs[strings.ToUpper(fn)] = true
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// Check if this is a parameterized SQL function
+		if !parameterizedFuncs[strings.ToUpper(token.Text)] {
+			continue
+		}
+
+		funcName := token.Text
+
+		// Look ahead for '(' then find the first string argument
+		inCall := false
+		parenDepth := 0
+		for j := i + 1; j < len(tokens); j++ {
+			t := tokens[j]
+
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == "(" {
+				if !inCall {
+					inCall = true
+				}
+				parenDepth++
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == ")" {
+				parenDepth--
+				if parenDepth <= 0 {
+					break
+				}
+				continue
+			}
+
+			// Found a string in the function call
+			if inCall && parenDepth == 1 && t.Type == lexer.TokenString {
+				// Check for named parameters in this string
+				content := t.Text
+				if len(content) >= 2 {
+					content = content[1 : len(content)-1] // Remove quotes
+				}
+				placeholders := ParseSQLPlaceholders(content)
+				for _, ph := range placeholders {
+					if ph.IsNamed {
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityWarning,
+							Range:    tokenToRange(t),
+							Message:  fmt.Sprintf("Named SQL parameter '?%s?' not supported by '%s'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.", ph.Name, funcName),
+							Source:   "ssl-lsp",
+						})
+						break // One warning per string is enough
+					}
+				}
+				break // Only check first string argument
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkDirectProcedureCalls detects attempts to call procedures directly.
+// SSL requires DoProc("name", {params}) or ExecFunction("Module.name", {params}).
+// Gotcha #1 in gotchas.md.
+func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Extract procedure names from the AST
+	procedures := p.ExtractProcedures(ast)
+	if len(procedures) == 0 {
+		return diagnostics
+	}
+
+	// Build set of procedure names (case-insensitive)
+	procNames := make(map[string]string) // uppercase -> original
+	for _, proc := range procedures {
+		procNames[strings.ToUpper(proc.Name)] = proc.Name
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// Check if this identifier matches a procedure name
+		originalName, isProc := procNames[strings.ToUpper(token.Text)]
+		if !isProc {
+			continue
+		}
+
+		// Look ahead for '(' (skip whitespace)
+		for j := i + 1; j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "(" {
+				// Check if this is NOT part of a :PROCEDURE declaration
+				// Look back for :PROCEDURE keyword on same line
+				isDeclaration := false
+				for k := i - 1; k >= 0; k-- {
+					if tokens[k].Type == lexer.TokenWhitespace {
+						// Check if crossed a newline
+						if strings.Contains(tokens[k].Text, "\n") {
+							break
+						}
+						continue
+					}
+					if tokens[k].Type == lexer.TokenKeyword {
+						normalized := strings.ToUpper(strings.TrimPrefix(tokens[k].Text, ":"))
+						if normalized == "PROCEDURE" {
+							isDeclaration = true
+						}
+					}
+					break
+				}
+
+				if !isDeclaration {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("SSL doesn't support direct procedure calls. Use DoProc(\"%s\", {params}) instead of '%s()'", originalName, originalName),
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+			break
+		}
+	}
+
+	return diagnostics
+}
+
+// checkMissingQuotesInExecFunction detects ExecFunction(Module.Proc, ...) patterns
+// where the namespace path is not quoted.
+// Related to Gotcha #8 (dot notation).
+func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// Check if this is ExecFunction or DoProc
+		upper := strings.ToUpper(token.Text)
+		if upper != "EXECFUNCTION" && upper != "DOPROC" {
+			continue
+		}
+
+		funcName := token.Text
+
+		// Look ahead for '(' then check first argument
+		inCall := false
+		for j := i + 1; j < len(tokens); j++ {
+			t := tokens[j]
+
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == "(" {
+				inCall = true
+				continue
+			}
+
+			if inCall {
+				// First non-whitespace token after '(' should be the first argument
+				// If it's an identifier followed by TokenUnknown starting with '.', that's the error
+				if t.Type == lexer.TokenIdentifier {
+					// Look ahead for .identifier pattern (TokenUnknown)
+					for k := j + 1; k < len(tokens); k++ {
+						if tokens[k].Type == lexer.TokenWhitespace || tokens[k].Type == lexer.TokenComment {
+							continue
+						}
+						if tokens[k].Type == lexer.TokenUnknown && strings.HasPrefix(tokens[k].Text, ".") {
+							// Found identifier.something pattern without quotes
+							diagnostics = append(diagnostics, Diagnostic{
+								Severity: SeverityError,
+								Range: Range{
+									Start: Position{Line: t.Line - 1, Character: t.Column - 1},
+									End:   Position{Line: tokens[k].Line - 1, Character: tokens[k].Column - 1 + len(tokens[k].Text)},
+								},
+								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
+								Source:  "ssl-lsp",
+							})
+						}
+						break
+					}
+				}
+				break
+			}
 		}
 	}
 
