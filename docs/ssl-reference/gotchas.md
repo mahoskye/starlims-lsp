@@ -157,7 +157,7 @@ DoSomething();  /* This line is actually outside the comment;
 ;
 ```
 
-**LSP Support:** Partial.
+**LSP Support:** Not currently detected (Issue #52 - deferred).
 
 ---
 
@@ -186,7 +186,7 @@ RunSQL("UPDATE T SET Field = ? WHERE ID = ?", "", {sValue, nID});
 sResult := LSearch("SELECT Name FROM T WHERE ID = ?", "",, {nID});
 ```
 
-**LSP Support:** Planned.
+**LSP Support:** Not currently detected.
 
 ---
 
@@ -321,7 +321,7 @@ x = "";        /* Only true for empty string;
 :PROCEDURE MyProc;
 ```
 
-**LSP Support:** Yes — syntax highlighting and parsing expect uppercase.
+**LSP Support:** Handled by lexer/parser — lowercase keywords will cause parse errors, not explicit diagnostic warnings.
 
 ---
 

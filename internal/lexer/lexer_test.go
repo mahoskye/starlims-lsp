@@ -276,13 +276,15 @@ func TestLexer_TokenKeyword(t *testing.T) {
 
 func TestLexer_TokenKeyword_AllKeywords(t *testing.T) {
 	// Test a selection of important keywords
+	// Note: :ELSEIF and :EXIT do not exist in SSL
 	keywords := []string{
-		":PROCEDURE", ":ENDPROC", ":IF", ":ELSE", ":ELSEIF", ":ENDIF",
+		":PROCEDURE", ":ENDPROC", ":IF", ":ELSE", ":ENDIF",
 		":WHILE", ":ENDWHILE", ":FOR", ":NEXT", ":TO", ":STEP",
 		":TRY", ":CATCH", ":FINALLY", ":ENDTRY",
 		":DECLARE", ":PUBLIC", ":PARAMETERS", ":DEFAULT",
 		":BEGINCASE", ":CASE", ":OTHERWISE", ":ENDCASE", ":EXITCASE",
-		":RETURN", ":EXIT", ":CLASS", ":INHERIT", ":REGION", ":ENDREGION",
+		":RETURN", ":CLASS", ":INHERIT", ":REGION", ":ENDREGION",
+		":BEGININLINECODE", ":ENDINLINECODE",
 	}
 
 	for _, kw := range keywords {
@@ -351,8 +353,19 @@ func TestLexer_TokenOperator(t *testing.T) {
 		{"assignment", ":=", ":=", TokenOperator},
 		{"hash", "#", "#", TokenOperator},
 		{"dollar", "$", "$", TokenOperator},
-		// Note: Some compound operators like !=, <=, >= may be tokenized
-		// as separate tokens depending on constants.IsSSLCompoundOperator
+		// Multi-character comparison operators
+		{"less_equal", "<=", "<=", TokenOperator},
+		{"greater_equal", ">=", ">=", TokenOperator},
+		{"equal_equal", "==", "==", TokenOperator},
+		{"not_equal", "!=", "!=", TokenOperator},
+		{"not_equal_legacy", "<>", "<>", TokenOperator},
+		// Compound assignment operators
+		{"plus_equal", "+=", "+=", TokenOperator},
+		{"minus_equal", "-=", "-=", TokenOperator},
+		{"multiply_equal", "*=", "*=", TokenOperator},
+		{"divide_equal", "/=", "/=", TokenOperator},
+		{"modulo_equal", "%=", "%=", TokenOperator},
+		{"power_equal", "^=", "^=", TokenOperator},
 	}
 
 	for _, tc := range tests {
@@ -1073,6 +1086,115 @@ func TestGetContextAtPosition(t *testing.T) {
 			ctx := GetContextAtPosition(tokens, tc.line, tc.column)
 			if ctx != tc.expected {
 				t.Errorf("expected %v, got %v", tc.expected, ctx)
+			}
+		})
+	}
+}
+
+func TestLexer_NIL_Literal(t *testing.T) {
+	// NIL should be tokenized as a keyword, not an identifier
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"uppercase", "NIL"},
+		{"lowercase", "nil"},
+		{"mixed", "Nil"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lex := NewLexer(tc.input)
+			tokens := lex.Tokenize()
+
+			if len(tokens) < 2 {
+				t.Fatalf("expected at least 2 tokens, got %d", len(tokens))
+			}
+			if tokens[0].Type != TokenKeyword {
+				t.Errorf("expected TokenKeyword for %s, got %s", tc.input, tokens[0].Type)
+			}
+		})
+	}
+}
+
+func TestLexer_BracketString_AfterKeyword(t *testing.T) {
+	// Bracket strings after keywords should be strings, not array access
+	input := `:IF [condition]`
+	lex := NewLexer(input)
+	tokens := lex.Tokenize()
+
+	// Should be: :IF, whitespace, [condition], EOF
+	if len(tokens) < 4 {
+		t.Fatalf("expected at least 4 tokens, got %d", len(tokens))
+	}
+
+	// First token should be keyword :IF
+	if tokens[0].Type != TokenKeyword {
+		t.Errorf("expected TokenKeyword for :IF, got %s", tokens[0].Type)
+	}
+
+	// Second token should be whitespace
+	if tokens[1].Type != TokenWhitespace {
+		t.Errorf("expected TokenWhitespace, got %s", tokens[1].Type)
+	}
+
+	// Third token should be string [condition]
+	if tokens[2].Type != TokenString {
+		t.Errorf("expected TokenString for [condition], got %s (text: %s)", tokens[2].Type, tokens[2].Text)
+	}
+	if tokens[2].Text != "[condition]" {
+		t.Errorf("expected [condition], got %s", tokens[2].Text)
+	}
+}
+
+func TestLexer_BracketString_AfterIdentifier_IsArrayAccess(t *testing.T) {
+	// Bracket after identifier should be array access (punctuation), not string
+	input := `arr[0]`
+	lex := NewLexer(input)
+	tokens := lex.Tokenize()
+
+	// Should be: arr, [, 0, ], EOF
+	if len(tokens) < 5 {
+		t.Fatalf("expected at least 5 tokens, got %d", len(tokens))
+	}
+
+	// First token should be identifier arr
+	if tokens[0].Type != TokenIdentifier {
+		t.Errorf("expected TokenIdentifier for arr, got %s", tokens[0].Type)
+	}
+
+	// Second token should be punctuation [
+	if tokens[1].Type != TokenPunctuation || tokens[1].Text != "[" {
+		t.Errorf("expected TokenPunctuation '[', got %s %s", tokens[1].Type, tokens[1].Text)
+	}
+}
+
+func TestLexer_ComparisonOperators_SingleToken(t *testing.T) {
+	// Verify comparison operators are tokenized as single tokens, not split
+	tests := []struct {
+		name   string
+		input  string
+		tokens int // expected number of tokens (including EOF and whitespace)
+	}{
+		{"less_equal", "x <= 5", 6},       // x, ws, <=, ws, 5, EOF
+		{"greater_equal", "x >= 5", 6},    // x, ws, >=, ws, 5, EOF
+		{"equal_equal", "x == 5", 6},      // x, ws, ==, ws, 5, EOF
+		{"not_equal", "x != 5", 6},        // x, ws, !=, ws, 5, EOF
+		{"not_equal_legacy", "x <> 5", 6}, // x, ws, <>, ws, 5, EOF
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lex := NewLexer(tc.input)
+			tokens := lex.Tokenize()
+
+			if len(tokens) != tc.tokens {
+				t.Errorf("expected %d tokens, got %d: %v", tc.tokens, len(tokens), tokens)
+			}
+
+			// The operator should be a single token at index 2
+			if tokens[2].Type != TokenOperator {
+				t.Errorf("expected TokenOperator at index 2, got %s", tokens[2].Type)
 			}
 		})
 	}

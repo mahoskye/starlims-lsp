@@ -64,9 +64,15 @@ All SSL keywords must be prefixed with `:` and written in UPPERCASE:
 :ENDPROC;
 :RETURN value;
 
-/* Classes;
+/* Classes - ONE per file, NO :ENDCLASS, extends to EOF;
 :CLASS ClassName;
 :INHERIT BaseClass;
+
+/* Code Organization (equivalent);
+:REGION RegionName;
+:ENDREGION;
+:BEGININLINECODE;
+:ENDINLINECODE;
 ```
 
 ### Statement Termination

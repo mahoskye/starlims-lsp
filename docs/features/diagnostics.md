@@ -295,7 +295,7 @@ sUser := gCurrentUser;
     Me:bActive := .T.;
     Me:nCounter := 0;
 :ENDPROC;
-:ENDCLASS;
+/* Note: No :ENDCLASS - class extends to end of file;
 /* Expected: No warnings on 'Me';
 ```
 

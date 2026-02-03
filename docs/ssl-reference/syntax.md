@@ -56,12 +56,15 @@ Keywords are colon-prefixed and UPPERCASE:
 | `:RETURN` | Return value from procedure |
 | `:CLASS`, `:INHERIT` | Define a class with inheritance |
 
+**Note:** There is NO `:ENDCLASS` keyword. A file can contain only one `:CLASS` declaration, and the class scope extends from `:CLASS` to the end of the file. All procedures defined after `:CLASS` become methods of that class.
+
 ### Other Keywords
 
 | Keyword | Purpose |
 |---------|---------|
 | `:INCLUDE` | Include external script |
 | `:REGION`, `:ENDREGION` | Code organization regions |
+| `:BEGININLINECODE`, `:ENDINLINECODE` | Code organization (equivalent to REGION/ENDREGION) |
 | `:LABEL` | Define a label |
 
 ---
@@ -419,6 +422,12 @@ sValue := oDataset:Fields("Name"):Value;
 
 ### Class Definition
 
+**Important:**
+- A file can contain only ONE `:CLASS` declaration
+- There is NO `:ENDCLASS` keyword
+- The class scope extends from `:CLASS` to the end of the file
+- All procedures defined after `:CLASS` become methods of that class
+
 ```ssl
 :CLASS MyClass;
 :INHERIT BaseClass;  /* Optional inheritance;
@@ -435,6 +444,7 @@ sValue := oDataset:Fields("Name"):Value;
     Me:nValue := Me:nValue + 1;
     :RETURN Me:nValue;
 :ENDPROC;
+/* No :ENDCLASS - class extends to end of file;
 ```
 
 ### Object Creation

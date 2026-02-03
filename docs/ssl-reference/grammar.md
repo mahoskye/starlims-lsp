@@ -207,7 +207,7 @@ date_literal = "{" year "," month "," day [ "," hour "," minute "," second ] "}"
 
 ## Tokens
 
-### Keywords (32 Total)
+### Keywords (37 Total)
 
 All keywords are colon-prefixed and case-sensitive (UPPERCASE):
 
@@ -249,12 +249,17 @@ All keywords are colon-prefixed and case-sensitive (UPPERCASE):
 ```
 :LABEL, :INCLUDE
 :REGION, :ENDREGION
+:BEGININLINECODE, :ENDINLINECODE
 ```
 
 **Object-Oriented:**
 ```
 :CLASS, :INHERIT
 ```
+
+**Note:** `:BEGININLINECODE` and `:ENDINLINECODE` are equivalent to `:REGION` and `:ENDREGION` — they serve as organizational markers for code folding.
+
+**Note:** There is NO `:ENDCLASS` keyword. A file can contain only one `:CLASS` declaration, and the class scope extends from `:CLASS` to the end of the file.
 
 ### Operators
 

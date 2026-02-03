@@ -166,7 +166,9 @@ func (l *Lexer) isArrayAccessContext(tokens []Token) bool {
 		if t.Type == TokenWhitespace || t.Type == TokenComment {
 			continue
 		}
-		if t.Type == TokenIdentifier || t.Type == TokenNumber || t.Type == TokenString || t.Type == TokenKeyword {
+		// Array access follows identifiers, numbers, strings, or closing delimiters
+		// Keywords are NOT included - [bracket] after :IF should be a string, not array access
+		if t.Type == TokenIdentifier || t.Type == TokenNumber || t.Type == TokenString {
 			return true
 		}
 		if t.Type == TokenPunctuation && (t.Text == ")" || t.Text == "]") {
@@ -354,6 +356,10 @@ func (l *Lexer) readIdentifier() Token {
 	if constants.IsKeyword(upper) {
 		return Token{Type: TokenKeyword, Text: str, Line: line, Column: col, Offset: start}
 	}
+	// Check for literals like NIL
+	if constants.IsSSLLiteral(upper) {
+		return Token{Type: TokenKeyword, Text: str, Line: line, Column: col, Offset: start}
+	}
 
 	return Token{Type: TokenIdentifier, Text: str, Line: line, Column: col, Offset: start}
 }
@@ -405,7 +411,7 @@ func (l *Lexer) readOperator() Token {
 	if l.pos < len(l.input) {
 		next := l.input[l.pos]
 		twoChar := string(char) + string(next)
-		if constants.IsSSLCompoundOperator(twoChar) {
+		if constants.IsSSLMultiCharOperator(twoChar) {
 			text.WriteRune(next)
 			l.advance()
 		}

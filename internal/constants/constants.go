@@ -23,8 +23,9 @@ var SSLKeywords = []string{
 
 // BlockStartKeywords are keywords that start a block (increase indent after).
 // Includes middle keywords like ELSE, CASE, CATCH that start new indented content.
+// Note: CLASS is excluded because there is no :ENDCLASS - classes extend to end of file.
 var BlockStartKeywords = []string{
-	"IF", "ELSE", "WHILE", "FOR", "BEGINCASE", "CASE", "OTHERWISE", "TRY", "CATCH", "FINALLY", "PROCEDURE", "CLASS", "REGION", "BEGININLINECODE",
+	"IF", "ELSE", "WHILE", "FOR", "BEGINCASE", "CASE", "OTHERWISE", "TRY", "CATCH", "FINALLY", "PROCEDURE", "REGION", "BEGININLINECODE",
 }
 
 // BlockEndKeywords are keywords that end a block.
@@ -63,6 +64,15 @@ var SSLLogicalOperators = []string{".AND.", ".OR.", ".NOT."}
 
 // SSLCompoundOperators are compound assignment operators.
 var SSLCompoundOperators = []string{":=", "+=", "-=", "*=", "/=", "%=", "^="}
+
+// SSLMultiCharOperators are all operators that span multiple characters.
+// Used by the lexer to correctly tokenize multi-character operators as single tokens.
+var SSLMultiCharOperators = []string{
+	// Comparison operators
+	"<=", ">=", "==", "!=", "<>",
+	// Assignment operators
+	":=", "+=", "-=", "*=", "/=", "%=", "^=",
+}
 
 // SSLLiterals contains boolean and null literal values (3 total).
 var SSLLiterals = []string{".T.", ".F.", "NIL"}
@@ -299,6 +309,11 @@ func IsSSLLogicalOperator(s string) bool {
 // IsSSLCompoundOperator checks if a string is a compound operator.
 func IsSSLCompoundOperator(s string) bool {
 	return slices.Contains(SSLCompoundOperators, s)
+}
+
+// IsSSLMultiCharOperator checks if a string is a multi-character operator.
+func IsSSLMultiCharOperator(s string) bool {
+	return slices.Contains(SSLMultiCharOperators, s)
 }
 
 // IsSSLLiteral checks if a string is an SSL literal.
