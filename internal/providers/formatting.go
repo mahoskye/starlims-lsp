@@ -209,10 +209,12 @@ type formatState struct {
 	inProcedure           bool
 	currentLineLen        int
 	parenDepth            int
+	continuationIndent    int // Additional indent for continuation lines inside parens
 	inSQLFunction         bool
 	sqlFunctionParenDepth int
 	sqlArgCount           int
 	sqlFormatter          *SQLFormatter
+	pendingComment        *lexer.Token // End-of-line comment to write before newline
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
@@ -277,7 +279,16 @@ func (s *formatState) updateParenDepth(token lexer.Token) {
 
 func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 	if s.lineStart && token.Type != lexer.TokenWhitespace && token.Type != lexer.TokenComment {
-		s.currentLineLen = writeIndentLen(s.builder, s.indent, s.opts)
+		// Calculate continuation indent for lines inside parens
+		contIndent := s.continuationIndent
+		// If the first token on this line is a closing paren/bracket, dedent by one
+		// since it should align with the opening paren's level
+		if isCloseParen(token) && contIndent > 0 {
+			contIndent--
+		}
+		// Calculate total indent: base indent + continuation indent
+		totalIndent := s.indent + contIndent
+		s.currentLineLen = writeIndentLen(s.builder, totalIndent, s.opts)
 		s.lineStart = false
 	}
 }
@@ -293,6 +304,13 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 			s.currentLineLen++
 		}
 
+		// Write any pending end-of-line comment before the newline
+		if s.pendingComment != nil {
+			s.builder.WriteString("  ") // Two spaces before comment
+			s.builder.WriteString(s.pendingComment.Text)
+			s.pendingComment = nil
+		}
+
 		newlineCount := strings.Count(token.Text, "\n")
 		if newlineCount > 2 {
 			newlineCount = 2
@@ -302,6 +320,10 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		s.lineStart = true
 		s.currentLineLen = 0
+
+		// Set continuation indent for lines inside parentheses
+		// This will be applied when the next token is written
+		s.continuationIndent = s.parenDepth
 	} else if !s.lineStart {
 		s.builder.WriteString(" ")
 		s.currentLineLen++
@@ -460,6 +482,16 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			break
 		}
 
+		// Check if this is an end-of-line comment (comment on same line as code)
+		if token.Type == lexer.TokenComment {
+			if isEndOfLineComment(token, state.lastNonWSToken, tokens, i) {
+				// Store this comment to be written before the next newline
+				commentCopy := token
+				state.pendingComment = &commentCopy
+				continue
+			}
+		}
+
 		state.updateForKeyword(token)
 		state.updateParenDepth(token)
 		state.writeIndentIfNeeded(token)
@@ -481,12 +513,37 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		state.finalizeToken(token)
 	}
 
+	// Write any remaining pending comment at end of file
+	if state.pendingComment != nil {
+		state.builder.WriteString("  ")
+		state.builder.WriteString(state.pendingComment.Text)
+	}
+
 	formatted := state.builder.String()
 	if len(formatted) > 0 && !strings.HasSuffix(formatted, "\n") {
 		formatted += "\n"
 	}
 
 	return formatted
+}
+
+// isEndOfLineComment checks if a comment token is an end-of-line comment
+// (a comment on the same line as code, following code).
+func isEndOfLineComment(comment lexer.Token, lastNonWSToken lexer.Token, tokens []lexer.Token, commentIndex int) bool {
+	// If no code was written yet, this is not an end-of-line comment
+	if lastNonWSToken.Type == 0 {
+		return false
+	}
+
+	// If the comment is on the same line as the last non-whitespace token, it's an end-of-line comment
+	if comment.Line == lastNonWSToken.Line {
+		// Also check that the comment doesn't contain newlines (is single-line)
+		if !strings.Contains(comment.Text, "\n") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // writeIndentLen writes indentation and returns the visual length.
