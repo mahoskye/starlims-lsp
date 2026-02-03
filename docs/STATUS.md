@@ -28,6 +28,7 @@ This document provides a quick overview of all LSP features and their current im
 | [Signature Help](./features/signature-help.md) | IMPLEMENTED | 367 built-in functions + user procedures |
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
+| [Rename](./features/rename.md) | IMPLEMENTED | Single-file, scope-aware, validates new name |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: regions contain procedures |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
@@ -47,7 +48,6 @@ This document provides a quick overview of all LSP features and their current im
 
 | Feature | Reason |
 |---------|--------|
-| `textDocument/rename` | Future enhancement |
 | `textDocument/codeAction` | No quick fixes defined |
 | `textDocument/codeLens` | Not needed for SSL |
 | `textDocument/inlayHint` | Future enhancement |

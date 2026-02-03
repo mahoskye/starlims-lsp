@@ -119,7 +119,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 |---------|-------------|--------|
 | #16 | Go-to-definition for `ExecFunction`/`DoProc` | ✅ Same-file implemented |
 | #36 | Context-aware reference finding | ✅ Implemented |
-| #40 | Scope-aware rename | Pending |
+| #40 | Scope-aware rename | ✅ Implemented |
 
 ---
 

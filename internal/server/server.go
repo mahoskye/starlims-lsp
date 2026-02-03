@@ -103,6 +103,8 @@ func NewSSLServer() *SSLServer {
 		TextDocumentDidSave:             s.handleDidSave,
 		TextDocumentFormatting:          s.handleFormatting,
 		TextDocumentRangeFormatting:     s.handleRangeFormatting,
+		TextDocumentRename:              s.handleRename,
+		TextDocumentPrepareRename:       s.handlePrepareRename,
 		WorkspaceSymbol:                 s.handleWorkspaceSymbol,
 		WorkspaceDidChangeConfiguration: s.handleDidChangeConfiguration,
 	}
@@ -136,6 +138,9 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	capabilities.DocumentFormattingProvider = true
 	capabilities.DocumentRangeFormattingProvider = true
 	capabilities.WorkspaceSymbolProvider = true
+	capabilities.RenameProvider = &protocol.RenameOptions{
+		PrepareProvider: ptrTo(true),
+	}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,

@@ -429,3 +429,75 @@ func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protoco
 
 	return result, nil
 }
+
+// handlePrepareRename handles prepare rename requests.
+func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.PrepareRenameParams) (any, error) {
+	uri := params.TextDocument.URI
+
+	content, ok := s.documents.GetDocument(uri)
+	if !ok {
+		return nil, nil
+	}
+
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+
+	result := providers.PrepareRename(
+		content,
+		int(params.Position.Line)+1,
+		int(params.Position.Character)+1,
+		uri,
+		cache.Procedures,
+		cache.Variables,
+	)
+
+	if result == nil {
+		return nil, nil
+	}
+
+	return protocol.RangeWithPlaceholder{
+		Range:       toProtocolRange(result.Range),
+		Placeholder: result.Placeholder,
+	}, nil
+}
+
+// handleRename handles rename requests.
+func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	uri := params.TextDocument.URI
+
+	content, ok := s.documents.GetDocument(uri)
+	if !ok {
+		return nil, nil
+	}
+
+	version := s.documentVersion[uri]
+	cache := s.documents.ParseDocument(uri, version)
+
+	result := providers.Rename(
+		content,
+		int(params.Position.Line)+1,
+		int(params.Position.Character)+1,
+		params.NewName,
+		uri,
+		cache.Procedures,
+		cache.Variables,
+	)
+
+	if result == nil {
+		return nil, nil
+	}
+
+	// Convert to protocol WorkspaceEdit
+	changes := make(map[protocol.DocumentUri][]protocol.TextEdit)
+	for docUri, edits := range result.Changes {
+		protocolEdits := make([]protocol.TextEdit, 0, len(edits))
+		for _, edit := range edits {
+			protocolEdits = append(protocolEdits, toProtocolTextEdit(edit))
+		}
+		changes[docUri] = protocolEdits
+	}
+
+	return &protocol.WorkspaceEdit{
+		Changes: changes,
+	}, nil
+}
