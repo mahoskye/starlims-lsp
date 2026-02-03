@@ -2,7 +2,7 @@
 
 This document outlines the prioritized feature roadmap for the starlims-lsp project.
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-03
 
 ---
 
@@ -14,7 +14,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 
 ---
 
-## Current Release: v1.1
+## Current Release: v1.4
 
 ### Implemented Features
 
@@ -26,7 +26,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 | Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
 | Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
 | Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
-| Diagnostics | Full suite with opt-in undeclared/unused/SQL param checks | ✅ Complete |
+| Diagnostics | Full suite with gotcha checks + opt-in undeclared/unused/SQL param checks | ✅ Complete |
 
 ---
 
@@ -91,6 +91,78 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 
 ---
 
+## v1.4 - Gotcha Diagnostics (COMPLETED)
+
+**Goal:** Detect common SSL mistakes documented in gotchas.md.
+
+**Status:** ✅ COMPLETED
+
+### Features (All Implemented)
+
+| Gotcha | Description | Status |
+|--------|-------------|--------|
+| #1 | Direct procedure calls (should use DoProc/ExecFunction) | ✅ Implemented |
+| #5 | Zero-based array indexing (SSL is 1-based) | ✅ Implemented |
+| #7 | Named SQL params (`?name?`) in wrong functions | ✅ Implemented |
+| #8 | Dot property access (should use colon) | ✅ Implemented |
+| #9 | Assignment (`:=`) in conditions | ✅ Implemented |
+| #15 | Parentheses for class instantiation (should use `{}`) | ✅ Implemented |
+| - | Missing quotes in ExecFunction arguments | ✅ Implemented |
+
+See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL gotchas and their LSP detection status.
+
+---
+
+## v1.5 - Type Inference & Class Members (IN PROGRESS)
+
+**Goal:** Enable intelligent completion for object properties and methods.
+
+**Status:** 🔄 IN PROGRESS
+
+### Phase 1: Class Member Metadata (Next Up)
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Define class member structure | Properties/methods for 30 SSL classes | ⏳ Pending |
+| Add SSLDataset members | Most commonly used class | ⏳ Pending |
+| Add Email members | Common utility class | ⏳ Pending |
+| Add SSLExpando members | Dynamic object class | ⏳ Pending |
+| Add remaining 27 classes | Complete coverage | ⏳ Pending |
+
+### Phase 2: Type Inference System
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Track `ClassName{}` instantiation | `oEmail := Email{}` → type is Email | ⏳ Pending |
+| Track `CreateUdObject()` calls | Returns SSLExpando | ⏳ Pending |
+| Infer types from function returns | e.g., `GetDataSet()` → SSLDataset | ⏳ Pending |
+| SSLExpando dynamic properties | Track `oObj:propName := value` | ⏳ Pending |
+
+### Phase 3: Member Completion
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Trigger on `:` after typed variable | Context-aware completion | ⏳ Pending |
+| Filter by property vs method | Show appropriate icon | ⏳ Pending |
+| Include inherited members | For classes with INHERIT | ⏳ Pending |
+
+---
+
+## v1.6 - Additional Gotcha Detection (PLANNED)
+
+**Goal:** Detect remaining common SSL mistakes.
+
+**Status:** 📋 PLANNED
+
+| Gotcha | Description | Complexity |
+|--------|-------------|------------|
+| #10 | Loose string equality (`=` vs `==`) | Medium - needs context analysis |
+| #11 | NIL vs Empty confusion | Medium - semantic analysis |
+| #14 | Str() vs LimsString() confusion | Low - pattern matching |
+| #6 | Semicolon in comments | Deferred (Issue #52) |
+
+---
+
 ## v2.0 - Workspace Features
 
 **Goal:** Enable cross-file analysis and navigation.
@@ -133,7 +205,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 
 | Feature | Description | Effort |
 |---------|-------------|--------|
-| Inlay Hints | Parameter name hints in calls | Large |
+| Inlay Hints | Parameter name hints in calls | ✅ Implemented |
 | Semantic Tokens | Enhanced syntax highlighting | Medium |
 | Call Hierarchy | Incoming/outgoing call analysis | Large |
 | Code Actions | Quick fixes for diagnostics | Large |
@@ -199,5 +271,6 @@ See the [main README](../../README.md) for:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-03 | 1.4 | Added v1.4 (gotcha diagnostics), v1.5 (type inference), v1.6 (additional gotchas) |
 | 2026-02-02 | 1.1 | Updated to reflect completed v1.1, v1.2, v1.3 features |
 | 2025-02-02 | 1.0 | Initial roadmap from ISSUE_ALIGNMENT analysis |

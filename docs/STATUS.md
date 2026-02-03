@@ -2,7 +2,7 @@
 
 This document provides a quick overview of all LSP features and their current implementation status.
 
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-03
 
 ---
 
@@ -72,6 +72,28 @@ This document provides a quick overview of all LSP features and their current im
 | Undeclared variables | IMPLEMENTED | Disabled by default (opt-in) |
 | Unused variables | IMPLEMENTED | Disabled by default (opt-in) |
 | SQL parameter validation | IMPLEMENTED | Disabled by default (opt-in) |
+
+### Gotcha Diagnostics (v1.4)
+
+These diagnostics detect common SSL mistakes documented in [gotchas.md](./ssl-reference/gotchas.md):
+
+| Gotcha | Diagnostic | Status |
+|--------|------------|--------|
+| #1 | Direct procedure calls | IMPLEMENTED |
+| #2 | Missing `:EXITCASE` | IMPLEMENTED |
+| #3 | `:DEFAULT` with `:DECLARE` | IMPLEMENTED |
+| #4 | Bare logical operators | IMPLEMENTED |
+| #5 | Zero-based array indexing | IMPLEMENTED |
+| #6 | Semicolon in comments | PARTIAL (Issue #52) |
+| #7 | Named SQL params in wrong functions | IMPLEMENTED |
+| #8 | Dot property notation | IMPLEMENTED |
+| #9 | Assignment in conditions | IMPLEMENTED |
+| #10 | Loose string equality | NOT IMPLEMENTED |
+| #11 | NIL vs Empty | NOT IMPLEMENTED |
+| #12 | Lowercase keywords | IMPLEMENTED (parser) |
+| #13 | Property as undeclared | IMPLEMENTED |
+| #14 | Str() vs LimsString() | NOT IMPLEMENTED |
+| #15 | Parentheses for class instantiation | IMPLEMENTED |
 
 ### Known Diagnostic Gaps
 
@@ -180,16 +202,27 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 ## Version Milestones
 
-### v1.0 (Current)
+### v1.0 (Complete)
 - Core LSP features implemented
 - Single-file analysis
 - Basic diagnostics
 - SSL + SQL formatting
 
-### v1.1 (Planned)
-- Enhanced formatting (end-of-line comments, multi-line structure) - COMPLETED
-- SQL string detection and formatting - COMPLETED
-- Workspace indexing improvements
+### v1.1-v1.3 (Complete)
+- Enhanced formatting (end-of-line comments, multi-line structure)
+- SQL string detection and formatting
+- Diagnostic improvements and gap fixes
+- Hover enhancements (SQL placeholders, `Me` keyword)
+
+### v1.4 (Complete)
+- Gotcha diagnostics for common SSL mistakes
+- 7 new diagnostic checks implemented
+- See [gotchas.md](./ssl-reference/gotchas.md) for full list
+
+### v1.5 (In Progress)
+- Type inference system
+- Class member metadata (properties/methods for 30 SSL classes)
+- Member completion after `object:`
 
 ### v2.0 (Future)
 - Workspace indexing

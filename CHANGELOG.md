@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Gotcha Diagnostics** - 7 new diagnostic checks for common SSL mistakes:
+  - Direct procedure calls without DoProc/ExecFunction (Gotcha #1)
+  - Zero-based array indexing detection (Gotcha #5)
+  - Named SQL parameters (`?name?`) in functions that don't support them (Gotcha #7)
+  - Dot notation for property access instead of colon (Gotcha #8)
+  - Assignment operator (`:=`) in IF/WHILE/CASE conditions (Gotcha #9)
+  - Parentheses for class instantiation instead of curly braces (Gotcha #15)
+  - Missing quotes in ExecFunction procedure name arguments
+- Helper functions for identifier pattern matching in diagnostics
+- Comprehensive tests for all gotcha diagnostic checks
 - MIT License and project disclaimer
 - Comprehensive documentation (DOCUMENTATION.md)
 - `.golangci.yml` for standardized linting
@@ -25,10 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved code documentation with explanatory comments
 - Strengthened test assertions in formatting and handler tests
 - Replaced magic numbers with named constants in tests
+- Updated gotchas.md with LSP detection status for all documented gotchas
+- Improved `checkTokenErrors` to skip dot property patterns (avoids duplicate diagnostics)
 
 ### Fixed
 - Block depth diagnostic no longer uses hardcoded character position
 - Region name extraction handles trailing semicolons correctly
+- Test for `SSLExpando` class instantiation now uses correct `{}` syntax
 
 ## [0.1.0] - 2026-01-10
 
