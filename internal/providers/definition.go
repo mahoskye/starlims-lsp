@@ -14,9 +14,18 @@ type Location struct {
 	Range Range
 }
 
+// doProcPattern matches DoProc or ExecFunction calls to extract the procedure name
+var doProcPattern = regexp.MustCompile(`(?i)\b(DoProc|ExecFunction)\s*\(\s*["']([^"']+)["']`)
+
 // FindDefinition finds the definition for a symbol.
 // Respects scope precedence: local/parameter variables take precedence over public variables.
+// Also supports go-to-definition for DoProc/ExecFunction string targets.
 func FindDefinition(text string, line, column int, uri string, procedures []parser.ProcedureInfo, variables []parser.VariableInfo) *Location {
+	// First, check if cursor is inside a DoProc/ExecFunction string target
+	if loc := findDoProcDefinition(text, line, column, uri, procedures); loc != nil {
+		return loc
+	}
+
 	word := lexer.GetWordAtPosition(text, line, column)
 
 	if word == "" {
@@ -210,4 +219,53 @@ func escapeRegex(s string) string {
 	return special.ReplaceAllStringFunc(s, func(m string) string {
 		return `\` + m
 	})
+}
+
+// findDoProcDefinition checks if the cursor is inside a DoProc/ExecFunction string argument
+// and returns the definition location of the referenced procedure.
+func findDoProcDefinition(text string, line, column int, uri string, procedures []parser.ProcedureInfo) *Location {
+	lines := strings.Split(text, "\n")
+	if line < 1 || line > len(lines) {
+		return nil
+	}
+
+	lineText := lines[line-1]
+
+	// Find all DoProc/ExecFunction calls on this line
+	matches := doProcPattern.FindAllStringSubmatchIndex(lineText, -1)
+	if matches == nil {
+		return nil
+	}
+
+	// Check if cursor is inside any of the procedure name strings
+	for _, match := range matches {
+		if len(match) < 6 {
+			continue
+		}
+
+		// match[4] and match[5] are the start/end of the procedure name (capture group 2)
+		procNameStart := match[4] + 1 // +1 for 1-based column
+		procNameEnd := match[5] + 1
+
+		// Check if cursor is within the procedure name
+		if column >= procNameStart && column <= procNameEnd {
+			procName := lineText[match[4]:match[5]]
+
+			// Look for this procedure in the document
+			procNameLower := strings.ToLower(procName)
+			for _, proc := range procedures {
+				if strings.ToLower(proc.Name) == procNameLower {
+					return &Location{
+						URI: uri,
+						Range: Range{
+							Start: Position{Line: proc.StartLine - 1, Character: 0},
+							End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name) + 11}, // :PROCEDURE + name
+						},
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
