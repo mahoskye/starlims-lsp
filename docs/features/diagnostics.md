@@ -43,13 +43,12 @@ These diagnostics are implemented but disabled by default:
 | Diagnostic | Severity | Description |
 |------------|----------|-------------|
 | Undeclared variables | Warning | Variable used without declaration (enable via `CheckUndeclaredVars`) |
+| Unused variables | Hint | Variable declared but never used (enable via `CheckUnusedVars`) |
+| SQL parameter validation | Warning | SQL `?param?` not matching declared variable (enable via `CheckSQLParams`) |
 
 ### 2.4 Planned Diagnostics
 
-| Diagnostic | Severity | Description |
-|------------|----------|-------------|
-| Unused variables | Hint | Variable declared but never used |
-| SQL parameter validation | Warning | SQL `?param?` not matching declared variable |
+*No planned diagnostics at this time. All previously planned diagnostics have been implemented.*
 
 ---
 
@@ -340,6 +339,26 @@ sUser := gCurrentUser;
 /* Expected: Warning on line 4 - "Block nesting depth (4) exceeds maximum (3)";
 ```
 
+### 6.13 SQL Parameter Validation
+
+```ssl
+/* Test: Undeclared SQL parameter warning;
+/* Config: CheckSQLParams = true;
+:PROCEDURE Test;
+:DECLARE sName;
+sSQL := "SELECT * FROM users WHERE name = ?sName? AND id = ?nId?";
+/*                                                        ^^^^;
+/* Expected: Warning on '?nId?' - "SQL parameter 'nId' is not declared";
+:ENDPROC;
+
+/* Test: Declared SQL parameter - no warning;
+:PROCEDURE Test2;
+:DECLARE sStatus;
+sSQL := "SELECT * FROM orders WHERE status = ?sStatus?";
+/* Expected: No warning - sStatus is declared;
+:ENDPROC;
+```
+
 ---
 
 ## 7. Related Issues
@@ -350,6 +369,7 @@ sUser := gCurrentUser;
 | #55 | Globals not recognized | High | Open |
 | #2 | `Me` flagged as undeclared | High | Open |
 | #53 | Functions flagged as variables | High | Open |
+| #8 | SQL parameter validation | Medium | Fixed |
 | #47 | SQL param case sensitivity | Medium | Closed |
 | #25 | SQL param case (duplicate) | Medium | Closed |
 | #22 | Property access confusion | Medium | Closed |

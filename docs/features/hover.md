@@ -103,20 +103,19 @@ Hovering over `Me` should show:
 Used within `:CLASS` blocks to access instance properties and methods.
 ```
 
-### 4.6 SQL Placeholders - PLANNED
+### 4.6 SQL Placeholders
 
 **Named Parameters (`?varName?`):**
 
-Hovering over `?myVar?` should show:
-- Variable name
-- Declaration location
-- Value (if statically determinable)
+Hovering over `?myVar?` inside a SQL string shows:
+- Parameter name and type (named parameter)
+- Variable declaration location (if found)
 
 **Positional Parameters (`?`):**
 
-Hovering over `?` should show:
+Hovering over `?` inside a SQL string shows:
 - Parameter position (1st, 2nd, etc.)
-- Corresponding array element (if determinable from context)
+- Note about corresponding array element
 
 ---
 
@@ -124,7 +123,6 @@ Hovering over `?` should show:
 
 | Limitation | Notes |
 |------------|-------|
-| SQL placeholder hover | Not yet implemented |
 | Object method hover | No type tracking for object methods |
 | `:INCLUDE` definitions | Cannot show info from included files |
 | Custom function hover | No support for project-defined functions |
@@ -254,7 +252,7 @@ x := "SQLExecute is a function";
 /* Expected: No hover (or null response);
 ```
 
-### 6.10 SQL Placeholder Hover (PLANNED)
+### 6.10 SQL Placeholder Hover
 
 ```ssl
 /* Test: Hover over named SQL parameter;
@@ -263,8 +261,7 @@ sCustomer := "ACME";
 sSQL := "SELECT * FROM customers WHERE name = ?sCustomer?";
 /* Hover position: over "sCustomer" inside the ?...?;
 /* Expected:
-   **SQL Parameter:** `sCustomer`
-   **Value:** "ACME"
+   **SQL Parameter:** `sCustomer` (named)
    Declared at line 2
 ;
 
@@ -272,8 +269,8 @@ sSQL := "SELECT * FROM customers WHERE name = ?sCustomer?";
 RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
 /* Hover position: over second "?";
 /* Expected:
-   **Positional SQL Placeholder**
-   Parameter 2
+   **SQL Placeholder** (positional)
+   Parameter position: 2
 ;
 ```
 
@@ -285,8 +282,8 @@ RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
 |-------|-------------|--------|
 | #30 | DoProc hover shows incorrect signature | To Verify |
 | #27 | SQL functions inside strings trigger hover | To Fix |
-| #15 | Hover for named SQL parameters | Planned |
-| #13 | Hover for positional SQL placeholders | Planned |
+| #15 | Hover for named SQL parameters | Fixed |
+| #13 | Hover for positional SQL placeholders | Fixed |
 | #37 | Unnecessary "Usage Frequency" line | Fixed |
 
 ---

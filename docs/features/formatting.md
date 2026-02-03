@@ -110,30 +110,22 @@ result := CallFunction(
 
 ## 5. Edge Cases & Special Handling
 
-### 5.1 End-of-Line Comments - PARTIAL
+### 5.1 End-of-Line Comments
 
-**Current Behavior:** End-of-line comments may be moved to the next line.
-
-**Expected Behavior:** Comments on the same line as code should remain on that line:
+End-of-line comments are preserved on the same line as their code:
 
 ```ssl
 x := 5;  /* set x to 5;
-
-/* Should NOT become:;
-x := 5;
-/* set x to 5;
+/* Stays on same line after formatting;
 ```
 
-**Status:** Known gap, tracked for v1.3.
+The formatter detects comments that appear on the same line as code and ensures they remain attached to that line.
 
-### 5.2 Multi-Line Structure Preservation - PARTIAL
+### 5.2 Multi-Line Structure Preservation
 
-**Current Behavior:** Intentionally structured multi-line code may be collapsed.
-
-**Expected Behavior:** Preserve user's intentional line breaks:
+Intentionally structured multi-line code is preserved with proper indentation:
 
 ```ssl
-/* User wrote:;
 result := OuterFunction(
     InnerFunction(
         arg1,
@@ -141,12 +133,10 @@ result := OuterFunction(
     ),
     arg3
 );
-
-/* Should NOT become:;
-result := OuterFunction(InnerFunction(arg1, arg2), arg3);
+/* Multi-line structure is preserved with continuation indentation;
 ```
 
-**Status:** Known gap, tracked for v1.3.
+The formatter tracks parenthesis depth and applies appropriate indentation for each nesting level.
 
 ### 5.3 Comment Content Preservation
 
@@ -164,11 +154,17 @@ Comment content should NEVER be modified:
 
 ### 5.4 SQL Function Casing
 
-**Issue:** SQL functions like `substr()` should not be converted to SSL's `SubStr()` casing.
+SQL built-in functions (COUNT, SUM, AVG, etc.) follow the same casing rules as SQL keywords:
 
-**Current Behavior:** May incorrectly apply SSL casing to SQL functions.
+```sql
+/* With keywordCase = "upper":;
+SELECT COUNT(*), SUM(amount), AVG(price) FROM orders
 
-**Expected Behavior:** SQL formatter should only case SQL keywords, not SQL functions.
+/* With keywordCase = "lower":;
+select count(*), sum(amount), avg(price) from orders
+```
+
+Functions are distinguished from identifiers and formatted appropriately, with no space before the opening parenthesis.
 
 ### 5.5 Multi-Line Logical Expressions
 
@@ -194,16 +190,42 @@ DoProc("MyProc", {
 });
 ```
 
+### 5.7 SQL String Auto-Detection
+
+SQL strings are automatically detected and formatted in any string literal, not just those passed to SQL functions. Detection is based on structural patterns:
+
+| SQL Command | Required Structure |
+|-------------|-------------------|
+| `SELECT` | Content after SELECT (expression or FROM with columns) |
+| `INSERT` | Must contain `INTO` |
+| `UPDATE` | Must contain `SET` |
+| `DELETE` | Must contain `FROM` |
+| `CREATE/ALTER/DROP` | Must contain object type (TABLE, VIEW, etc.) |
+
+**Example:**
+```ssl
+/* Before formatting:;
+sSQL := "select * from users where status = 'active'";
+
+/* After formatting (auto-detected as SQL):;
+sSQL := "
+    SELECT *
+    FROM users
+    WHERE status = 'active'
+";
+```
+
+This feature is controlled by `ssl.format.sql.detectSQLStrings` (default: `true`).
+
 ---
 
 ## 6. Known Limitations
 
 | Limitation | Notes |
 |------------|-------|
-| End-of-line comments may move | #11 - Planned for v1.3 |
-| Multi-line structure collapsed | #33 - Planned for v1.3 |
-| SQL function casing | #28 - Planned for v1.3 |
 | Continuation indentation | #31 - Needs improvement |
+
+*Most previously known limitations (end-of-line comments, multi-line structure, SQL function casing) have been resolved.*
 
 ---
 
@@ -387,19 +409,44 @@ x := 5;
 :ENDPROC;
 ```
 
+### 7.11 SQL String Auto-Detection
+
+```ssl
+/* Test: SQL in variable assignment is detected and formatted;
+/* Config: sql.detectSQLStrings = true (default);
+/* Before:;
+sSQL := "select id, name from users where active = 1";
+
+/* After:;
+sSQL := "
+    SELECT id, name
+    FROM users
+    WHERE active = 1
+";
+```
+
+### 7.12 Non-SQL String Not Formatted
+
+```ssl
+/* Test: English sentences are not mistakenly formatted as SQL;
+/* Before:;
+msg := "Update your settings in the configuration";
+
+/* After (unchanged - no SET keyword means not SQL):;
+msg := "Update your settings in the configuration";
+```
+
 ---
 
 ## 8. Related Issues
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| #11 | End-of-line comments moved | Planned v1.3 |
-| #33 | Multi-line structure collapsed | Planned v1.3 |
-| #28 | SQL function casing incorrect | Planned v1.3 |
+| #9 | End-of-line comments moved | Fixed |
+| #10 | Multi-line structure collapsed | Fixed |
+| #28 | SQL function casing incorrect | Fixed |
 | #31 | Continuation indentation | Planned v1.3 |
 | #8 | Comment content modified | To Verify |
-| #9 | Line length not respected | Fixed |
-| #10 | SQL formatting support | Fixed |
 | #43 | SQL schema layout | Fixed |
 | #44 | Formatter silently fails | To Investigate |
 
@@ -416,8 +463,17 @@ The formatter operates on tokens, not raw text:
 
 ### 9.2 SQL Detection
 
-SQL is detected in first argument of known SQL functions:
-`SQLExecute`, `GetDataSet`, `RunSQL`, `LSearch`, `LSelect`, etc.
+SQL is detected in two ways:
+
+1. **Function Arguments:** First argument of known SQL functions:
+   `SQLExecute`, `GetDataSet`, `RunSQL`, `LSearch`, `LSelect`, etc.
+
+2. **Auto-Detection:** Any string literal that matches SQL patterns (when `detectSQLStrings` is enabled):
+   - Starts with SQL command keyword (SELECT, INSERT, UPDATE, DELETE, etc.)
+   - Contains required structural elements (e.g., SELECT with FROM, INSERT with INTO)
+   - Uses `IsSQLString()` function for validation
+
+Auto-detection distinguishes SQL from English sentences by requiring structural patterns, not just keyword presence.
 
 ### 9.3 Performance
 

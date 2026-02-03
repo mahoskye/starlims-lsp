@@ -2,9 +2,9 @@
 
 This document specifies all configuration options available in the starlims-lsp language server. It serves as the authoritative reference for client configuration.
 
-**Version:** 1.0  
-**Last Updated:** 2025-02-02  
-**Status:** Draft
+**Version:** 1.1  
+**Last Updated:** 2026-02-02  
+**Status:** Current
 
 ---
 
@@ -76,6 +76,7 @@ interface SQLFormattingOptions {
   keywordCase: "upper" | "lower" | "preserve";
   indentSize: number;
   maxLineLength: number;
+  detectSQLStrings: boolean;
 }
 
 interface DiagnosticOptions {
@@ -336,6 +337,41 @@ Number of spaces per indentation level within SQL statements.
 | **File** | `internal/providers/sql_formatter.go:14,31` |
 
 Maximum line length for SQL before wrapping. Used with `canonicalCompact` and `expanded` styles.
+
+### 4.6 ssl.format.sql.detectSQLStrings
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `true` |
+| **File** | `internal/providers/sql_formatter.go:15,32` |
+
+When enabled, SQL strings are automatically detected and formatted in any string literal, not just those passed to SQL functions. Detection uses structural patterns to distinguish SQL from English sentences.
+
+**Detected SQL Patterns:**
+- `SELECT` with content (expression or FROM clause)
+- `INSERT` with `INTO`
+- `UPDATE` with `SET`
+- `DELETE` with `FROM`
+- `CREATE/ALTER/DROP` with object type (TABLE, VIEW, etc.)
+- `TRUNCATE` with `TABLE`
+- `WITH` (CTE) containing DML statement
+- `EXEC/EXECUTE/CALL` with content
+
+**Example:**
+```ssl
+/* With detectSQLStrings: true (default);
+sSQL := "select * from users";
+/* Becomes:;
+sSQL := "
+    SELECT *
+    FROM users
+";
+
+/* With detectSQLStrings: false;
+sSQL := "select * from users";
+/* Stays unchanged (only SQL function args are formatted);
+```
 
 ---
 
@@ -626,6 +662,7 @@ Uses all defaults.
   "ssl.format.sql.keywordCase": "upper",
   "ssl.format.sql.indentSize": 4,
   "ssl.format.sql.maxLineLength": 90,
+  "ssl.format.sql.detectSQLStrings": true,
   "ssl.diagnostics.hungarianNotation": false,
   "ssl.diagnostics.hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
   "ssl.diagnostics.globals": ["gCurrentUser", "gAppName"]
@@ -654,6 +691,7 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.keywordCase` | `"upper"` |
 | `ssl.format.sql.indentSize` | `4` |
 | `ssl.format.sql.maxLineLength` | `90` |
+| `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","n","o","s"]` |
 | `ssl.diagnostics.globals` | `[]` |

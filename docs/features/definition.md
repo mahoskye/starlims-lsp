@@ -81,18 +81,28 @@ If the same name appears in multiple scopes, return the most relevant:
 
 Currently, definition only works within the same file. `:INCLUDE` paths and `DoProc`/`ExecFunction` targets are not resolved across files.
 
-### 4.6 DoProc/ExecFunction String Targets - PLANNED
+### 4.6 DoProc/ExecFunction String Targets - PARTIAL
 
-**Expected Behavior:**
+Go-to-definition works for procedure names inside `DoProc()` and `ExecFunction()` string arguments, but only for procedures defined in the same file.
+
+**Supported:**
 ```ssl
-DoProc("Helpers.CalculateTotal", {args});
-/*      ^--- Ctrl+Click should navigate to CalculateTotal procedure;
+:PROCEDURE CalculateTotal;
+:PARAMETERS nPrice, nQty;
+:ENDPROC;
+
+:PROCEDURE Main;
+    DoProc("CalculateTotal", {10, 5});
+    /*      ^--- Ctrl+Click navigates to CalculateTotal above;
+:ENDPROC;
 ```
 
-Currently not implemented. Requires:
+**Not Supported:**
+- Cross-file navigation (e.g., `DoProc("Helpers.CalculateTotal")`)
 - Namespace path resolution
-- Workspace indexing
-- Configuration for namespace roots
+- Procedures in `:INCLUDE`d files
+
+Cross-file support requires workspace indexing (planned for v2.0).
 
 ---
 
@@ -102,7 +112,7 @@ Currently not implemented. Requires:
 |------------|-------|
 | Single-file only | Cannot navigate to other files |
 | No `:INCLUDE` resolution | Cannot follow include paths |
-| No DoProc/ExecFunction resolution | Cannot navigate to string procedure references |
+| DoProc/ExecFunction cross-file | Same-file works; cross-file requires workspace indexing |
 | No built-in source | Built-in functions have no navigable source |
 
 ---
@@ -218,12 +228,42 @@ x := globalVar;
 /* Expected: Location of line 4 (local DECLARE), not line 1;
 ```
 
+### 6.10 DoProc String Target (Same File)
+
+```ssl
+/* Test: Navigate to procedure from DoProc string;
+:PROCEDURE HelperProc;
+:PARAMETERS nValue;
+:ENDPROC;
+
+:PROCEDURE Main;
+    DoProc("HelperProc", {10});
+/*         ^ Go to definition here (inside string);
+:ENDPROC;
+/* Expected: Location of line 1 (HelperProc definition);
+```
+
+### 6.11 ExecFunction String Target (Same File)
+
+```ssl
+/* Test: Navigate to procedure from ExecFunction string;
+:PROCEDURE Calculate;
+:ENDPROC;
+
+:PROCEDURE Main;
+    result := ExecFunction("Calculate");
+/*                          ^ Go to definition here;
+:ENDPROC;
+/* Expected: Location of line 1 (Calculate definition);
+```
+
 ---
 
 ## 7. Related Issues
 
 | Issue | Description | Status |
 |-------|-------------|--------|
+| #11 | DoProc/ExecFunction same-file definition | Fixed |
 | #16 | Namespace-based file linking for ExecFunction/DoProc | Future (v2.0) |
 
 ---
