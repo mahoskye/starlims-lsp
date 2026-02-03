@@ -64,12 +64,12 @@ Rename respects SSL scoping rules:
 
 ```ssl
 :PROCEDURE Proc1;
-:DECLARE sValue;        /* Rename here... */
-sValue := "one";        /* ...updates this... */
+:DECLARE sValue;        /* Rename here;
+sValue := "one";        /* ...updates this;
 :ENDPROC;
 
 :PROCEDURE Proc2;
-:DECLARE sValue;        /* ...but NOT this (different scope) */
+:DECLARE sValue;        /* ...but NOT this (different scope);
 sValue := "two";
 :ENDPROC;
 ```
@@ -80,8 +80,8 @@ SSL is case-insensitive. Renaming finds all case variations:
 
 ```ssl
 :DECLARE sName;
-sname := "test";        /* Found */
-SNAME := sname;         /* Both found */
+sname := "test";        /* Found;
+SNAME := sname;         /* Both found;
 ```
 
 All variations will be renamed to the exact casing you specify.

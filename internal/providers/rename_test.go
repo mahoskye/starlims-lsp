@@ -110,7 +110,7 @@ x := "hello world";
 
 func TestPrepareRename_InsideComment_NotAllowed(t *testing.T) {
 	text := `:PROCEDURE Test;
-/* This is a comment */
+/* This is a comment;
 x := 1;
 :ENDPROC;`
 
