@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-03
+
 ### Added
+- **CLI Validation Mode** (`--validate`) - Validate SSL files from the command line with structured JSON output
+  - File-based validation: `starlims-lsp --validate script.ssl`
+  - Stdin support: `echo '...' | starlims-lsp --validate --stdin`
+  - Designed for agent skills, CI pipelines, and programmatic use
 - **Gotcha Diagnostics** - 7 new diagnostic checks for common SSL mistakes:
   - Direct procedure calls without DoProc/ExecFunction (Gotcha #1)
   - Zero-based array indexing detection (Gotcha #5)
@@ -43,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Region name extraction handles trailing semicolons correctly
 - Test for `SSLExpando` class instantiation now uses correct `{}` syntax
 
+### Removed
+- **`ssl-validator` standalone binary** - Consolidated into `starlims-lsp --validate`
+
 ## [0.1.0] - 2026-01-10
 
 ### Added
@@ -72,5 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mahoskye/starlims-lsp/releases/tag/v0.1.0

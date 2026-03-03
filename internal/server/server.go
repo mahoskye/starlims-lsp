@@ -59,7 +59,7 @@ type SQLFormatSettings struct {
 
 const serverName = "starlims-lsp"
 
-var version = "0.1.0"
+var version = "0.2.0"
 
 // ExtendedServerCapabilities embeds the standard capabilities and adds LSP 3.17 features.
 type ExtendedServerCapabilities struct {

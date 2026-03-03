@@ -83,6 +83,36 @@ Or if built locally:
 ./bin/starlims-lsp --stdio
 ```
 
+### Validation Mode
+
+Validate SSL files from the command line with structured JSON output. Designed for agent skills, CI pipelines, and programmatic use:
+
+```bash
+# Validate one or more files
+starlims-lsp --validate script.ssl
+starlims-lsp --validate file1.ssl file2.ssl
+
+# Pipe content via stdin
+echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin
+
+# Get validation-specific help
+starlims-lsp --validate --help
+```
+
+Output is a JSON array with diagnostics per file:
+
+```json
+[
+  {
+    "file": "script.ssl",
+    "valid": true,
+    "diagnostics": []
+  }
+]
+```
+
+Exit code `0` means all inputs pass; `1` means errors were found.
+
 ### VS Code Integration
 
 To use with VS Code, you need a client extension that launches this server. The companion extension [vs-code-ssl-formatter](https://github.com/mahoskye/vs-code-ssl-formatter) can be configured to use this LSP.
@@ -209,7 +239,8 @@ make clean
 starlims-lsp/
 ├── cmd/
 │   └── starlims-lsp/
-│       └── main.go           # Entry point
+│       ├── main.go           # Entry point
+│       └── validate.go       # --validate CLI mode
 ├── internal/
 │   ├── lexer/
 │   │   └── lexer.go          # Tokenizer

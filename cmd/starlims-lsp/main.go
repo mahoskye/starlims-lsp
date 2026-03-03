@@ -20,19 +20,33 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Handle validate flag
+	if len(os.Args) > 1 && os.Args[1] == "--validate" {
+		runValidate(os.Args[2:])
+		return
+	}
+
 	// Handle help flag
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
 		fmt.Println("starlims-lsp - Language Server for STARLIMS Scripting Language (SSL)")
 		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Println("  starlims-lsp [flags]")
+		fmt.Println("  starlims-lsp --validate <file.ssl> [file2.ssl ...]")
+		fmt.Println("  starlims-lsp --validate --stdin")
 		fmt.Println()
 		fmt.Println("Flags:")
-		fmt.Println("  --stdio     Use stdio for communication (default)")
-		fmt.Println("  --version   Print version information")
-		fmt.Println("  --help      Print this help message")
+		fmt.Println("  --stdio      Use stdio for communication (default)")
+		fmt.Println("  --validate   Validate SSL files and output JSON diagnostics")
+		fmt.Println("  --version    Print version information")
+		fmt.Println("  --help       Print this help message")
 		fmt.Println()
 		fmt.Println("The server communicates via stdin/stdout using the Language Server Protocol.")
+		fmt.Println()
+		fmt.Println("Validate mode:")
+		fmt.Println("  Validates SSL files for syntax errors and outputs structured JSON.")
+		fmt.Println("  Designed for agent skills, CI pipelines, and programmatic use.")
+		fmt.Println("  Run 'starlims-lsp --validate --help' for detailed usage.")
 		fmt.Println()
 		fmt.Println("Editor integration:")
 		fmt.Println("  VS Code:  Use the vs-code-ssl-formatter extension")

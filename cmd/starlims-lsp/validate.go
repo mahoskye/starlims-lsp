@@ -1,20 +1,15 @@
-// ssl-validator is a command-line tool for validating SSL syntax.
 package main
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
-)
-
-var (
-	version   = "dev"
-	buildTime = "unknown"
 )
 
 // DiagnosticOutput represents the JSON output format for a file's diagnostics.
@@ -33,36 +28,50 @@ type DiagnosticDetail struct {
 	Source   string `json:"source"`
 }
 
-func main() {
-	// Handle version flag
-	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("ssl-validator version %s (built %s)\n", version, buildTime)
-		os.Exit(0)
+// runValidate handles the --validate CLI mode.
+// It validates SSL files or stdin content and outputs JSON diagnostics.
+func runValidate(args []string) {
+	// Check for --help
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			printValidateHelp()
+			os.Exit(0)
+		}
 	}
 
-	// Handle help flag
-	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
-		printHelp()
-		os.Exit(0)
+	// Check for --stdin flag
+	useStdin := false
+	files := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--stdin" {
+			useStdin = true
+		} else {
+			files = append(files, arg)
+		}
 	}
 
-	// Validate arguments
-	if len(os.Args) < 2 {
+	if !useStdin && len(files) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: no input files specified")
-		fmt.Fprintln(os.Stderr, "Usage: ssl-validator <file1.ssl> [file2.ssl ...]")
-		fmt.Fprintln(os.Stderr, "Run 'ssl-validator --help' for more information")
+		fmt.Fprintln(os.Stderr, "Usage: starlims-lsp --validate <file.ssl> [file2.ssl ...]")
+		fmt.Fprintln(os.Stderr, "       starlims-lsp --validate --stdin")
+		fmt.Fprintln(os.Stderr, "Run 'starlims-lsp --validate --help' for more information")
 		os.Exit(1)
 	}
 
-	files := os.Args[1:]
-	results := make([]DiagnosticOutput, 0, len(files))
+	results := make([]DiagnosticOutput, 0)
 	hasErrors := false
 
-	// Process each file
-	for _, filePath := range files {
-		result := validateFile(filePath)
+	if useStdin {
+		result := validateStdin()
 		results = append(results, result)
+		if !result.Valid {
+			hasErrors = true
+		}
+	}
 
+	for _, filePath := range files {
+		result := validateFilePath(filePath)
+		results = append(results, result)
 		if !result.Valid {
 			hasErrors = true
 		}
@@ -76,31 +85,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Exit with error code if any files had errors
 	if hasErrors {
 		os.Exit(1)
 	}
 }
 
-func printHelp() {
-	fmt.Println("ssl-validator - CLI tool for validating SSL syntax")
+func printValidateHelp() {
+	fmt.Println("starlims-lsp --validate - Validate SSL files for syntax errors")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  ssl-validator <file1.ssl> [file2.ssl ...]")
+	fmt.Println("  starlims-lsp --validate <file1.ssl> [file2.ssl ...]")
+	fmt.Println("  starlims-lsp --validate --stdin")
+	fmt.Println("  cat script.ssl | starlims-lsp --validate --stdin")
 	fmt.Println()
 	fmt.Println("Description:")
-	fmt.Println("  Validates one or more SSL files for syntax errors and warnings.")
-	fmt.Println("  Outputs structured JSON with diagnostics for each file.")
+	fmt.Println("  Validates SSL files and outputs structured JSON diagnostics.")
+	fmt.Println("  Designed for programmatic use by agent skills and CI pipelines.")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --stdin     Read SSL content from stdin instead of files")
+	fmt.Println("  --help      Print this help message")
 	fmt.Println()
 	fmt.Println("Exit codes:")
-	fmt.Println("  0 - All files are valid (no errors)")
-	fmt.Println("  1 - One or more files have errors")
+	fmt.Println("  0 - All inputs are valid (no errors; warnings are OK)")
+	fmt.Println("  1 - One or more inputs have errors")
 	fmt.Println()
 	fmt.Println("Output format:")
-	fmt.Println("  JSON array of file results with diagnostics including:")
-	fmt.Println("    - file: filename")
-	fmt.Println("    - valid: true if no errors (warnings are OK)")
-	fmt.Println("    - diagnostics: array of issues found")
+	fmt.Println("  JSON array of results, each containing:")
+	fmt.Println("    - file: filename (\"stdin\" for piped input)")
+	fmt.Println("    - valid: true if no errors")
+	fmt.Println("    - diagnostics: array of issues with line, column, severity, message")
 	fmt.Println()
 	fmt.Println("Diagnostic checks:")
 	fmt.Println("  - Unclosed blocks (:IF without :ENDIF, :FOR without :NEXT, etc.)")
@@ -108,22 +122,22 @@ func printHelp() {
 	fmt.Println("  - Missing :EXITCASE in :CASE/:OTHERWISE blocks")
 	fmt.Println("  - Bare logical operators (AND instead of .AND.)")
 	fmt.Println("  - :DEFAULT on :DECLARE line (invalid syntax)")
+	fmt.Println("  - Dot property access (should use colon notation)")
+	fmt.Println("  - Direct procedure calls (should use DoProc/ExecFunction)")
+	fmt.Println("  - Zero-based array indexing (SSL is 1-based)")
+	fmt.Println("  - Class instantiation with () instead of {}")
+	fmt.Println("  - Assignment in conditions (:= instead of = or ==)")
 	fmt.Println("  - Block nesting depth warnings")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  ssl-validator script.ssl")
-	fmt.Println("  ssl-validator file1.ssl file2.ssl file3.ssl")
-	fmt.Println("  ssl-validator examples/*.ssl")
-	fmt.Println()
-	fmt.Println("Flags:")
-	fmt.Println("  --version   Print version information")
-	fmt.Println("  --help      Print this help message")
+	fmt.Println("  starlims-lsp --validate script.ssl")
+	fmt.Println("  starlims-lsp --validate *.ssl")
+	fmt.Println("  echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin")
 }
 
-func validateFile(filePath string) DiagnosticOutput {
+func validateFilePath(filePath string) DiagnosticOutput {
 	fileName := filepath.Base(filePath)
 
-	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return DiagnosticOutput{
@@ -135,14 +149,39 @@ func validateFile(filePath string) DiagnosticOutput {
 					Column:   1,
 					Severity: "error",
 					Message:  fmt.Sprintf("Failed to read file: %v", err),
-					Source:   "ssl-validator",
+					Source:   "ssl-validate",
 				},
 			},
 		}
 	}
 
+	return validateContent(fileName, string(content))
+}
+
+func validateStdin() DiagnosticOutput {
+	content, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return DiagnosticOutput{
+			File:  "stdin",
+			Valid: false,
+			Diagnostics: []DiagnosticDetail{
+				{
+					Line:     1,
+					Column:   1,
+					Severity: "error",
+					Message:  fmt.Sprintf("Failed to read stdin: %v", err),
+					Source:   "ssl-validate",
+				},
+			},
+		}
+	}
+
+	return validateContent("stdin", string(content))
+}
+
+func validateContent(name string, content string) DiagnosticOutput {
 	// Tokenize
-	lex := lexer.NewLexer(string(content))
+	lex := lexer.NewLexer(content)
 	tokens := lex.Tokenize()
 
 	// Parse
@@ -173,7 +212,7 @@ func validateFile(filePath string) DiagnosticOutput {
 	}
 
 	return DiagnosticOutput{
-		File:        fileName,
+		File:        name,
 		Valid:       !hasErrors,
 		Diagnostics: details,
 	}
