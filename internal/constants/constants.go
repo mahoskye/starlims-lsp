@@ -189,11 +189,13 @@ var ParameterizedSQLFunctions = []string{
 	"GetDataSetWithSchemaFromSelect",
 	"GetDataSetXMLFromSelect",
 	"GetNETDataSet",
+	"GetTables",
 	"RunSQL",
 	"LSearch",
 	"LSelect",
 	"LSelect1",
 	"LSelectC",
+	"XmlExportSql",
 }
 
 // SSLKeywordDescriptions maps keywords to their descriptions.

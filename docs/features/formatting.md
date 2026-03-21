@@ -361,8 +361,8 @@ sXml := GetDataSet("
     SELECT *
     FROM users
     WHERE a = 1
-        AND b = 2
-        AND c = 3
+      AND b = 2
+      AND c = 3
 ", {1, 2, 3});
 ```
 

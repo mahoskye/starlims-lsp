@@ -119,6 +119,8 @@ x += 5;        /* Add and assign;
 x -= 3;        /* Subtract and assign;
 x *= 2;        /* Multiply and assign;
 x /= 4;        /* Divide and assign;
+x ^= 2;        /* Power and assign;
+x %= 3;        /* Modulo and assign;
 ```
 
 #### Comparison Operators
@@ -528,13 +530,13 @@ oSeeded := CreateUdObject({{"Property1", "value"}, {"Property2", 123}});
 
 SSL functions are case-insensitive but should use documented casing for consistency:
 
-### Array Functions (lowercase)
+### Array Functions (source-aligned PascalCase)
 ```ssl
-aadd(aArray, value);
-alen(aArray);
-ascan(aArray, value);
-ascanexact(aArray, value);
-aeval(aArray, codeBlock);
+AAdd(aArray, value);
+ALen(aArray);
+AScan(aArray, value);
+AScanExact(aArray, value);
+AEval(aArray, codeBlock);
 ```
 
 ### String Functions (PascalCase)

@@ -31,7 +31,7 @@ Completion is triggered automatically on these characters:
 |------|-------|---------|-------------------|
 | Keywords | 38 | `:IF`, `:WHILE`, `:DECLARE` | Keyword (14) |
 | Built-in Functions | 354 | `SQLExecute`, `Len`, `Upper` | Function (3) |
-| Built-in Classes | 21 | `SSLExpando`, `SSLDataset`, `CDataTable` | Class (7) |
+| Built-in Classes | 21 | `SSLExpando`, `SSLDataset`, `Email` | Class (7) |
 | Class-context forms | Contextual | `Me`, `Base`, `Constructor` | Keyword/Constructor |
 | Literals | 3 | `.T.`, `.F.`, `NIL` | Constant (21) |
 | Operators | 3 | `.AND.`, `.OR.`, `.NOT.` | Operator (24) |

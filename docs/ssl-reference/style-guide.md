@@ -42,7 +42,8 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 ### Naming Guidelines
 
 - Use abbreviations sparingly and only when obvious
-- Avoid underscores in variable names (discouraged, not prohibited)
+- Avoid underscores in variable names for general use (discouraged, not prohibited)
+- **Exception:** Underscore-prefixed class members (e.g. `_sInternal`) are a deliberate private-by-convention pattern. They are excluded from reflection-based access and should not be renamed or removed. Do not treat them as style violations.
 - Keep class-context references in their canonical forms: `Me:Member`, `Base:Member`, `Constructor`
 
 ---
@@ -54,6 +55,7 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 - Use **tabs** (preferred) or consistent spaces
 - Indent block contents by one level
 - Align continuation lines for readability
+- **Class files:** Do not add an extra indentation level for the class body itself. Because SSL has no `:ENDCLASS` and the class extends to the end of the file, the formatter does not indent the class body relative to `:CLASS`.
 
 ```ssl
 :PROCEDURE ProcessData;
@@ -86,6 +88,15 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 | Before semicolon | No space | `statement;` |
 | Inside parentheses | No space | `DoProc("MyProc", {sName, nCount})` not `DoProc( "MyProc", { sName, nCount } )` |
 | Member access | Prefer no spaces around `:` | `oEmail:Subject` not `oEmail : Subject` |
+
+### Not-Preferred Operators
+
+The following comparison operators are valid SSL but not preferred — use `!=` instead:
+
+| Operator | Use Instead |
+|----------|-------------|
+| `<>` | `!=` |
+| `#` | `!=` |
 
 ### Line Length
 
@@ -250,6 +261,20 @@ sResult := "";
 - All comments must end with semicolon
 - Never place an extra semicolon inside comment text; the first semicolon terminates the comment and the remaining text becomes executable code
 
+### Visibility Annotations (Scripts Only)
+
+Place `/*@private;` or `/*@protected;` on its own line immediately before `:PROCEDURE` to restrict access from external callers:
+
+```ssl
+/*@private;
+:PROCEDURE InternalHelper;
+    /* Not accessible via DoProc/ExecFunction from outside this script;
+:ENDPROC;
+```
+
+- Both annotations make the procedure inaccessible via `DoProc` / `ExecFunction` from external scripts.
+- **These annotations have no effect on class methods.** Class methods are always public regardless.
+
 ### Code Organization
 
 - Prefer comment regions (`/* region ...;` / `/* endregion;`) for editor grouping
@@ -307,7 +332,7 @@ bSuccess := RunSQL(sSQL,, {sNewStatus, nOrderID});
 sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 ```
 
-`LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, `GetDataSetEx`, `GetDataSetWithSchemaFromSelect`, `GetDataSetXMLFromSelect`, and `GetNETDataSet` follow the same positional-parameter convention.
+`LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, `GetDataSetEx`, `GetDataSetWithSchemaFromSelect`, `GetDataSetXMLFromSelect`, `GetNETDataSet`, `XmlExportSql`, and `GetTables` follow the same positional-parameter convention.
 
 `SQLExecute` also supports source-aligned array expansion (`?aValues?`), object-property access (`?oUser:ID?`), and parameterless function calls such as `?Today()?`.
 
@@ -320,6 +345,8 @@ sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 | `LSearch` | Single value lookup | `?` (positional) |
 | `LSelect` / `LSelect1` / `LSelectC` | Multi-row SELECT | `?` (positional) |
 | `GetDataSet` | XML dataset output | `?` (positional) |
+| `XmlExportSql` | Export SQL result as XML | `?` (positional) |
+| `GetTables` | Get tables result | `?` (positional) |
 
 ---
 
@@ -447,6 +474,18 @@ RunSQL(sSQL, sFriendlyName, aParams);
 LSearch(sSQL, default, sFriendlyName, aParams);
 GetDataSet(sSQL, aParams);
 ```
+
+---
+
+## Predefined Global Variables
+
+SSL provides read-only predefined globals available in all scripts:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `MYUSERNAME` | String | Current user's username |
+
+Do not assign to `MYUSERNAME`; it is a runtime-provided read-only value.
 
 ---
 

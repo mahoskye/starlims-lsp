@@ -10,6 +10,7 @@ This document is a source-aligned summary of the SSL v11 grammar used by the LSP
 
 ```ebnf
 Program ::= ClassDefinition | {Statement}
+(* A script can be a class definition or a series of statements *)
 
 Statement ::= (
     ProcedureStatement |
@@ -82,6 +83,10 @@ ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression [":" "
 NextStatement ::= ":" "NEXT"
 ExitForStatement ::= ":" "EXITFOR"
 LoopContinue ::= ":" "LOOP"
+
+ResumeStatement ::= ":" "RESUME"
+StepStatement   ::= ":" "STEP"
+(* ResumeStatement is the legacy resume-mode marker; StepStatement appears inside ForStatement. *)
 ```
 
 ---
@@ -157,30 +162,62 @@ Source-aligned notes:
 ## Expressions
 
 ```ebnf
+LogicStatement ::= Assignment | FunctionCall | Expression | ReturnStatement
+ReturnStatement ::= ":" "RETURN" [Expression]
+
 Assignment ::= (VariableAccess | PropertyAccess) AssignmentOperator Expression
 AssignmentOperator ::= ":=" | "+=" | "-=" | "*=" | "/=" | "^=" | "%="
 
 FunctionCall ::= DirectFunctionCall | IndirectFunctionCall
 DirectFunctionCall ::= Identifier "(" [ArgumentList] ")"
-IndirectFunctionCall ::= Identifier "(" StringLiteral "," ArrayLiteral ")"
+IndirectFunctionCall ::= Identifier "(" StringLiteral ["," ArrayLiteral] ")"
+(* The array argument is optional when there are no parameters:
+   DoProc("Name") is preferred over DoProc("Name", {}) when no arguments. *)
 ArgumentList ::= Expression {"," Expression}
+
+IncrementExpression ::= Identifier ("++" | "--") | ("++" | "--") Identifier
+
+ObjectCreation     ::= Identifier "{" [ArgumentList] "}"
+MethodCall         ::= Expression ":" Identifier "(" [ArgumentList] ")"
+ObjectPropertyAccess ::= Expression ":" Identifier
+DynamicCodeExecution ::= Identifier "(" StringLiteral ["," ArrayLiteral] ")"
+(* DoProc and ExecFunction are the canonical dynamic-call functions. *)
+
+DatabaseStatement     ::= DatabaseFunctionCall
+DatabaseFunctionCall  ::= Identifier "(" [ArgumentList] ")"
+(* SQL functions such as SQLExecute, RunSQL, LSearch; distinguished by context. *)
+DatabaseParameter ::= "?" Identifier "?" | "?"
 ```
 
 Source-aligned notes:
 - Built-in functions use normal call syntax.
 - Custom procedures are not called directly; use `DoProc(...)` / `ExecFunction(...)`, or `Me:Method()` / `Base:Method()` inside classes.
 - Property and method access use colon notation, not dot notation.
+- `DoProc("Name")` (no second argument) is preferred when there are no parameters.
 
 ---
 
 ## Literals And Core Tokens
 
 ```ebnf
+Literal ::= NumberLiteral | StringLiteral | BooleanLiteral | ArrayLiteral | NilLiteral | DateLiteral | CodeBlockLiteral
+
+NumberLiteral ::= Digit {Digit} ["." {Digit}] [("e" | "E") ["-"] Digit {Digit}]
+(* Valid: 123, 3.14, 1.2e-3, 0.5e1 — Invalid: 9E+1 (plus sign), .5e1 (no leading zero), 7e2 (no decimal) *)
+
 StringLiteral ::= '"' {Character} '"' | "'" {Character} "'" | "[" {Character} "]"
+
 BooleanLiteral ::= ".T." | ".F."
+
 NilLiteral ::= "NIL"
+
 ArrayLiteral ::= "{" [Expression {"," Expression}] "}"
+
 DateLiteral ::= "{" year "," month "," day [ "," hour "," minute "," second ] "}"
+
+CodeBlockLiteral ::= "{|" [IdentifierList] "|" ExpressionList "}"
+(* Anonymous function / code block: {|x| x * x} *)
+
 DatabaseParameter ::= "?" Identifier "?" | "?"
 ```
 
@@ -189,3 +226,5 @@ Key language facts:
 - Comments use `/* ... ;` and end at the first semicolon.
 - Keywords are colon-prefixed and case-sensitive uppercase.
 - Identifiers and function names are case-insensitive.
+- Division always produces a floating-point result (`5 / 2` yields `2.5`, not `2`).
+- Bitwise built-ins (`_AND`, `_OR`, `_NOT`, `_XOR`) require integer-valued operands.

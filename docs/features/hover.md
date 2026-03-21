@@ -96,7 +96,7 @@ Hovering over `Me` should show:
 Used within `:CLASS` blocks to access instance properties and methods.
 ```
 
-Hovering over `Base` shows that it refers to inherited members and must be used as `Base:Member`.
+Hovering over `Base` shows that it refers to inherited members, must be used as `Base:Member` (cannot stand alone), and is only meaningful inside a `:CLASS` that declares `:INHERIT`.
 
 Hovering over `Constructor` shows that it is the reserved constructor name inside `:CLASS`.
 

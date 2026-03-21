@@ -36,20 +36,30 @@ The starlims-lsp is a standalone executable that communicates with editors via t
 starlims-lsp/
 ├── cmd/
 │   └── starlims-lsp/
-│       └── main.go              # Entry point
+│       ├── main.go              # Entry point
+│       └── validate.go          # --validate CLI mode
 ├── internal/
 │   ├── server/
 │   │   ├── server.go            # LSP server lifecycle
-│   │   └── handler.go           # Request dispatch
+│   │   ├── handler.go           # Request dispatch
+│   │   ├── wrapper_handler.go   # Handler wrapper utilities
+│   │   ├── cache.go             # Document cache
+│   │   ├── conversions.go       # LSP type conversions
+│   │   └── inlayhints_types.go  # Inlay hint type definitions
 │   ├── providers/
-│   │   ├── completion.go        # textDocument/completion
+│   │   ├── completion.go        # textDocument/completion + snippets
 │   │   ├── hover.go             # textDocument/hover
 │   │   ├── signaturehelp.go     # textDocument/signatureHelp
 │   │   ├── definition.go        # definition + references
 │   │   ├── symbols.go           # documentSymbol + foldingRange
 │   │   ├── formatting.go        # formatting + rangeFormatting
 │   │   ├── sql_formatter.go     # SQL string formatting
-│   │   └── diagnostics.go       # publishDiagnostics
+│   │   ├── sql_lexer.go         # SQL tokenizer for formatter
+│   │   ├── sql_constants.go     # SQL keyword/clause data
+│   │   ├── diagnostics.go       # publishDiagnostics
+│   │   ├── inlayhints.go        # textDocument/inlayHint
+│   │   ├── rename.go            # textDocument/rename + prepareRename
+│   │   └── function_docs.go     # Built-in function documentation data
 │   ├── lexer/
 │   │   └── lexer.go             # SSL tokenizer
 │   ├── parser/
@@ -95,14 +105,16 @@ Handles LSP protocol concerns:
 Implements LSP features:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Providers                          │
-├───────────────┬───────────────┬───────────────┬─────────┤
-│  completion   │    hover      │  signature    │ defn/   │
-│               │               │    help       │  refs   │
-├───────────────┼───────────────┼───────────────┼─────────┤
-│   symbols     │  formatting   │ sql_formatter │  diags  │
-└───────────────┴───────────────┴───────────────┴─────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        Providers                            │
+├──────────────┬──────────────┬──────────────┬────────────────┤
+│  completion  │    hover     │  signature   │  defn / refs   │
+│  (snippets)  │              │    help      │                │
+├──────────────┼──────────────┼──────────────┼────────────────┤
+│   symbols    │  formatting  │ sql_formatter│    diags       │
+├──────────────┼──────────────┼──────────────┼────────────────┤
+│ inlayhints   │    rename    │ function_docs│  sql_constants │
+└──────────────┴──────────────┴──────────────┴────────────────┘
          │               │               │
          └───────────────┼───────────────┘
                          ▼
@@ -152,7 +164,7 @@ Static SSL language data:
 ├─────────────────────────────────────────────────────────┤
 │  source_alignment.go                                    │
 │  ├── Built-in Functions (354)                           │
-│  ├── Built-in Classes (31)                              │
+│  ├── Built-in Classes (21)                              │
 │  └── Source-only additions / exclusions / canonicalize  │
 ├─────────────────────────────────────────────────────────┤
 │  signatures.go                                          │

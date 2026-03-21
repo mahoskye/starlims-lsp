@@ -125,6 +125,8 @@ nCount += 1;                   /* Add and assign;
 nCount -= 1;                   /* Subtract and assign;
 nCount *= 2;                   /* Multiply and assign;
 nCount /= 2;                   /* Divide and assign;
+nCount ^= 2;                   /* Power and assign;
+nCount %= 3;                   /* Modulo and assign;
 ```
 
 ---
@@ -150,8 +152,8 @@ nCount /= 2;                   /* Divide and assign;
 | `=` | Equality (loose; prefix-style for strings) |
 | `==` | Strict equality (use for exact string equality) |
 | `!=` | Not equal |
-| `<>` | Not equal (alternative) |
-| `#` | Not equal (alternative) |
+| `<>` | Not equal (not preferred — use `!=`) |
+| `#` | Not equal (not preferred — use `!=`) |
 | `<` | Less than |
 | `>` | Greater than |
 | `<=` | Less than or equal |
@@ -177,10 +179,12 @@ nCount /= 2;                   /* Divide and assign;
 
 | Operator | Description |
 |----------|-------------|
-| `.AND.` | Logical AND |
-| `.OR.` | Logical OR |
+| `.AND.` | Logical AND (short-circuit) |
+| `.OR.` | Logical OR (short-circuit) |
 | `.NOT.` | Logical NOT |
 | `!` | Negation (alternative) |
+
+`.AND.` and `.OR.` use **short-circuit evaluation**: if the first operand determines the result, the second operand is not evaluated.
 
 ```ssl
 /* CORRECT;
@@ -197,12 +201,16 @@ nCount /= 2;                   /* Divide and assign;
 | Operator | Description |
 |----------|-------------|
 | `+` | Concatenation |
+| `-` | Trim trailing spaces from left operand, then concatenate |
 | `$` | Contains (returns `.T.` if left string is found in right) |
+| `[n]` | Character at position n (1-based) |
 
 ```ssl
 sResult := "Hello " + "World";
+sResult := "Hello   " - "World";  /* "HelloWorld" (trims trailing spaces first);
 bFound := "needle" $ "haystack";  /* .F.;
 bFound := "hay" $ "haystack";     /* .T.;
+cFirst := "Hello"[1];             /* "H";
 ```
 
 ---
@@ -242,7 +250,11 @@ n3 := -5;        /* Negative;
 n4 := 1.2e-3;    /* Scientific notation;
 ```
 
-Scientific notation must include a decimal point before the exponent. For example, `1.2e-3` and `9.0E1` are valid, while `1e10`, `7e2`, and `.5e1` are not canonical SSL number forms.
+Scientific notation requires a decimal point before the exponent and must not use an explicit plus sign. Valid forms: `1.2e-3`, `4.56E-3`, `0.5e1`. Invalid forms: `9E+1` (plus sign not allowed), `7e2` (no decimal point), `.5e1` (leading decimal without zero — use `0.5e1`).
+
+Division always produces a floating-point result: `5 / 2` yields `2.5`, not `2`. Use `Integer(n)` for explicit truncation.
+
+Bitwise built-in functions (`_AND`, `_OR`, `_NOT`, `_XOR`) require integer-valued operands and raise errors on fractional values.
 
 ### Boolean Literals
 

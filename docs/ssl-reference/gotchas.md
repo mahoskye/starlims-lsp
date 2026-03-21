@@ -383,6 +383,39 @@ oCustom := CreateUdObject("MyClass", {params});
 
 ---
 
+## Gotcha #16: `!=` Is Not The Opposite of `=` For Strings
+
+**Problem:** `!=` negates `==` (exact match), **not** `=` (prefix/loose match). This means `=` and `!=` are not logical opposites for strings.
+
+```ssl
+sVal := "Logged";
+
+sVal = "Log"    /* .T. - "Logged" starts with "Log";
+sVal != "Log"   /* .T. - "Logged" does not exactly equal "Log";
+/* Both are .T. for the same operands! They are NOT opposites.;
+
+sVal == "Log"   /* .F. - not an exact match;
+.NOT. (sVal = "Log")  /* .F. - this is the true opposite of =;
+```
+
+**Solution:** To negate the loose `=` comparison, use `.NOT. (expr = value)` rather than `expr != value`.
+
+```ssl
+/* To check "does NOT start with 'Log'":;
+:IF .NOT. (sVal = "Log");
+    /* correct;
+:ENDIF;
+
+/* NOT this (incorrect):;
+:IF sVal != "Log";
+    /* wrong - != negates ==, not =;
+:ENDIF;
+```
+
+**LSP Support:** No — this asymmetry is not currently flagged by the LSP.
+
+---
+
 ## Summary Table
 
 | # | Gotcha | LSP Detects |
@@ -402,3 +435,4 @@ oCustom := CreateUdObject("MyClass", {params});
 | 13 | Property as undeclared | Yes |
 | 14 | `Str()` vs `LimsString()` | Reference only |
 | 15 | Parentheses for class instantiation | Yes |
+| 16 | `!=` asymmetry with `=` for strings | No |

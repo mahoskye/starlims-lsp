@@ -263,8 +263,14 @@ The `insertText` uses LSP snippet syntax:
 | `:IF...:ELSE...:ENDIF` | `ifelse` | IF/ELSE block |
 | `:WHILE...:ENDWHILE` | `while` | WHILE loop |
 | `:FOR...:NEXT` | `for` | FOR loop |
+| `:FOR...:STEP...:NEXT` | `forstep` | FOR loop with STEP |
 | `:BEGINCASE...:ENDCASE` | `case` | Case statement |
 | `:TRY...:ENDTRY` | `try` | Try/Catch block |
+| `:TRY...:CATCH...:FINALLY...:ENDTRY` | `tryfinally` | Try/Catch/Finally block |
+| `:TRY...:CATCH (GetLastSSLError)` | `catchssl` | Try/Catch with SSL error retrieval |
+| `:TRY...:CATCH (GetLastSQLError)` | `catchsql` | Try/Catch with SQL error retrieval |
 | `:DECLARE` | `declare` | Variable declaration |
+| `:PUBLIC` | `public` | Public variable declaration |
+| `:INCLUDE` | `include` | Include directive |
 | `SQLExecute` | `sql` | SQL execution pattern |
 | `DoProc` | `doproc` | Same-file procedure call |

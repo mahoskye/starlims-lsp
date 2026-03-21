@@ -24,10 +24,12 @@ The following symbols cannot be renamed:
 |-------------|--------|
 | Keywords (`:IF`, `:WHILE`, etc.) | Language constructs |
 | Built-in functions (`Len`, `Trim`, etc.) | 354 source-aligned built-in functions |
-| Built-in classes (`SSLDataset`, `CDataTable`, etc.) | 21 source-aligned built-in classes |
+| Built-in classes (`SSLDataset`, `Email`, etc.) | 21 source-aligned built-in classes |
 | Literals (`.T.`, `.F.`, `NIL`) | Language constants |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | Language operators |
 | `Me` keyword | Self-reference in classes |
+| `Base` keyword | Inherited member access in classes — always used as `Base:MemberName` |
+| `Constructor` keyword | Reserved constructor method name inside `:CLASS` |
 | Content inside strings | You cannot start rename from inside a string literal |
 | Content inside comments | You cannot start rename from inside a comment |
 

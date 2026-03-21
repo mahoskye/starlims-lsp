@@ -88,9 +88,17 @@ Function names are case-insensitive at runtime, but the LSP presents the canonic
 | `SQLExecute(sql, dsName)` | Execute SQL (supports `?varName?` params) |
 | `RunSQL(sql, name, params)` | Execute DML (INSERT/UPDATE/DELETE) |
 | `LSearch(sql, default, name, params)` | Single value lookup |
-| `LSelect1(sql, name, params)` | Multi-row SELECT to 2D array |
-| `GetDataSet(sql, params)` | Get XML dataset |
+| `LSelect(sql, name, params)` | Multi-row SELECT to 2D array |
+| `LSelect1(sql, name, params)` | Multi-row SELECT to 2D array (behaves like `LSelect` when field list is omitted) |
+| `LSelectC(sql, name, params)` | Multi-row SELECT (delegates to `LSelect`) |
+| `GetDataSet(sql, params)` | Get XML dataset (positional `?` params) |
+| `GetDataSetEx(sql, params)` | Get XML dataset (extended) |
+| `GetDataSetWithSchemaFromSelect(sql, params)` | Get XML dataset with schema |
+| `GetDataSetXMLFromSelect(sql, params)` | Get XML dataset from SELECT |
 | `GetNETDataSet(sql, dsName, params, table, xml, schema)` | Get dataset/object output with positional parameters |
+| `GetSSLDataset(sql)` | Get `SSLDataset` object |
+| `GetTables(sql, params)` | Get tables result |
+| `XmlExportSql(sql, params)` | Export SQL result as XML |
 | `BeginLimsTransaction(name)` | Start transaction |
 | `EndLimsTransaction(name, commit)` | End transaction |
 | `LimsRecordsAffected()` | Get affected row count |
@@ -129,7 +137,7 @@ Function names are case-insensitive at runtime, but the LSP presents the canonic
 When there are no arguments, prefer `DoProc("Name")` over `DoProc("Name", {})`, and likewise for `ExecFunction`.
 Inside class methods, prefer `Me:MethodName()` / `Base:MethodName()` over `DoProc(...)` for sibling and inherited methods.
 
-Only `SQLExecute` supports named `?varName?` substitution. `RunSQL`, `LSearch`, `LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, and related dataset helpers use positional `?` placeholders with explicit value arrays.
+Only `SQLExecute` supports named `?varName?` substitution. `RunSQL`, `LSearch`, `LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, `XmlExportSql`, `GetTables`, and related dataset helpers use positional `?` placeholders with explicit value arrays.
 `SQLExecute` also supports array expansion (`?aValues?`), object-property access (`?oUser:ID?`), and parameterless function calls such as `?Today()?`.
 Built-in classes such as `Email`, `SSLDataset`, and `SSLRegex` must use curly-brace construction (`Email{}`), not `CreateUdObject("Email")`.
 
