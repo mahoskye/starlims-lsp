@@ -118,7 +118,7 @@ func TestSQLFormatter_WhereClause_Standard(t *testing.T) {
 	sql := "SELECT * FROM users WHERE status = 'active' AND role = 'admin'"
 
 	opts := DefaultSQLFormattingOptions()
-	// Default is "standard" style - AND stays on same line as WHERE
+	opts.Style = "standard"
 	formatter := NewSQLFormatter(opts)
 
 	formatted := formatter.FormatSQL(sql, "")
@@ -161,6 +161,23 @@ func TestSQLFormatter_WhereClause_CanonicalCompact(t *testing.T) {
 	t.Logf("Formatted SQL (canonicalCompact):\n%s", formatted)
 }
 
+func TestSQLFormatter_CanonicalCompactUsesTwoSpaceClauseIndent(t *testing.T) {
+	sql := "SELECT * FROM users WHERE status = 'active' AND role = 'admin' GROUP BY role HAVING COUNT(*) > 1"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.Style = "canonicalCompact"
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	if !strings.Contains(formatted, "\n  AND role = 'admin'") {
+		t.Fatalf("expected canonicalCompact AND indentation to be two spaces, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "\n  HAVING COUNT(*) > 1") {
+		t.Fatalf("expected canonicalCompact HAVING indentation to be two spaces, got:\n%s", formatted)
+	}
+}
+
 func TestSQLFormatter_JoinClause(t *testing.T) {
 	sql := "SELECT u.name, o.total FROM users u INNER JOIN orders o ON u.id = o.user_id"
 
@@ -180,6 +197,23 @@ func TestSQLFormatter_JoinClause(t *testing.T) {
 	}
 
 	t.Logf("Formatted SQL:\n%s", formatted)
+}
+
+func TestSQLFormatter_CanonicalCompactJoinOnIndent(t *testing.T) {
+	sql := "SELECT u.name, o.total FROM users u INNER JOIN orders o ON u.id = o.user_id AND o.active = 1"
+
+	opts := DefaultSQLFormattingOptions()
+	opts.Style = "canonicalCompact"
+	formatter := NewSQLFormatter(opts)
+
+	formatted := formatter.FormatSQL(sql, "")
+
+	if !strings.Contains(formatted, "\n  ON u.id = o.user_id") {
+		t.Fatalf("expected canonicalCompact ON indentation to be two spaces, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "\n  AND o.active = 1") {
+		t.Fatalf("expected canonicalCompact join AND indentation to be two spaces, got:\n%s", formatted)
+	}
 }
 
 func TestSQLFormatter_InsertStatement(t *testing.T) {

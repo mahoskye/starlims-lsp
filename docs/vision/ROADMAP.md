@@ -2,7 +2,7 @@
 
 This document outlines the prioritized feature roadmap for the starlims-lsp project.
 
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-03-21
 
 ---
 
@@ -22,7 +22,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 |----------|---------|--------|
 | Completion | Keywords, functions, classes, snippets | ✅ Complete |
 | Hover | Function signatures, keyword docs, SQL placeholders, `Me` keyword | ✅ Complete |
-| Signature Help | 367 built-in functions + user procedures | ✅ Complete |
+| Signature Help | 354 source-aligned built-in functions and dispatch helpers | ✅ Complete |
 | Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
 | Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
 | Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
@@ -123,19 +123,19 @@ See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL 
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Define class member structure | Properties/methods for 30 SSL classes | ⏳ Pending |
+| Define class member structure | Properties/methods for 21 source-aligned built-in classes | ⏳ Pending |
 | Add SSLDataset members | Most commonly used class | ⏳ Pending |
 | Add Email members | Common utility class | ⏳ Pending |
 | Add SSLExpando members | Dynamic object class | ⏳ Pending |
-| Add remaining 27 classes | Complete coverage | ⏳ Pending |
+| Add remaining 23 classes | Complete coverage | ⏳ Pending |
 
 ### Phase 2: Type Inference System
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Track `ClassName{}` instantiation | `oEmail := Email{}` → type is Email | ⏳ Pending |
-| Track `CreateUdObject()` calls | Returns SSLExpando | ⏳ Pending |
-| Infer types from function returns | e.g., `GetDataSet()` → SSLDataset | ⏳ Pending |
+| Track `ClassName{}` instantiation | `oEmail := Email{}` → local inferred object type for diagnostics | 🔄 Partial |
+| Track `CreateUdObject()` calls | Local inferred object type for diagnostics | 🔄 Partial |
+| Infer types from function returns | Coarse built-in return-type mapping for diagnostics | 🔄 Partial |
 | SSLExpando dynamic properties | Track `oObj:propName := value` | ⏳ Pending |
 
 ### Phase 3: Member Completion
@@ -148,18 +148,18 @@ See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL 
 
 ---
 
-## v1.6 - Additional Gotcha Detection (PLANNED)
+## v1.6 - Additional Gotcha Refinement (PLANNED)
 
-**Goal:** Detect remaining common SSL mistakes.
+**Goal:** Deepen currently conservative gotcha coverage and add low-cost reference checks.
 
 **Status:** 📋 PLANNED
 
 | Gotcha | Description | Complexity |
 |--------|-------------|------------|
-| #10 | Loose string equality (`=` vs `==`) | Medium - needs context analysis |
-| #11 | NIL vs Empty confusion | Medium - semantic analysis |
-| #14 | Str() vs LimsString() confusion | Low - pattern matching |
-| #6 | Semicolon in comments | Deferred (Issue #52) |
+| #10 | Loose string equality (`=` vs `==`) | Medium - already implemented conservatively; future work is broader inference coverage |
+| #11 | NIL vs Empty confusion | Medium - already implemented conservatively; future work is broader inference coverage |
+| #14 | `Str()` vs `LimsString()` confusion | Low - pattern matching |
+| #6 | Semicolon in comments | Partial heuristic implemented; full intent detection still open |
 
 ---
 

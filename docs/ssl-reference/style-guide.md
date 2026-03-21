@@ -3,6 +3,7 @@
 This document summarizes SSL coding conventions and best practices.
 
 > **See also:** [AGENTS.md](../../AGENTS.md) for quick AI agent reference.
+> **Authority:** `dev/ssl-style-guide/` is the source of truth when this public summary lags behind.
 
 ---
 
@@ -20,6 +21,8 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 | `d` | Date | `dCreatedOn`, `dDueDate`, `dExpiry` |
 | `o` | Object | `oConnection`, `oDataset`, `oEmail` |
 | `a` | Array | `aItems`, `aResults`, `aRows` |
+| `fn` | Code block | `fnTransform`, `fnPredicate` |
+| `v` | Variant / unknown | `vResult`, `vValue` |
 
 ### Identifier Naming
 
@@ -27,23 +30,20 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 |---------|------------|---------|
 | Procedures | PascalCase | `CalculateTotal`, `ProcessOrder` |
 | Classes | PascalCase | `InvoiceManager`, `DataHandler` |
-| Local Variables | camelCase with prefix | `sUserName`, `nTotal` |
-| Parameters | camelCase with prefix | `sInput`, `nValue` |
+| Variables | camelCase with prefix | `sUserName`, `nTotal`, `vResult` |
 | Constants | UPPER_SNAKE_CASE | `MAX_RETRIES`, `DEFAULT_PATH` |
-| Global Variables | `g` prefix | `gCurrentUser` |
 
 ### Exceptions to Hungarian Notation
 
-- **Loop counters:** Single letters `i`, `j`, `k` are acceptable
-- **Common abbreviations:** `ID`, `SQL`, `URL`, `XML`, `HTML`, `API`, `UID`, `GUID`
+- **Loop counters:** Single letters `i`, `j`, `k`, `x`, `y`, `z` are acceptable
+- **Acronyms:** Preserve existing acronym casing such as `ID`, `SQL`, `URL`, `XML`
 - **SSL constants:** `NIL`, `.T.`, `.F.`
 
 ### Naming Guidelines
 
-- Keep variable names under 20 characters
-- Keep function names under 30 characters
 - Use abbreviations sparingly and only when obvious
 - Avoid underscores in variable names (discouraged, not prohibited)
+- Keep class-context references in their canonical forms: `Me:Member`, `Base:Member`, `Constructor`
 
 ---
 
@@ -82,9 +82,10 @@ STARLIMS uses Hungarian notation prefixes to indicate variable types:
 |---------|------|---------|
 | Assignment | Space around `:=` | `x := 1` |
 | Comparison | Space around operators | `x > 0` |
-| After commas | One space | `DoProc(a, b, c)` |
+| After commas | One space | `DoProc("MyProc", {sName, nCount, bFlag})` |
 | Before semicolon | No space | `statement;` |
-| Inside parentheses | No space | `DoProc(a, b)` not `DoProc( a, b )` |
+| Inside parentheses | No space | `DoProc("MyProc", {sName, nCount})` not `DoProc( "MyProc", { sName, nCount } )` |
+| Member access | Prefer no spaces around `:` | `oEmail:Subject` not `oEmail : Subject` |
 
 ### Line Length
 
@@ -109,6 +110,24 @@ sSQL := "SELECT CustomerID, CustomerName, OrderTotal " +
 
 ## Code Structure
 
+### Procedure Calls
+
+Custom procedures are not called directly:
+
+```ssl
+vResult := DoProc("LocalProcedure", {sValue, nCount});
+vResult := ExecFunction("Category.Script.ProcedureName", {sValue});
+```
+
+Inside `:CLASS` methods, use `Me:MethodName()` / `Base:MethodName()` for sibling and inherited methods instead of `DoProc(...)`.
+
+When optional trailing arguments are omitted, leave them out entirely rather than passing empty arrays or empty strings:
+
+```ssl
+DoProc("NoArgProc");
+GetDataSet(sSQL);
+```
+
 ### Procedure Organization
 
 ```ssl
@@ -116,18 +135,18 @@ sSQL := "SELECT CustomerID, CustomerName, OrderTotal " +
  * Procedure: ProcedureName
  * Description: Brief description
  * Parameters:
- *   param1 - description
- *   param2 - description
+ *   sInput - description
+ *   nCount - description
  * Returns: description
 ;
 :PROCEDURE ProcedureName;
-:PARAMETERS param1, param2;
-:DEFAULT param1, "";
-:DEFAULT param2, 0;
-:DECLARE localVar1, localVar2;
+:PARAMETERS sInput, nCount;
+:DEFAULT sInput, "";
+:DEFAULT nCount, 0;
+:DECLARE sResult, aRows;
 
 /* Initialization;
-localVar1 := "";
+sResult := "";
 
 /* Main logic;
 :TRY;
@@ -136,7 +155,7 @@ localVar1 := "";
     /* Handle error;
 :ENDTRY;
 
-:RETURN result;
+:RETURN sResult;
 :ENDPROC;
 ```
 
@@ -150,17 +169,22 @@ localVar1 := "";
 7. `:RETURN` (if applicable)
 8. `:ENDPROC;`
 
+**Placement rules:**
+- Script-level `:PARAMETERS` must appear before top-level script statements, though leading `:PROCEDURE` definitions may come first
+- Inside a procedure, `:PARAMETERS` must immediately follow `:PROCEDURE`
+- `:DEFAULT` must immediately follow `:PARAMETERS`
+
 ### Control Flow Best Practices
 
-**Always use EXITCASE:**
+**Prefer `:EXITCASE;` at the end of every `:CASE` and `:OTHERWISE` block unless multi-match behavior is intentional:**
 ```ssl
 :BEGINCASE;
 :CASE condition;
-    DoSomething();
-    :EXITCASE;  /* Required!;
+    sResult := "matched";
+    :EXITCASE;
 :OTHERWISE;
-    DoDefault();
-    :EXITCASE;  /* Required!;
+    sResult := "default";
+    :EXITCASE;
 :ENDCASE;
 ```
 
@@ -172,16 +196,16 @@ localVar1 := "";
 ```ssl
 /* Prefer this;
 :IF bIsValid;
-    ProcessValid();
+    sStatus := "valid";
 :ELSE;
-    HandleInvalid();
+    sStatus := "invalid";
 :ENDIF;
 
 /* Over this;
 :IF .NOT. bIsValid;
-    HandleInvalid();
+    sStatus := "invalid";
 :ELSE;
-    ProcessValid();
+    sStatus := "valid";
 :ENDIF;
 ```
 
@@ -224,6 +248,12 @@ localVar1 := "";
 - Use sentence case
 - Place comments above the code they describe
 - All comments must end with semicolon
+- Never place an extra semicolon inside comment text; the first semicolon terminates the comment and the remaining text becomes executable code
+
+### Code Organization
+
+- Prefer comment regions (`/* region ...;` / `/* endregion;`) for editor grouping
+- Treat `:REGION` / `:ENDREGION` as legacy functional text-capture constructs, not formatting aids
 
 ---
 
@@ -244,18 +274,21 @@ aResults := SQLExecute(sSQL);
 
 ### SQL Formatting
 
-- SQL keywords in lowercase: `select`, `from`, `where`
-- Table/column names in UPPERCASE: `CUSTOMERS`, `CUSTOMER_ID`
+- SQL keywords in UPPERCASE: `SELECT`, `FROM`, `WHERE`
+- Preserve external object casing only when the schema requires it
 - Place major clauses on new lines
 - Indent continuation lines
 
 ```ssl
-sSQL := "select C.CUSTOMER_ID, C.CUSTOMER_NAME, O.ORDER_TOTAL
-         from CUSTOMERS C
-         inner join ORDERS O on O.CUSTOMER_ID = C.CUSTOMER_ID
-         where C.STATUS = ?sStatus?
-             and O.ORDER_DATE >= ?dStartDate?
-         order by O.ORDER_DATE desc";
+sSQL := "
+    SELECT c.customer_id, c.customer_name, o.order_total
+    FROM customers c
+    INNER JOIN orders o
+      ON o.customer_id = c.customer_id
+    WHERE c.status = ?sStatus?
+      AND o.order_date >= ?dStartDate?
+    ORDER BY o.order_date DESC
+";
 ```
 
 ### SQL Parameters
@@ -274,6 +307,10 @@ bSuccess := RunSQL(sSQL,, {sNewStatus, nOrderID});
 sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 ```
 
+`LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, `GetDataSetEx`, `GetDataSetWithSchemaFromSelect`, `GetDataSetXMLFromSelect`, and `GetNETDataSet` follow the same positional-parameter convention.
+
+`SQLExecute` also supports source-aligned array expansion (`?aValues?`), object-property access (`?oUser:ID?`), and parameterless function calls such as `?Today()?`.
+
 ### Database Function Selection
 
 | Function | Use Case | Parameter Style |
@@ -281,6 +318,7 @@ sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 | `SQLExecute` | General queries | `?varName?` (named) |
 | `RunSQL` | INSERT/UPDATE/DELETE | `?` (positional) |
 | `LSearch` | Single value lookup | `?` (positional) |
+| `LSelect` / `LSelect1` / `LSelectC` | Multi-row SELECT | `?` (positional) |
 | `GetDataSet` | XML dataset output | `?` (positional) |
 
 ---
@@ -313,10 +351,15 @@ sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 
 ### Error Handling Guidelines
 
-- Use structured `:TRY`/`:CATCH` over legacy `:ERROR` markers
+- Use structured `:TRY`/`:CATCH` over legacy `:ERROR` / `:RESUME`
+- A `:TRY` block must contain at least one statement before `:CATCH` or `:FINALLY`
+- A `:TRY` block must include at least one `:CATCH` or `:FINALLY`
+- Only one `:CATCH` block is allowed, and `:CATCH` does not name an exception variable
+- Legacy `:ERROR` handlers must contain at least one statement before `:RESUME` or the next scope boundary
 - Always log errors with contextual information
 - Never swallow errors silently
 - Clean up resources in `:FINALLY` blocks
+- `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` are compile-time errors inside `:FINALLY`
 
 ---
 
@@ -333,8 +376,8 @@ sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
 ### Array Operations
 
 - Preallocate arrays when size is known
-- Use appropriate array functions (`ascan`, `ascanexact`)
-- Consider `BuildStringForIn()` for SQL `IN` clauses
+- Use appropriate array functions (`AScan`, `AScanExact`)
+- Prefer `SQLExecute` array expansion (`?aValues?`) for dynamic `IN` clauses over manual string building
 
 ### General
 
@@ -371,12 +414,12 @@ aResults := SQLExecute(sSQL);
 
 ## Function Casing Reference
 
-### Array Functions (lowercase)
+### Array Functions (Canonical Casing)
 ```ssl
-aadd(aArray, value);
-alen(aArray);
-ascan(aArray, value);
-ascanexact(aArray, value);
+AAdd(aArray, value);
+ALen(aArray);
+AScan(aArray, value);
+AScanExact(aArray, value);
 ```
 
 ### String Functions (PascalCase)
@@ -390,7 +433,8 @@ Lower(sString);
 
 ### Type Functions (PascalCase)
 ```ssl
-LimsString(value);  /* Convert to string (NOT Str());
+LimsString(value);  /* General value-to-string conversion;
+Str(nValue, 6, 2);  /* Numeric formatting with width/decimals;
 Empty(value);       /* Check if empty/nil/zero;
 Val(sString);       /* Convert to number;
 LimsTypeEx(value);  /* Get type name;

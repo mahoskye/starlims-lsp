@@ -261,22 +261,10 @@ func (l *Lexer) readString() Token {
 	if quote == '[' {
 		closeQuote = ']'
 	}
-	isEscaped := false
-
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 		text.WriteRune(char)
 		l.advance()
-
-		if isEscaped {
-			isEscaped = false
-			continue
-		}
-
-		if char == '\\' && quote != '[' {
-			isEscaped = true
-			continue
-		}
 
 		if char == closeQuote {
 			break
@@ -291,13 +279,25 @@ func (l *Lexer) readNumber() Token {
 	line := l.line
 	col := l.column
 	var text strings.Builder
+	seenDecimal := false
+	digitsBeforeDecimal := 0
 
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
-		if l.isDigit(char) || char == '.' {
+		if l.isDigit(char) {
 			text.WriteRune(char)
+			if !seenDecimal {
+				digitsBeforeDecimal++
+			}
+			l.advance()
+		} else if char == '.' {
+			text.WriteRune(char)
+			seenDecimal = true
 			l.advance()
 		} else if (char == 'e' || char == 'E') && (l.peek(1) == '+' || l.peek(1) == '-' || l.isDigit(l.peek(1))) {
+			if !seenDecimal || digitsBeforeDecimal == 0 {
+				break
+			}
 			text.WriteRune(char)
 			l.advance()
 			if l.pos < len(l.input) && (l.input[l.pos] == '+' || l.input[l.pos] == '-') {

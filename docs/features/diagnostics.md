@@ -1,6 +1,6 @@
 # Diagnostics
 
-**Status:** PARTIAL  
+**Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/publishDiagnostics` (server to client)  
 **Source Files:** `internal/providers/diagnostics.go`
 
@@ -30,9 +30,36 @@ The diagnostics provider analyzes SSL code and reports potential issues as squig
 | Unclosed blocks | Error | `:IF` without `:ENDIF`, etc. |
 | Unmatched delimiters | Error | `(`, `[`, `{` without matching closer |
 | Block depth exceeded | Warning | Nesting exceeds configured maximum |
-| Missing EXITCASE | Warning | `:CASE` block without `:EXITCASE` |
+| Missing EXITCASE | Warning | Style warning when a `:CASE` or `:OTHERWISE` block omits `:EXITCASE` |
 | Bare logical operators | Error | `AND` instead of `.AND.` |
+| Keyword form errors | Error | Bare, lowercase, or mixed-case SSL keywords |
+| INCLUDE placement | Info | `:INCLUDE` should stay at the top of the file |
 | DEFAULT on DECLARE | Warning | `:DEFAULT` only works with `:PARAMETERS` |
+| DEFAULT placement | Error | `:DEFAULT` must immediately follow `:PARAMETERS` |
+| PARAMETERS placement | Error | `:PARAMETERS` must immediately follow `:PROCEDURE`, and script-level parameters must appear before top-level statements |
+| BEGININLINECODE without name | Error | `:BEGININLINECODE` must have an identifier or quoted name |
+| TRY/CATCH/FINALLY structure | Error | Bare `:TRY...:ENDTRY`, empty `:TRY` body, multi-`CATCH`, wrong `:CATCH` / `:FINALLY` order, and empty `:FINALLY` body |
+| ERROR handler structure | Error | `:ERROR` must contain at least one statement before `:RESUME` or the end of the current scope |
+| CATCH clause form | Error | `:CATCH` cannot name an exception variable; use `GetLastSSLError()` inside the block |
+| Missing comment terminator | Error | SSL comments must end with `;` |
+| Comment termination heuristic | Warning | Flags comments that terminate before the line ends |
+| FOR numeric checks | Warning | Inferred non-numeric loop variables and bounds in `:FOR ... :TO ... :STEP ...` headers |
+| Type-safety advisories | Info/Warning | Conservative inferred-type checks for `NIL`, `$`, string `=`, and code-block comparison gotchas |
+| Class member order | Error | Class members must be `:INHERIT`, `:DECLARE`, methods, then `Constructor` |
+| Class-context `DoProc` misuse | Error | Inside class methods, use `Me:Method()` / `Base:Method()` instead of `DoProc(...)` |
+| `Me` / `Base` misuse | Error | `Me` is class-only; `Base` must be `Base:MemberName` inside a `:CLASS` with `:INHERIT` |
+| Branch target labels | Error | Literal `Branch("...")` targets must include `LABEL` token text such as `"LABEL SKIP"` |
+| Direct procedure calls | Error | Custom procedures must be invoked with `DoProc(...)` / `ExecFunction(...)` |
+| Wrong SQL placeholder style | Warning | Only `SQLExecute` supports `?varName?`; other DB helpers require positional `?` and value arrays |
+| Dot property access | Error | `oObj.Prop` should be `oObj:Prop` |
+| Built-in class via `CreateUdObject` | Error | Built-in classes such as `Email` or `CDataTable` must use `ClassName{}` instead of `CreateUdObject("ClassName")` |
+| Zero-based array index | Error | SSL arrays are 1-based |
+| Assignment in condition | Warning | `:=` inside `:IF` / `:WHILE` / `:CASE` conditions is usually a bug |
+| Empty trailing arg arrays | Info | Prefer `DoProc("Name")` over `DoProc("Name", {})` and similar empty trailing optional args |
+| Loop/finally control misuse | Error | `:EXITFOR`, `:EXITWHILE`, `:LOOP`, and `:RETURN` are restricted by loop context and `:FINALLY` rules |
+| Deprecated keywords | Warning/Info | `:ERROR`, `:RESUME`, `:LABEL`, and discouraged operator forms are flagged |
+| PUBLIC usage | Warning | `:PUBLIC` is discouraged because it creates shared global state |
+| Excessive procedure parameters | Warning | Procedures with more than 20 parameters should be refactored |
 | Global assignment | Error | Assignment to configured global variable |
 | Hungarian notation | Warning | Optional style check |
 
@@ -58,11 +85,12 @@ These diagnostics are implemented but disabled by default:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ssl.diagnostics.enabled` | bool | `true` | Enable diagnostics |
-| `ssl.diagnostics.hungarianNotation` | bool | `false` | Check for Hungarian prefixes |
-| `ssl.diagnostics.hungarianPrefixes` | string[] | `["a","b","d","n","o","s"]` | Prefixes to detect |
+| `ssl.diagnostics.hungarianNotation` | bool | `false` | Enforce Hungarian prefixes on declared variables |
+| `ssl.diagnostics.hungarianPrefixes` | string[] | `["a","b","d","fn","n","o","s","v"]` | Allowed prefixes |
 | `ssl.diagnostics.globals` | string[] | `[]` | Pre-declared global variables |
 | `ssl.diagnostics.maxBlockDepth` | int | `10` | Maximum block nesting depth |
+
+Additional always-on style diagnostics include compact label forms such as `:LABELSKIP;` being accepted, informational warnings when trailing empty argument arrays like `DoProc("MyProc", {})` should be omitted, `:INCLUDE` placement guidance, `:PUBLIC` warnings, `:PARAMETERS` placement enforcement, parameter-count warnings, legacy `:ERROR` / `:RESUME` warnings, `:ERROR` handler-body validation, `:CATCH` clause-form validation, literal `Branch("...")` label-target validation, and class-only rules such as constructor placement plus `Me` / `Base` / `DoProc(...)` usage inside class code.
 
 ### 3.2 Configuration via LSP
 
@@ -71,8 +99,9 @@ These diagnostics are implemented but disabled by default:
   "ssl": {
     "diagnostics": {
       "hungarianNotation": false,
-      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
-      "globals": ["gCurrentUser", "gAppName", "gLimsDate"]
+      "hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
+      "globals": ["gCurrentUser", "gAppName", "gLimsDate"],
+      "maxBlockDepth": 10
     }
   }
 }
@@ -86,7 +115,7 @@ These diagnostics are implemented but disabled by default:
 
 **Issue #56:** `:INCLUDE` path components flagged as undeclared.
 
-**Current Behavior:** May flag `File_Helpers` and `FileWork` as undeclared in:
+**Current Behavior:** `:INCLUDE` statements are skipped when undeclared-variable checking is enabled:
 ```ssl
 :INCLUDE File_Helpers.FileWork;
 ```
@@ -106,17 +135,17 @@ if normalized == "INCLUDE" {
 
 **Issue #2:** `Me` flagged as undeclared.
 
-**Current Behavior:** May report `Me` as an undeclared variable.
+**Current Behavior:** `Me` is treated as a built-in identifier and is not flagged.
 
 **Expected Behavior:** `Me` is a built-in class self-reference (like `this` in other languages) and should NEVER be flagged as undeclared.
 
-**Implementation:** Add `Me` to the built-in identifier list.
+**Implementation:** `Me`, `Base`, `Constructor`, case-insensitive literal forms (`.T.`, `.F.`, `NIL`), classes, and built-in functions are included in the built-in identifier set.
 
 ### 4.3 Function Calls
 
 **Issue #53:** Built-in function calls flagged as undeclared variables.
 
-**Current Behavior:** May flag `infomes` in `infomes("test");` as undeclared.
+**Current Behavior:** Built-in function calls are excluded from undeclared-variable checking.
 
 **Expected Behavior:** Any identifier immediately followed by `(` is a function call and should NOT be validated as a variable.
 
@@ -132,7 +161,7 @@ if nextToken.Text == "(" {
 
 **Issue #55:** Configured globals still flagged as undeclared.
 
-**Current Behavior:** Globals are checked for assignment prevention but NOT recognized as declared variables.
+**Current Behavior:** Configured globals are recognized as declared names by provider-level undeclared-variable and SQL-parameter checks.
 
 **Expected Behavior:** Variables in `ssl.diagnostics.globals` should be treated as pre-declared and never flagged as undeclared.
 
@@ -170,12 +199,41 @@ SQL parameter matching is now case-insensitive. `?sRunno?` correctly matches `sR
 
 **Issue #52:** Semicolon inside comment ends comment early.
 
-**Current Behavior:** May not detect that text after `;` in a comment is actually code:
+**Current Behavior:** The diagnostics provider now warns when a block comment ends and more tokens continue on the same line, which usually means an embedded semicolon terminated the comment early:
 ```ssl
 /* This is a comment; this text is CODE not comment
 ```
 
-**Expected Behavior:** Warn when comment appears to terminate prematurely with text following.
+**Limit:** This is a heuristic. It catches the common accidental case but does not try to infer author intent for every same-line comment/code pattern.
+
+### 4.8 Additional Style-Guide Enforcement
+
+The diagnostics provider also enforces newer guide rules that are always on:
+
+- `:BEGININLINECODE` must include a block name, either `:BEGININLINECODE Name;` or `:BEGININLINECODE "Name";`
+- `:PARAMETERS` must appear immediately after `:PROCEDURE`, and script-level `:PARAMETERS` must appear before top-level statements (leading `:PROCEDURE` blocks are allowed)
+- `:DEFAULT` must appear immediately after `:PARAMETERS`
+- `:TRY` must contain at least one statement before `:CATCH` or `:FINALLY`
+- `:TRY` must have at least one `:CATCH` or `:FINALLY` block, and only one `:CATCH` is allowed
+- `:CATCH` must appear before `:FINALLY`
+- `:CATCH` never names an exception variable; use `GetLastSSLError()` inside the catch block
+- `:FINALLY` must contain at least one statement
+- `:ERROR` handlers must contain at least one statement before `:RESUME` or the next scope boundary
+- `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` inside `:FINALLY` are compile-time errors
+- Comments that terminate before the line ends are flagged as likely embedded-semicolon mistakes
+- Non-numeric `:FOR` loop variables, start values, limits, and `:STEP` values are flagged when the type can be inferred from declarations, assignments, constructors, or built-in function returns
+- String `=` comparisons are flagged because `=` does prefix matching for strings
+- `NIL` vs `""`, `0`, or `.F.` comparisons are flagged because declared variables start as empty string, not `NIL`
+- Non-string operands inferred from literals, declarations, assignments, constructors, or built-in function returns are flagged for `$`
+- `NIL` arithmetic/string operations are flagged
+- Code blocks inferred from `{|...|}` literals, `fn...` identifiers, or simple assignments are flagged when compared with `=` or `==`
+- `:INCLUDE` statements are expected at the top of the file
+- `:PUBLIC` declarations are warned because they introduce persistent shared state
+- Procedures with more than 20 parameters generate a warning
+- Class files are checked for the preferred member order `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`
+- `Me` is class-only, and `Base` must be used as `Base:MemberName` inside a class that declares `:INHERIT`
+- Inside class methods, `DoProc(...)` is flagged in favor of `Me:MethodName()` / `Base:MethodName()`
+- Literal `Branch("...")` targets are checked for the required `LABEL` token text
 
 ---
 
@@ -183,14 +241,16 @@ SQL parameter matching is now case-insensitive. `?sRunno?` correctly matches `sR
 
 | Limitation | Notes |
 |------------|-------|
-| `:INCLUDE` paths flagged | #56 - Handled when undeclared checking enabled |
-| Globals not recognized | #55 - Handled via configuration |
+| `:INCLUDE` paths flagged | #56 - Handled when undeclared checking is enabled |
+| Globals not recognized | #55 - Handled |
 | `Me` flagged as undeclared | #2 - Handled |
 | Functions flagged as variables | #53 - Handled |
 | SQL parameter case | #47, #25 - ✅ Resolved |
 | Property access confusion | #22 - Handled |
 | Undeclared variable checking | ✅ Implemented (opt-in) |
 | Unused variable checking | ✅ Implemented (opt-in) |
+
+The remaining limit is whole-program semantic analysis. Diagnostics stay conservative when types cannot be inferred from local declarations, assignments, constructors, or known built-in function return shapes.
 
 ---
 
@@ -230,7 +290,7 @@ x := (a + b];
 /* Test: Case without EXITCASE;
 :BEGINCASE;
 :CASE x = 1;
-    DoSomething();
+    sResult := "one";
 :ENDCASE;
 /* Expected: Warning on line 2 - "':CASE' block should end with ':EXITCASE;'";
 ```
@@ -267,14 +327,14 @@ sUser := gCurrentUser;
 ### 6.7 Hungarian Notation Detection
 
 ```ssl
-/* Test: Hungarian prefix detection;
+/* Test: Missing Hungarian prefix;
 /* Config: hungarianNotation = true;
-:DECLARE sName, nCount;
-/* Expected: Warning on 'sName' - "Hungarian notation prefix 's' detected in 'sName'";
-/* Expected: Warning on 'nCount' - "Hungarian notation prefix 'n' detected in 'nCount'";
+:DECLARE goodName, sValue;
+/* Expected: Warning on 'goodName' - "Variable 'goodName' should use a Hungarian notation prefix";
+/* Expected: No warning on 'sValue';
 
-/* Test: Not Hungarian (lowercase after prefix);
-:DECLARE sample, number;
+/* Test: Loop counters are exempt;
+:DECLARE i, j;
 /* Expected: No warning;
 ```
 
@@ -291,10 +351,10 @@ sUser := gCurrentUser;
 ```ssl
 /* Test: Me not flagged as undeclared;
 :CLASS MyClass;
-:PROCEDURE Initialize;
-    Me:bActive := .T.;
-    Me:nCounter := 0;
-:ENDPROC;
+    :PROCEDURE Initialize;
+        Me:bActive := .T.;
+        Me:nCounter := 0;
+    :ENDPROC;
 /* Note: No :ENDCLASS - class extends to end of file;
 /* Expected: No warnings on 'Me';
 ```
@@ -306,9 +366,9 @@ sUser := gCurrentUser;
 :PROCEDURE Test;
     infomes("Hello");
     result := SQLExecute(sql, "ds");
-    MyCustomProc(x, y);
+    result := Len(sValue);
 :ENDPROC;
-/* Expected: No warnings on 'infomes', 'SQLExecute', 'MyCustomProc';
+/* Expected: No warnings on 'infomes', 'SQLExecute', 'Len';
 ```
 
 ### 6.11 Configured Global Recognition (Expected)
@@ -373,7 +433,7 @@ sSQL := "SELECT * FROM orders WHERE status = ?sStatus?";
 | #47 | SQL param case sensitivity | Medium | ✅ Resolved |
 | #25 | SQL param case (duplicate) | Medium | ✅ Resolved |
 | #22 | Property access confusion | Medium | Handled |
-| #52 | Comment semicolon edge case | Medium | Deferred |
+| #52 | Comment semicolon edge case | Medium | Handled heuristically |
 | #4 | Duplicate diagnostics | Low | Closed |
 | #3 | Multi-line expression semicolons | Low | Closed |
 
@@ -390,17 +450,17 @@ sSQL := "SELECT * FROM orders WHERE status = ?sStatus?";
 
 ### 8.2 Scope Tracking
 
-Variables are scoped to their declaring procedure:
+Variables are scoped to their declarations:
 - `:DECLARE` → procedure scope
 - `:PARAMETERS` → procedure scope
 - `:PUBLIC` → file scope
-- Assignment → procedure scope (dynamic declaration)
+- Assignment targets are ignored by undeclared-variable checking on the defining line, but assignments are not treated as declarations
 
 ### 8.3 Case Sensitivity
 
-- Keywords: case-insensitive
+- Keywords: case-sensitive and must use canonical colon-prefixed uppercase forms
 - Variables: case-insensitive for matching
-- Literals (`.T.`, `.F.`, `NIL`): case-sensitive
+- Literals (`.T.`, `.F.`, `NIL`) and class-context forms (`Me`, `Base`, `Constructor`): case-insensitive
 
 ### 8.4 Error Recovery
 

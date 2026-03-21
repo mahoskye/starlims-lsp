@@ -27,6 +27,10 @@ func TestFormatDocument_BasicIndentation(t *testing.T) {
 		t.Error("formatted output should contain tabs for indentation")
 	}
 
+	if strings.Contains(formatted, "x := 1;:IF") {
+		t.Error("formatted output should place statements on separate lines after semicolons")
+	}
+
 	t.Logf("Formatted output:\n%s", formatted)
 }
 

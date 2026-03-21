@@ -122,6 +122,7 @@ func TestApplySettings_FullSettings(t *testing.T) {
 			"diagnostics": map[string]interface{}{
 				"hungarianNotation": true,
 				"hungarianPrefixes": []string{"a", "b"},
+				"maxBlockDepth":     6,
 			},
 		},
 	}
@@ -174,6 +175,9 @@ func TestApplySettings_FullSettings(t *testing.T) {
 	if !reflect.DeepEqual(s.settings.Diagnostics.HungarianPrefixes, []string{"a", "b"}) {
 		t.Errorf("expected Hungarian prefixes [a b], got %v", s.settings.Diagnostics.HungarianPrefixes)
 	}
+	if s.settings.Diagnostics.MaxBlockDepth != 6 {
+		t.Errorf("expected max block depth 6, got %d", s.settings.Diagnostics.MaxBlockDepth)
+	}
 }
 
 func TestApplySettings_Globals(t *testing.T) {
@@ -192,6 +196,24 @@ func TestApplySettings_Globals(t *testing.T) {
 	expectedGlobals := []string{"gCurrentUser", "gAppName", "gDebugMode"}
 	if !reflect.DeepEqual(s.settings.Diagnostics.GlobalVariables, expectedGlobals) {
 		t.Errorf("expected globals %v, got %v", expectedGlobals, s.settings.Diagnostics.GlobalVariables)
+	}
+}
+
+func TestApplySettings_MaxBlockDepth(t *testing.T) {
+	s := NewSSLServer()
+
+	settings := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"diagnostics": map[string]interface{}{
+				"maxBlockDepth": 3,
+			},
+		},
+	}
+
+	s.applySettings(settings)
+
+	if s.settings.Diagnostics.MaxBlockDepth != 3 {
+		t.Errorf("expected max block depth 3, got %d", s.settings.Diagnostics.MaxBlockDepth)
 	}
 }
 

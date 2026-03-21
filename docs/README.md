@@ -24,7 +24,7 @@ This project follows a **document-driven development** approach:
 1. **Specification First:** Each feature is fully specified before implementation
 2. **Test Scenarios:** Every spec includes test cases for validation
 3. **Living Documents:** Documentation evolves with the codebase
-4. **Single Source of Truth:** These docs are the authoritative reference
+4. **Clear Authority Boundaries:** `dev/ssl-style-guide/` is authoritative for SSL language rules; `docs/` is authoritative for LSP behavior and configuration
 
 ---
 
@@ -79,7 +79,7 @@ See the [main README](../README.md) for full installation instructions.
 | Document Symbols | IMPLEMENTED | [document-symbols.md](./features/document-symbols.md) |
 | Workspace Symbols | PARTIAL | [workspace-symbols.md](./features/workspace-symbols.md) |
 | Formatting | IMPLEMENTED | [formatting.md](./features/formatting.md) |
-| Diagnostics | PARTIAL | [diagnostics.md](./features/diagnostics.md) |
+| Diagnostics | IMPLEMENTED | [diagnostics.md](./features/diagnostics.md) |
 | Folding Ranges | IMPLEMENTED | [folding-ranges.md](./features/folding-ranges.md) |
 | Snippets | IMPLEMENTED | [snippets.md](./features/snippets.md) |
 

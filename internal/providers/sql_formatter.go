@@ -16,7 +16,7 @@ type SQLFormattingOptions struct {
 }
 
 // SQL formatting styles:
-// - "standard": Simple clause breaks (FROM, WHERE, JOIN on new lines). Default per style guide.
+// - "standard": Simple clause breaks (FROM, WHERE, JOIN on new lines).
 // - "canonicalCompact": Balanced formatting with indented AND/OR and smart column wrapping.
 // - "compact": Minimal formatting, single line where possible.
 // - "expanded": Each column/condition on its own line.
@@ -26,7 +26,7 @@ type SQLFormattingOptions struct {
 func DefaultSQLFormattingOptions() SQLFormattingOptions {
 	return SQLFormattingOptions{
 		Enabled:          true,
-		Style:            "standard",
+		Style:            "canonicalCompact",
 		KeywordCase:      "upper",
 		IndentSize:       4,
 		MaxLineLength:    90,
@@ -78,6 +78,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 	// State tracking
 	var currentClause string
+	var rootCommand string
 	parenDepth := 0
 	inSelectColumns := false
 
@@ -87,6 +88,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 		// Track state
 		if t.Type == SQLTokenKeyword {
+			if rootCommand == "" && SQLCommandKeywords[upperText] {
+				rootCommand = upperText
+			}
 			switch upperText {
 			case "SELECT":
 				currentClause = "SELECT"
@@ -95,6 +99,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				currentClause = "UPDATE"
 			case "INSERT":
 				currentClause = "INSERT"
+			case "MERGE":
+				currentClause = "MERGE"
 			case "FROM":
 				inSelectColumns = false
 				currentClause = "FROM"
@@ -146,10 +152,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					needsBreak = false
 				} else {
 					needsBreak = true
-					// Only indent ON for canonicalCompact style
-					if upperText == "ON" && style == "canonicalCompact" {
-						extraIndent = f.indentString
-					}
+					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
 				}
 			}
 
@@ -157,7 +160,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			if (style == "canonicalCompact" || style == "expanded") &&
 				SQLIndentedKeywords[upperText] && t.Type == SQLTokenKeyword {
 				needsBreak = true
-				extraIndent = f.indentString
+				extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
 			}
 
 			// SET clause formatting
@@ -231,6 +234,30 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	}
 
 	return result.String()
+}
+
+func (f *SQLFormatter) keywordIndent(style, keyword, currentClause, rootCommand string, parenDepth int) string {
+	switch style {
+	case "canonicalCompact":
+		switch keyword {
+		case "AND", "OR", "ON", "HAVING", "WHEN", "ELSE":
+			if rootCommand == "MERGE" && parenDepth == 0 && (keyword == "ON" || keyword == "WHEN") {
+				return ""
+			}
+			return "  "
+		}
+	case "expanded":
+		switch keyword {
+		case "AND", "OR", "ON", "WHEN", "ELSE":
+			return f.indentString
+		case "HAVING":
+			if currentClause == "GROUP" {
+				return f.indentString
+			}
+		}
+	}
+
+	return ""
 }
 
 // isComplexSQL checks if SQL needs multi-line formatting.

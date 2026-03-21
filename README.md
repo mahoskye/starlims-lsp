@@ -22,19 +22,21 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 ## Features
 
 - **Auto-completion** for keywords, built-in functions, classes, procedures, and variables
+  - Procedure completions are source-aligned: script contexts dispatch with `DoProc(...)`, class-method contexts suggest `Me:MethodName(...)`
 - **Hover information** for keywords, functions, classes, and user-defined symbols
-- **Signature help** for built-in functions
+- **Signature help** for built-in functions, including dispatch helpers such as `DoProc` and `ExecFunction`
 - **Go to Definition** for procedures and variables
 - **Find References** for all symbols
-- **Document Symbols** (outline) for procedures, variables, and regions
+- **Document Symbols** (outline) for procedures, variables, and comment regions
 - **Workspace Symbols** (open documents only; no workspace indexing)
 - **Diagnostics** including:
-  - Unclosed block detection (`:IF` without `:ENDIF`, etc.)
-  - Unmatched parentheses and brackets
-  - Block nesting depth warnings
+  - Core block/keyword validation (`:IF`, `:TRY`, `:CLASS`, `:DEFAULT`, keyword form, loop control)
+  - Style-guide enforcement for `DoProc`/`ExecFunction`, SQL placeholder usage, class layout, `Me`/`Base` class-context forms, `:PUBLIC`, `:INCLUDE`, and legacy keyword handling
+  - Conservative inferred-type checks for `:FOR`, `NIL`, `$`, string `=`, and code-block comparison mistakes
+  - SSL gotcha detection for direct procedure calls, dot-property access, zero-based arrays, assignment in conditions, and comment-semicolon hazards
   - Opt-in Hungarian notation warnings (configurable prefixes)
 - **Document formatting** for SSL and embedded SQL
-- **Folding Ranges** for procedures, regions, and comments
+- **Folding Ranges** for procedures, comment regions, control-flow blocks, and comments
 - **Code Snippets** for common SSL patterns
 
 ## Installation
@@ -164,7 +166,7 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
       "blankLinesBetweenProcs": 1,
       "sql": {
         "enabled": true,
-        "style": "standard",
+        "style": "canonicalCompact",
         "keywordCase": "upper",
         "indentSize": 4,
         "maxLineLength": 90
@@ -172,14 +174,20 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
     },
     "diagnostics": {
       "hungarianNotation": false,
-      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
+      "hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
       "globals": ["gCurrentUser", "gAppName"]
+    },
+    "inlayHints": {
+      "enabled": true,
+      "minParameterCount": 2
     }
   }
 }
 ```
 
-Diagnostics settings default to server defaults and can opt in to Hungarian notation warnings using the style guide prefixes (`a`, `b`, `d`, `n`, `o`, `s`). Global variables can be declared via `globals` array - assignments to these variables will trigger an error.
+`indentStyle: "tab"` is the source-aligned default. `indentSize` is only used when `indentStyle` is `"space"`; the bundled value `4` is the fallback space width, not the width of a tab-indented SSL block.
+
+Diagnostics settings default to server defaults. When `hungarianNotation` is enabled, the LSP warns on declared variables that do not use an allowed Hungarian prefix. Global variables can be declared via `globals` array; assignments to these variables will trigger an error. Always-on diagnostics enforce major rules from the authoritative material under `dev/ssl-style-guide/`; [`docs/ssl-reference/style-guide.md`](docs/ssl-reference/style-guide.md) is the bundled public summary.
 
 ## SSL Language Overview
 
@@ -191,8 +199,11 @@ SSL (STARLIMS Scripting Language) is a procedural scripting language used in STA
 - Comments: `/* comment text;`
 - Strings: `"double"`, `'single'`, or `[bracket]` notation
 - Boolean literals: `.T.`, `.F.`
+- Null literal: `NIL`
 - Logical operators: `.AND.`, `.OR.`, `.NOT.`
 - Assignment: `:=`
+- Built-in classes use curly braces (`Email{}`); `CreateUdObject(...)` is for user-defined classes, empty dynamic objects, or anonymous property bags
+- Custom procedures are invoked through `DoProc(...)` / `ExecFunction(...)`
 
 ### Example
 
@@ -247,7 +258,9 @@ starlims-lsp/
 │   ├── parser/
 │   │   └── parser.go         # AST parser
 │   ├── constants/
-│   │   └── constants.go      # Language constants
+│   │   ├── constants.go      # Keywords, literals, operators, legacy inventories
+│   │   ├── source_alignment.go # Source-aligned public function/class inventories
+│   │   └── signatures.go     # Legacy signature corpus used by source alignment
 │   ├── providers/
 │   │   ├── completion.go     # Auto-completion
 │   │   ├── hover.go          # Hover information

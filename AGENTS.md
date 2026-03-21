@@ -2,6 +2,8 @@
 
 This document provides essential SSL (STARLIMS Scripting Language) coding conventions for AI agents working on this codebase. Following these conventions ensures generated code is syntactically correct and stylistically consistent.
 
+When this file conflicts with anything under `dev/ssl-style-guide/`, treat `dev/ssl-style-guide/` as the source of truth.
+
 ---
 
 ## Quick Reference Card
@@ -14,8 +16,9 @@ This document provides essential SSL (STARLIMS Scripting Language) coding conven
 | Assignment | `:=` (not `=`) |
 | Property access | Colon notation: `object:Property` (not `object.Property`) |
 | Array indexing | **1-based** (first element is `[1]`, not `[0]`) |
-| Comments | `/* comment text;` (ends with semicolon) |
-| Procedure calls | Use `DoProc()` or `ExecFunction()`, never direct calls |
+| Comments | `/* comment text;` (ends with semicolon; avoid extra `;` inside comment text) |
+| Procedure calls | Use `DoProc()` / `ExecFunction()` for script procedures; use `Me:Method()` / `Base:Method()` inside `:CLASS` methods |
+| Parameters | `:PARAMETERS` must follow `:PROCEDURE`; `:DEFAULT` must follow `:PARAMETERS` |
 
 ---
 
@@ -68,10 +71,10 @@ All SSL keywords must be prefixed with `:` and written in UPPERCASE:
 :CLASS ClassName;
 :INHERIT BaseClass;
 
-/* Code Organization (equivalent);
+/* Legacy functional text blocks;
 :REGION RegionName;
 :ENDREGION;
-:BEGININLINECODE;
+:BEGININLINECODE BlockName;
 :ENDINLINECODE;
 ```
 
@@ -104,6 +107,8 @@ SSL uses block comment syntax that terminates with semicolon:
  * Returns: processed result
 ;
 ```
+
+The first semicolon ends the comment. Do not place an extra `;` inside comment text or the remaining text becomes executable code.
 
 ### Operators
 
@@ -182,10 +187,12 @@ All variables must use Hungarian notation prefixes to indicate type:
 | `d` | Date | `dStartDate`, `dCreatedOn`, `dExpiry` |
 | `a` | Array | `aResults`, `aItems`, `aRows` |
 | `o` | Object | `oDataset`, `oEmail`, `oConnection` |
+| `fn` | Code block | `fnTransform`, `fnPredicate` |
+| `v` | Variant / unknown | `vResult`, `vValue` |
 
 ### Exceptions to Hungarian Notation
 
-1. **Loop counters**: Single letters `i`, `j`, `k` are allowed
+1. **Loop counters**: Single letters `i`, `j`, `k`, `x`, `y`, `z` are allowed
 2. **Constants**: Use `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_PATH`)
 3. **Special identifiers**: `NIL`, `.T.`, `.F.`, `ID`, `SQL`, `URL`, `XML`
 
@@ -216,17 +223,23 @@ MyProcedure();
 /* Same file - use DoProc;
 result := DoProc("CalculateTotal", {5, 10});
 
-/* Different file - use ExecFunction;
-result := ExecFunction("Module.CalculateTotal", {5, 10});
+/* Different file entry point - use ExecFunction;
+result := ExecFunction("Category.Script", {5, 10});
+
+/* Different file specific procedure - use ExecFunction;
+result := ExecFunction("Category.Script.CalculateTotal", {5, 10});
 
 /* Skip parameters with empty array positions;
 result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
+
+/* Omit trailing optional args entirely;
+result := DoProc("NoArgProc");
 ```
 
-### ❌ Missing EXITCASE — ALWAYS REQUIRED
+### ❌ Omitting `:EXITCASE` Unintentionally
 
 ```ssl
-/* WRONG - missing :EXITCASE will cause fall-through;
+/* WRONG - missing :EXITCASE can let later matching CASE blocks run;
 :BEGINCASE;
 :CASE nVal == 1;
     DoSomething();
@@ -238,7 +251,7 @@ result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
 ### ✅ Correct CASE Structure
 
 ```ssl
-/* CORRECT - every case must have :EXITCASE;
+/* CORRECT - prefer :EXITCASE unless multi-match behavior is intentional;
 :BEGINCASE;
 :CASE nVal == 1;
     DoSomething();
@@ -473,6 +486,11 @@ nCount := 0;
 6. `:RETURN` (if applicable)
 7. `:ENDPROC;`
 
+Placement rules:
+- Script-level `:PARAMETERS` must appear before top-level executable statements, though leading `:PROCEDURE` blocks may come first
+- Inside a procedure, `:PARAMETERS` must immediately follow `:PROCEDURE`
+- `:DEFAULT` must immediately follow `:PARAMETERS`
+
 ---
 
 ## 6. Object Creation
@@ -484,7 +502,7 @@ nCount := 0;
 oEmail := Email{};
 oEmail := Email{.T.};  /* With parameter;
 oRegex := SSLRegex{'\d+'};
-oTable := CDataTable{};
+oDataset := SSLDataset{};
 oDict := SSLStringDictionary{};
 ```
 
@@ -495,10 +513,13 @@ oDict := SSLStringDictionary{};
 oCustom := CreateUdObject("MyClass");
 oCustom := CreateUdObject("MyClass", {param1, param2});
 
-/* Anonymous object;
+/* Empty dynamic object;
 oAnon := CreateUdObject();
 oAnon:Property1 := "value";
 oAnon:Property2 := 123;
+
+/* Anonymous object with named properties;
+oSeeded := CreateUdObject({{"Property1", "value"}, {"Property2", 123}});
 ```
 
 ---
@@ -529,7 +550,8 @@ Lower(sString);
 
 ### Type/Conversion Functions (PascalCase)
 ```ssl
-LimsString(value);     /* NOT Str() - Str doesn't exist;
+LimsString(value);     /* General value-to-string conversion;
+Str(nValue, 6, 2);    /* Numeric formatting with width/decimals;
 LimsTypeEx(value);
 Empty(value);
 Val(sString);
@@ -579,6 +601,12 @@ DateToString(dDate, sFormat);
 :ENDTRY;
 ```
 
+Important restrictions:
+- `:TRY` must include at least one statement before `:CATCH` or `:FINALLY`
+- At least one of `:CATCH` or `:FINALLY` is required
+- `:CATCH` does not bind an exception variable; call `GetLastSSLError()` inside the block
+- `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` are compile-time errors inside `:FINALLY`
+
 ---
 
 ## Summary: Top 10 SSL Rules
@@ -589,7 +617,7 @@ DateToString(dDate, sFormat);
 4. **Period-wrapped logical ops** — `.AND.`, `.OR.`, `.NOT.`
 5. **Hungarian notation** — `sName`, `nCount`, `bFlag`, `aItems`, `oObject`
 6. **DoProc/ExecFunction** — Never call procedures directly
-7. **:EXITCASE required** — Every CASE block needs it
+7. **Prefer `:EXITCASE;`** — Use it unless multi-match CASE behavior is intentional
 8. **1-based arrays** — First element is `[1]`
 9. **Colon property access** — `object:Property`, not `object.Property`
 10. **SQLExecute vs others** — Only SQLExecute uses `?varName?` syntax

@@ -35,49 +35,48 @@ Snippets are delivered through the completion provider with:
 
 | Trigger | Expands To |
 |---------|------------|
-| `:PROCEDURE` | Procedure with name and body |
-| `:proc` | Same as above |
-| `:procparams` | Procedure with parameters |
+| `proc` | Procedure with header comment and body |
+| `procparams` | Procedure with parameters and defaults scaffold |
 
 #### Control Flow
 
 | Trigger | Expands To |
 |---------|------------|
-| `:IF` | IF/ENDIF block |
-| `:IFELSE` | IF/ELSE/ENDIF block |
-| `:WHILE` | WHILE/ENDWHILE loop |
-| `:FOR` | FOR/NEXT loop |
-| `:FOREACH` | FOR loop over array |
+| `if` | IF/ENDIF block |
+| `ifelse` | IF/ELSE/ENDIF block |
+| `while` | WHILE/ENDWHILE loop |
+| `for` | FOR/NEXT loop |
+| `forstep` | FOR loop with STEP |
 
 #### Case Statements
 
 | Trigger | Expands To |
 |---------|------------|
-| `:BEGINCASE` | BEGINCASE with CASE/ENDCASE |
-| `:CASE` | Single CASE with EXITCASE |
+| `case` | BEGINCASE with CASE/ENDCASE |
 
 #### Error Handling
 
 | Trigger | Expands To |
 |---------|------------|
-| `:TRY` | TRY/CATCH/ENDTRY block |
-| `:TRYFINALLY` | TRY/CATCH/FINALLY/ENDTRY block |
+| `try` | TRY/CATCH/ENDTRY block |
+| `tryfinally` | TRY/CATCH/FINALLY/ENDTRY block |
+| `catchssl` | TRY/CATCH with `GetLastSSLError()` |
+| `catchsql` | TRY/CATCH with `GetLastSQLError()` |
 
 #### Declarations
 
 | Trigger | Expands To |
 |---------|------------|
-| `:DECLARE` | Variable declaration |
-| `:PARAMETERS` | Parameter declaration with DEFAULT |
-| `:PUBLIC` | Public variable declaration |
+| `declare` | Variable declaration |
+| `public` | Public variable declaration |
+| `include` | Include directive |
 
 #### SQL Patterns
 
 | Trigger | Expands To |
 |---------|------------|
-| `sqlexec` | SQLExecute with placeholders |
-| `getds` | GetDataSet pattern |
-| `runsql` | RunSQL with parameters |
+| `sql` | SQLExecute with named placeholders |
+| `doproc` | DoProc call with argument array |
 
 ---
 
@@ -100,19 +99,15 @@ Snippets are delivered through the completion provider with:
 
 ### 4.1 Context Sensitivity
 
-Snippets are filtered based on context:
-- Block snippets offered at statement positions
-- SQL snippets offered in expression positions
+The server does not apply extra semantic snippet filtering. Snippets are returned alongside regular completions everywhere outside strings and comments.
 
 ### 4.2 Indentation
 
-Snippets should inherit the current line's indentation. Each line in the snippet template is indented relative to the trigger position.
+Snippet bodies contain their own baseline indentation and are inserted at the current cursor position. Final alignment depends on the editor client and any follow-up formatting pass.
 
 ### 4.3 Conflict with Keywords
 
-When a snippet trigger matches a keyword, both appear in completion:
-- `:IF` shows both the keyword and the snippet
-- Snippet has additional documentation explaining the expansion
+When a snippet trigger overlaps a common keyword stem, the final ordering is client-side. The server returns both regular completions and snippet completions together.
 
 ---
 
@@ -132,9 +127,16 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: Procedure snippet expands correctly;
-/* Type: :proc<Tab>;
+/* Type: proc<Tab>;
 /* Expected expansion:;
+:/*
+ * Procedure: |ProcedureName|
+ * Description: |Brief description|
+ * Parameters:
+ * Returns: |NIL|
+;
 :PROCEDURE |ProcedureName|;
+    :DECLARE |sResult|;
     |/* body;|
 :ENDPROC;
 /* Where |...| are tab stop positions;
@@ -144,7 +146,7 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: IF/ELSE snippet;
-/* Type: :IFELSE<Tab>;
+/* Type: ifelse<Tab>;
 /* Expected expansion:;
 :IF |condition|;
     |/* then body;|
@@ -157,7 +159,7 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: FOR loop snippet;
-/* Type: :FOR<Tab>;
+/* Type: for<Tab>;
 /* Expected expansion:;
 :FOR |i| := |1| :TO |10|;
     |/* body;|
@@ -168,7 +170,7 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: TRY/CATCH snippet;
-/* Type: :TRY<Tab>;
+/* Type: try<Tab>;
 /* Expected expansion:;
 :TRY;
     |/* code;|
@@ -181,7 +183,7 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: BEGINCASE snippet;
-/* Type: :BEGINCASE<Tab>;
+/* Type: case<Tab>;
 /* Expected expansion:;
 :BEGINCASE;
 :CASE |condition1|;
@@ -197,9 +199,13 @@ When a snippet trigger matches a keyword, both appear in completion:
 
 ```ssl
 /* Test: SQLExecute snippet;
-/* Type: sqlexec<Tab>;
+/* Type: sql<Tab>;
 /* Expected expansion:;
-|dsResult| := SQLExecute("|SELECT * FROM table|", "|dsName|");
+SQLExecute("
+    SELECT |*|
+    FROM |table_name|
+    WHERE |column_name| = ?|sValue|?
+", "|dsName|");
 ```
 
 ### 6.7 Indentation Preservation
@@ -208,7 +214,7 @@ When a snippet trigger matches a keyword, both appear in completion:
 /* Test: Snippet respects current indentation;
 :PROCEDURE Test;
     :IF x > 0;
-        :FOR<Tab>  /* Trigger snippet here;
+        for<Tab>  /* Trigger snippet here;
 /* Expected: FOR loop indented to match context;
         :FOR i := 1 :TO 10;
             /* body;
@@ -251,15 +257,14 @@ The `insertText` uses LSP snippet syntax:
 
 | Label | Prefix | Description |
 |-------|--------|-------------|
-| `:PROCEDURE...:ENDPROC` | `:proc` | Complete procedure |
-| `:PROCEDURE with params` | `:procparams` | Procedure with parameters |
-| `:IF...:ENDIF` | `:IF` | IF block |
-| `:IF...:ELSE...:ENDIF` | `:IFELSE` | IF/ELSE block |
-| `:WHILE...:ENDWHILE` | `:WHILE` | WHILE loop |
-| `:FOR...:NEXT` | `:FOR` | FOR loop |
-| `:BEGINCASE...:ENDCASE` | `:BEGINCASE` | Case statement |
-| `:TRY...:ENDTRY` | `:TRY` | Try/Catch block |
-| `:DECLARE` | `:DECLARE` | Variable declaration |
-| `:PARAMETERS` | `:PARAMETERS` | Parameter with default |
-| `SQLExecute` | `sqlexec` | SQL execution pattern |
-| `GetDataSet` | `getds` | Dataset retrieval |
+| `:PROCEDURE...:ENDPROC` | `proc` | Complete procedure |
+| `:PROCEDURE with params` | `procparams` | Procedure with parameters |
+| `:IF...:ENDIF` | `if` | IF block |
+| `:IF...:ELSE...:ENDIF` | `ifelse` | IF/ELSE block |
+| `:WHILE...:ENDWHILE` | `while` | WHILE loop |
+| `:FOR...:NEXT` | `for` | FOR loop |
+| `:BEGINCASE...:ENDCASE` | `case` | Case statement |
+| `:TRY...:ENDTRY` | `try` | Try/Catch block |
+| `:DECLARE` | `declare` | Variable declaration |
+| `SQLExecute` | `sql` | SQL execution pattern |
+| `DoProc` | `doproc` | Same-file procedure call |

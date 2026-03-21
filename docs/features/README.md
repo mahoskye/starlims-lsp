@@ -34,7 +34,7 @@ Each feature document includes:
 | Workspace Symbols | PARTIAL | [workspace-symbols.md](./workspace-symbols.md) |
 | Folding Ranges | IMPLEMENTED | [folding-ranges.md](./folding-ranges.md) |
 | Formatting | IMPLEMENTED | [formatting.md](./formatting.md) |
-| Diagnostics | PARTIAL | [diagnostics.md](./diagnostics.md) |
+| Diagnostics | IMPLEMENTED | [diagnostics.md](./diagnostics.md) |
 | Snippets | IMPLEMENTED | [snippets.md](./snippets.md) |
 
 ---

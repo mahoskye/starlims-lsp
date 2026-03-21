@@ -128,8 +128,7 @@ func TestPrepareRename_MeKeyword_NotAllowed(t *testing.T) {
 	text := `:CLASS MyClass;
 :PROCEDURE Init;
 Me:Name := "test";
-:ENDPROC;
-:ENDCLASS;`
+:ENDPROC;`
 
 	procedures, variables := parseText(text)
 

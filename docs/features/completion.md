@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The completion provider offers context-aware suggestions as the user types. It provides completions for SSL keywords, built-in functions, classes, literals, operators, user-defined procedures, variables, and code snippets.
+The completion provider offers SSL symbol and snippet suggestions as the user types. It provides completions for SSL keywords, built-in functions, classes, literals, operators, user-defined procedures, variables, and code snippets. Class-only forms such as `Me`, `Base`, and `Constructor` are only suggested when completion is requested inside a `:CLASS` method.
 
 ---
 
@@ -22,32 +22,32 @@ Completion is triggered automatically on these characters:
 |-----------|---------|
 | `:` | Triggers keyword completions (`:IF`, `:WHILE`, etc.) |
 | `.` | Triggers literal (`.T.`, `.F.`) and operator (`.AND.`) completions |
-| `(` | Triggers parameter-related completions |
-| `,` | Triggers parameter-related completions |
+| `(` | Retriggers completion while editing a call expression |
+| `,` | Retriggers completion while editing an argument list |
 
 ### 2.2 Completion Types
 
 | Type | Count | Example | CompletionItemKind |
 |------|-------|---------|-------------------|
-| Keywords | 37 | `:IF`, `:WHILE`, `:DECLARE` | Keyword (14) |
-| Built-in Functions | 367 | `SQLExecute`, `Len`, `Upper` | Function (3) |
-| Built-in Classes | 30 | `SSLExpando`, `SSLDataset` | Class (7) |
+| Keywords | 38 | `:IF`, `:WHILE`, `:DECLARE` | Keyword (14) |
+| Built-in Functions | 354 | `SQLExecute`, `Len`, `Upper` | Function (3) |
+| Built-in Classes | 21 | `SSLExpando`, `SSLDataset`, `CDataTable` | Class (7) |
+| Class-context forms | Contextual | `Me`, `Base`, `Constructor` | Keyword/Constructor |
 | Literals | 3 | `.T.`, `.F.`, `NIL` | Constant (21) |
 | Operators | 3 | `.AND.`, `.OR.`, `.NOT.` | Operator (24) |
 | Procedures | Dynamic | User-defined procedures | Function (3) |
 | Variables | Dynamic | Declared variables | Variable (6) |
 | Snippets | 25+ | Code templates | Snippet (15) |
 
-### 2.3 Context-Aware Filtering
+### 2.3 Current Filtering Rules
 
-Completions are filtered based on context:
+The server currently applies only lightweight filtering:
 
-| Context | Completions Offered |
-|---------|---------------------|
-| After `:` at line start | Keywords |
-| After `.` | Literals and operators |
-| Start of identifier | Functions, classes, procedures, variables |
-| Inside parentheses | Variables, literals |
+| Context | Behavior |
+|---------|----------|
+| Inside strings/comments | No completions returned |
+| Inside `:CLASS` methods | Adds class-context forms and inserts procedure completions as `Me:MethodName(...)` |
+| Other code contexts | Returns built-in plus document-local completions without class-only forms |
 
 ### 2.4 Completion Item Details
 
@@ -84,9 +84,10 @@ Each completion item includes:
 
 ### 4.1 Case Insensitivity
 
-SSL is case-insensitive. Completions match regardless of case:
+Identifier and function matching are case-insensitive, but keyword completions insert canonical colon-prefixed uppercase forms:
 - Typing `sql` matches `SQLExecute`
 - Typing `IF` matches `:IF`
+- Typing `me` matches `Me`
 
 ### 4.2 Colon-Prefix Keywords
 
@@ -104,6 +105,17 @@ Completions should NOT be offered inside string literals (content between `"` or
 
 Completions should NOT be offered inside comments (`/* ... ;`).
 
+### 4.6 Source-Aligned Snippets
+
+Snippet templates follow the bundled style-guide defaults:
+
+- Procedure snippets place `:DEFAULT` immediately after `:PARAMETERS`
+- SQL snippets use `SQLExecute` named-parameter style and `RunSQL` positional-parameter style
+- Class snippets avoid an extra class-body indent because `:CLASS` extends to EOF and has no `:ENDCLASS`
+- Region snippets use comment-based `/* region ...;` / `/* endregion;` rather than legacy functional `:REGION`
+- Procedure completions insert `DoProc(...)` dispatch snippets in script files, and `Me:MethodName(...)` snippets when completion is requested inside a `:CLASS` method
+- Class-context forms (`Me`, `Base`, `Constructor`) are only offered in class-method context
+
 ---
 
 ## 5. Known Limitations
@@ -113,6 +125,8 @@ Completions should NOT be offered inside comments (`/* ... ;`).
 | No custom functions | Cannot define project-specific function signatures |
 | No custom classes | Cannot define project-specific classes |
 | Single-file scope | Variables from `:INCLUDE` files not available |
+| No scope filtering | Variables are document-local, not narrowed to the current procedure |
+| No semantic ranking | The server does not reorder items by context or prefix relevance |
 | No type inference | Cannot suggest methods based on object type |
 
 ---
@@ -136,7 +150,7 @@ Completions should NOT be offered inside comments (`/* ... ;`).
 ```ssl
 /* Test: Built-in function completion;
 SQLEx|
-/* Expected: CompletionList containing SQLExecute, SQLExecDirect, etc.;
+/* Expected: CompletionList containing SQLExecute, SQLRemoveComments, etc.;
 /* Each item should have:
    - kind: Function (3)
    - detail: Signature
@@ -169,9 +183,9 @@ x := NI|
 ```ssl
 /* Test: Declared variable completion;
 :PROCEDURE Test;
-:DECLARE myVariable;
-myV|
-/* Expected: CompletionList containing myVariable;
+:DECLARE sMyValue;
+sMy|
+/* Expected: CompletionList containing sMyValue;
 :ENDPROC;
 ```
 
@@ -219,7 +233,7 @@ x := "some text SQL|";
 | Issue | Description | Status |
 |-------|-------------|--------|
 | #46 | Missing configuration for customizing auto-complete | Open |
-| #18 | CreateUDObject member tracking | Future Enhancement |
+| #18 | CreateUdObject member tracking | Future Enhancement |
 
 ---
 
@@ -233,9 +247,6 @@ The `resolveProvider` capability is set to `false`. All completion item details 
 
 Completion should return within 100ms. The built-in function list is pre-loaded at startup for fast access.
 
-### 8.3 Sorting
+### 8.3 Ordering
 
-Completions are sorted by:
-1. Exact prefix matches first
-2. Then by relevance (context-appropriate items)
-3. Then alphabetically
+The server returns completions in provider order. Editors may apply their own filtering and sorting on top of that list.

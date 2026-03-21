@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The folding ranges provider enables code folding in the editor. Users can collapse procedures, regions, and multi-line comments to focus on specific sections of code.
+The folding ranges provider enables code folding in the editor. Users can collapse procedures, comment regions, control-flow blocks, and multi-line comments to focus on specific sections of code.
 
 ---
 
@@ -19,7 +19,7 @@ The folding ranges provider enables code folding in the editor. Users can collap
 | Element | Fold Kind | Start | End |
 |---------|-----------|-------|-----|
 | Procedure | region | `:PROCEDURE` | `:ENDPROC` |
-| Region | region | `/* region` | `/* endregion` |
+| Comment Region | region | `/* region` | `/* endregion` |
 | Multi-line Comment | comment | `/*` | `;` |
 | IF Block | region | `:IF` | `:ENDIF` |
 | WHILE Block | region | `:WHILE` | `:ENDWHILE` |
@@ -78,7 +78,7 @@ Nested blocks each get their own folding range:
 
 If a block is opened but not closed, the folding range extends to the end of the file.
 
-### 4.3 Region Comments
+### 4.3 Region Markers
 
 Region markers are case-insensitive:
 - `/* region Name ;`
@@ -111,7 +111,7 @@ Elements that fit on a single line are not foldable:
 | Limitation | Notes |
 |------------|-------|
 | No import folding | SSL uses `:INCLUDE` but not grouped |
-| No class folding | `:CLASS` blocks not specifically handled |
+| No class folding | `:CLASS` blocks are not specifically handled |
 
 ---
 
@@ -162,8 +162,8 @@ x := 1;                  /* Line 2;
 ```ssl
 /* Test: IF block is foldable;
 :IF condition;              /* Line 0;
-    DoSomething();          /* Line 1;
-    DoMore();               /* Line 2;
+    sResult := "one";       /* Line 1;
+    sOther := "two";        /* Line 2;
 :ENDIF;                     /* Line 3;
 /* Expected folding range:
    { startLine: 0, endLine: 3, kind: "region" }
@@ -202,7 +202,7 @@ x := 1;                  /* Line 2;
 /* Test: Unclosed block extends to end;
 :PROCEDURE Test;            /* Line 0;
     :IF x > 0;              /* Line 1;
-        DoSomething();      /* Line 2;
+        sResult := "open";  /* Line 2;
 /* Missing :ENDIF and :ENDPROC;
 /* Expected folding ranges:
    { startLine: 0, endLine: 2, kind: "region" },  // Procedure to EOF

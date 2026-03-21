@@ -3,6 +3,7 @@
 This section provides reference documentation for the STARLIMS Scripting Language (SSL).
 
 > **Quick Reference:** See [AGENTS.md](../../AGENTS.md) in the project root for AI agent coding conventions.
+> **Authority:** When these public docs disagree with `dev/ssl-style-guide/`, the `dev/ssl-style-guide/` material wins.
 
 ---
 
@@ -13,8 +14,8 @@ This section provides reference documentation for the STARLIMS Scripting Languag
 | [Syntax Overview](./syntax.md) | SSL syntax rules | Keywords, operators, control flow |
 | [Formal Grammar](./grammar.md) | EBNF specification | Complete grammar definition |
 | [Style Guide](./style-guide.md) | Coding conventions | Naming, formatting, best practices |
-| [Built-in Functions](./functions.md) | Function reference | 367+ built-in functions |
-| [Built-in Classes](./classes.md) | Class reference | 30 built-in classes |
+| [Built-in Functions](./functions.md) | Function reference | 354 source-aligned developer-facing built-in functions |
+| [Built-in Classes](./classes.md) | Class reference | 21 source-aligned developer-facing built-in classes |
 | [Common Gotchas](./gotchas.md) | SSL pitfalls | Common mistakes and how to avoid them |
 
 ---
@@ -26,7 +27,7 @@ This section provides reference documentation for the STARLIMS Scripting Languag
 STARLIMS Scripting Language (SSL) is a domain-specific language used within the STARLIMS Laboratory Information Management System (LIMS). It combines features from various languages:
 
 - **Syntax:** Similar to xBase/Clipper with colon-prefixed keywords
-- **Typing:** Dynamic typing with optional Hungarian notation
+- **Typing:** Dynamic typing with Hungarian-style naming conventions
 - **Comments:** Block comments using `/* ... ;` syntax
 - **Operators:** Logical operators wrapped in periods (`.AND.`, `.OR.`)
 
@@ -34,14 +35,15 @@ STARLIMS Scripting Language (SSL) is a domain-specific language used within the 
 
 | Feature | Description |
 |---------|-------------|
-| Case Sensitivity | Keywords: UPPERCASE. Identifiers: case-insensitive |
+| Case Sensitivity | Keywords are colon-prefixed and case-sensitive; identifiers/functions are case-insensitive; `.T.`, `.F.`, `NIL`, `Me`, `Base`, and `Constructor` are case-insensitive |
 | Statement Terminator | Semicolon (`;`) — everything including comments |
 | Keywords | Colon-prefixed (`:IF`, `:WHILE`, `:PROCEDURE`) |
 | Logical Operators | Period-wrapped (`.AND.`, `.OR.`, `.NOT.`) |
-| Comments | Block style: `/* comment text ;` |
+| Comments | Block style: `/* comment text;` |
 | String Literals | Double, single, or bracket quotes |
 | Property Access | Colon notation (`object:property`) |
 | Array Indexing | 1-based (first element is `[1]`) |
+| Legacy Text Blocks | `:REGION` / `:BEGININLINECODE` are functional storage constructs, not editor-folding markers |
 
 ### Example Code
 
@@ -90,13 +92,13 @@ nCount := 0;
     DoProc("ProcessItem", {aItems[i]});
 :NEXT;
 
-/* Case statement (EXITCASE required);
+/* Case statement (prefer :EXITCASE unless multi-match behavior is intentional);
 :BEGINCASE;
 :CASE nVal == 1;
-    DoOne();
+    sResult := "one";
     :EXITCASE;
 :OTHERWISE;
-    DoDefault();
+    sResult := "other";
     :EXITCASE;
 :ENDCASE;
 
@@ -108,8 +110,12 @@ nCount := 0;
 :ENDTRY;
 
 /* Procedure call (never direct);
-result := DoProc("MyProcedure", {param1, param2});
-result := ExecFunction("Module.MyProcedure", {param1});
+result := DoProc("MyProcedure", {sValue, nCount});
+result := ExecFunction("Category.Script.Proc", {sValue});
+
+/* Inside classes, call methods through Me/Base;
+Me:Recalculate();
+Base:Initialize(sValue);
 
 /* Object property access;
 oEmail:Subject := "Test";
@@ -124,10 +130,11 @@ The Language Server Protocol implementation sources:
 
 | Purpose | File |
 |---------|------|
-| Function signatures | `internal/constants/signatures.go` |
-| Built-in classes | `internal/constants/constants.go` |
+| Source-aligned public SSL inventories | `internal/constants/source_alignment.go` |
+| Legacy function signature corpus | `internal/constants/signatures.go` |
+| Keywords, literals, operators, and legacy inventories | `internal/constants/constants.go` |
 | Parser | `internal/parser/parser.go` |
-| Diagnostics | `internal/analysis/diagnostics.go` |
+| Diagnostics | `internal/providers/diagnostics.go` |
 
 ---
 

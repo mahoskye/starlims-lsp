@@ -2,8 +2,8 @@
 
 This document specifies all configuration options available in the starlims-lsp language server. It serves as the authoritative reference for client configuration.
 
-**Version:** 1.1  
-**Last Updated:** 2026-02-02  
+**Version:** 1.2  
+**Last Updated:** 2026-03-21  
 **Status:** Current
 
 ---
@@ -15,9 +15,10 @@ This document specifies all configuration options available in the starlims-lsp 
 3. [Formatting Options](#3-formatting-options)
 4. [SQL Formatting Options](#4-sql-formatting-options)
 5. [Diagnostic Options](#5-diagnostic-options)
-6. [Internal Options](#6-internal-options)
-7. [Configuration Examples](#7-configuration-examples)
-8. [VS Code Integration](#8-vs-code-integration)
+6. [Inlay Hint Options](#6-inlay-hint-options)
+7. [Internal Options](#7-internal-options)
+8. [Configuration Examples](#8-configuration-examples)
+9. [VS Code Integration](#9-vs-code-integration)
 
 ---
 
@@ -35,7 +36,8 @@ All SSL Language Server options are nested under the `ssl` namespace:
 {
   "ssl": {
     "format": { ... },
-    "diagnostics": { ... }
+    "diagnostics": { ... },
+    "inlayHints": { ... }
   }
 }
 ```
@@ -56,6 +58,7 @@ interface SSLConfiguration {
   ssl: {
     format: FormattingOptions;
     diagnostics: DiagnosticOptions;
+    inlayHints: InlayHintOptions;
   }
 }
 
@@ -83,6 +86,12 @@ interface DiagnosticOptions {
   hungarianNotation: boolean;
   hungarianPrefixes: string[];
   globals: string[];
+  maxBlockDepth: number;
+}
+
+interface InlayHintOptions {
+  enabled: boolean;
+  minParameterCount: number;
 }
 ```
 
@@ -114,7 +123,7 @@ Specifies whether to use tabs or spaces for indentation.
 | **Range** | `1` - `8` |
 | **File** | `internal/providers/formatting.go:14,27` |
 
-Number of spaces per indentation level. Only applies when `indentStyle` is `"space"`.
+Number of spaces per indentation level. Only applies when `indentStyle` is `"space"`. The source guide's preferred default is tab indentation; the bundled value `4` is the fallback width for space-indented formatting, not the width of a tab-indented SSL block.
 
 ```json
 { "ssl.format.indentSize": 4 }
@@ -167,12 +176,12 @@ When enabled, ensures a space after each comma in parameter lists.
 
 **Before formatting (commaSpacing: false):**
 ```ssl
-CallProc(a,b,c);
+DoProc("CallProc",{a,b,c});
 ```
 
 **After formatting (commaSpacing: true):**
 ```ssl
-CallProc(a, b, c);
+DoProc("CallProc", {a, b, c});
 ```
 
 ### 3.6 ssl.format.semicolonEnforcement
@@ -224,7 +233,7 @@ When enabled, SQL strings passed to SQL functions are automatically formatted.
 - `GetDataSet`
 - `GetDataSetWithSchemaFromSelect`
 - `GetDataSetXMLFromSelect`
-- `GetNetDataSet`
+- `GetNETDataSet`
 - `RunSQL`
 - `LSearch`
 - `LSelect`
@@ -237,7 +246,7 @@ When enabled, SQL strings passed to SQL functions are automatically formatted.
 | Property | Value |
 |----------|-------|
 | **Type** | `string` |
-| **Default** | `"standard"` |
+| **Default** | `"canonicalCompact"` |
 | **Values** | `"standard"`, `"canonicalCompact"`, `"compact"`, `"expanded"` |
 | **File** | `internal/providers/sql_formatter.go:11,28` |
 
@@ -274,9 +283,9 @@ WHERE active = 1 AND status = 'open'
 SELECT id, name, email, phone, address
 FROM users
 INNER JOIN orders
-    ON users.id = orders.user_id
+  ON users.id = orders.user_id
 WHERE active = 1
-    AND status = 'open'
+  AND status = 'open'
 ```
 
 **compact:**
@@ -385,7 +394,7 @@ sSQL := "select * from users";
 | **Default** | `false` |
 | **File** | `internal/providers/diagnostics.go:49,62` |
 
-When enabled, warns about variables using Hungarian notation prefixes.
+When enabled, warns on declared variables that do not use an allowed Hungarian notation prefix.
 
 ```json
 { "ssl.diagnostics.hungarianNotation": true }
@@ -393,7 +402,7 @@ When enabled, warns about variables using Hungarian notation prefixes.
 
 **Example Warning:**
 ```ssl
-:DECLARE sName;  /* Warning: Hungarian notation prefix 's' detected in 'sName';
+:DECLARE badName;  /* Warning: Variable 'badName' should use a Hungarian notation prefix;
 ```
 
 ### 5.2 ssl.diagnostics.hungarianPrefixes
@@ -401,25 +410,28 @@ When enabled, warns about variables using Hungarian notation prefixes.
 | Property | Value |
 |----------|-------|
 | **Type** | `string[]` |
-| **Default** | `["a", "b", "d", "n", "o", "s"]` |
+| **Default** | `["a", "b", "d", "fn", "n", "o", "s", "v"]` |
 | **File** | `internal/providers/diagnostics.go:50,63` |
 
-List of single-character prefixes to detect as Hungarian notation.
+List of allowed Hungarian prefixes.
 
 | Prefix | STARLIMS Convention |
 |--------|---------------------|
 | `a` | Array |
 | `b` | Boolean |
 | `d` | Date |
+| `fn` | Code block |
 | `n` | Numeric |
 | `o` | Object |
 | `s` | String |
+| `v` | Variant / any |
 
-**Detection Logic:**
+**Validation Logic:**
 1. Strip leading underscores
-2. Check if name starts with a prefix from this list
-3. Check if next character is uppercase
-4. If both conditions met, flag as Hungarian notation
+2. Allow loop-counter exceptions such as `i`, `j`, `k`, `x`, `y`, `z`
+3. Check if the remaining name starts with a prefix from this list
+4. Check if the next character is uppercase
+5. Warn if no allowed prefix matches
 
 ```json
 { "ssl.diagnostics.hungarianPrefixes": ["s", "n", "b"] }
@@ -456,15 +468,77 @@ List of global variable names. Assignment to these variables triggers an error.
 gCurrentUser := "test";  /* Error: Cannot assign to global variable 'gCurrentUser';
 ```
 
-**Future Enhancement:** These globals will also be recognized as "pre-declared" when undeclared variable checking is implemented.
+When provider-level undeclared-variable or SQL-parameter validation is enabled, these globals are also treated as pre-declared names.
+
+### 5.4 ssl.diagnostics.maxBlockDepth
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `10` |
+| **Range** | `0` (disabled) or greater |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `0` to disable the check.
+
+```json
+{ "ssl.diagnostics.maxBlockDepth": 10 }
+```
 
 ---
 
-## 6. Internal Options
+## 6. Inlay Hint Options
+
+### 6.1 ssl.inlayHints.enabled
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `true` |
+| **File** | `internal/server/server.go:31-36,324-326` |
+
+Enables or disables inlay hints for built-in SSL functions and dispatch helpers
+such as `DoProc` and `ExecFunction`.
+
+```json
+{
+  "ssl": {
+    "inlayHints": {
+      "enabled": true
+    }
+  }
+}
+```
+
+### 6.2 ssl.inlayHints.minParameterCount
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `2` |
+| **Range** | `1` - `20` |
+| **File** | `internal/server/server.go:31-36,324-326` |
+
+Minimum number of parameters required before the server emits inlay hints for a
+call site.
+
+```json
+{
+  "ssl": {
+    "inlayHints": {
+      "minParameterCount": 2
+    }
+  }
+}
+```
+
+---
+
+## 7. Internal Options
 
 These options are hardcoded and cannot be changed via client configuration.
 
-### 6.1 CheckUnclosedBlocks
+### 7.1 CheckUnclosedBlocks
 
 | Property | Value |
 |----------|-------|
@@ -474,7 +548,7 @@ These options are hardcoded and cannot be changed via client configuration.
 
 Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 
-### 6.2 CheckUnmatchedParens
+### 7.2 CheckUnmatchedParens
 
 | Property | Value |
 |----------|-------|
@@ -484,39 +558,40 @@ Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 
 Always checks for unmatched parentheses, brackets, and braces.
 
-### 6.3 CheckUndeclaredVars
+### 7.3 CheckUndeclaredVars
 
 | Property | Value |
 |----------|-------|
 | **Type** | `boolean` |
 | **Value** | `false` |
-| **Status** | PLANNED |
+| **Status** | IMPLEMENTED (provider option only) |
 | **File** | `internal/providers/diagnostics.go:47,59` |
 
-Will check for usage of undeclared variables when implemented.
+Checks for usage of undeclared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 6.4 CheckUnusedVars
+### 7.4 CheckUnusedVars
 
 | Property | Value |
 |----------|-------|
 | **Type** | `boolean` |
 | **Value** | `false` |
-| **Status** | PLANNED |
+| **Status** | IMPLEMENTED (provider option only) |
 | **File** | `internal/providers/diagnostics.go:48,60` |
 
-Will check for declared but unused variables when implemented.
+Checks for declared but unused variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 6.5 MaxBlockDepth
+### 7.5 CheckSQLParams
 
 | Property | Value |
 |----------|-------|
-| **Type** | `number` |
-| **Value** | `10` |
-| **File** | `internal/providers/diagnostics.go:52,64` |
+| **Type** | `boolean` |
+| **Value** | `false` |
+| **Status** | IMPLEMENTED (provider option only) |
+| **File** | `internal/providers/diagnostics.go:50,64` |
 
-Maximum allowed block nesting depth. Exceeding this triggers a warning.
+Checks named SQL placeholders against declared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 6.6 MaxNumberOfProblems
+### 7.6 MaxNumberOfProblems
 
 | Property | Value |
 |----------|-------|
@@ -528,9 +603,9 @@ Maximum number of diagnostics to report per document.
 
 ---
 
-## 7. Configuration Examples
+## 8. Configuration Examples
 
-### 7.1 Minimal Configuration
+### 8.1 Minimal Configuration
 
 ```json
 {
@@ -540,7 +615,7 @@ Maximum number of diagnostics to report per document.
 
 Uses all defaults.
 
-### 7.2 STARLIMS Style Guide Configuration
+### 8.2 STARLIMS Style Guide Configuration
 
 ```json
 {
@@ -555,7 +630,7 @@ Uses all defaults.
       "blankLinesBetweenProcs": 1,
       "sql": {
         "enabled": true,
-        "style": "standard",
+        "style": "canonicalCompact",
         "keywordCase": "upper",
         "indentSize": 4,
         "maxLineLength": 90
@@ -563,14 +638,14 @@ Uses all defaults.
     },
     "diagnostics": {
       "hungarianNotation": true,
-      "hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
+      "hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
       "globals": []
     }
   }
 }
 ```
 
-### 7.3 Production Environment Configuration
+### 8.3 Production Environment Configuration
 
 ```json
 {
@@ -607,7 +682,7 @@ Uses all defaults.
 }
 ```
 
-### 7.4 Compact SQL Configuration
+### 8.4 Compact SQL Configuration
 
 ```json
 {
@@ -623,7 +698,7 @@ Uses all defaults.
 }
 ```
 
-### 7.5 Disable SQL Formatting
+### 8.5 Disable SQL Formatting
 
 ```json
 {
@@ -639,14 +714,14 @@ Uses all defaults.
 
 ---
 
-## 8. VS Code Integration
+## 9. VS Code Integration
 
-### 8.1 settings.json Location
+### 9.1 settings.json Location
 
 - **User:** `~/.config/Code/User/settings.json` (Linux/Mac) or `%APPDATA%\Code\User\settings.json` (Windows)
 - **Workspace:** `.vscode/settings.json`
 
-### 8.2 VS Code Settings Example
+### 9.2 VS Code Settings Example
 
 ```json
 {
@@ -658,18 +733,18 @@ Uses all defaults.
   "ssl.format.semicolonEnforcement": true,
   "ssl.format.blankLinesBetweenProcs": 1,
   "ssl.format.sql.enabled": true,
-  "ssl.format.sql.style": "standard",
+  "ssl.format.sql.style": "canonicalCompact",
   "ssl.format.sql.keywordCase": "upper",
   "ssl.format.sql.indentSize": 4,
   "ssl.format.sql.maxLineLength": 90,
   "ssl.format.sql.detectSQLStrings": true,
   "ssl.diagnostics.hungarianNotation": false,
-  "ssl.diagnostics.hungarianPrefixes": ["a", "b", "d", "n", "o", "s"],
+  "ssl.diagnostics.hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
   "ssl.diagnostics.globals": ["gCurrentUser", "gAppName"]
 }
 ```
 
-### 8.3 Configuration via Extension
+### 9.3 Configuration via Extension
 
 The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuration changes to the LSP. Settings changed in VS Code are immediately applied.
 
@@ -680,20 +755,20 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | Option | Default |
 |--------|---------|
 | `ssl.format.indentStyle` | `"tab"` |
-| `ssl.format.indentSize` | `4` |
+| `ssl.format.indentSize` | `4` (space mode only) |
 | `ssl.format.maxLineLength` | `90` |
 | `ssl.format.operatorSpacing` | `true` |
 | `ssl.format.commaSpacing` | `true` |
 | `ssl.format.semicolonEnforcement` | `true` |
 | `ssl.format.blankLinesBetweenProcs` | `1` |
 | `ssl.format.sql.enabled` | `true` |
-| `ssl.format.sql.style` | `"standard"` |
+| `ssl.format.sql.style` | `"canonicalCompact"` |
 | `ssl.format.sql.keywordCase` | `"upper"` |
 | `ssl.format.sql.indentSize` | `4` |
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
-| `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","n","o","s"]` |
+| `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 
 ## Appendix B: Option Types

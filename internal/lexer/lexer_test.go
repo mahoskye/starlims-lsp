@@ -126,9 +126,9 @@ func TestLexer_TokenString_Escaped(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"escaped_quote", `"hello\"world"`, `"hello\"world"`},
-		{"escaped_backslash", `"hello\\world"`, `"hello\\world"`},
-		{"multiple_escapes", `"a\"b\"c"`, `"a\"b\"c"`},
+		{"backslash_is_literal", `"hello\\world"`, `"hello\\world"`},
+		{"quote_after_backslash_still_closes", `"hello\"world"`, `"hello\"`},
+		{"quote_after_multiple_backslashes_still_closes", `"a\\\"b"`, `"a\\\"`},
 	}
 
 	for _, tc := range tests {
@@ -216,8 +216,9 @@ func TestLexer_TokenNumber(t *testing.T) {
 		{"trailing_dot", "5.", "5."},
 		{"scientific_positive", "1.5e+10", "1.5e+10"},
 		{"scientific_negative", "2.3e-5", "2.3e-5"},
-		{"scientific_no_sign", "1e10", "1e10"},
-		{"uppercase_e", "1E10", "1E10"},
+		{"scientific_requires_decimal_point_lower", "1e10", "1"},
+		{"scientific_requires_decimal_point_upper", "1E10", "1"},
+		{"scientific_requires_leading_digit_before_decimal", ".5e1", ".5"},
 	}
 
 	for _, tc := range tests {
@@ -252,6 +253,7 @@ func TestLexer_TokenKeyword(t *testing.T) {
 		{"public", ":PUBLIC", ":PUBLIC"},
 		{"for", ":FOR", ":FOR"},
 		{"try", ":TRY", ":TRY"},
+		{"resume", ":RESUME", ":RESUME"},
 		{"lowercase", ":if", ":if"},
 		{"mixed_case", ":If", ":If"},
 	}
@@ -281,6 +283,7 @@ func TestLexer_TokenKeyword_AllKeywords(t *testing.T) {
 		":PROCEDURE", ":ENDPROC", ":IF", ":ELSE", ":ENDIF",
 		":WHILE", ":ENDWHILE", ":FOR", ":NEXT", ":TO", ":STEP",
 		":TRY", ":CATCH", ":FINALLY", ":ENDTRY",
+		":ERROR", ":RESUME",
 		":DECLARE", ":PUBLIC", ":PARAMETERS", ":DEFAULT",
 		":BEGINCASE", ":CASE", ":OTHERWISE", ":ENDCASE", ":EXITCASE",
 		":RETURN", ":CLASS", ":INHERIT", ":REGION", ":ENDREGION",
@@ -359,6 +362,11 @@ func TestLexer_TokenOperator(t *testing.T) {
 		{"equal_equal", "==", "==", TokenOperator},
 		{"not_equal", "!=", "!=", TokenOperator},
 		{"not_equal_legacy", "<>", "<>", TokenOperator},
+		{"power_alias", "**", "**", TokenOperator},
+		{"increment", "++", "++", TokenOperator},
+		{"decrement", "--", "--", TokenOperator},
+		{"shift_left", "<<", "<<", TokenOperator},
+		{"shift_right", ">>", ">>", TokenOperator},
 		// Compound assignment operators
 		{"plus_equal", "+=", "+=", TokenOperator},
 		{"minus_equal", "-=", "-=", TokenOperator},
@@ -422,10 +430,10 @@ func TestLexer_TokenOperator_Boolean(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"true", ".T."},
-		{"false", ".F."},
-		{"lowercase_true", ".t."},
-		{"lowercase_false", ".f."},
+		{"true_upper", ".T."},
+		{"true_lower", ".t."},
+		{"false_upper", ".F."},
+		{"false_lower", ".f."},
 	}
 
 	for _, tc := range tests {
@@ -439,6 +447,24 @@ func TestLexer_TokenOperator_Boolean(t *testing.T) {
 			// Boolean literals are treated as keywords
 			if tokens[0].Type != TokenKeyword {
 				t.Errorf("expected TokenKeyword for boolean literal, got %s", tokens[0].Type)
+			}
+		})
+	}
+}
+
+func TestLexer_TokenIdentifier_TrueFalseAreNotBooleanAliases(t *testing.T) {
+	tests := []string{"true", "false", "TRUE", "FALSE"}
+
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			lex := NewLexer(input)
+			tokens := lex.Tokenize()
+
+			if len(tokens) < 2 {
+				t.Fatalf("expected at least 2 tokens, got %d", len(tokens))
+			}
+			if tokens[0].Type != TokenIdentifier {
+				t.Errorf("expected TokenIdentifier for %q, got %s", input, tokens[0].Type)
 			}
 		})
 	}

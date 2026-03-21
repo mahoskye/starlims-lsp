@@ -14,10 +14,10 @@ Inlay hints display inline parameter names before function arguments, making cod
 
 ```ssl
 /* Without inlay hints;
-result := Substr("Hello World", 1, 5);
+result := SubStr("Hello World", 1, 5);
 
 /* With inlay hints, the editor displays parameter names inline:;
-/*   result := Substr(source: "Hello World", startPos: 1, length: 5);
+/*   result := SubStr(source: "Hello World", startPos: 1, length: 5);
 /* Note: The hints are visual only - the actual code is unchanged;
 ```
 
@@ -29,7 +29,7 @@ result := Substr("Hello World", 1, 5);
 
 | Type | Hints Shown | Notes |
 |------|-------------|-------|
-| Built-in functions | Yes | 367 functions with parameter names |
+| Built-in functions | Yes | 354 source-aligned functions with parameter names |
 | DoProc calls | Yes | Shows `sProcName:` and `aParams:` |
 | ExecFunction calls | Yes | Same as DoProc |
 | DoProc with known procedure | Yes | Also shows inner parameter names |
@@ -46,13 +46,13 @@ result := Substr("Hello World", 1, 5);
 
 ### 2.3 Built-in Function Hints
 
-For the 367 built-in SSL functions, parameter names come from the signature database:
+For the 354 source-aligned built-in SSL functions, parameter names come from the signature database:
 
 ```ssl
 /* Actual code;
-x := SQLExecuteScalar(query, "DSN1");
+x := SQLExecute(query, "DSN1");
 
-/* Editor displays with hints: SQLExecuteScalar(cSQL: query, cDSName: "DSN1");
+/* Editor displays with hints: SQLExecute(commandString: query, friendlyName: "DSN1");
 ```
 
 ### 2.4 DoProc/ExecFunction Hints
@@ -104,7 +104,7 @@ To reduce visual noise, hints are only shown for functions with a minimum number
 **Example with `minParameterCount: 2`:**
 ```ssl
 Len(sValue);              /* No hints - only 1 parameter;
-Substr(s, 1, 5);          /* Shows hints - 3 parameters;
+SubStr(s, 1, 5);          /* Shows hints - 3 parameters;
 ```
 
 ### 3.2 Disabling Hints
@@ -113,7 +113,11 @@ To disable inlay hints entirely:
 
 ```json
 {
-  "ssl.inlayHints.enabled": false
+  "ssl": {
+    "inlayHints": {
+      "enabled": false
+    }
+  }
 }
 ```
 
@@ -127,7 +131,7 @@ Hints are shown for all function calls in an expression:
 
 ```ssl
 /* Actual code;
-x := Trim(Substr(s, 1, 10));
+x := Trim(SubStr(s, 1, 10));
 
 /* Editor displays hints for both Trim and Substr parameters;
 ```
@@ -138,7 +142,7 @@ Hints are only shown for arguments that exist:
 
 ```ssl
 /* Two arguments provided to function with 3 parameters;
-Substr(s, 1);
+SubStr(s, 1);
 
 /* Only shows hints for provided arguments;
 ```
@@ -149,7 +153,7 @@ No hints are generated for function-like patterns inside strings or comments:
 
 ```ssl
 /* No hints generated for function calls inside strings;
-sCode := "Substr(s, 1, 5)";
+sCode := "SubStr(s, 1, 5)";
 
 /* Comments are also ignored;
 ```
@@ -187,7 +191,7 @@ DoProc(sProcName, aParams);
 
 ```ssl
 /* Test: Built-in function hints;
-x := Substr("Hello", 1, 5);
+x := SubStr("Hello", 1, 5);
 /* Expected hints:
    - Position before "Hello": source:
    - Position before 1: startPos:
@@ -243,7 +247,7 @@ ExecFunction("MyProc", {arg1});
 
 ```ssl
 /* Test: Nested calls get hints;
-x := Upper(Trim(Substr(s, 1, 5)));
+x := Upper(Trim(SubStr(s, 1, 5)));
 /* Expected: Hints for all three functions;
 ```
 
@@ -251,7 +255,7 @@ x := Upper(Trim(Substr(s, 1, 5)));
 
 ```ssl
 /* Test: No hints for strings;
-s := "Substr(s, 1, 5)";
+s := "SubStr(s, 1, 5)";
 /* Expected: No hints generated;
 ```
 
@@ -259,8 +263,8 @@ s := "Substr(s, 1, 5)";
 
 ```ssl
 /* Test: Hints disabled via config;
-/* Config: ssl.inlayHints.enabled = false;
-x := Substr("Hello", 1, 5);
+/* Config: {"ssl":{"inlayHints":{"enabled":false}}};
+x := SubStr("Hello", 1, 5);
 /* Expected: No hints generated;
 ```
 
@@ -269,8 +273,8 @@ x := Substr("Hello", 1, 5);
 ```ssl
 /* Test: Only hints in requested range;
 /* Request range: lines 5-10;
-x := Substr(a, 1, 2);  /* Line 3 - No hints, outside range;
-y := Substr(b, 3, 4);  /* Line 7 - Hints generated, in range;
+x := SubStr(a, 1, 2);  /* Line 3 - No hints, outside range;
+y := SubStr(b, 3, 4);  /* Line 7 - Hints generated, in range;
 ```
 
 ---

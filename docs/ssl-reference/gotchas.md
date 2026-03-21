@@ -22,47 +22,50 @@ MyProcedure();
 /* CORRECT - same file;
 result := DoProc("CalculateTotal", {5, 10});
 
-/* CORRECT - different file;
-result := ExecFunction("Module.CalculateTotal", {5, 10});
+/* CORRECT - different file entry point;
+result := ExecFunction("Category.Script", {5, 10});
+
+/* CORRECT - different file specific procedure;
+result := ExecFunction("Category.Script.CalculateTotal", {5, 10});
 
 /* Skip parameters with empty array positions;
 result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
 ```
 
-**LSP Support:** Yes — detects direct calls to procedures defined in the same file.
+**LSP Support:** Yes — flags direct custom procedure calls and points users to `DoProc(...)` / `ExecFunction(...)`.
 
 ---
 
-## Gotcha #2: Missing :EXITCASE Causes Fall-Through
+## Gotcha #2: Missing :EXITCASE Can Trigger Multiple Matching Cases
 
-**Problem:** Without `:EXITCASE`, execution falls through to the next case.
+**Problem:** Without `:EXITCASE`, later `:CASE` expressions are still evaluated and their bodies run if they also match. This is multi-match behavior, not C-style fall-through.
 
 ```ssl
-/* WRONG - falls through!;
+/* WRONG - both matching CASE blocks may run!;
 :BEGINCASE;
 :CASE nVal == 1;
-    DoOne();
-    /* Missing :EXITCASE - DoTwo() will also execute!;
+    sResult := "one";
+    /* Missing :EXITCASE - later CASE blocks can still run!;
 :CASE nVal == 2;
-    DoTwo();
+    sResult := "two";
     :EXITCASE;
 :ENDCASE;
 ```
 
-**Solution:** Always include `:EXITCASE` at the end of every case block.
+**Solution:** Include `:EXITCASE` at the end of every `:CASE` and `:OTHERWISE` block.
 
 ```ssl
 /* CORRECT;
 :BEGINCASE;
 :CASE nVal == 1;
-    DoOne();
-    :EXITCASE;  /* Required!;
+    sResult := "one";
+    :EXITCASE;
 :CASE nVal == 2;
-    DoTwo();
-    :EXITCASE;  /* Required!;
+    sResult := "two";
+    :EXITCASE;
 :OTHERWISE;
-    DoDefault();
-    :EXITCASE;  /* Required!;
+    sResult := "default";
+    :EXITCASE;
 :ENDCASE;
 ```
 
@@ -146,7 +149,7 @@ sLast := aItems[Len(aItems)];  /* "third";
 
 ```ssl
 /* This comment ends here; this is CODE now!
-DoSomething();  /* This line is actually outside the comment;
+x := 1;  /* This line is actually outside the comment;
 ```
 
 **Solution:** Be careful with semicolons in comments.
@@ -157,7 +160,7 @@ DoSomething();  /* This line is actually outside the comment;
 ;
 ```
 
-**LSP Support:** Not currently detected (Issue #52 - deferred).
+**LSP Support:** Partial. The LSP now warns when a comment token ends and more tokens continue on the same line, which catches the common accidental embedded-semicolon case.
 
 ---
 
@@ -264,7 +267,7 @@ sName == "Hell"    /* .F. - not exact;
 sName == ""        /* .F. - not exact;
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Implemented conservatively. The LSP warns when either side can be inferred to be a string from literals, declared prefixes, straightforward assignments, constructors, or known built-in function returns. It does not attempt whole-program type propagation.
 
 ---
 
@@ -297,22 +300,22 @@ x = "";        /* Only true for empty string;
 :ENDIF;
 ```
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Implemented conservatively. The LSP warns on `NIL` comparisons against `""`, `0`, and `.F.` when the operands are directly visible or can be inferred from local declarations, assignments, constructors, or known built-in function returns. It does not attempt full semantic analysis of every `Empty()`-related case.
 
 ---
 
-## Gotcha #12: Keywords Are Case-Sensitive (UPPERCASE)
+## Gotcha #12: Keywords Must Be Colon-Prefixed And Uppercase
 
-**Problem:** Keywords must be uppercase.
+**Problem:** SSL keywords are only valid in colon-prefixed uppercase form.
 
 ```ssl
-/* WRONG - lowercase keywords don't work;
+/* WRONG - lowercase or bare keywords don't work;
 :if condition;
-:while x < 10;
-:procedure MyProc;
+while x < 10;
+procedure MyProc;
 ```
 
-**Solution:** Always use UPPERCASE keywords.
+**Solution:** Always use colon-prefixed UPPERCASE keywords.
 
 ```ssl
 /* CORRECT;
@@ -321,7 +324,7 @@ x = "";        /* Only true for empty string;
 :PROCEDURE MyProc;
 ```
 
-**LSP Support:** Handled by lexer/parser — lowercase keywords will cause parse errors, not explicit diagnostic warnings.
+**LSP Support:** Yes — reports explicit keyword-form diagnostics.
 
 ---
 
@@ -340,22 +343,22 @@ oLogger:LogError := GetLastSQLError();
 
 ---
 
-## Gotcha #14: Str() vs LimsString()
+## Gotcha #14: `Str()` vs `LimsString()`
 
-**Problem:** `Str()` and `LimsString()` have different purposes and may be confused.
+**Problem:** `Str()` and `LimsString()` serve different purposes and are easy to mix up.
 
 ```ssl
-/* Str() - formats numbers with length and decimal places;
-sNum := Str(123, 6, 2);      /* "123.00" (6 chars, 2 decimals);
+/* Str() - numeric formatting with width and decimals;
+sNum := Str(123, 6, 2);      /* "123.00";
 
 /* LimsString() - general value-to-string conversion;
 sNum := LimsString(123);     /* "123";
 sDate := LimsString(dDate);  /* Converts date to string;
 ```
 
-**Solution:** Use `Str()` for number formatting with specific length/decimals, use `LimsString()` for general conversion.
+**Solution:** Use `Str()` when you need numeric formatting with width and decimal precision. Use `LimsString()` when you need general value-to-string conversion.
 
-**LSP Support:** Not currently detected.
+**LSP Support:** Reference-only. The LSP recognizes both built-ins, but it does not currently diagnose choosing the wrong one.
 
 ---
 
@@ -393,9 +396,9 @@ oCustom := CreateUdObject("MyClass", {params});
 | 7 | Named params with RunSQL | Yes |
 | 8 | Dot property notation | Yes |
 | 9 | `:=` in conditions | Yes |
-| 10 | Loose string equality | No |
-| 11 | NIL vs Empty | No |
+| 10 | Loose string equality | Implemented conservatively |
+| 11 | NIL vs Empty | Implemented conservatively |
 | 12 | Lowercase keywords | Yes |
 | 13 | Property as undeclared | Yes |
-| 14 | Str() vs LimsString() | No |
+| 14 | `Str()` vs `LimsString()` | Reference only |
 | 15 | Parentheses for class instantiation | Yes |

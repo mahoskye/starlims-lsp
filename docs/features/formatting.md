@@ -43,7 +43,7 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `ssl.format.indentStyle` | string | `"tab"` | `"tab"` or `"space"` |
-| `ssl.format.indentSize` | int | `4` | Spaces per indent level |
+| `ssl.format.indentSize` | int | `4` | Spaces per indent level when `indentStyle` is `"space"` |
 | `ssl.format.maxLineLength` | int | `90` | Maximum line length (0 = unlimited) |
 | `ssl.format.operatorSpacing` | bool | `true` | Space around operators |
 | `ssl.format.commaSpacing` | bool | `true` | Space after commas |
@@ -55,17 +55,18 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `ssl.format.sql.enabled` | bool | `true` | Enable SQL formatting |
-| `ssl.format.sql.style` | string | `"standard"` | Formatting style |
+| `ssl.format.sql.style` | string | `"canonicalCompact"` | Formatting style |
 | `ssl.format.sql.keywordCase` | string | `"upper"` | Keyword case transformation |
 | `ssl.format.sql.indentSize` | int | `4` | Spaces per SQL indent |
 | `ssl.format.sql.maxLineLength` | int | `90` | Max line length for SQL |
+| `ssl.format.sql.detectSQLStrings` | bool | `true` | Auto-detect and format SQL-looking standalone strings |
 
 ### 3.3 SQL Styles
 
 | Style | Description |
 |-------|-------------|
-| `standard` | Simple clause breaks (default) |
-| `canonicalCompact` | Balanced with indented AND/OR |
+| `standard` | Simple clause breaks |
+| `canonicalCompact` | Balanced with indented AND/OR (default) |
 | `compact` | Minimal breaks |
 | `expanded` | Each element on own line |
 
@@ -76,15 +77,21 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 ### 4.1 Block Keywords
 
 **Increase indent after:**
-`:IF`, `:ELSE`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:TRY`, `:CATCH`, `:FINALLY`, `:PROCEDURE`, `:CLASS`, `:REGION`
+`:IF`, `:ELSE`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:TRY`, `:CATCH`, `:FINALLY`, `:PROCEDURE`, `:REGION`, `:BEGININLINECODE`
 
 **Decrease indent before:**
-`:ENDIF`, `:ENDWHILE`, `:NEXT`, `:ENDCASE`, `:ENDTRY`, `:ENDPROC`, `:ENDREGION`
+`:ENDIF`, `:ENDWHILE`, `:NEXT`, `:ENDCASE`, `:ENDTRY`, `:ENDPROC`, `:ENDREGION`, `:ENDINLINECODE`
 
 **Same level (dedent then indent):**
 `:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY`
 
 **Note:** `:EXITCASE` is a regular statement (like `break`) that stays at content indentation level.
+
+`:CLASS` is intentionally excluded. Because SSL classes have no `:ENDCLASS` and extend to EOF, the formatter does not add an extra indentation level for the class body itself.
+
+Comment-based `/* region ...;` / `/* endregion;` markers remain the preferred organization aid. The formatter still indents legacy functional `:REGION` / `:ENDREGION` blocks correctly because they are part of the language grammar, not because they are the recommended style for editor grouping.
+
+The source guide's preferred indentation model is tab-based SSL indentation. The exposed default `indentSize: 4` is only the fallback width used when callers switch the formatter to space indentation.
 
 ### 4.2 Parenthesis Alignment
 
@@ -217,6 +224,8 @@ sSQL := "
 
 This feature is controlled by `ssl.format.sql.detectSQLStrings` (default: `true`).
 
+The default SQL style is `canonicalCompact`, which matches the compact reference in `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md`: clause keywords aligned at the SQL margin, continuation columns aligned under `SELECT`, and `AND` / `OR` / `ON` indented two spaces beneath their parent clause.
+
 ---
 
 ## 6. Known Limitations
@@ -270,10 +279,10 @@ y := x + y * z;
 ```ssl
 /* Test: Spacing after commas;
 /* Before:;
-DoSomething(a,b,c);
+DoProc("MyProc",{a,b,c});
 
 /* After:;
-DoSomething(a, b, c);
+DoProc("MyProc", {a, b, c});
 ```
 
 ### 7.4 CASE Statement Indentation
@@ -283,20 +292,20 @@ DoSomething(a, b, c);
 /* Before:;
 :BEGINCASE;
 :CASE x=1;
-DoOne();
+sResult:="one";
 :EXITCASE;
 :OTHERWISE;
-DoDefault();
+sResult:="default";
 :EXITCASE;
 :ENDCASE;
 
 /* After:;
 :BEGINCASE;
 :CASE x = 1;
-    DoOne();
+    sResult := "one";
     :EXITCASE;
 :OTHERWISE;
-    DoDefault();
+    sResult := "default";
     :EXITCASE;
 :ENDCASE;
 ```
@@ -307,20 +316,20 @@ DoDefault();
 /* Test: TRY block formatting;
 /* Before:;
 :TRY;
-DoRisky();
+result:=SQLExecute(sSQL);
 :CATCH;
-HandleError();
+oErr:=GetLastSSLError();
 :FINALLY;
-Cleanup();
+oConnection:=NIL;
 :ENDTRY;
 
 /* After:;
 :TRY;
-    DoRisky();
+    result := SQLExecute(sSQL);
 :CATCH;
-    HandleError();
+    oErr := GetLastSSLError();
 :FINALLY;
-    Cleanup();
+    oConnection := NIL;
 :ENDTRY;
 ```
 
@@ -329,14 +338,14 @@ Cleanup();
 ```ssl
 /* Test: SQL string formatting;
 /* Before:;
-ds := GetDataSet("select id,name from users where active=1 and status='open'", "ds");
+sXml := GetDataSet("select id,name from users where active=1 and status='open'", {sStatus});
 
 /* After:;
-ds := GetDataSet("
+sXml := GetDataSet("
     SELECT id, name
     FROM users
     WHERE active = 1 AND status = 'open'
-", "ds");
+", {sStatus});
 ```
 
 ### 7.7 SQL Formatting (canonicalCompact)
@@ -345,16 +354,16 @@ ds := GetDataSet("
 /* Test: SQL with indented AND/OR;
 /* Config: sql.style = "canonicalCompact";
 /* Before:;
-ds := GetDataSet("select * from users where a=1 and b=2 and c=3", "ds");
+sXml := GetDataSet("select * from users where a=1 and b=2 and c=3", {1, 2, 3});
 
 /* After:;
-ds := GetDataSet("
+sXml := GetDataSet("
     SELECT *
     FROM users
     WHERE a = 1
         AND b = 2
         AND c = 3
-", "ds");
+", {1, 2, 3});
 ```
 
 ### 7.8 Range Formatting

@@ -3,6 +3,7 @@ package providers
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"starlims-lsp/internal/lexer"
@@ -63,6 +64,12 @@ type RegionInfo struct {
 	Name      string
 	StartLine int
 	EndLine   int
+}
+
+type regionEvent struct {
+	Line    int
+	Name    string
+	IsStart bool
 }
 
 // GetDocumentSymbols returns all document symbols.
@@ -231,49 +238,78 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 
 // extractRegions extracts region markers from tokens.
 func extractRegions(tokens []lexer.Token) []RegionInfo {
-	var regions []RegionInfo
+	var events []regionEvent
+	lastLine := 0
 
+	// Match region comments, handling optional trailing semicolon and whitespace.
+	// SSL comments are: /* comment text ;
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
+	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion`)
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenEOF && token.Line > lastLine {
+			lastLine = token.Line
+		}
+
+		if token.Type == lexer.TokenComment {
+			text := strings.TrimSuffix(token.Text, ";")
+			text = strings.TrimSpace(text)
+
+			if matches := regionStartPattern.FindStringSubmatch(text); matches != nil {
+				name := strings.TrimSpace(matches[1])
+				name = strings.TrimSuffix(name, ";")
+				name = strings.TrimSpace(name)
+				if name == "" {
+					name = "Region"
+				}
+				events = append(events, regionEvent{Line: token.Line, Name: name, IsStart: true})
+				continue
+			}
+
+			if regionEndPattern.MatchString(text) {
+				events = append(events, regionEvent{Line: token.Line, IsStart: false})
+			}
+		}
+	}
+
+	sort.SliceStable(events, func(i, j int) bool {
+		if events[i].Line == events[j].Line {
+			return events[i].IsStart && !events[j].IsStart
+		}
+		return events[i].Line < events[j].Line
+	})
+
+	var regions []RegionInfo
 	type stackItem struct {
 		name      string
 		startLine int
 	}
 	var regionStack []stackItem
 
-	// Match region comments, handling optional trailing semicolon and whitespace
-	// SSL comments are: /* comment text ;
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
-	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion`)
-
-	for _, token := range tokens {
-		if token.Type == lexer.TokenComment {
-			// Normalize the text by trimming trailing semicolon and whitespace
-			text := strings.TrimSuffix(token.Text, ";")
-			text = strings.TrimSpace(text)
-
-			if matches := regionStartPattern.FindStringSubmatch(text); matches != nil {
-				name := strings.TrimSpace(matches[1])
-				// Also strip any trailing semicolon from the name itself
-				name = strings.TrimSuffix(name, ";")
-				name = strings.TrimSpace(name)
-				if name == "" {
-					name = "Region"
-				}
-				regionStack = append(regionStack, stackItem{name: name, startLine: token.Line})
-				continue
-			}
-
-			if regionEndPattern.MatchString(text) {
-				if len(regionStack) > 0 {
-					start := regionStack[len(regionStack)-1]
-					regionStack = regionStack[:len(regionStack)-1]
-					regions = append(regions, RegionInfo{
-						Name:      start.name,
-						StartLine: start.startLine,
-						EndLine:   token.Line,
-					})
-				}
-			}
+	for _, event := range events {
+		if event.IsStart {
+			regionStack = append(regionStack, stackItem{name: event.Name, startLine: event.Line})
+			continue
 		}
+		if len(regionStack) == 0 {
+			continue
+		}
+
+		start := regionStack[len(regionStack)-1]
+		regionStack = regionStack[:len(regionStack)-1]
+		regions = append(regions, RegionInfo{
+			Name:      start.name,
+			StartLine: start.startLine,
+			EndLine:   event.Line,
+		})
+	}
+
+	for _, region := range regionStack {
+		regions = append(regions, RegionInfo{
+			Name:      region.name,
+			StartLine: region.startLine,
+			EndLine:   lastLine,
+		})
 	}
 
 	return regions

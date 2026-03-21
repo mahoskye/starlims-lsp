@@ -19,8 +19,9 @@ type FunctionSignature struct {
 	Parameters  []FunctionParameter
 }
 
-// SSLFunctionSignatures maps function names (lowercase) to their signatures.
-var SSLFunctionSignatures = map[string]FunctionSignature{
+// legacySSLFunctionSignatures maps historical function names (lowercase) to signatures.
+// The public SSLFunctionSignatures map is source-aligned in source_alignment.go.
+var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"aadd": {
 		Name: "aadd", Description: "Appends an element to an array and returns the appended element.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -351,9 +352,10 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"createudobject": {
-		Name: "CreateUdObject", Description: "Creates user-defined objects with dynamic properties and returns a `sslexpando` object.", ReturnType: "sslexpando",
+		Name: "CreateUdObject", Description: "Creates an empty dynamic object, a user-defined class instance, or an anonymous property bag when initialized with name/value pairs.", ReturnType: "sslexpando",
 		Parameters: []FunctionParameter{
-			{Name: "args", Type: "sslvalue[]", Required: true, Description: "An array of SSLValue objects. First element can be a string (object type name for late binding) or an array of property definitions. Property definitions can be strings (property names) or arrays of [name, value] pairs."},
+			{Name: "className", Type: "string", Required: false, Description: "Optional user-defined class name to instantiate. Omit it to create an empty dynamic object, or pass an array of {name, value} pairs to seed an anonymous property bag."},
+			{Name: "args", Type: "array", Required: false, Description: "Optional constructor argument array passed to the user-defined class when className is provided."},
 		},
 	},
 	"createzip": {
@@ -835,9 +837,10 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"doproc": {
-		Name: "DoProc", Description: "Executes a procedure based on the provided name and arguments, returning the result as a variant.", ReturnType: "variant",
+		Name: "DoProc", Description: "Calls a procedure by name, usually in the current file or context, and returns whatever that procedure returns.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "args", Type: "sslvalue[]", Required: true, Description: "An array containing the parameters passed to the DoProc function for processing."},
+			{Name: "name", Type: "string", Required: true, Description: "Procedure name to execute. In class methods, prefer Me:MethodName() or Base:MethodName() for sibling and inherited methods."},
+			{Name: "args", Type: "array", Required: false, Description: "Optional argument array for the called procedure. Omit the second argument entirely when there are no parameters."},
 		},
 	},
 	"dossupport": {
@@ -902,17 +905,17 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"errormes": {
-		Name: "ErrorMes", Description: "Constructs and returns a formatted error message from two input values.", ReturnType: "variant",
+		Name: "ErrorMes", Description: "Writes a formatted entry to the server log, forcing the write even when UsrMes logging is globally disabled.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "a", Type: "variant", Required: true, Description: "Error code or identifier."},
-			{Name: "b", Type: "variant", Required: true, Description: "Error message or description."},
+			{Name: "message", Type: "variant", Required: true, Description: "Primary message payload. Values are stringified before being written to the log."},
+			{Name: "details", Type: "variant", Required: false, Description: "Optional caption or additional value to stringify into the log entry, often an array of contextual values."},
 		},
 	},
 	"execfunction": {
-		Name: "ExecFunction", Description: "Executes a named SSL function with parameters and returns the result as a variant.", ReturnType: "variant",
+		Name: "ExecFunction", Description: "Calls a procedure by path or exported name and returns whatever that procedure returns.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "name", Type: "string", Required: true, Description: "Name of the function to execute."},
-			{Name: "parameters", Type: "object[]", Required: true, Description: "An array of objects representing the parameters to pass to the function."},
+			{Name: "path", Type: "string", Required: true, Description: "Procedure path or exported name to execute, commonly in Module.Procedure form."},
+			{Name: "args", Type: "array", Required: false, Description: "Optional argument array for the called procedure. Omit the second argument entirely when there are no parameters."},
 		},
 	},
 	"execinternal": {
@@ -1045,10 +1048,10 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{},
 	},
 	"getdataset": {
-		Name: "GetDataSet", Description: "Returns a string containing dataset data based on a SQL command and optional parameters.", ReturnType: "string",
+		Name: "GetDataSet", Description: "Executes a SELECT query and returns the resulting XML dataset string. Use positional '?' placeholders with the values array.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "string", Required: true, Description: "SQL query or command string used to retrieve data from the database."},
-			{Name: "arrayOfValues", Type: "array", Required: false, Description: "An array of values to be used in the SQL query."},
+			{Name: "arrayOfValues", Type: "array", Required: false, Description: "Optional positional values array corresponding to '?' placeholders in the SQL query."},
 			{Name: "includeSchema", Type: "boolean", Required: false, Description: "Indicates whether the schema information should be included in the data set returned by the GetDataSet function."},
 			{Name: "tableName", Type: "string", Required: false, Description: "Specifies the name of the table from which to retrieve data."},
 			{Name: "nullAsBlank", Type: "boolean", Required: false, Description: "NullAsBlank determines whether null values in the dataset should be represented as blank strings."},
@@ -1086,7 +1089,7 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"getdatasetwithschemafromselect": {
-		Name: "GetDataSetWithSchemaFromSelect", Description: "Computes a dataset with schema from a select command and returns it as a string.", ReturnType: "string",
+		Name: "GetDataSetWithSchemaFromSelect", Description: "Computes a dataset with schema from a SELECT command and returns it as a string. Use positional '?' placeholders with the values array.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "string", Required: true, Description: "SQL query used to retrieve data from the database."},
 			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name used to identify or reference a specific dataset within the system."},
@@ -1106,7 +1109,7 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"getdatasetxmlfromselect": {
-		Name: "GetDataSetXMLFromSelect", Description: "Converts a database query result to XML format and returns it as a string.", ReturnType: "string",
+		Name: "GetDataSetXMLFromSelect", Description: "Converts a database query result to XML format and returns it as a string. Use positional '?' placeholders with the values array.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "string", Required: true, Description: "SQL query used to retrieve data from the database."},
 			{Name: "friendlyName", Type: "string", Required: false, Description: "FriendlyName\": \"A human-readable identifier for the dataset being retrieved."},
@@ -1273,7 +1276,7 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{},
 	},
 	"getnetdataset": {
-		Name: "GetNETDataSet", Description: "Returns a dataset based on a command string and parameters, optionally in XML format.", ReturnType: "variant",
+		Name: "GetNETDataSet", Description: "Returns a dataset based on a command string and positional parameters, optionally in XML format. Use positional '?' placeholders with the values array.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "variant", Required: true, Description: "SQL command or query string to execute."},
 			{Name: "friendlyName", Type: "variant", Required: true, Description: "FriendlyName specifies the friendly name or identifier for the dataset to retrieve."},
@@ -1428,10 +1431,10 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{},
 	},
 	"infomes": {
-		Name: "InfoMes", Description: "Constructs and returns a user message from two input values.", ReturnType: "variant",
+		Name: "InfoMes", Description: "Writes an informational server-log entry. It behaves like UsrMes and is suppressed when UsrMes logging is globally disabled.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "a", Type: "variant", Required: true, Description: "First argument passed to the InfoMes function, representing a message or object to be displayed."},
-			{Name: "b", Type: "variant", Required: true, Description: "Message to display."},
+			{Name: "message", Type: "variant", Required: true, Description: "Primary message payload. Values are stringified before being written to the log."},
+			{Name: "details", Type: "variant", Required: false, Description: "Optional caption or additional value to stringify into the log entry, often an array of contextual values."},
 		},
 	},
 	"integer": {
@@ -2415,11 +2418,11 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		},
 	},
 	"str": {
-		Name: "Str", Description: "Converts a number to a string with specified length and decimal places. Returns a string.", ReturnType: "string",
+		Name: "Str", Description: "Converts a numeric value to a formatted string with optional width and decimal precision. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "number", Type: "double", Required: true, Description: "Numeric value to be converted to a string."},
-			{Name: "length", Type: "double", Required: false, Description: "Specifies the total length of the resulting string, including any decimal places if specified."},
-			{Name: "decimals", Type: "double", Required: false, Description: "Specifies the number of decimal places to include in the formatted string representation of a numeric value."},
+			{Name: "number", Type: "double", Required: true, Description: "Numeric value to be converted to a formatted string."},
+			{Name: "length", Type: "double", Required: false, Description: "Optional total width of the resulting string."},
+			{Name: "decimals", Type: "double", Required: false, Description: "Optional number of decimal places to include in the formatted result."},
 		},
 	},
 	"stringtodate": {
@@ -2601,10 +2604,10 @@ var SSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{},
 	},
 	"usrmes": {
-		Name: "usrmes", Description: "Constructs a user message from two variants and returns it as a string.", ReturnType: "variant",
+		Name: "UsrMes", Description: "Writes a server-log entry unless UsrMes logging is globally disabled. Inputs are stringified into the log entry.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "a", Type: "variant", Required: true, Description: "First parameter in the usrmes function, a, represents the object on which the method will be invoked."},
-			{Name: "b", Type: "variant", Required: true, Description: "Message to display."},
+			{Name: "message", Type: "variant", Required: true, Description: "Primary message payload. Values are stringified before being written to the log."},
+			{Name: "details", Type: "variant", Required: false, Description: "Optional caption or additional value to stringify into the log entry, often an array of contextual values."},
 		},
 	},
 	"val": {

@@ -31,6 +31,12 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getMeKeywordHover(word); hover != nil {
 		return hover
 	}
+	if hover := getBaseKeywordHover(word); hover != nil {
+		return hover
+	}
+	if hover := getConstructorHover(word); hover != nil {
+		return hover
+	}
 	if hover := getFunctionHover(word); hover != nil {
 		return hover
 	}
@@ -81,6 +87,36 @@ func getMeKeywordHover(word string) *Hover {
 				"- Access class members: `Me:PropertyName`\n" +
 				"- Call class methods: `Me:MethodName()`\n" +
 				"- Pass self to other functions: `DoSomething(Me)`",
+		}
+	}
+	return nil
+}
+
+func getBaseKeywordHover(word string) *Hover {
+	if strings.EqualFold(word, "Base") {
+		return &Hover{
+			Contents: "**Base**\n\n" +
+				"*Parent-class reference*\n\n" +
+				"Used inside a `:CLASS` method to access inherited members.\n\n" +
+				"**Usage:**\n" +
+				"- Call a parent method: `Base:MethodName()`\n" +
+				"- Access an inherited member: `Base:PropertyName`\n\n" +
+				"`Base` must be followed by `:MemberName` and is only meaningful in class context.",
+		}
+	}
+	return nil
+}
+
+func getConstructorHover(word string) *Hover {
+	if strings.EqualFold(word, "Constructor") {
+		return &Hover{
+			Contents: "**Constructor**\n\n" +
+				"*Reserved class constructor name*\n\n" +
+				"Inside a `:CLASS`, define the constructor with `:PROCEDURE Constructor;`.\n\n" +
+				"**Rules:**\n" +
+				"- Constructors belong inside a `:CLASS`\n" +
+				"- Class member order must be `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`\n" +
+				"- `:RETURN` cannot return a value from a constructor",
 		}
 	}
 	return nil
@@ -163,15 +199,14 @@ func getClassHover(word string) *Hover {
 
 // getLiteralHover returns hover information for a literal.
 func getLiteralHover(word string) *Hover {
-	upper := strings.ToUpper(word)
-
-	if constants.IsSSLLiteral(upper) {
-		description := constants.SSLLiteralDescriptions[upper]
+	canonical, ok := constants.CanonicalSSLLiteral(strings.ToUpper(word))
+	if ok {
+		description := constants.SSLLiteralDescriptions[canonical]
 		if description == "" {
-			description = fmt.Sprintf("SSL literal: %s", upper)
+			description = fmt.Sprintf("SSL literal: %s", canonical)
 		}
 		return &Hover{
-			Contents: fmt.Sprintf("**%s**\n\n%s", upper, description),
+			Contents: fmt.Sprintf("**%s**\n\n%s", canonical, description),
 		}
 	}
 
@@ -266,8 +301,7 @@ type SQLPlaceholder struct {
 	IsNamed  bool   // True if this is a named parameter (?name?)
 }
 
-// namedParamPattern matches named SQL parameters like ?paramName?
-var namedParamPattern = regexp.MustCompile(`\?([a-zA-Z_][a-zA-Z0-9_]*)\?`)
+var simpleNamedParamPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // ParseSQLPlaceholders extracts all SQL placeholders from a string.
 // It handles both named parameters (?paramName?) and positional parameters (?).
@@ -275,61 +309,29 @@ func ParseSQLPlaceholders(sqlString string) []SQLPlaceholder {
 	var placeholders []SQLPlaceholder
 	positionalIndex := 0
 
-	// First, find all named parameters and their positions
-	namedMatches := namedParamPattern.FindAllStringSubmatchIndex(sqlString, -1)
-	namedPositions := make(map[int]bool)
-	for _, match := range namedMatches {
-		if len(match) >= 4 {
-			namedPositions[match[0]] = true
+	for i := 0; i < len(sqlString); i++ {
+		if sqlString[i] != '?' {
+			continue
+		}
+
+		if end, name, ok := parseNamedPlaceholder(sqlString, i); ok {
 			placeholders = append(placeholders, SQLPlaceholder{
-				Name:    sqlString[match[2]:match[3]], // Capture group 1
-				Start:   match[0],
-				End:     match[1],
+				Name:    name,
+				Start:   i,
+				End:     end + 1,
 				IsNamed: true,
 			})
+			i = end
+			continue
 		}
-	}
 
-	// Then find positional parameters (? not followed by alphanumeric)
-	// We need to manually scan to avoid matching the ? in ?name?
-	for i := 0; i < len(sqlString); i++ {
-		if sqlString[i] == '?' {
-			// Check if this is the start of a named parameter
-			if namedPositions[i] {
-				continue
-			}
-			// Check if this is the ending ? of a named parameter
-			if i > 0 {
-				// Look back to see if this is closing a named param
-				isClosing := false
-				for j := i - 1; j >= 0; j-- {
-					if sqlString[j] == '?' {
-						// Check if there's a valid name between j and i
-						between := sqlString[j+1 : i]
-						if len(between) > 0 && namedParamPattern.MatchString("?"+between+"?") {
-							isClosing = true
-						}
-						break
-					}
-					// If we hit a non-identifier char, stop looking
-					c := sqlString[j]
-					if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
-						break
-					}
-				}
-				if isClosing {
-					continue
-				}
-			}
-			// This is a positional parameter
-			positionalIndex++
-			placeholders = append(placeholders, SQLPlaceholder{
-				Position: positionalIndex,
-				Start:    i,
-				End:      i + 1,
-				IsNamed:  false,
-			})
-		}
+		positionalIndex++
+		placeholders = append(placeholders, SQLPlaceholder{
+			Position: positionalIndex,
+			Start:    i,
+			End:      i + 1,
+			IsNamed:  false,
+		})
 	}
 
 	// Sort placeholders by their position in the string
@@ -338,6 +340,54 @@ func ParseSQLPlaceholders(sqlString string) []SQLPlaceholder {
 	})
 
 	return placeholders
+}
+
+func parseNamedPlaceholder(sqlString string, start int) (int, string, bool) {
+	if start < 0 || start >= len(sqlString) || sqlString[start] != '?' {
+		return 0, "", false
+	}
+
+	for end := start + 1; end < len(sqlString); end++ {
+		if sqlString[end] != '?' {
+			continue
+		}
+
+		name := sqlString[start+1 : end]
+		if isNamedPlaceholderContent(name) {
+			return end, name, true
+		}
+		break
+	}
+
+	return 0, "", false
+}
+
+func isNamedPlaceholderContent(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	first := rune(name[0])
+	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
+		return false
+	}
+
+	for _, ch := range name {
+		switch {
+		case ch >= 'a' && ch <= 'z':
+		case ch >= 'A' && ch <= 'Z':
+		case ch >= '0' && ch <= '9':
+		case ch == '_', ch == ':', ch == '[', ch == ']', ch == '(', ch == ')', ch == '.':
+		default:
+			return false
+		}
+	}
+
+	return true
+}
+
+func isSimpleNamedPlaceholder(name string) bool {
+	return simpleNamedParamPattern.MatchString(name)
 }
 
 // GetSQLPlaceholderHover returns hover information for a SQL placeholder at the given position.

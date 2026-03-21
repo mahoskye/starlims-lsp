@@ -18,30 +18,29 @@ The hover provider displays contextual information when the user hovers over ide
 
 | Element | Hover Shows |
 |---------|-------------|
-| Keywords | Description and usage example |
+| Keywords | Description |
 | Built-in Functions | Signature, parameters, return type, description |
-| Built-in Classes | Class name and description |
+| Built-in Classes | Class name with generic built-in class label |
 | Literals (`.T.`, `.F.`, `NIL`) | Description of the literal value |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | Description and usage |
 | User Procedures | Signature with parameters from `:PARAMETERS` |
-| Variables | Declaration location and type (if determinable) |
+| Variables | Declaration location and scope |
 
 ### 2.2 Hover Format
 
-Hover content is rendered as Markdown with code blocks:
+Hover content is rendered as Markdown text:
 
 ```markdown
-```ssl
-function SQLExecute(cSQL: String, cDSName: String): Dataset
-```
+**SQLExecute(commandString: variant, [friendlyName: variant], ...)**
 
-Executes a SQL statement and returns a dataset.
+Built-in SSL function
 
 **Parameters:**
-- `cSQL`: The SQL statement to execute
-- `cDSName`: The dataset name
+- `commandString`: The SQL command to execute
+- `friendlyName`: Optional logging/friendly name
+- `...`: Additional optional execution controls
 
-**Returns:** Dataset containing query results
+**Returns:** Variant result routed by SQLExecute
 ```
 
 ### 2.3 Hover Response Structure
@@ -51,10 +50,6 @@ Executes a SQL statement and returns a dataset.
   "contents": {
     "kind": "markdown",
     "value": "..."
-  },
-  "range": {
-    "start": { "line": 5, "character": 4 },
-    "end": { "line": 5, "character": 14 }
   }
 }
 ```
@@ -73,16 +68,14 @@ Executes a SQL statement and returns a dataset.
 
 ### 4.1 Case Insensitivity
 
-Hover lookup is case-insensitive:
+Hover lookup normalizes built-ins for convenience:
 - Hovering over `sqlexecute` shows info for `SQLExecute`
 
-### 4.2 Inside Strings - PARTIAL
+Valid SSL source still requires colon-prefixed uppercase keywords, while identifiers/functions remain case-insensitive and `.T.`, `.F.`, `NIL`, `Me`, `Base`, and `Constructor` are case-insensitive.
 
-**Current Behavior:** Hover may activate for identifiers inside strings.
+### 4.2 Inside Strings
 
-**Expected Behavior:** Hover should NOT show function info inside strings, EXCEPT for:
-- SQL placeholders (`?varName?`) - show variable info
-- Procedure names in `DoProc`/`ExecFunction` - show procedure info
+**Current Behavior:** General symbol hover is suppressed inside strings. The only supported string-context hover is SQL placeholder hover (`?varName?` or positional `?`).
 
 ### 4.3 Inside Comments
 
@@ -94,7 +87,7 @@ When hovering over `object:property`:
 - Hovering over `object` shows the variable's declaration
 - Hovering over `property` should show nothing (property info not available)
 
-### 4.5 The `Me` Keyword
+### 4.5 Class-Context Keywords
 
 Hovering over `Me` should show:
 ```markdown
@@ -103,13 +96,17 @@ Hovering over `Me` should show:
 Used within `:CLASS` blocks to access instance properties and methods.
 ```
 
+Hovering over `Base` shows that it refers to inherited members and must be used as `Base:Member`.
+
+Hovering over `Constructor` shows that it is the reserved constructor name inside `:CLASS`.
+
 ### 4.6 SQL Placeholders
 
-**Named Parameters (`?varName?`):**
+**Named Parameters (`?varName?`, `?oObj:Prop?`, `?aArr[i]?`, `?Func()?`):**
 
 Hovering over `?myVar?` inside a SQL string shows:
-- Parameter name and type (named parameter)
-- Variable declaration location (if found)
+- Parameter name and placeholder kind
+- Runtime substitution note
 
 **Positional Parameters (`?`):**
 
@@ -147,16 +144,14 @@ Hovering over `?` inside a SQL string shows:
 result := SQLExecute(query, "ds");
 /* Hover position: line 1, character 12 (over "SQLExecute");
 /* Expected:
-   ```ssl
-   function SQLExecute(cSQL: String, cDSName: String): Dataset
-   ```
-   Executes a SQL statement...
+   Markdown text beginning with the function label/signature for SQLExecute
+   followed by the built-in function description and parameter list
    
    **Parameters:**
-   - `cSQL`: ...
-   - `cDSName`: ...
+   - `commandString`: ...
+   - `friendlyName`: ...
    
-   **Returns:** Dataset
+   **Returns:** variant
 ;
 ```
 
@@ -164,7 +159,7 @@ result := SQLExecute(query, "ds");
 
 ```ssl
 /* Test: Hover over built-in class;
-obj := CreateUDObject("SSLExpando");
+obj := SSLExpando{};
 /* Hover position: over "SSLExpando";
 /* Expected: Description of SSLExpando class;
 ```
@@ -199,17 +194,10 @@ x := NIL;
 :PROCEDURE CalculateTotal;
 :PARAMETERS nPrice, nQuantity;
 :ENDPROC;
-
-:PROCEDURE Main;
-    CalculateTotal(10, 5);
-/* Hover position: over "CalculateTotal" on line 6;
+/* Hover position: over "CalculateTotal" on line 2;
 /* Expected:
-   ```ssl
-   procedure CalculateTotal(nPrice, nQuantity)
-   ```
-   Defined at line 1
+   Markdown text showing the procedure name, parameter list, and declaration location
 ;
-:ENDPROC;
 ```
 
 ### 6.7 Variable Hover
@@ -217,10 +205,10 @@ x := NIL;
 ```ssl
 /* Test: Hover over declared variable;
 :PROCEDURE Test;
-:DECLARE myCounter;
-x := myCounter + 1;
-/* Hover position: over "myCounter" on line 4;
-/* Expected: "myCounter - Declared at line 3";
+:DECLARE nCounter;
+x := nCounter + 1;
+/* Hover position: over "nCounter" on line 4;
+/* Expected: "nCounter - Declared at line 3";
 :ENDPROC;
 ```
 
@@ -231,10 +219,8 @@ x := myCounter + 1;
 DoProc("MyProcedure", {arg1, arg2});
 /* Hover position: over "DoProc";
 /* Expected:
-   ```ssl
-   function DoProc(cProcedureName: String, aArgs: Array): Any
-   ```
-   (First parameter is procedure name, not just "any[] args")
+   Markdown text showing the DoProc signature and noting that the second argument
+   is optional and should be omitted entirely when there are no parameters
 ;
 ```
 
@@ -261,16 +247,17 @@ sCustomer := "ACME";
 sSQL := "SELECT * FROM customers WHERE name = ?sCustomer?";
 /* Hover position: over "sCustomer" inside the ?...?;
 /* Expected:
-   **SQL Parameter:** `sCustomer` (named)
-   Declared at line 2
+   **SQL Parameter: sCustomer**
+   Named parameter placeholder
+   This placeholder will be replaced with the value of `sCustomer` at runtime.
 ;
 
 /* Test: Hover over positional SQL placeholder;
 RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
 /* Hover position: over second "?";
 /* Expected:
-   **SQL Placeholder** (positional)
-   Parameter position: 2
+   **SQL Parameter #2**
+   Positional parameter placeholder
 ;
 ```
 
@@ -280,8 +267,8 @@ RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| #30 | DoProc hover shows incorrect signature | To Verify |
-| #27 | SQL functions inside strings trigger hover | To Fix |
+| #30 | DoProc hover shows incorrect signature | Fixed |
+| #27 | SQL functions inside strings trigger hover | Fixed |
 | #15 | Hover for named SQL parameters | Fixed |
 | #13 | Hover for positional SQL placeholders | Fixed |
 | #37 | Unnecessary "Usage Frequency" line | Fixed |
@@ -296,11 +283,11 @@ Hover should respond within 50ms. Token lookup is O(n) where n is document lengt
 
 ### 8.2 Range Calculation
 
-The hover response includes a `range` indicating exactly which characters the hover applies to. This helps the editor highlight the hovered element.
+The current server returns hover contents without an explicit hover range.
 
 ### 8.3 Function Signature Database
 
-All 367 built-in functions have pre-defined signatures in `internal/constants/signatures.go` with:
+All 354 source-aligned built-in functions are exposed through the source-aligned inventory in `internal/constants/source_alignment.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
 - Function name
 - Parameter list (name, type, optional flag)
 - Return type

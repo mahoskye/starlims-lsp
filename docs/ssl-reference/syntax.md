@@ -12,7 +12,7 @@ All statements end with a semicolon, including comments:
 
 ```ssl
 x := 10;
-DoProc("MyProcedure", {});
+DoProc("MyProcedure");
 /* This comment also ends with semicolon;
 ```
 
@@ -29,7 +29,7 @@ Keywords are colon-prefixed and UPPERCASE:
 | `:IF`, `:ELSE`, `:ENDIF` | Conditional branching |
 | `:WHILE`, `:ENDWHILE` | While loop |
 | `:FOR`, `:TO`, `:STEP`, `:NEXT` | For loop |
-| `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:EXITCASE`, `:ENDCASE` | Switch statement |
+| `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:EXITCASE`, `:ENDCASE` | Multi-branch conditional block |
 | `:EXITFOR`, `:EXITWHILE`, `:LOOP` | Loop control |
 
 ### Error Handling Keywords
@@ -38,6 +38,7 @@ Keywords are colon-prefixed and UPPERCASE:
 |---------|---------|
 | `:TRY`, `:CATCH`, `:FINALLY`, `:ENDTRY` | Structured exception handling |
 | `:ERROR` | Legacy error handling marker |
+| `:RESUME` | Legacy resume-mode error handling keyword |
 
 ### Declaration Keywords
 
@@ -46,7 +47,7 @@ Keywords are colon-prefixed and UPPERCASE:
 | `:DECLARE` | Declare local variables |
 | `:PARAMETERS` | Declare procedure parameters |
 | `:DEFAULT` | Set parameter default values |
-| `:PUBLIC` | Declare global/public variables |
+| `:PUBLIC` | Declare global/public variables (legacy/shared-state pattern; discouraged in new code) |
 
 ### Procedure & Class Keywords
 
@@ -62,10 +63,10 @@ Keywords are colon-prefixed and UPPERCASE:
 
 | Keyword | Purpose |
 |---------|---------|
-| `:INCLUDE` | Include external script |
-| `:REGION`, `:ENDREGION` | Code organization regions |
-| `:BEGININLINECODE`, `:ENDINLINECODE` | Code organization (equivalent to REGION/ENDREGION) |
-| `:LABEL` | Define a label |
+| `:INCLUDE` | Include external script; keep includes at the top of the file |
+| `:REGION`, `:ENDREGION` | Legacy functional text-capture regions |
+| `:BEGININLINECODE`, `:ENDINLINECODE` | Legacy named inline-code storage blocks; `:BEGININLINECODE` must include a name |
+| `:LABEL` | Legacy Branch() target label |
 
 ---
 
@@ -101,19 +102,25 @@ SSL uses block comments that terminate with a semicolon:
 ### Declaration
 
 ```ssl
-:DECLARE myVariable;           /* Declare local variable;
-:DECLARE var1, var2, var3;     /* Multiple variables;
+:DECLARE sValue;               /* Declare local variable;
+:DECLARE sName, nCount, aRows; /* Multiple variables;
 
-:PARAMETERS param1, param2;    /* Procedure parameters;
-:DEFAULT param1, "default";    /* Default value (after :PARAMETERS only);
+:PARAMETERS sInput, nCount;    /* Procedure parameters;
+:DEFAULT sInput, "default";    /* Default value (after :PARAMETERS only);
 
-:PUBLIC globalVar;             /* Global/public scope;
+:PUBLIC gSharedValue;          /* Global/public scope (discouraged in new code);
 ```
+
+Placement rules:
+
+- Script-level `:PARAMETERS` must appear before top-level statements, though leading `:PROCEDURE` blocks may come first
+- Inside a procedure, `:PARAMETERS` must immediately follow `:PROCEDURE`
+- `:DEFAULT` must immediately follow `:PARAMETERS`
 
 ### Assignment
 
 ```ssl
-myVariable := "value";         /* Basic assignment;
+sValue := "value";             /* Basic assignment;
 nCount += 1;                   /* Add and assign;
 nCount -= 1;                   /* Subtract and assign;
 nCount *= 2;                   /* Multiply and assign;
@@ -140,8 +147,8 @@ nCount /= 2;                   /* Divide and assign;
 
 | Operator | Description |
 |----------|-------------|
-| `=` | Equality (loose for strings) |
-| `==` | Strict equality |
+| `=` | Equality (loose; prefix-style for strings) |
+| `==` | Strict equality (use for exact string equality) |
 | `!=` | Not equal |
 | `<>` | Not equal (alternative) |
 | `#` | Not equal (alternative) |
@@ -159,7 +166,12 @@ nCount /= 2;                   /* Divide and assign;
 | `*` | Multiplication |
 | `/` | Division |
 | `^` | Power (exponentiation) |
+| `**` | Power (alias for `^`) |
 | `%` | Modulo |
+| `++` | Increment |
+| `--` | Decrement |
+| `<<` | Bitwise left shift |
+| `>>` | Bitwise right shift |
 
 ### Logical Operators (Must Include Periods!)
 
@@ -207,6 +219,13 @@ s2 := 'single quotes';
 s3 := [bracket quotes];  /* Useful for SQL with embedded quotes;
 ```
 
+SSL does **not** have C-style escape sequences. Backslashes are literal characters, and a quote still closes the string:
+
+```ssl
+sPath := "C:\Temp\file.txt";
+sLiteral := "Backslash \";  /* Ends at the quote after the backslash;
+```
+
 Multi-line strings are supported:
 ```ssl
 sSQL := "SELECT *
@@ -222,6 +241,8 @@ n2 := 3.14;      /* Decimal;
 n3 := -5;        /* Negative;
 n4 := 1.2e-3;    /* Scientific notation;
 ```
+
+Scientific notation must include a decimal point before the exponent. For example, `1.2e-3` and `9.0E1` are valid, while `1e10`, `7e2`, and `.5e1` are not canonical SSL number forms.
 
 ### Boolean Literals
 
@@ -313,19 +334,23 @@ dDate := {2024, 12, 25, 14, 30, 0};  /* year, month, day, hour, min, sec;
 :NEXT;
 ```
 
-### CASE Statement (EXITCASE Required!)
+The `:FOR` start value, `:TO` limit, and optional `:STEP` value should be numeric. The LSP warns when those values can be inferred as non-numeric from literals, declared prefixes, straightforward assignments, constructors, or known built-in function returns.
+
+### CASE Statement (`:EXITCASE` Recommended)
+
+Without `:EXITCASE;`, later `:CASE` expressions are still evaluated and their bodies run if they also match. This is not C-style fall-through, but it can still execute multiple case blocks.
 
 ```ssl
 :BEGINCASE;
 :CASE nVal == 1;
-    DoOne();
-    :EXITCASE;  /* Required!;
+    sResult := "one";
+    :EXITCASE;
 :CASE nVal == 2;
-    DoTwo();
-    :EXITCASE;  /* Required!;
+    sResult := "two";
+    :EXITCASE;
 :OTHERWISE;
-    DoDefault();
-    :EXITCASE;  /* Required!;
+    sResult := "other";
+    :EXITCASE;
 :ENDCASE;
 ```
 
@@ -337,15 +362,15 @@ dDate := {2024, 12, 25, 14, 30, 0};  /* year, month, day, hour, min, sec;
 
 ```ssl
 :PROCEDURE MyProcedure;
-:PARAMETERS param1, param2;
-:DEFAULT param1, "default";
-:DEFAULT param2, 0;
-:DECLARE localVar;
+:PARAMETERS sParam1, nParam2;
+:DEFAULT sParam1, "default";
+:DEFAULT nParam2, 0;
+:DECLARE sLocalValue;
 
 /* Procedure body;
-localVar := param1 + LimsString(param2);
+sLocalValue := sParam1 + LimsString(nParam2);
 
-:RETURN localVar;
+:RETURN sLocalValue;
 :ENDPROC;
 ```
 
@@ -361,11 +386,17 @@ MyProcedure("test", 123);
 result := DoProc("MyProcedure", {"test", 123});
 
 /* CORRECT - different file;
-result := ExecFunction("Module.MyProcedure", {"test", 123});
+result := ExecFunction("Category.Script.Proc", {"test", 123});
+
+/* Preferred when there are no arguments;
+result := DoProc("MyProcedure");
+result := ExecFunction("Category.Script.Proc");
 
 /* Skip parameters with empty array slots;
-result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
+result := DoProc("MyProc", {sFirst,,nThird});  /* Skips param2;
 ```
+
+Inside class methods, call sibling and inherited methods with `Me:MethodName()` / `Base:MethodName()` instead of `DoProc(...)`.
 
 ---
 
@@ -387,6 +418,30 @@ result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
 :ENDTRY;
 ```
 
+`:TRY` bodies must contain at least one statement before `:CATCH` or `:FINALLY`, and `:FINALLY` blocks must not be empty.
+At least one of `:CATCH` or `:FINALLY` must be present. Only one `:CATCH` block is allowed, `:CATCH` does not name an exception variable, and `:RETURN`, `:EXITWHILE`, `:EXITFOR`, and `:LOOP` are compile-time errors inside `:FINALLY`.
+`:CATCH` must appear before `:FINALLY`.
+
+```ssl
+/* WRONG - :CATCH does not bind an exception variable;
+:CATCH oErr;
+
+/* CORRECT;
+:CATCH;
+    oErr := GetLastSSLError();
+```
+
+### ERROR/RESUME (Legacy)
+
+```ssl
+:ERROR;
+    oErr := GetLastSSLError();
+    UsrMes(oErr:Description, "Error");
+:RESUME;
+```
+
+Legacy `:ERROR` handlers apply to subsequent code in the current scope and must contain at least one statement. `:RESUME` switches execution into resume mode, which has significant runtime cost; prefer targeted `:TRY` / `:CATCH` / `:FINALLY` blocks in new or refactored code.
+
 ### Error Functions
 
 | Function | Description |
@@ -401,6 +456,8 @@ result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
 ## Property Access
 
 SSL uses colon notation for object properties and methods:
+
+Spaced member access forms such as `oObject : PropertyName` are accepted by the language, but style should prefer `oObject:PropertyName` with no spaces around the colon.
 
 ```ssl
 /* Read property;
@@ -418,6 +475,25 @@ sValue := oDataset:Fields("Name"):Value;
 
 ---
 
+## Branch Labels
+
+`Branch()` is a legacy control-flow function. Its string target must include the label token text, including the word `LABEL`:
+
+```ssl
+/* CORRECT - spaced label token text;
+:LABEL SKIP;
+Branch("LABEL SKIP");
+
+/* CORRECT - compact label token text;
+:LABELSKIP;
+Branch("LABELSKIP");
+
+/* WRONG - omitting LABEL causes a runtime failure;
+Branch("SKIP");
+```
+
+---
+
 ## Classes
 
 ### Class Definition
@@ -427,6 +503,15 @@ sValue := oDataset:Fields("Name"):Value;
 - There is NO `:ENDCLASS` keyword
 - The class scope extends from `:CLASS` to the end of the file
 - All procedures defined after `:CLASS` become methods of that class
+- Preferred member order is `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`
+- Bare and qualified `:INHERIT` names are both accepted
+- Without `:INHERIT`, a class inherits from `SSLObject` by default
+- `Constructor` is the reserved constructor method name inside a class, and `:RETURN` inside `Constructor` cannot return a value
+- Inside class methods, use `Me:MethodName()` / `Base:MethodName()` for sibling and inherited method calls
+- `Me` is only meaningful inside a `:CLASS` definition
+- `Base` must always be used as `Base:MemberName` and is only meaningful when the class declares `:INHERIT`
+- Underscore-prefixed members such as `_sInternal` follow the SSL private convention and are excluded from reflection
+- `/*@private;` and `/*@protected;` annotations apply to script procedures only; they do not change class-method visibility
 
 ```ssl
 :CLASS MyClass;
@@ -458,9 +543,12 @@ oRegex := SSLRegex{'\d+'};
 oCustom := CreateUdObject("MyClass");
 oCustom := CreateUdObject("MyClass", {param1, param2});
 
-/* Anonymous object;
+/* Empty dynamic object;
 oAnon := CreateUdObject();
 oAnon:Property := "value";
+
+/* Anonymous object with named properties;
+oSeeded := CreateUdObject({{"Property", "value"}});
 ```
 
 ---
@@ -470,8 +558,9 @@ oAnon:Property := "value";
 ### Regions
 
 ```ssl
-:REGION Database Operations;
-    /* Code here;
+/* Functional text-capture region (legacy);
+:REGION DataBlock;
+    Raw text content;
 :ENDREGION;
 
 /* IDE folding (comment-based);
@@ -480,8 +569,11 @@ oAnon:Property := "value";
 /* endregion;
 ```
 
+
 ### Includes
 
 ```ssl
-:INCLUDE "library-name";
+:INCLUDE File_Helpers.FileWork;
 ```
+
+Place `:INCLUDE` directives at the top of the file, after any header comments, so dependencies are easy to find.

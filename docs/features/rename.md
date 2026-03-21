@@ -23,13 +23,13 @@ The following symbols cannot be renamed:
 | Symbol Type | Reason |
 |-------------|--------|
 | Keywords (`:IF`, `:WHILE`, etc.) | Language constructs |
-| Built-in functions (`Len`, `Trim`, etc.) | 367 built-in functions |
-| Built-in classes (`CDataTable`, etc.) | 30 built-in classes |
+| Built-in functions (`Len`, `Trim`, etc.) | 354 source-aligned built-in functions |
+| Built-in classes (`SSLDataset`, `CDataTable`, etc.) | 21 source-aligned built-in classes |
 | Literals (`.T.`, `.F.`, `NIL`) | Language constants |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | Language operators |
 | `Me` keyword | Self-reference in classes |
-| Content inside strings | String literals preserved |
-| Content inside comments | Comments preserved |
+| Content inside strings | You cannot start rename from inside a string literal |
+| Content inside comments | You cannot start rename from inside a comment |
 
 ## How It Works
 
@@ -110,7 +110,7 @@ Most LSP-compatible editors support rename via:
 ```ssl
 :PROCEDURE ProcessData;
 :DECLARE sOutput;
-sOutput := Transform(input);
+sOutput := Upper(sInput);
 :RETURN sOutput;
 :ENDPROC;
 ```
@@ -119,21 +119,17 @@ sOutput := Transform(input);
 ```ssl
 :PROCEDURE ProcessData;
 :DECLARE sResult;
-sResult := Transform(input);
+sResult := Upper(sInput);
 :RETURN sResult;
 :ENDPROC;
 ```
 
-### Renaming a Procedure
+### Renaming a Procedure Declaration
 
 **Before:**
 ```ssl
 :PROCEDURE CalcTotal;
 :RETURN 100;
-:ENDPROC;
-
-:PROCEDURE Main;
-x := CalcTotal();
 :ENDPROC;
 ```
 
@@ -142,11 +138,9 @@ x := CalcTotal();
 :PROCEDURE CalculateTotal;
 :RETURN 100;
 :ENDPROC;
-
-:PROCEDURE Main;
-x := CalculateTotal();
-:ENDPROC;
 ```
+
+Valid runtime dispatch still uses `DoProc("CalcTotal")` or `ExecFunction(...)`, and those string targets are not rewritten by the current rename provider.
 
 ## Known Limitations
 

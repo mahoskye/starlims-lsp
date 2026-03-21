@@ -2,7 +2,7 @@
 
 This document provides a quick overview of all LSP features and their current implementation status.
 
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-03-21
 
 ---
 
@@ -23,16 +23,16 @@ This document provides a quick overview of all LSP features and their current im
 
 | Feature | Status | Gaps/Notes |
 |---------|--------|------------|
-| [Completion](./features/completion.md) | IMPLEMENTED | Context-aware, excludes strings/comments |
+| [Completion](./features/completion.md) | IMPLEMENTED | Broad symbol/snippet list, excludes strings/comments, class-aware procedure dispatch snippets |
 | [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword and SQL placeholders |
-| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 367 built-in functions + user procedures |
+| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 354 source-aligned built-in functions and dispatch helpers such as `DoProc` / `ExecFunction` |
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Rename](./features/rename.md) | IMPLEMENTED | Single-file, scope-aware, validates new name |
 | [Inlay Hints](./features/inlay-hints.md) | IMPLEMENTED | Parameter name hints for function calls |
-| [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: regions contain procedures |
+| [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: comment regions contain procedures |
 | [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
-| [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, regions, comments, control flow blocks |
+| [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, comment regions, comments, control flow blocks |
 | [Formatting](./features/formatting.md) | IMPLEMENTED | SSL + embedded SQL |
 | [Diagnostics](./features/diagnostics.md) | IMPLEMENTED | Full diagnostic suite with opt-in checks |
 | [Snippets](./features/snippets.md) | IMPLEMENTED | 25+ code templates |
@@ -51,7 +51,6 @@ This document provides a quick overview of all LSP features and their current im
 |---------|--------|
 | `textDocument/codeAction` | No quick fixes defined |
 | `textDocument/codeLens` | Not needed for SSL |
-| `textDocument/inlayHint` | IMPLEMENTED |
 | `textDocument/semanticTokens` | Future enhancement |
 | `callHierarchy/*` | Future enhancement |
 
@@ -64,9 +63,11 @@ This document provides a quick overview of all LSP features and their current im
 | Unclosed blocks | IMPLEMENTED | `:IF` without `:ENDIF`, etc. |
 | Unmatched delimiters | IMPLEMENTED | `(`, `[`, `{` matching |
 | Block depth exceeded | IMPLEMENTED | Configurable max depth |
-| Missing EXITCASE | IMPLEMENTED | SSL-specific requirement |
+| Missing EXITCASE | IMPLEMENTED | Style-guide warning for `:CASE` / `:OTHERWISE` blocks |
 | Bare logical operators | IMPLEMENTED | `AND` vs `.AND.` |
 | DEFAULT on DECLARE | IMPLEMENTED | Common SSL mistake |
+| CATCH clause form | IMPLEMENTED | `:CATCH` cannot name an exception variable |
+| Branch target labels | IMPLEMENTED | Literal `Branch("...")` targets must include `LABEL` |
 | Global assignment | IMPLEMENTED | Protect configured globals |
 | Hungarian notation | IMPLEMENTED | Optional style check |
 | Undeclared variables | IMPLEMENTED | Disabled by default (opt-in) |
@@ -84,16 +85,17 @@ These diagnostics detect common SSL mistakes documented in [gotchas.md](./ssl-re
 | #3 | `:DEFAULT` with `:DECLARE` | IMPLEMENTED |
 | #4 | Bare logical operators | IMPLEMENTED |
 | #5 | Zero-based array indexing | IMPLEMENTED |
-| #6 | Semicolon in comments | PARTIAL (Issue #52) |
+| #6 | Semicolon in comments | PARTIAL (same-line trailing-code heuristic) |
 | #7 | Named SQL params in wrong functions | IMPLEMENTED |
 | #8 | Dot property notation | IMPLEMENTED |
 | #9 | Assignment in conditions | IMPLEMENTED |
-| #10 | Loose string equality | NOT IMPLEMENTED |
-| #11 | NIL vs Empty | NOT IMPLEMENTED |
+| #10 | Loose string equality | IMPLEMENTED (conservative inferred-type coverage) |
+| #11 | NIL vs Empty | IMPLEMENTED (conservative inferred-type coverage) |
 | #12 | Lowercase keywords | IMPLEMENTED (parser) |
 | #13 | Property as undeclared | IMPLEMENTED |
-| #14 | Str() vs LimsString() | NOT IMPLEMENTED |
+| #14 | `Str()` vs `LimsString()` | REFERENCE ONLY |
 | #15 | Parentheses for class instantiation | IMPLEMENTED |
+| Branch label token text | IMPLEMENTED | Literal `Branch("...")` targets must include `LABEL` |
 
 ### Known Diagnostic Gaps
 
@@ -136,14 +138,14 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 | Category | Count | Status |
 |----------|-------|--------|
-| Keywords | 37 | IMPLEMENTED |
-| Built-in Functions | 367 | IMPLEMENTED |
-| Built-in Classes | 30 | IMPLEMENTED |
+| Keywords | 38 | IMPLEMENTED |
+| Built-in Functions | 354 | IMPLEMENTED |
+| Built-in Classes | 21 | IMPLEMENTED |
 | Literals (`.T.`, `.F.`, `NIL`) | 3 | IMPLEMENTED |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | 3 | IMPLEMENTED |
 | Snippets | 25+ | IMPLEMENTED |
 | Procedures (current document) | Dynamic | IMPLEMENTED |
-| Variables (current scope) | Dynamic | IMPLEMENTED |
+| Variables (current document) | Dynamic | IMPLEMENTED |
 | Custom Functions | - | NOT SUPPORTED |
 | Custom Classes | - | NOT SUPPORTED |
 
@@ -184,19 +186,19 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Config Path | Status | Default |
 |-------------|--------|---------|
 | `ssl.format.indentStyle` | IMPLEMENTED | `"tab"` |
-| `ssl.format.indentSize` | IMPLEMENTED | `4` |
+| `ssl.format.indentSize` | IMPLEMENTED | `4` (space mode only; tabs remain the default style) |
 | `ssl.format.maxLineLength` | IMPLEMENTED | `90` |
 | `ssl.format.operatorSpacing` | IMPLEMENTED | `true` |
 | `ssl.format.commaSpacing` | IMPLEMENTED | `true` |
 | `ssl.format.semicolonEnforcement` | IMPLEMENTED | `true` |
 | `ssl.format.blankLinesBetweenProcs` | IMPLEMENTED | `1` |
 | `ssl.format.sql.enabled` | IMPLEMENTED | `true` |
-| `ssl.format.sql.style` | IMPLEMENTED | `"standard"` |
+| `ssl.format.sql.style` | IMPLEMENTED | `"canonicalCompact"` |
 | `ssl.format.sql.keywordCase` | IMPLEMENTED | `"upper"` |
 | `ssl.format.sql.detectSQLStrings` | IMPLEMENTED | `true` |
 | `ssl.diagnostics.hungarianNotation` | IMPLEMENTED | `false` |
-| `ssl.diagnostics.hungarianPrefixes` | IMPLEMENTED | `["a","b","d","n","o","s"]` |
-| `ssl.diagnostics.globals` | PARTIAL | `[]` |
+| `ssl.diagnostics.hungarianPrefixes` | IMPLEMENTED | `["a","b","d","fn","n","o","s","v"]` |
+| `ssl.diagnostics.globals` | IMPLEMENTED | `[]` |
 
 ---
 
@@ -220,8 +222,8 @@ The following behaviors are handled when undeclared variable checking is enabled
 - See [gotchas.md](./ssl-reference/gotchas.md) for full list
 
 ### v1.5 (In Progress)
-- Type inference system
-- Class member metadata (properties/methods for 30 SSL classes)
+- Conservative local type inference for diagnostics implemented
+- Class member metadata (properties/methods for 21 source-aligned built-in classes)
 - Member completion after `object:`
 
 ### v2.0 (Future)

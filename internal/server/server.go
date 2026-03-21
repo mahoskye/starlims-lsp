@@ -27,6 +27,7 @@ type DiagnosticsSettings struct {
 	HungarianNotation *bool     `json:"hungarianNotation"`
 	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
 	Globals           *[]string `json:"globals"`
+	MaxBlockDepth     *int      `json:"maxBlockDepth"`
 }
 
 // InlayHintsSettings represents inlay hint settings from the client.
@@ -315,6 +316,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
+		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)
 	}
 
 	// Apply inlay hints settings

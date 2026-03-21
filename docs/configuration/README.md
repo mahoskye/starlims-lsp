@@ -29,4 +29,6 @@ This directory contains configuration documentation for the SSL Language Server.
 }
 ```
 
+`indentStyle: "tab"` matches the source guide. `indentSize` only applies when `indentStyle` is `"space"`; the default `4` is the fallback space width, while tab-indented SSL code uses one tab per indentation level.
+
 See [CONFIGURATION.md](CONFIGURATION.md) for the complete reference.

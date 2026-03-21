@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"fmt"
 	"strings"
 
 	"starlims-lsp/internal/constants"
@@ -131,9 +130,13 @@ func GetSignatureHelpFromTokens(tokens []lexer.Token, line, column int) *Signatu
 	return GetSignatureHelpWithProcedures(tokens, nil, line, column)
 }
 
-// GetSignatureHelpWithProcedures returns signature help, checking both built-in functions
-// and user-defined procedures from the current document.
+// GetSignatureHelpWithProcedures returns signature help for built-in SSL functions.
+// The procedures parameter is accepted for API compatibility, but user-defined
+// procedures are intentionally excluded because SSL runtime dispatch uses
+// DoProc/ExecFunction rather than direct custom procedure calls.
 func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.ProcedureInfo, line, column int) *SignatureHelp {
+	_ = procedures
+
 	// Find the function call context from tokens
 	funcName, activeParam := findFunctionContextFromTokens(tokens, line, column)
 	if funcName == "" {
@@ -156,51 +159,7 @@ func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.Pr
 		}
 	}
 
-	// Not a built-in function, check user-defined procedures
-	if procedures != nil {
-		for _, proc := range procedures {
-			if strings.EqualFold(proc.Name, funcName) {
-				return buildProcedureSignatureHelp(proc, activeParam)
-			}
-		}
-	}
-
 	return nil
-}
-
-// buildProcedureSignatureHelp creates signature help from a user-defined procedure.
-func buildProcedureSignatureHelp(proc parser.ProcedureInfo, activeParam int) *SignatureHelp {
-	// Build parameter list for label
-	paramLabels := make([]string, len(proc.Parameters))
-	params := make([]ParameterInformation, len(proc.Parameters))
-
-	for i, paramName := range proc.Parameters {
-		paramLabels[i] = paramName
-		params[i] = ParameterInformation{
-			Label:         paramName,
-			Documentation: fmt.Sprintf("Parameter `%s`", paramName),
-		}
-	}
-
-	// Build the signature label: ProcName(param1, param2, ...)
-	var label string
-	if len(paramLabels) > 0 {
-		label = fmt.Sprintf("%s(%s)", proc.Name, strings.Join(paramLabels, ", "))
-	} else {
-		label = fmt.Sprintf("%s()", proc.Name)
-	}
-
-	return &SignatureHelp{
-		Signatures: []SignatureInformation{
-			{
-				Label:         label,
-				Documentation: fmt.Sprintf("User-defined procedure `%s`", proc.Name),
-				Parameters:    params,
-			},
-		},
-		ActiveSignature: 0,
-		ActiveParameter: activeParam,
-	}
 }
 
 // findFunctionContextFromTokens finds function context using tokens.

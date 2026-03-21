@@ -1,393 +1,191 @@
 # SSL Grammar Reference
 
-This document provides the formal SSL grammar specification in EBNF notation.
+This document is a source-aligned summary of the SSL v11 grammar used by the LSP.
+
+**Authority:** `dev/ssl-style-guide/ssl-style-guide/ssl-ebnf-grammar.md` is the canonical grammar. When this summary lags, the source file wins.
 
 ---
 
-## Grammar Overview
-
-SSL grammar follows a structured format with distinct productions for statements, expressions, and declarations.
-
-### Top-Level Structure
+## Top-Level Structure
 
 ```ebnf
-program = { statement } ;
+Program ::= ClassDefinition | {Statement}
 
-statement = procedure_declaration
-          | class_declaration
-          | variable_declaration
-          | control_statement
-          | expression_statement
-          | return_statement ;
+Statement ::= (
+    ProcedureStatement |
+    ConditionalStatement |
+    LoopStatement |
+    SwitchStatement |
+    ErrorHandlingStatement |
+    ErrorBlockStanza |
+    DeclarationStatement |
+    LogicStatement |
+    CommentStatement |
+    LabelStatement |
+    RegionBlock |
+    InlineCodeBlock |
+    BranchStatement |
+    DatabaseStatement
+) ";"
+```
+
+Key implications:
+- A file is either a `:CLASS` file or a script.
+- There is no `:ENDCLASS`; class scope extends to end of file.
+- Legacy constructs such as `:REGION`, `:BEGININLINECODE`, `:ERROR`, and `:RESUME` still exist in the broader syntax surface even though new code should usually avoid them.
+
+---
+
+## Classes And Procedures
+
+```ebnf
+ClassDefinition ::= ClassDeclaration [InheritStatement] {ClassMember}
+ClassDeclaration ::= ":" "CLASS" [Identifier]
+InheritStatement ::= ":" "INHERIT" Identifier
+ClassMember ::= ClassFieldDeclaration | MethodDeclaration
+ClassFieldDeclaration ::= ":" "DECLARE" IdentifierList
+MethodDeclaration ::= ProcedureStatement
+
+ProcedureStatement ::= ProcedureStart [ParameterDeclaration] [DefaultParameterDeclaration] {Statement} ProcedureEnd
+ProcedureStart ::= ":" "PROCEDURE" Identifier
+ProcedureEnd ::= ":" "ENDPROC"
+
+ParameterDeclaration ::= ":" "PARAMETERS" ParameterList
+DefaultParameterDeclaration ::= ":" "DEFAULT" DefaultParameterList
+ParameterList ::= Identifier {"," Identifier}
+DefaultParameterList ::= Identifier "," Expression
+```
+
+Source-aligned notes:
+- Inside a procedure, `:PARAMETERS` must appear immediately after `:PROCEDURE`.
+- `:DEFAULT` must immediately follow `:PARAMETERS`.
+- Inside `:CLASS`, `Constructor` is the reserved constructor procedure name.
+
+---
+
+## Control Flow
+
+```ebnf
+ConditionalStatement ::= IfStatement | ElseStatement | EndIfStatement
+IfStatement ::= ":" "IF" Expression
+ElseStatement ::= ":" "ELSE"
+EndIfStatement ::= ":" "ENDIF"
+
+LoopStatement ::= WhileLoop | ForLoop | ExitWhileStatement | ExitForStatement | LoopContinue
+WhileLoop ::= WhileStatement {Statement} EndWhileStatement
+WhileStatement ::= ":" "WHILE" Expression
+EndWhileStatement ::= ":" "ENDWHILE"
+ExitWhileStatement ::= ":" "EXITWHILE"
+
+ForLoop ::= ForStatement {Statement} NextStatement
+ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression [":" "STEP" Expression]
+NextStatement ::= ":" "NEXT"
+ExitForStatement ::= ":" "EXITFOR"
+LoopContinue ::= ":" "LOOP"
 ```
 
 ---
 
-## Declarations
-
-### Procedure Declaration
+## CASE Blocks
 
 ```ebnf
-procedure_declaration = ":PROCEDURE" identifier ";"
-                       [ parameters_clause ]
-                       [ defaults_clause ]
-                       [ declare_clause ]
-                       { statement }
-                       [ return_statement ]
-                       ":ENDPROC" ";" ;
-
-parameters_clause = ":PARAMETERS" parameter_list ";" ;
-parameter_list = identifier { "," identifier } ;
-
-defaults_clause = { ":DEFAULT" identifier "," expression ";" } ;
-
-declare_clause = ":DECLARE" identifier_list ";" ;
-identifier_list = identifier { "," identifier } ;
+SwitchStatement ::= BeginCaseStatement CaseBlock {CaseBlock} [OtherwiseBlock] EndCaseStatement
+BeginCaseStatement ::= ":" "BEGINCASE"
+CaseBlock ::= CaseStatement {Statement} [ExitCaseStatement]
+CaseStatement ::= ":" "CASE" Expression
+OtherwiseBlock ::= OtherwiseStatement {Statement}
+OtherwiseStatement ::= ":" "OTHERWISE"
+EndCaseStatement ::= ":" "ENDCASE"
+ExitCaseStatement ::= ":" "EXITCASE"
 ```
 
-### Class Declaration
-
-```ebnf
-class_declaration = ":CLASS" identifier ";"
-                   [ ":INHERIT" identifier ";" ]
-                   { declare_clause }
-                   { procedure_declaration } ;
-```
-
-### Variable Declaration
-
-```ebnf
-variable_declaration = ":DECLARE" identifier_list ";"
-                     | ":PUBLIC" identifier_list ";" ;
-```
+Important behavior:
+- `:BEGINCASE` is not a value-switch; each `:CASE` evaluates its own boolean expression.
+- Without `:EXITCASE;`, later matching `:CASE` bodies may also run.
+- `:BEGINCASE` requires at least one `:CASE`.
 
 ---
 
-## Control Statements
-
-### Conditional
+## TRY, CATCH, FINALLY
 
 ```ebnf
-if_statement = ":IF" expression ";"
-               { statement }
-               [ ":ELSE" ";" { statement } ]
-               ":ENDIF" ";" ;
+ErrorHandlingStatement ::= TryBlock
+TryBlock ::= TryStatement Statement {Statement} (CatchBlock [FinallyBlock] | FinallyBlock) EndTryStatement
+TryStatement ::= ":" "TRY"
+CatchBlock ::= CatchStatement {Statement}
+CatchStatement ::= ":" "CATCH"
+FinallyBlock ::= FinallyStatement Statement {Statement}
+FinallyStatement ::= ":" "FINALLY"
+EndTryStatement ::= ":" "ENDTRY"
+
+ErrorBlockStanza ::= ErrorMarker {Statement}
+ErrorMarker ::= ":" "ERROR"
 ```
 
-### Loops
+Important behavior:
+- `:TRY` must contain at least one statement before `:CATCH` or `:FINALLY`.
+- At least one of `:CATCH` or `:FINALLY` is required.
+- `:CATCH` does not declare an exception variable; use `GetLastSSLError()` in the catch body.
+- `:FINALLY` must contain at least one statement.
+- `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` are compile-time errors inside `:FINALLY`.
+- `:ERROR` is a legacy handler form and must contain at least one statement before `:RESUME` or the end of the current scope.
+
+---
+
+## Legacy Text-Capture Constructs
 
 ```ebnf
-while_statement = ":WHILE" expression ";"
-                  { statement }
-                  ":ENDWHILE" ";" ;
+RegionBlock ::= RegionStart {Character} RegionEnd
+RegionStart ::= ":" "REGION" Identifier ";"
+RegionEnd ::= ":" "ENDREGION" ";"
 
-for_statement = ":FOR" identifier ":=" expression
-                ":TO" expression
-                [ ":STEP" expression ]
-                ";"
-                { statement }
-                ":NEXT" ";" ;
+InlineCodeBlock ::= InlineCodeStart {Statement} InlineCodeEnd
+InlineCodeStart ::= ":" "BEGININLINECODE" [StringLiteral | Identifier] ";"
+InlineCodeEnd ::= ":" "ENDINLINECODE" ";"
+
+LabelStatement ::= ":" "LABEL" Identifier
+BranchStatement ::= Identifier "(" StringLiteral ")"
 ```
 
-### Case Statement
-
-```ebnf
-case_statement = ":BEGINCASE" ";"
-                 { case_clause }
-                 [ otherwise_clause ]
-                 ":ENDCASE" ";" ;
-
-case_clause = ":CASE" expression ";"
-              { statement }
-              ":EXITCASE" ";" ;
-
-otherwise_clause = ":OTHERWISE" ";"
-                   { statement }
-                   ":EXITCASE" ";" ;
-```
-
-### Error Handling
-
-```ebnf
-try_statement = ":TRY" ";"
-                { statement }
-                ":CATCH" ";"
-                { statement }
-                [ ":FINALLY" ";" { statement } ]
-                ":ENDTRY" ";" ;
-```
-
-### Loop Control
-
-```ebnf
-loop_control = ":EXITFOR" ";"
-             | ":EXITWHILE" ";"
-             | ":LOOP" ";" ;
-```
+Source-aligned notes:
+- `:REGION` / `:ENDREGION` store raw text and are not modern editor-folding markers.
+- `:BEGININLINECODE` must include a name.
+- `Branch()` targets must include the label token text, such as `"LABEL SKIP"` or `"LABELSKIP"`.
 
 ---
 
 ## Expressions
 
-### Operator Precedence (Lowest to Highest)
-
 ```ebnf
-expression = logical_or ;
+Assignment ::= (VariableAccess | PropertyAccess) AssignmentOperator Expression
+AssignmentOperator ::= ":=" | "+=" | "-=" | "*=" | "/=" | "^=" | "%="
 
-logical_or = logical_and { ".OR." logical_and } ;
-
-logical_and = comparison { ".AND." comparison } ;
-
-comparison = addition { comparison_op addition } ;
-
-comparison_op = "=" | "==" | "!=" | "<>" | "#" | "<" | ">" | "<=" | ">=" ;
-
-addition = multiplication { ("+" | "-") multiplication } ;
-
-multiplication = power { ("*" | "/" | "%") power } ;
-
-power = unary { "^" unary } ;
-
-unary = [ ".NOT." | "!" | "-" ] postfix ;
-
-postfix = primary { index_access | property_access | method_call } ;
-
-index_access = "[" expression { "," expression } "]" ;
-
-property_access = ":" identifier ;
-
-method_call = ":" identifier "(" [ argument_list ] ")" ;
+FunctionCall ::= DirectFunctionCall | IndirectFunctionCall
+DirectFunctionCall ::= Identifier "(" [ArgumentList] ")"
+IndirectFunctionCall ::= Identifier "(" StringLiteral "," ArrayLiteral ")"
+ArgumentList ::= Expression {"," Expression}
 ```
 
-### Primary Expressions
-
-```ebnf
-primary = literal
-        | identifier
-        | function_call
-        | "(" expression ")"
-        | array_literal
-        | code_block ;
-
-function_call = identifier "(" [ argument_list ] ")" ;
-
-argument_list = expression { "," expression } ;
-
-array_literal = "{" [ expression { "," expression } ] "}" ;
-
-code_block = "{" "|" parameter_list "|" expression "}" ;
-```
+Source-aligned notes:
+- Built-in functions use normal call syntax.
+- Custom procedures are not called directly; use `DoProc(...)` / `ExecFunction(...)`, or `Me:Method()` / `Base:Method()` inside classes.
+- Property and method access use colon notation, not dot notation.
 
 ---
 
-## Literals
+## Literals And Core Tokens
 
 ```ebnf
-literal = string_literal
-        | numeric_literal
-        | boolean_literal
-        | nil_literal
-        | date_literal ;
-
-string_literal = '"' { character } '"'
-               | "'" { character } "'"
-               | "[" { character } "]" ;
-
-numeric_literal = digit { digit } [ "." digit { digit } ]
-                | digit { digit } "." digit { digit } "e" [ "+" | "-" ] digit { digit } ;
-
-boolean_literal = ".T." | ".F." ;
-
-nil_literal = "NIL" ;
-
-date_literal = "{" year "," month "," day [ "," hour "," minute "," second ] "}" ;
+StringLiteral ::= '"' {Character} '"' | "'" {Character} "'" | "[" {Character} "]"
+BooleanLiteral ::= ".T." | ".F."
+NilLiteral ::= "NIL"
+ArrayLiteral ::= "{" [Expression {"," Expression}] "}"
+DateLiteral ::= "{" year "," month "," day [ "," hour "," minute "," second ] "}"
+DatabaseParameter ::= "?" Identifier "?" | "?"
 ```
 
----
-
-## Tokens
-
-### Keywords (37 Total)
-
-All keywords are colon-prefixed and case-sensitive (UPPERCASE):
-
-**Conditional:**
-```
-:IF, :ELSE, :ENDIF
-```
-
-**Loops:**
-```
-:FOR, :NEXT, :TO, :STEP
-:WHILE, :ENDWHILE
-:EXITFOR, :EXITWHILE, :LOOP
-```
-
-**Switch/Case:**
-```
-:BEGINCASE, :CASE, :ENDCASE, :OTHERWISE, :EXITCASE
-```
-
-**Exception Handling:**
-```
-:TRY, :CATCH, :FINALLY, :ENDTRY
-:ERROR
-```
-
-**Procedures:**
-```
-:PROCEDURE, :ENDPROC
-:RETURN
-```
-
-**Declarations:**
-```
-:DECLARE, :PARAMETERS, :DEFAULT, :PUBLIC
-```
-
-**Code Organization:**
-```
-:LABEL, :INCLUDE
-:REGION, :ENDREGION
-:BEGININLINECODE, :ENDINLINECODE
-```
-
-**Object-Oriented:**
-```
-:CLASS, :INHERIT
-```
-
-**Note:** `:BEGININLINECODE` and `:ENDINLINECODE` are equivalent to `:REGION` and `:ENDREGION` — they serve as organizational markers for code folding.
-
-**Note:** There is NO `:ENDCLASS` keyword. A file can contain only one `:CLASS` declaration, and the class scope extends from `:CLASS` to the end of the file.
-
-### Operators
-
-**Assignment:**
-```
-:=   Assignment
-+=   Add and assign
--=   Subtract and assign
-*=   Multiply and assign
-/=   Divide and assign
-^=   Power and assign
-%=   Modulo and assign
-```
-
-**Comparison:**
-```
-=    Equality (loose for strings)
-==   Strict equality
-!=   Not equal
-<>   Not equal
-#    Not equal
-<    Less than
->    Greater than
-<=   Less or equal
->=   Greater or equal
-```
-
-**Arithmetic:**
-```
-+    Addition / concatenation
--    Subtraction / negation
-*    Multiplication
-/    Division
-^    Power
-%    Modulo
-```
-
-**Logical (must include periods):**
-```
-.AND.   Logical AND
-.OR.    Logical OR
-.NOT.   Logical NOT
-!       Negation (alternative)
-```
-
-**String:**
-```
-+    Concatenation
-$    Contains
-```
-
-**Other:**
-```
-:    Property/method access
-[]   Array indexing
-{}   Array literal / object instantiation
-()   Function call / grouping
-```
-
----
-
-## Identifier Rules
-
-```ebnf
-identifier = letter { letter | digit | "_" } ;
-
-letter = "A" | "B" | ... | "Z" | "a" | "b" | ... | "z" ;
-
-digit = "0" | "1" | ... | "9" ;
-```
-
-- Identifiers are case-insensitive
-- Cannot start with a digit
-- Cannot be a reserved keyword
-- Recommended: Hungarian notation prefixes (`s`, `n`, `b`, `d`, `a`, `o`)
-
----
-
-## Comments
-
-```ebnf
-comment = "/*" { any_character_except_semicolon } ";" ;
-```
-
-Comments start with `/*` and end at the first semicolon.
-
----
-
-## Statement Termination
-
-All statements (including comments) must end with a semicolon:
-
-```ebnf
-statement_terminator = ";" ;
-```
-
----
-
-## Special Syntax
-
-### SQL Parameter Placeholders
-
-**Named (SQLExecute only):**
-```
-?variableName?
-```
-
-**Positional (RunSQL, LSearch, etc.):**
-```
-?
-```
-
-### Object Instantiation
-
-**Built-in classes:**
-```ebnf
-class_instantiation = class_name "{" [ argument_list ] "}" ;
-```
-
-**User-defined objects:**
-```ebnf
-udo_creation = "CreateUdObject" "(" [ string_literal [ "," array_literal ] ] ")" ;
-```
-
----
-
-## Machine-Readable Grammar
-
-For parser implementation, see:
-
-**LSP Parser:** `internal/parser/parser.go`
+Key language facts:
+- Arrays are 1-based.
+- Comments use `/* ... ;` and end at the first semicolon.
+- Keywords are colon-prefixed and case-sensitive uppercase.
+- Identifiers and function names are case-insensitive.

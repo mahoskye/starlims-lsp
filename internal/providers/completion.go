@@ -187,7 +187,7 @@ func GetOperatorCompletions() []CompletionItem {
 }
 
 // GetProcedureCompletions returns procedure completions from the current document.
-func GetProcedureCompletions(procedures []parser.ProcedureInfo) []CompletionItem {
+func GetProcedureCompletions(procedures []parser.ProcedureInfo, classMethodContext bool) []CompletionItem {
 	var items []CompletionItem
 	for _, proc := range procedures {
 		paramsDoc := "*No parameters*"
@@ -195,19 +195,49 @@ func GetProcedureCompletions(procedures []parser.ProcedureInfo) []CompletionItem
 			paramsDoc = fmt.Sprintf("**Parameters:** %s", strings.Join(proc.Parameters, ", "))
 		}
 
-		doc := fmt.Sprintf("**Procedure:** %s\n\n%s\n\n**Location:** Line %d-%d",
-			proc.Name, paramsDoc, proc.StartLine, proc.EndLine)
+		dispatchDoc := "Use `DoProc(...)` for same-file script procedures, or `ExecFunction(...)` for external script procedures."
+		if classMethodContext {
+			dispatchDoc = "Inside `:CLASS` methods, call sibling or inherited members with `Me:MethodName(...)` or `Base:MethodName(...)`."
+		}
+
+		doc := fmt.Sprintf("**Procedure:** %s\n\n%s\n\n%s\n\n**Location:** Line %d-%d",
+			proc.Name, paramsDoc, dispatchDoc, proc.StartLine, proc.EndLine)
 
 		items = append(items, CompletionItem{
 			Label:            proc.Name,
 			Kind:             CompletionKindFunction,
 			Detail:           fmt.Sprintf("Procedure (line %d)", proc.StartLine),
 			Documentation:    doc,
-			InsertText:       proc.Name,
-			InsertTextFormat: InsertTextFormatPlainText,
+			InsertText:       buildProcedureDispatchSnippet(proc, classMethodContext),
+			InsertTextFormat: InsertTextFormatSnippet,
 		})
 	}
 	return items
+}
+
+func buildProcedureDispatchSnippet(proc parser.ProcedureInfo, classMethodContext bool) string {
+	callTarget := "DoProc"
+	if classMethodContext {
+		callTarget = "Me:" + proc.Name
+	}
+
+	if len(proc.Parameters) == 0 {
+		if classMethodContext {
+			return fmt.Sprintf(`%s()`, callTarget)
+		}
+		return fmt.Sprintf(`DoProc("%s")`, proc.Name)
+	}
+
+	placeholders := make([]string, 0, len(proc.Parameters))
+	for i, param := range proc.Parameters {
+		placeholders = append(placeholders, fmt.Sprintf("${%d:%s}", i+1, param))
+	}
+
+	if classMethodContext {
+		return fmt.Sprintf(`%s(%s)`, callTarget, strings.Join(placeholders, ", "))
+	}
+
+	return fmt.Sprintf(`DoProc("%s", {%s})`, proc.Name, strings.Join(placeholders, ", "))
 }
 
 // GetVariableCompletions returns variable completions from the current document.
@@ -227,14 +257,42 @@ func GetVariableCompletions(variables []parser.VariableInfo) []CompletionItem {
 }
 
 // GetAllCompletions returns all completions.
-func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo) []CompletionItem {
+func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, classMethodContext bool) []CompletionItem {
 	var items []CompletionItem
 	items = append(items, GetKeywordCompletions()...)
 	items = append(items, GetFunctionCompletions()...)
 	items = append(items, GetClassCompletions()...)
 	items = append(items, GetLiteralCompletions()...)
+	if classMethodContext {
+		items = append(items,
+			CompletionItem{
+				Label:            "Me",
+				Kind:             CompletionKindKeyword,
+				Detail:           "Class Self Reference",
+				Documentation:    "Refers to the current object instance inside a `:CLASS` method.",
+				InsertText:       "Me",
+				InsertTextFormat: InsertTextFormatPlainText,
+			},
+			CompletionItem{
+				Label:            "Base",
+				Kind:             CompletionKindKeyword,
+				Detail:           "Parent Class Reference",
+				Documentation:    "Refers to inherited members inside a `:CLASS` method and must be used as `Base:Member`.",
+				InsertText:       "Base",
+				InsertTextFormat: InsertTextFormatPlainText,
+			},
+			CompletionItem{
+				Label:            "Constructor",
+				Kind:             CompletionKindConstructor,
+				Detail:           "Reserved Constructor Name",
+				Documentation:    "Reserved method name used for class constructors inside `:CLASS`.",
+				InsertText:       "Constructor",
+				InsertTextFormat: InsertTextFormatPlainText,
+			},
+		)
+	}
 	items = append(items, GetOperatorCompletions()...)
-	items = append(items, GetProcedureCompletions(procedures)...)
+	items = append(items, GetProcedureCompletions(procedures, classMethodContext)...)
 	items = append(items, GetVariableCompletions(variables)...)
 	return items
 }
@@ -247,8 +305,13 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:          CompletionKindSnippet,
 			Detail:        "SSL Procedure",
 			Documentation: "Create a new procedure",
-			InsertText: `:PROCEDURE ${1:ProcedureName};
-	:DECLARE ${2:localVar};
+			InsertText: `/*
+ * Procedure: ${1:ProcedureName}
+ * Description: ${2:Brief description}
+ * Parameters:
+ * Returns: -
+;
+:PROCEDURE ${1:ProcedureName};
 	${0}
 :ENDPROC;`,
 			InsertTextFormat: InsertTextFormatSnippet,
@@ -258,10 +321,20 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:          CompletionKindSnippet,
 			Detail:        "SSL Procedure with Parameters",
 			Documentation: "Create a new procedure with parameters",
-			InsertText: `:PROCEDURE ${1:ProcedureName};
-	:PARAMETERS ${2:param1};
-	:DECLARE ${3:localVar};
+			InsertText: `/*
+ * Procedure: ${1:ProcedureName}
+ * Description: ${2:Brief description}
+ * Parameters:
+ *   ${3:sParam1} - ${4:Description}
+ * Returns: ${5:sResult} - ${6:Description}
+;
+:PROCEDURE ${1:ProcedureName};
+	:PARAMETERS ${3:sParam1};
+	:DEFAULT ${3:sParam1}, "";
+	:DECLARE ${5:sResult};
+	${5:sResult} := "";
 	${0}
+	:RETURN ${5:sResult};
 :ENDPROC;`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
@@ -362,11 +435,15 @@ func GetSnippetCompletions() []CompletionItem {
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
-			Label:            "sql",
-			Kind:             CompletionKindSnippet,
-			Detail:           "SQL Execute",
-			Documentation:    "Execute a SQL query",
-			InsertText:       `SQLExecute("${1:SELECT * FROM table}", "${2:QueryName}");`,
+			Label:         "sql",
+			Kind:          CompletionKindSnippet,
+			Detail:        "SQL Execute",
+			Documentation: "Execute a SQL query",
+			InsertText: `aResults := SQLExecute("
+    SELECT ${1:*}
+    FROM ${2:table_name}
+    WHERE ${3:column_name} = ?${4:sValue}?
+");`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -374,7 +451,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:             CompletionKindSnippet,
 			Detail:           "DoProc Call",
 			Documentation:    "Call a procedure",
-			InsertText:       `DoProc("${1:ProcedureName}", ${0});`,
+			InsertText:       `DoProc("${1:ProcedureName}", {${0}});`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -382,7 +459,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:             CompletionKindSnippet,
 			Detail:           "Declare Variable",
 			Documentation:    "Declare a local variable",
-			InsertText:       `:DECLARE ${0:varName};`,
+			InsertText:       `:DECLARE ${0:sValue};`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -390,7 +467,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:             CompletionKindSnippet,
 			Detail:           "Public Variable",
 			Documentation:    "Declare a public variable",
-			InsertText:       `:PUBLIC ${0:varName};`,
+			InsertText:       `:PUBLIC ${0:sGlobalValue};`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -401,9 +478,9 @@ func GetSnippetCompletions() []CompletionItem {
 			InsertText: `:TRY;
 	${1}
 :CATCH;
-	:DECLARE ${2:sslErr};
-	${2:sslErr} := GetLastSSLError();
-	:IF ${2:sslErr} != NIL;
+	:DECLARE ${2:oSslErr};
+	${2:oSslErr} := GetLastSSLError();
+	:IF ${2:oSslErr} != NIL;
 		${0}
 		ClearLastSSLError();
 	:ENDIF;
@@ -418,9 +495,9 @@ func GetSnippetCompletions() []CompletionItem {
 			InsertText: `:TRY;
 	${1}
 :CATCH;
-	:DECLARE ${2:sqlErr};
-	${2:sqlErr} := GetLastSQLError();
-	:IF ${2:sqlErr} != NIL;
+	:DECLARE ${2:oSqlErr};
+	${2:oSqlErr} := GetLastSQLError();
+	:IF ${2:oSqlErr} != NIL;
 		${0}
 	:ENDIF;
 :ENDTRY;`,
@@ -429,11 +506,11 @@ func GetSnippetCompletions() []CompletionItem {
 		{
 			Label:         "region",
 			Kind:          CompletionKindSnippet,
-			Detail:        "SSL Region",
-			Documentation: "Create a region block",
-			InsertText: `:REGION ${1:RegionName};
+			Detail:        "Comment Region",
+			Documentation: "Create a comment-based editor region",
+			InsertText: `/* region ${1:RegionName};
 	${0}
-:ENDREGION;`,
+/* endregion;`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -441,7 +518,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:          CompletionKindSnippet,
 			Detail:        "SSL Inline Code",
 			Documentation: "Create an inline code block",
-			InsertText: `:BEGININLINECODE;
+			InsertText: `:BEGININLINECODE "${1:BlockName}";
 	${0}
 :ENDINLINECODE;`,
 			InsertTextFormat: InsertTextFormatSnippet,
@@ -452,11 +529,17 @@ func GetSnippetCompletions() []CompletionItem {
 			Detail:        "SSL Class Definition",
 			Documentation: "Define a new class",
 			InsertText: `:CLASS ${1:ClassName};
-	:PUBLIC ${2:Property};
+	:INHERIT ${2:BaseClass};
 
-	:PROCEDURE ${3:MethodName};
-		${0}
-	:ENDPROC;`,
+	:DECLARE ${3:sValue};
+
+	:PROCEDURE ${4:MethodName};
+	${5}
+:ENDPROC;
+
+:PROCEDURE Constructor;
+	${0}
+:ENDPROC;`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -465,21 +548,27 @@ func GetSnippetCompletions() []CompletionItem {
 			Detail:        "SSL Class with Constructor",
 			Documentation: "Define a new class with a constructor",
 			InsertText: `:CLASS ${1:ClassName};
-	:PUBLIC ${2:Property};
+	:INHERIT ${2:BaseClass};
 
-	:PROCEDURE Constructor;
-		${0}
-	:ENDPROC;`,
+	:DECLARE ${3:sValue};
+
+	:PROCEDURE ${4:MethodName};
+	Me:${3:sValue} := ${5:""};
+:ENDPROC;
+
+:PROCEDURE Constructor;
+	${0}
+:ENDPROC;`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
-			Label:         "classdtor",
+			Label:         "constructor",
 			Kind:          CompletionKindSnippet,
-			Detail:        "SSL Class Destructor",
-			Documentation: "Define a class destructor",
-			InsertText: `:PROCEDURE Destructor;
-		${0}
-	:ENDPROC;`,
+			Detail:        "SSL Constructor",
+			Documentation: "Create a constructor inside a class",
+			InsertText: `:PROCEDURE Constructor;
+	${0}
+:ENDPROC;`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -487,9 +576,9 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:          CompletionKindSnippet,
 			Detail:        "SSL Expando Object",
 			Documentation: "Create a new Expando object",
-			InsertText: `:DECLARE ${1:obj};
-	${1:obj} := CreateUdObject();
-	${1:obj}:AddProperty("${2:PropertyName}");
+			InsertText: `:DECLARE ${1:oObj};
+	${1:oObj} := CreateUdObject();
+	${1:oObj}:AddProperty("${2:PropertyName}");
 	${0}`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
@@ -506,7 +595,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:             CompletionKindSnippet,
 			Detail:           "Include Script",
 			Documentation:    "Include another script",
-			InsertText:       `:INCLUDE "${1:ScriptName}";`,
+			InsertText:       `:INCLUDE ${1:Category.ScriptName};`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -522,10 +611,10 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:          CompletionKindSnippet,
 			Detail:        "LIMS OLE Connection",
 			Documentation: "Connect to an OLE object",
-			InsertText: `:DECLARE ${1:obj};
-	${1:obj} := LimsOleConnect("${2:ProgID}");
+			InsertText: `:DECLARE ${1:oOle};
+	${1:oOle} := LimsOleConnect("${2:ProgID}");
 	${0}
-	EndLimsOleConnect(${1:obj});`,
+	EndLimsOleConnect(${1:oOle});`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{
@@ -533,7 +622,7 @@ func GetSnippetCompletions() []CompletionItem {
 			Kind:             CompletionKindSnippet,
 			Detail:           "RunSQL",
 			Documentation:    "Execute a SQL command",
-			InsertText:       `RunSQL("${1:UPDATE table SET column = ? WHERE id = ?}", "${2:QueryName}", {${3:values}});`,
+			InsertText:       `bSuccess := RunSQL("${1:UPDATE table SET column = ? WHERE id = ?}",, {${2:values}});`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 	}

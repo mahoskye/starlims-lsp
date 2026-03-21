@@ -1,12 +1,12 @@
 # SSL Built-in Classes
 
-This document lists the built-in classes available in SSL.
+This document lists the developer-facing built-in classes available in SSL.
 
-**LSP Source:** `internal/constants/constants.go`
+**Primary Sources:** `dev/ssl-style-guide/README.md`, `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md`, `internal/constants/source_alignment.go`, `internal/constants/constants.go`
 
 ---
 
-## Built-in Classes (30)
+## Built-in Classes (21)
 
 The starlims-lsp provides completion and hover support for these built-in classes:
 
@@ -24,21 +24,12 @@ The starlims-lsp provides completion and hover support for these built-in classe
 | `SSLCompilerError` | Compiler error information |
 | `SSLCompilerErrorList` | Collection of compiler errors |
 
-### Data Classes
 
-| Class | Description |
-|-------|-------------|
-| `CDataTable` | Data table representation |
-| `CDataRow` | Single row of data |
-| `CDataColumn` | Column definition |
-| `CDataColumns` | Collection of columns |
-| `CDataField` | Data field representation |
 
 ### Integration Classes
 
 | Class | Description |
 |-------|-------------|
-| `SQLConnection` | Database connection management |
 | `Email` | Email sending functionality |
 | `WebServices` | Web service client |
 | `AzureStorage` | Azure storage integration |
@@ -62,12 +53,13 @@ The starlims-lsp provides completion and hover support for these built-in classe
 | `RegSetup` | Registry/setup utilities |
 | `Sequence` | Sequence generation |
 
+
+
 ### Import/Export Classes
 
 | Class | Description |
 |-------|-------------|
 | `EnterpriseExporter` | Enterprise data export |
-| `EnterpriseImpExBase` | Import/export base class |
 | `TablesImport` | Table import functionality |
 
 ---
@@ -77,12 +69,18 @@ The starlims-lsp provides completion and hover support for these built-in classe
 ### Creating Objects
 
 ```ssl
-/* Using CreateUDObject;
-oExpando := CreateUDObject("SSLExpando");
+/* Built-in classes use curly-brace construction;
+oExpando := SSLExpando{};
 oExpando:PropertyName := "value";
 
-/* Direct instantiation (where supported);
-oDataset := CreateUDObject("SSLDataset");
+/* Built-in dataset class;
+oDataset := SSLDataset{};
+
+/* User-defined classes use CreateUdObject;
+oCustom := CreateUdObject("MyClass", {sName, nCount});
+
+/* Anonymous property bag;
+oAnon := CreateUdObject({{"Name", "value"}, {"Count", 1}});
 ```
 
 ### Accessing Properties and Methods
@@ -93,7 +91,7 @@ value := oObject:PropertyName;
 oObject:PropertyName := newValue;
 
 /* Method calls;
-result := oObject:MethodName(param1, param2);
+vResult := oObject:MethodName(sName, nCount);
 ```
 
 ---
@@ -105,7 +103,7 @@ The most commonly used class for dynamic objects:
 ```ssl
 :DECLARE oData;
 
-oData := CreateUDObject("SSLExpando");
+oData := SSLExpando{};
 oData:Name := "John Doe";
 oData:Age := 30;
 oData:Items := {1, 2, 3};
@@ -127,8 +125,11 @@ For tabular data manipulation:
 ```ssl
 :DECLARE oDS;
 
-/* Create from SQL;
-oDS := GetDataSet("SELECT * FROM customers", "dsCustomers");
+/* Create an empty dataset object;
+oDS := SSLDataset{};
+
+/* Or retrieve one from SQL;
+oDS := GetSSLDataset("SELECT * FROM customers");
 
 /* Navigate;
 oDS:First();
@@ -146,6 +147,14 @@ oDS:Post();
 ---
 
 ## Class Support in LSP
+
+Class-style notes from the guide:
+- User-defined class files prefer `:INHERIT`, then `:DECLARE`, then regular methods, then `Constructor`
+- Bare and qualified `:INHERIT` names are both accepted
+- Without `:INHERIT`, classes inherit from `SSLObject` by default
+- `Me` is only meaningful inside a `:CLASS`; `Base` must be used as `Base:MemberName` and requires `:INHERIT`
+- Underscore-prefixed members such as `_sInternal` follow the SSL private convention and are excluded from reflection
+- `/*@private;` and `/*@protected;` annotations do not affect class-method visibility
 
 The LSP provides:
 - **Completion:** Class names when creating objects

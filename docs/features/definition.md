@@ -19,7 +19,7 @@ The definition provider enables navigation from a usage of an identifier to its 
 | Element | Navigates To |
 |---------|--------------|
 | Procedure calls | `:PROCEDURE` declaration line |
-| Variable usages | `:DECLARE`, `:PARAMETERS`, `:PUBLIC`, or first assignment |
+| Variable usages | `:DECLARE`, `:PARAMETERS`, or `:PUBLIC` declaration |
 | Parameter usages | `:PARAMETERS` line where declared |
 
 ### 2.2 Response Format
@@ -44,7 +44,6 @@ The definition provider enables navigation from a usage of an identifier to its 
 1. `:DECLARE varName` - explicit declaration
 2. `:PARAMETERS varName` - procedure parameter
 3. `:PUBLIC varName` - public variable
-4. `varName := value` - first assignment (dynamic declaration)
 
 ---
 
@@ -127,7 +126,7 @@ Cross-file support requires workspace indexing (planned for v2.0).
 :ENDPROC;
 
 :PROCEDURE Main;
-    HelperProc();
+    DoProc("HelperProc");
 /*  ^ Go to definition here;
 :ENDPROC;
 /* Expected: Location of line 1, character 11-21 (HelperProc);
@@ -170,19 +169,7 @@ x := gGlobalCounter;
 /* Expected: Location of line 1 (PUBLIC line);
 ```
 
-### 6.5 Variable Definition (Dynamic)
-
-```ssl
-/* Test: Navigate to first assignment (dynamic declaration);
-:PROCEDURE Test;
-dynamicVar := 10;
-x := dynamicVar;
-/*   ^ Go to definition here;
-:ENDPROC;
-/* Expected: Location of line 2 (first assignment);
-```
-
-### 6.6 Case Insensitivity
+### 6.5 Case Insensitivity
 
 ```ssl
 /* Test: Case-insensitive matching;
@@ -190,13 +177,13 @@ x := dynamicVar;
 :ENDPROC;
 
 :PROCEDURE Main;
-    myprocedure();
+    DoProc("myprocedure");
 /*  ^ Go to definition here;
 :ENDPROC;
 /* Expected: Location of line 1 (MyProcedure, despite case difference);
 ```
 
-### 6.7 Built-in Function (No Definition)
+### 6.6 Built-in Function (No Definition)
 
 ```ssl
 /* Test: Built-in function returns null;
@@ -205,7 +192,7 @@ result := SQLExecute(query, "ds");
 /* Expected: null (no definition available);
 ```
 
-### 6.8 Keyword (No Definition)
+### 6.7 Keyword (No Definition)
 
 ```ssl
 /* Test: Keyword returns null;
@@ -214,7 +201,7 @@ result := SQLExecute(query, "ds");
 /* Expected: null;
 ```
 
-### 6.9 Local vs Global Scope
+### 6.8 Local vs Global Scope
 
 ```ssl
 /* Test: Local scope takes precedence;
@@ -228,7 +215,7 @@ x := globalVar;
 /* Expected: Location of line 4 (local DECLARE), not line 1;
 ```
 
-### 6.10 DoProc String Target (Same File)
+### 6.9 DoProc String Target (Same File)
 
 ```ssl
 /* Test: Navigate to procedure from DoProc string;
@@ -243,7 +230,7 @@ x := globalVar;
 /* Expected: Location of line 1 (HelperProc definition);
 ```
 
-### 6.11 ExecFunction String Target (Same File)
+### 6.10 ExecFunction String Target (Same File)
 
 ```ssl
 /* Test: Navigate to procedure from ExecFunction string;
@@ -278,7 +265,6 @@ x := globalVar;
 4. If not found, search for variable declarations in scope order:
    - Current procedure's `:DECLARE`, `:PARAMETERS`
    - Global `:PUBLIC` declarations
-   - First assignment (dynamic declaration)
 5. Return the first match as a Location
 
 ### 8.2 Scope Handling

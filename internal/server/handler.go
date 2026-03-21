@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
 
 	"github.com/tliron/glsp"
@@ -26,7 +27,8 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	}
 
 	// Get all completions
-	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables)
+	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
+	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext)
 	snippets := providers.GetSnippetCompletions()
 
 	items := make([]protocol.CompletionItem, 0, len(completions)+len(snippets))
@@ -34,6 +36,32 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	items = append(items, toProtocolCompletionItems(snippets)...)
 
 	return items, nil
+}
+
+func isClassMethodContext(tokens []lexer.Token, procedures []parser.ProcedureInfo, line int) bool {
+	if !isClassFile(tokens) {
+		return false
+	}
+
+	for _, proc := range procedures {
+		if line >= proc.StartLine && line <= proc.EndLine {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isClassFile(tokens []lexer.Token) bool {
+	for _, token := range tokens {
+		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+			continue
+		}
+
+		return token.Type == lexer.TokenKeyword && strings.EqualFold(token.Text, ":CLASS")
+	}
+
+	return false
 }
 
 // handleHover handles hover requests.

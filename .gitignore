@@ -10,3 +10,6 @@
 
 # Local markers
 .qdrant-initialized
+
+# Local development references
+dev/

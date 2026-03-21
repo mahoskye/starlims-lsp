@@ -25,6 +25,15 @@ func containsCompletionLabel(items []protocol.CompletionItem, label string) bool
 	return false
 }
 
+func findCompletionItem(items []protocol.CompletionItem, label string) *protocol.CompletionItem {
+	for i := range items {
+		if items[i].Label == label {
+			return &items[i]
+		}
+	}
+	return nil
+}
+
 func TestHandleCompletion_ReturnsItems(t *testing.T) {
 	s := newTestServerWithDocument(`:PROCEDURE Test;
 :DECLARE myVar;
@@ -54,6 +63,41 @@ func TestHandleCompletion_ReturnsItems(t *testing.T) {
 	}
 	if !containsCompletionLabel(items, "myVar") {
 		t.Error("expected variable completion 'myVar'")
+	}
+}
+
+func TestHandleCompletion_ClassMethodUsesMeSnippet(t *testing.T) {
+	s := newTestServerWithDocument(`:CLASS MyClass;
+
+:PROCEDURE Helper;
+:ENDPROC;
+
+:PROCEDURE Main;
+    Hel
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 5, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+
+	item := findCompletionItem(items, "Helper")
+	if item == nil {
+		t.Fatal("expected method completion for 'Helper'")
+	}
+
+	if item.InsertText == nil || *item.InsertText != "Me:Helper()" {
+		t.Fatalf("expected Me:Helper() insert text, got %#v", item.InsertText)
 	}
 }
 

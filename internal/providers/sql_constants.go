@@ -4,16 +4,22 @@ package providers
 // SQLKeywords contains all SQL keywords for formatting.
 var SQLKeywords = map[string]bool{
 	"SELECT": true, "UPDATE": true, "DELETE": true, "INSERT": true,
+	"MERGE": true, "USING": true, "WITH": true, "RECURSIVE": true,
 	"VALUES": true, "SET": true, "WHERE": true, "FROM": true,
 	"JOIN": true, "INTO": true, "ON": true, "AND": true, "OR": true,
 	"AS": true, "IN": true, "DISTINCT": true, "TOP": true, "NOT": true,
 	"BETWEEN": true, "LIKE": true, "IS": true, "NULL": true,
 	"INNER": true, "LEFT": true, "RIGHT": true, "FULL": true, "CROSS": true,
 	"GROUP": true, "BY": true, "ORDER": true, "HAVING": true,
-	"UNION": true, "ALL": true, "EXCEPT": true, "INTERSECT": true,
+	"UNION": true, "ALL": true, "EXCEPT": true, "INTERSECT": true, "MINUS": true,
 	"ASC": true, "DESC": true, "LIMIT": true, "OFFSET": true,
 	"EXISTS": true, "CASE": true, "WHEN": true, "THEN": true,
-	"ELSE": true, "END": true,
+	"ELSE": true, "END": true, "MATCHED": true, "RETURNING": true,
+	"OVER": true, "PARTITION": true, "ROWS": true, "RANGE": true,
+	"PRECEDING": true, "FOLLOWING": true, "CURRENT": true, "ROW": true,
+	"START": true, "CONNECT": true, "PRIOR": true, "SIBLINGS": true,
+	"PIVOT": true, "UNPIVOT": true, "LATERAL": true, "OF": true,
+	"NOWAIT": true, "WAIT": true, "FETCH": true, "NEXT": true, "ONLY": true,
 }
 
 // SQLBuiltinFunctions contains common SQL aggregate and scalar functions.
@@ -50,7 +56,7 @@ var SQLBreakBeforeKeywords = map[string]bool{
 	"FROM": true, "WHERE": true, "INNER": true, "LEFT": true,
 	"RIGHT": true, "FULL": true, "CROSS": true, "ORDER": true,
 	"GROUP": true, "HAVING": true, "UNION": true, "VALUES": true,
-	"INTO": true, "ON": true, "CASE": true, "WHEN": true,
+	"INTO": true, "USING": true, "ON": true, "CASE": true, "WHEN": true,
 	"ELSE": true, "END": true,
 }
 

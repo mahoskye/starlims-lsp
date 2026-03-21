@@ -42,13 +42,14 @@ Each parameter includes:
 
 | Property | Description |
 |----------|-------------|
-| `label` | Parameter portion of signature (e.g., `cSQL: String`) |
+| `label` | Parameter portion of signature (e.g., `commandString: variant`) |
 | `documentation` | Parameter description |
 
 ### 2.5 Coverage
 
-- **367 built-in functions** with full parameter documentation
-- User-defined procedures with parameters from `:PARAMETERS` declarations
+- **354 source-aligned built-in functions** with parameter documentation
+- Built-in dispatch helpers such as `DoProc` and `ExecFunction`
+- No direct user-procedure signature resolution beyond those built-in dispatch helpers
 
 ---
 
@@ -67,8 +68,8 @@ Each parameter includes:
 When functions are nested, signature help shows the innermost function:
 
 ```ssl
-OuterFunc(InnerFunc(|))
-/*                  ^ Cursor here shows InnerFunc signature;
+Upper(AllTrim(|))
+/*               ^ Cursor here shows AllTrim signature;
 ```
 
 ### 4.2 Optional Parameters
@@ -76,22 +77,17 @@ OuterFunc(InnerFunc(|))
 Optional parameters are indicated in the signature:
 
 ```ssl
-function DoProc(cProcName: String, aArgs?: Array): Any
-/*                                 ^--- Optional indicator;
+DoProc(name: string, [args: array]) → variant
+/*                  ^--- Optional bracketed parameter;
 ```
 
 ### 4.3 No Signature Found
 
 If the function is not recognized, return null (no signature help).
 
-### 4.4 User Procedures
+### 4.4 Direct User Procedure Calls
 
-For user-defined procedures, parameters are extracted from `:PARAMETERS` declarations but type information is not available:
-
-```ssl
-procedure MyProc(param1, param2)
-/* No type info - SSL is dynamically typed;
-```
+Direct custom procedure calls are invalid SSL, so signature help intentionally does not surface signatures for `MyProc(...)` patterns. Runtime dispatch goes through `DoProc(...)` or `ExecFunction(...)`, and the current provider only shows the built-in helper signatures for those calls.
 
 ---
 
@@ -99,7 +95,6 @@ procedure MyProc(param1, param2)
 
 | Limitation | Notes |
 |------------|-------|
-| No type info for user procedures | SSL is dynamically typed |
 | Single signature per function | No overload support |
 | No DoProc/ExecFunction resolution | Cannot look up called procedure's signature |
 
@@ -115,10 +110,10 @@ SQLExecute(|
 /* Position: after '(';
 /* Expected:
    signatures: [{
-     label: "SQLExecute(cSQL: String, cDSName: String): Dataset",
+     label: "SQLExecute(commandString: variant, [friendlyName: variant], [rollbackExistingTransaction: variant], [nullAsBlank: variant], [invariantDateColumns: variant], [returnType: variant], [tableName: variant], [includeSchema: variant], [includeHeader: variant]) → variant",
      parameters: [
-       { label: "cSQL: String" },
-       { label: "cDSName: String" }
+       { label: "commandString: variant" },
+       { label: "friendlyName: variant" }
      ]
    }],
    activeParameter: 0
@@ -145,46 +140,34 @@ SQLExecute(query, dsName|
 
 ```ssl
 /* Test: Innermost function signature shown;
-Upper(Trim(|))
-/* Expected: Signature for Trim, not Upper;
-/* activeParameter: 0 for Trim;
+Upper(AllTrim(|))
+/* Expected: Signature for AllTrim, not Upper;
+/* activeParameter: 0 for AllTrim;
 
 /* Test: Outer function after closing inner;
-Upper(Trim(x)|)
+Upper(AllTrim(sValue)|)
 /* Expected: Signature for Upper;
-/* activeParameter: 0 (the Trim(x) result);
+/* activeParameter: 0 (the AllTrim(sValue) result);
 ```
 
 ### 6.4 Multiple Commas
 
 ```ssl
 /* Test: Third parameter;
-SomeFunc(a, b, |)
-/* Expected: activeParameter: 2;
+SQLExecute(sSQL, sFriendlyName, .T., |)
+/* Expected: activeParameter: 3;
 ```
 
-### 6.5 User Procedure Signature
+### 6.5 Direct User Procedure Call
 
 ```ssl
-/* Test: User procedure with parameters;
+/* Test: Direct user procedure call should not produce signature help;
 :PROCEDURE Calculate;
 :PARAMETERS nValue, sType, bFlag;
 :ENDPROC;
 
-:PROCEDURE Main;
 Calculate(|
-/* Expected:
-   signatures: [{
-     label: "Calculate(nValue, sType, bFlag)",
-     parameters: [
-       { label: "nValue" },
-       { label: "sType" },
-       { label: "bFlag" }
-     ]
-   }],
-   activeParameter: 0
-;
-:ENDPROC;
+/* Expected: null because custom procedures are invoked via DoProc/ExecFunction;
 ```
 
 ### 6.6 Unknown Function

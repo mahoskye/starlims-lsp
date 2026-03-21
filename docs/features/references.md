@@ -60,19 +60,13 @@ The references provider finds all occurrences of an identifier within the docume
 Reference matching is case-insensitive:
 - Searching for `myProc` finds `MyProc`, `MYPROC`, `myproc`
 
-### 4.2 Inside Strings - PARTIAL
+### 4.2 Inside Strings
 
-**Current Behavior:** May find matches inside strings.
-
-**Expected Behavior:** Should distinguish:
-- References in code context → include
-- References in comments → exclude
-- References in arbitrary strings → exclude
-- Procedure names in `DoProc("ProcName")` → include
+**Current Behavior:** Reference finding is text-based after symbol identification, so whole-word matches inside strings are included.
 
 ### 4.3 Inside Comments
 
-**Expected Behavior:** References inside comments (`/* ... ;`) should be excluded.
+**Current Behavior:** Comments are not filtered out by the current text-based search and may appear in results.
 
 ### 4.4 Whole Word Matching
 
@@ -94,8 +88,8 @@ Currently, references are found only within the same file.
 | Limitation | Notes |
 |------------|-------|
 | Single-file only | Cannot find references in other files |
-| May match in strings | Context detection incomplete |
-| No comment exclusion | Comments may be included |
+| Strings/comments included | Search is word-based after symbol selection |
+| No semantic call-site model | `DoProc("ProcName")` matches as text, not as a specialized call reference |
 
 ---
 
@@ -109,14 +103,14 @@ Currently, references are found only within the same file.
 :ENDPROC;
 
 :PROCEDURE Main;
-    HelperProc();
-    x := HelperProc();
+    DoProc("HelperProc");
+    sName := "HelperProc";
 :ENDPROC;
 /* Find references on: HelperProc (line 1);
 /* Expected (includeDeclaration: true):
    - Line 1, "HelperProc" (definition)
-   - Line 5, "HelperProc" (call)
-   - Line 6, "HelperProc" (call)
+   - Line 5, "HelperProc" (string target in DoProc)
+   - Line 6, "HelperProc" (string match)
 ;
 ```
 
@@ -211,7 +205,7 @@ y := localVar;
 ;
 ```
 
-### 6.7 Context Exclusion (Expected Behavior)
+### 6.7 Comments Are Currently Included
 
 ```ssl
 /* Test: Exclude references in comments;
@@ -221,14 +215,14 @@ y := localVar;
 x := myVar;
 :ENDPROC;
 /* Find references on: myVar (line 3);
-/* Expected (ideally):
+/* Expected today:
    - Line 3, "myVar" (declaration)
    - Line 4, "myVar" (usage)
-   NOT line 2 (inside comment)
+   - Line 2, "myVar" inside comment (current text-based behavior)
 ;
 ```
 
-### 6.8 DoProc String Reference (PLANNED)
+### 6.8 DoProc String Reference
 
 ```ssl
 /* Test: Find procedure reference in DoProc string;
@@ -236,10 +230,10 @@ x := myVar;
 :ENDPROC;
 
 :PROCEDURE Main;
-    DoProc("TargetProc", {});
+    DoProc("TargetProc");
 :ENDPROC;
 /* Find references on: TargetProc (line 1);
-/* Expected (when implemented):
+/* Expected:
    - Line 1, "TargetProc" (definition)
    - Line 5, "TargetProc" inside string (procedure call reference)
 ;
@@ -251,7 +245,7 @@ x := myVar;
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| #36 | Procedure references matched in comments/strings | To Fix |
+| #36 | Procedure references matched in comments/strings | Open |
 
 ---
 

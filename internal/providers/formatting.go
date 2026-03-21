@@ -207,6 +207,7 @@ type formatState struct {
 	lastNonWSToken        lexer.Token
 	prevKeyword           string
 	inProcedure           bool
+	afterEndProc          bool
 	currentLineLen        int
 	parenDepth            int
 	continuationIndent    int // Additional indent for continuation lines inside parens
@@ -215,6 +216,7 @@ type formatState struct {
 	sqlArgCount           int
 	sqlFormatter          *SQLFormatter
 	pendingComment        *lexer.Token // End-of-line comment to write before newline
+	pendingStatementBreak bool
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
@@ -253,14 +255,18 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	}
 
 	if normalized == "PROCEDURE" {
-		if s.inProcedure && s.opts.BlankLinesBetweenProcs > 0 {
+		if s.afterEndProc && s.opts.BlankLinesBetweenProcs > 0 {
 			for j := 0; j < s.opts.BlankLinesBetweenProcs; j++ {
 				s.builder.WriteString("\n")
 			}
 		}
 		s.inProcedure = true
+		s.afterEndProc = false
 	} else if normalized == "ENDPROC" {
 		s.inProcedure = false
+		s.afterEndProc = true
+	} else {
+		s.afterEndProc = false
 	}
 }
 
@@ -293,9 +299,31 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 	}
 }
 
+func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
+	if !s.pendingStatementBreak || token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+		return
+	}
+
+	if s.pendingComment != nil {
+		s.builder.WriteString("  ")
+		s.builder.WriteString(s.pendingComment.Text)
+		s.pendingComment = nil
+	}
+
+	s.builder.WriteString("\n")
+	s.lineStart = true
+	s.currentLineLen = 0
+	s.pendingStatementBreak = false
+}
+
 func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, index int) bool {
 	if token.Type != lexer.TokenWhitespace {
 		return false
+	}
+
+	if s.pendingStatementBreak && !strings.Contains(token.Text, "\n") {
+		s.prevToken = token
+		return true
 	}
 
 	if strings.Contains(token.Text, "\n") {
@@ -320,6 +348,7 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		s.lineStart = true
 		s.currentLineLen = 0
+		s.pendingStatementBreak = false
 
 		// Set continuation indent for lines inside parentheses
 		// This will be applied when the next token is written
@@ -472,11 +501,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 	}
 
 	if token.Text == ";" {
-		if shouldAddNewlineAfterSemicolon(s.prevKeyword) || isBlockEndKeyword(s.prevKeyword) {
-			s.builder.WriteString("\n")
-			s.lineStart = true
-			s.currentLineLen = 0
-		}
+		s.pendingStatementBreak = true
 		s.prevKeyword = ""
 	}
 
@@ -505,6 +530,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 
 		state.updateForKeyword(token)
 		state.updateParenDepth(token)
+		state.flushPendingStatementBreak(token)
 		state.writeIndentIfNeeded(token)
 		if state.handleWhitespace(token, tokens, i) {
 			continue
@@ -727,38 +753,6 @@ func estimateRemainingLineLen(tokens []lexer.Token, startIdx int) int {
 		}
 	}
 	return length
-}
-
-// shouldAddNewlineAfterSemicolon checks if we should add a newline after a semicolon.
-func shouldAddNewlineAfterSemicolon(keyword string) bool {
-	// Add newlines after these keywords' statements
-	keywords := map[string]bool{
-		"PROCEDURE":  true,
-		"ENDPROC":    true,
-		"IF":         true,
-		"ELSE":       true,
-		"ENDIF":      true,
-		"WHILE":      true,
-		"ENDWHILE":   true,
-		"FOR":        true,
-		"NEXT":       true,
-		"TRY":        true,
-		"CATCH":      true,
-		"FINALLY":    true,
-		"ENDTRY":     true,
-		"BEGINCASE":  true,
-		"CASE":       true,
-		"OTHERWISE":  true,
-		"ENDCASE":    true,
-		"DECLARE":    true,
-		"PARAMETERS": true,
-		"DEFAULT":    true,
-		"PUBLIC":     true,
-		"REGION":     true,
-		"ENDREGION":  true,
-		"RETURN":     true,
-	}
-	return keywords[keyword]
 }
 
 // isBlockEndKeyword checks if a keyword ends a block.

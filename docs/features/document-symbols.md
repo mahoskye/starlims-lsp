@@ -21,7 +21,7 @@ The document symbols provider returns a hierarchical list of symbols in the docu
 | Procedure | Function | 12 | Parameters |
 | Parameter | Variable | 13 | None |
 | Public Variable | Variable | 13 | None |
-| Region | Namespace | 3 | Contained symbols |
+| Comment Region | Namespace | 3 | Contained symbols |
 
 ### 2.2 Symbol Properties
 
@@ -62,7 +62,7 @@ Document
 
 ### 4.1 Regions
 
-Regions are defined by comment markers:
+The provider recognizes the recommended comment markers:
 
 ```ssl
 /* region MyRegion;
@@ -100,7 +100,7 @@ Each `:PUBLIC` declaration creates a separate symbol:
 
 | Limitation | Notes |
 |------------|-------|
-| No class support | `:CLASS` blocks not recognized |
+| No class support | `:CLASS` blocks are not emitted as document symbols |
 | No local variables | Only parameters shown, not `:DECLARE` |
 | No constants | No special symbol type for constants |
 
@@ -113,7 +113,7 @@ Each `:PUBLIC` declaration creates a separate symbol:
 ```ssl
 /* Test: Procedure appears in symbol list;
 :PROCEDURE MyProcedure;
-:PARAMETERS param1, param2;
+:PARAMETERS sValue, nCount;
 :ENDPROC;
 /* Expected symbols:
    [{
@@ -234,7 +234,7 @@ x := 1;
 1. Parse document for procedure declarations
 2. For each procedure, extract parameters from `:PARAMETERS` line
 3. Parse for `:PUBLIC` declarations
-4. Parse for region markers
+4. Parse for comment-region and legacy hash-region markers
 5. Build hierarchical tree with regions as containers
 6. Return tree to client
 
