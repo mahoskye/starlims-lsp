@@ -125,14 +125,40 @@ x %= 3;        /* Modulo and assign;
 
 #### Comparison Operators
 ```ssl
-x = y          /* Equality (loose for strings);
-x == y         /* Strict equality;
-x != y         /* Not equal;
-x <> y         /* Not equal (alternative);
+x = y          /* Equality (loose for strings: .T. if right is empty OR left starts with right);
+x == y         /* Strict equality (exact match);
+x != y         /* Not equal (negates ==, NOT =);
+x <> y         /* Not equal (same as !=, less preferred);
+x # y          /* Not equal (same as !=, less preferred);
 x < y          /* Less than;
 x > y          /* Greater than;
 x <= y         /* Less than or equal;
 x >= y         /* Greater than or equal;
+```
+
+**String equality gotcha:** `=` and `!=` are **NOT logical opposites** for strings. `=` does prefix matching, but `!=` negates `==` (exact match). Example: `"Logged" = "Log"` is `.T.` AND `"Logged" != "Log"` is also `.T.` — both true simultaneously. Always use `==` for exact string comparisons.
+
+#### Arithmetic Operators
+```ssl
+x + y          /* Addition / string concatenation;
+x - y          /* Subtraction / trim-trailing-spaces-then-concat for strings;
+x * y          /* Multiplication;
+x / y          /* Division (always floating-point: 5 / 2 = 2.5);
+x % y          /* Modulo;
+x ^ y          /* Exponentiation (power);
+x ** y         /* Exponentiation (alias for ^);
+x++;           /* Increment (prefix and postfix);
+x--;           /* Decrement (prefix and postfix);
+```
+
+#### Bitwise and Shift Operators
+```ssl
+nResult := _AND(nA, nB);   /* Bitwise AND (function syntax, integer operands only);
+nResult := _OR(nA, nB);    /* Bitwise OR;
+nResult := _XOR(nA, nB);   /* Bitwise XOR;
+nResult := _NOT(nA);       /* Bitwise NOT;
+nResult := nA << 2;        /* Left shift;
+nResult := nA >> 2;        /* Right shift;
 ```
 
 #### Logical Operators (MUST include periods)
@@ -148,8 +174,9 @@ x >= y         /* Greater than or equal;
 
 #### String Operators
 ```ssl
-sResult := sFirst + sSecond;    /* Concatenation;
-bFound := "needle" $ "haystack"; /* Contains (returns .T./.F.);
+sResult := sFirst + sSecond;     /* Concatenation;
+sResult := sFirst - sSecond;     /* Trim trailing spaces from left, then concatenate;
+bFound := "needle" $ "haystack"; /* Contains: .T. if left string is found within right string;
 ```
 
 ### Literals
@@ -171,8 +198,11 @@ s3 := [bracket quotes];  /* Useful for SQL with quotes inside;
 aItems := {"first", "second", "third"};
 sFirst := aItems[1];  /* Gets "first", NOT aItems[0];
 
-/* Date literal;
-dDate := {2024, 12, 25, 14, 30, 0};  /* year, month, day, hour, min, sec;
+/* Dates (use functions, NOT brace syntax - {2024,12,25} is an array, not a date);
+dDate := DateFromNumbers(2024, 12, 25, 14, 30, 0);
+dToday := Today();
+dNow := Now();
+dParsed := CToD("2024-12-25");
 ```
 
 ---
@@ -206,6 +236,8 @@ All variables must use Hungarian notation prefixes to indicate type:
 | Classes | PascalCase | `InvoiceManager`, `DataHandler` |
 | Variables | camelCase with prefix | `sCustomerName`, `nOrderCount` |
 | Constants | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT` |
+| UDO properties | lowerCamelCase (no prefix) | `oOrder:orderNo`, `oState:isValid` |
+| Built-in properties | PascalCase (defined by STARLIMS) | `oError:Description`, `oSeq:SequenceName` |
 
 ---
 
@@ -230,6 +262,12 @@ result := ExecFunction("Category.Script", {5, 10});
 
 /* Different file specific procedure - use ExecFunction;
 result := ExecFunction("Category.Script.CalculateTotal", {5, 10});
+
+/* User-defined functions - use ExecUdf;
+result := ExecUdf("MyUdfName", {param1, param2});
+
+/* Dynamic code execution - use Eval;
+result := Eval("1 + 2");
 
 /* Skip parameters with empty array positions;
 result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
@@ -416,7 +454,9 @@ sXml := GetDataSet("SELECT * FROM Samples WHERE Status = ?", {sStatus});
 | `SQLExecute` | `?varName?` (named) | Universal - auto-routes | Array, XML, Dataset, or Bool |
 | `RunSQL` | `?` (positional) | **DML only** (INSERT/UPDATE/DELETE) | Boolean |
 | `LSearch` | `?` (positional) | Single value lookup | Value with default |
+| `LSelect` | `?` (positional) | Multi-row SELECT | 2D Array |
 | `LSelect1` | `?` (positional) | Multi-row SELECT | 2D Array |
+| `LSelectC` | `?` (positional) | Multi-row SELECT (delegates to LSelect) | 2D Array |
 | `GetDataSet` | `?` (positional) | SELECT to XML | XML String |
 
 ### ❌ Wrong: Using Named Params with RunSQL
@@ -530,7 +570,7 @@ oSeeded := CreateUdObject({{"Property1", "value"}, {"Property2", 123}});
 
 SSL functions are case-insensitive but should use documented casing for consistency:
 
-### Array Functions (source-aligned PascalCase)
+### Array Functions (canonical PascalCase)
 ```ssl
 AAdd(aArray, value);
 ALen(aArray);
@@ -575,6 +615,21 @@ Now();
 DateAdd(dDate, nNumber, sDatePart);
 DateDiff(dStart, dEnd, sDatePart);
 DateToString(dDate, sFormat);
+LIMSDate(vDate, sFormat);     /* Note: LIMSDate, not LimsDate;
+DOW(dDate);                   /* Day of week (1=Sunday to 7=Saturday);
+DOY(dDate);                   /* Day of year;
+```
+
+### Canonical Casing Exceptions
+Most functions use PascalCase, but these exceptions must be preserved exactly:
+```ssl
+_AND(nA, nB);     /* Bitwise AND (not "And");
+_OR(nA, nB);      /* Bitwise OR (not "Or");
+_XOR(nA, nB);     /* Bitwise XOR (not "Xor");
+_NOT(nA);         /* Bitwise NOT (not "Not");
+DOW(dDate);       /* Day of week (not "Dow");
+DOY(dDate);       /* Day of year (not "Doy");
+LIMSDate(vDate);  /* Date formatting (not "LimsDate");
 ```
 
 ---
@@ -611,7 +666,7 @@ Important restrictions:
 
 ---
 
-## Summary: Top 10 SSL Rules
+## Summary: Top 20 SSL Rules
 
 1. **Semicolons everywhere** — Every statement, every comment
 2. **Colon-prefix keywords** — `:IF`, `:WHILE`, `:PROCEDURE`, etc.
@@ -623,3 +678,13 @@ Important restrictions:
 8. **1-based arrays** — First element is `[1]`
 9. **Colon property access** — `object:Property`, not `object.Property`
 10. **SQLExecute vs others** — Only SQLExecute uses `?varName?` syntax
+11. **`=` vs `==` for strings** — `=` does prefix matching; `!=` negates `==` not `=`; always use `==` for exact match
+12. **`:NEXT` not `:ENDFOR`** — FOR loops end with `:NEXT;` (`:ENDFOR` is invalid)
+13. **`:DEFAULT` only with `:PARAMETERS`** — Never on a `:DECLARE` line
+14. **Declared variables start as `""`** — Empty string, not NIL
+15. **Curly braces for built-ins** — `Email{}`, `SSLDataset{}`; never `CreateUdObject("Email")`
+16. **Dates are not brace literals** — `{2024,12,25}` is an array; use `DateFromNumbers()` or `CToD()`
+17. **DoProc is compile error in classes** — Use `Me:Method()` / `Base:Method()` inside `:CLASS`
+18. **Skipped params: adjacent commas** — `DoProc("P", {a,,c})` not `DoProc("P", {a, , c})`
+19. **Scientific notation needs decimal** — `7.0e2` not `7e2`
+20. **`:FINALLY` restrictions** — No `:RETURN`, `:EXITFOR`, `:EXITWHILE`, `:LOOP` inside `:FINALLY`

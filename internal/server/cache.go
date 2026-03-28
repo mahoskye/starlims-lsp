@@ -113,6 +113,18 @@ func (dm *DocumentManager) ParseDocument(uri string, version int) *DocumentCache
 	return cache
 }
 
+// OpenURIs returns the set of currently open document URIs.
+func (dm *DocumentManager) OpenURIs() map[string]struct{} {
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+
+	uris := make(map[string]struct{}, len(dm.documents))
+	for uri := range dm.documents {
+		uris[uri] = struct{}{}
+	}
+	return uris
+}
+
 // AllDocuments returns all document URIs.
 func (dm *DocumentManager) AllDocuments() []string {
 	dm.mu.RLock()

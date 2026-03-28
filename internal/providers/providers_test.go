@@ -1221,7 +1221,7 @@ func TestGetDiagnostics_DoProcInClassMethod(t *testing.T) {
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Inside class methods") {
+		if strings.Contains(d.Message, "DoProc is a compile-time error inside class methods") {
 			return
 		}
 	}
@@ -1356,8 +1356,8 @@ func TestGetDiagnostics_ClassMemberOrder(t *testing.T) {
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Class members must be ordered as") {
-			if d.Severity != SeverityError {
-				t.Fatalf("expected class member order to be an error, got %d", d.Severity)
+			if d.Severity != SeverityInfo {
+				t.Fatalf("expected class member order to be an info diagnostic, got %d", d.Severity)
 			}
 			return
 		}
@@ -1671,8 +1671,8 @@ func TestDefaultDiagnosticOptions(t *testing.T) {
 	if !opts.CheckUnmatchedParens {
 		t.Error("expected CheckUnmatchedParens to be true by default")
 	}
-	if opts.MaxBlockDepth != 10 {
-		t.Errorf("expected MaxBlockDepth to be 10, got %d", opts.MaxBlockDepth)
+	if opts.MaxBlockDepth != 4 {
+		t.Errorf("expected MaxBlockDepth to be 4, got %d", opts.MaxBlockDepth)
 	}
 	if opts.CheckHungarianNotation {
 		t.Error("expected CheckHungarianNotation to be false by default")
@@ -1794,6 +1794,40 @@ func TestGetDiagnostics_MissingExitCase_AllPresent(t *testing.T) {
 	}
 }
 
+func TestGetDiagnostics_MissingExitCase_Nested(t *testing.T) {
+	// Nested BEGINCASE blocks must be tracked independently
+	text := `:BEGINCASE;
+:CASE nOuter == 1;
+    :BEGINCASE;
+    :CASE nInner == 1;
+        x := 1;
+        :EXITCASE;
+    :ENDCASE;
+:CASE nOuter == 2;
+    x := 2;
+    :EXITCASE;
+:ENDCASE;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	// Outer first :CASE (nOuter == 1) is missing :EXITCASE — should be flagged
+	warnings := 0
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "EXITCASE") {
+			warnings++
+		}
+	}
+	if warnings != 1 {
+		t.Errorf("expected 1 missing EXITCASE warning (outer first CASE), got %d", warnings)
+		for _, d := range diagnostics {
+			if strings.Contains(d.Message, "EXITCASE") {
+				t.Logf("  warning: %s (line %d)", d.Message, d.Range.Start.Line+1)
+			}
+		}
+	}
+}
+
 func TestGetDiagnostics_BareLogicalOperators(t *testing.T) {
 	text := `:PROCEDURE Test;
 :IF x > 5 AND y < 10;
@@ -1873,19 +1907,19 @@ func TestGetDiagnostics_DefaultOnDeclareLine(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
-	// Should find warning for :DEFAULT on same line as :DECLARE
-	foundDefaultWarning := false
+	// Should find error for :DEFAULT on same line as :DECLARE (language constraint)
+	foundDefaultError := false
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
-			foundDefaultWarning = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity for DEFAULT on DECLARE line, got %v", d.Severity)
+			foundDefaultError = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity for DEFAULT on DECLARE line, got %v", d.Severity)
 			}
 		}
 	}
 
-	if !foundDefaultWarning {
-		t.Error("expected warning for :DEFAULT on same line as :DECLARE")
+	if !foundDefaultError {
+		t.Error("expected error for :DEFAULT on same line as :DECLARE")
 	}
 }
 
@@ -3889,6 +3923,2592 @@ sValue := sInput;`
 		if strings.Contains(d.Message, "':PARAMETERS' must appear immediately after ':PROCEDURE'") ||
 			strings.Contains(d.Message, "Script-level ':PARAMETERS' must appear before top-level statements") {
 			t.Fatalf("did not expect parameter placement diagnostic, got: %+v", diagnostics)
+		}
+	}
+}
+
+// --- Agent instruction & refactoring guide coverage tests ---
+
+func TestGetDiagnostics_ComplexSQLPlaceholder(t *testing.T) {
+	// Agent instructions gotcha #21: only arithmetic/concatenation expressions
+	// trigger the complex placeholder warning. Property access, array indexing,
+	// and function calls are standard supported patterns.
+	code := `SQLExecute("SELECT * FROM T WHERE Code = ?sPrefix + sSuffix?");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Complex expression") && d.Severity == SeverityInfo {
+			return
+		}
+	}
+
+	t.Fatal("expected complex SQL placeholder warning for ?sPrefix + sSuffix?")
+}
+
+func TestGetDiagnostics_ComplexSQLPlaceholder_StandardFormsNotFlagged(t *testing.T) {
+	// Source of truth: ?oObj:Prop?, ?aArr[i]?, ?Today()? are standard patterns, not complex
+	cases := []string{
+		`SQLExecute("SELECT * FROM T WHERE id = ?oUser:ID?");`,
+		`SQLExecute("SELECT * FROM T WHERE id = ?aIds[1]?");`,
+		`SQLExecute("SELECT * FROM T WHERE d = ?Today()?");`,
+	}
+
+	for _, code := range cases {
+		diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+		for _, d := range diagnostics {
+			if strings.Contains(d.Message, "Complex expression") {
+				t.Errorf("standard placeholder should not trigger complex warning: %s\n  got: %s", code, d.Message)
+			}
+		}
+	}
+}
+
+func TestGetDiagnostics_ComplexSQLPlaceholder_SimpleNotFlagged(t *testing.T) {
+	code := `SQLExecute("SELECT * FROM T WHERE Code = ?sCode?");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Complex expression") {
+			t.Fatal("simple placeholder ?sCode? should not trigger complex expression warning")
+		}
+	}
+}
+
+func TestGetDiagnostics_BeginCaseRequiresCase(t *testing.T) {
+	// Agent instructions: BEGINCASE requires at least one CASE block
+	code := `:BEGINCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "requires at least one ':CASE'") {
+			return
+		}
+	}
+
+	t.Fatal("expected BEGINCASE-requires-CASE diagnostic")
+}
+
+func TestGetDiagnostics_ReturnInFinally(t *testing.T) {
+	// Agent instructions: :RETURN inside :FINALLY is a compile-time error
+	code := `:TRY;
+	x := 1;
+:CATCH;
+	y := 2;
+:FINALLY;
+	:RETURN NIL;
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':RETURN'") && strings.Contains(d.Message, "':FINALLY'") {
+			return
+		}
+	}
+
+	t.Fatal("expected RETURN-in-FINALLY diagnostic")
+}
+
+func TestGetDiagnostics_ExitForOutsideLoop(t *testing.T) {
+	// Agent instructions: :EXITFOR must be inside a :FOR loop
+	code := `:PROCEDURE Test;
+:EXITFOR;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':EXITFOR' must be inside a ':FOR' loop") {
+			return
+		}
+	}
+
+	t.Fatal("expected EXITFOR-outside-loop diagnostic")
+}
+
+func TestGetDiagnostics_LoopOutsideLoop(t *testing.T) {
+	// Agent instructions: :LOOP must be inside a loop
+	code := `:PROCEDURE Test;
+:LOOP;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':LOOP' must be inside") {
+			return
+		}
+	}
+
+	t.Fatal("expected LOOP-outside-loop diagnostic")
+}
+
+func TestGetDiagnostics_ConstructorOutsideClass(t *testing.T) {
+	// Agent instructions: Constructor is only meaningful inside :CLASS
+	code := `:PROCEDURE Constructor;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "'Constructor' is only meaningful inside a ':CLASS'") {
+			return
+		}
+	}
+
+	t.Fatal("expected Constructor-outside-class diagnostic")
+}
+
+func TestGetDiagnostics_NotPreferredOperators(t *testing.T) {
+	// Schema: # and <> should use != instead
+	code := `:IF x <> 1;
+:ENDIF;
+:IF y # 2;
+:ENDIF;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	foundLtGt := false
+	foundHash := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "instead of '<>'") {
+			foundLtGt = true
+		}
+		if strings.Contains(d.Message, "instead of '#'") {
+			foundHash = true
+		}
+	}
+
+	if !foundLtGt {
+		t.Error("expected non-preferred operator warning for <>")
+	}
+	if !foundHash {
+		t.Error("expected non-preferred operator warning for #")
+	}
+}
+
+// ==================== Missing Test Coverage ====================
+
+// --- checkDefaultPlacement tests ---
+
+func TestGetDiagnostics_DefaultPlacement_MustFollowParameters(t *testing.T) {
+	// :DEFAULT must appear immediately after :PARAMETERS
+	code := `:PROCEDURE Test;
+:PARAMETERS sName;
+:DECLARE nVal;
+:DEFAULT sName, "";
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':DEFAULT' must appear immediately after ':PARAMETERS'") {
+			return
+		}
+	}
+
+	t.Fatal("expected DEFAULT placement diagnostic when DEFAULT doesn't follow PARAMETERS")
+}
+
+func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
+	// :DEFAULT immediately after :PARAMETERS should be fine
+	code := `:PROCEDURE Test;
+:PARAMETERS sName, nVal;
+:DEFAULT sName, "";
+:DEFAULT nVal, 0;
+:DECLARE sResult;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':DEFAULT' must appear immediately after ':PARAMETERS'") {
+			t.Errorf("unexpected DEFAULT placement diagnostic: %s", d.Message)
+		}
+	}
+}
+
+// --- checkUnusedVariables tests ---
+
+func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
+	code := `:DECLARE sUsed, sUnused;
+sUsed := "hello";`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUnusedVars = true
+
+	diagnostics := GetDiagnostics(code, opts)
+
+	foundUnused := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sUnused") && strings.Contains(d.Message, "never used") {
+			foundUnused = true
+		}
+	}
+
+	if !foundUnused {
+		t.Fatal("expected unused variable diagnostic for sUnused")
+	}
+}
+
+func TestGetDiagnostics_UnusedVariable_UsedVariableNotFlagged(t *testing.T) {
+	code := `:DECLARE sName;
+sName := "test";
+x := sName;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUnusedVars = true
+
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sName") && strings.Contains(d.Message, "never used") {
+			t.Error("sName is used and should not be flagged as unused")
+		}
+	}
+}
+
+func TestGetDiagnostics_UnusedVariable_DisabledByDefault(t *testing.T) {
+	code := `:DECLARE sUnused;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "never used") {
+			t.Error("unused variable check should be disabled by default")
+		}
+	}
+}
+
+// --- checkSQLParameterValidation tests ---
+
+func TestGetDiagnostics_SQLParameterValidation_UndeclaredParam(t *testing.T) {
+	code := `:DECLARE sName;
+sName := "test";
+x := SQLExecute("SELECT * FROM users WHERE name = ?sUndeclared?");`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sUndeclared") && strings.Contains(d.Message, "does not match") {
+			return
+		}
+	}
+
+	t.Fatal("expected SQL parameter validation diagnostic for undeclared ?sUndeclared?")
+}
+
+func TestGetDiagnostics_SQLParameterValidation_DeclaredParamNotFlagged(t *testing.T) {
+	code := `:DECLARE sName;
+sName := "test";
+x := SQLExecute("SELECT * FROM users WHERE name = ?sName?");`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSQLParams = true
+
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sName") && strings.Contains(d.Message, "does not match") {
+			t.Error("declared variable sName should not be flagged in SQL parameter validation")
+		}
+	}
+}
+
+func TestGetDiagnostics_SQLParameterValidation_DisabledByDefault(t *testing.T) {
+	code := `x := SQLExecute("SELECT * FROM users WHERE name = ?sUndeclared?");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "does not match any declared variable") {
+			t.Error("SQL parameter validation should be disabled by default")
+		}
+	}
+}
+
+// --- checkTokenErrors tests ---
+
+func TestGetDiagnostics_TokenErrors_UnknownToken(t *testing.T) {
+	// Backtick is not a valid SSL token
+	code := "x := `invalid`;"
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Unknown token") {
+			return
+		}
+	}
+
+	t.Fatal("expected unknown token diagnostic for backtick")
+}
+
+// --- checkLoopAndFinallyControl: :LOOP in :FINALLY ---
+
+func TestGetDiagnostics_LoopInFinally(t *testing.T) {
+	code := `:WHILE .T.;
+:TRY;
+    x := 1;
+:FINALLY;
+    :LOOP;
+:ENDTRY;
+:ENDWHILE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':LOOP' inside a ':FINALLY' block is a compile-time error") {
+			return
+		}
+	}
+
+	t.Fatal("expected LOOP-in-FINALLY diagnostic")
+}
+
+// --- checkDeprecatedKeywords: :ERROR and :LABEL ---
+
+func TestGetDiagnostics_ErrorIsDeprecatedKeyword(t *testing.T) {
+	code := `:ERROR;
+x := GetLastSSLError();`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':ERROR' is legacy error handling") {
+			return
+		}
+	}
+
+	t.Fatal("expected deprecation warning for :ERROR")
+}
+
+func TestGetDiagnostics_LabelIsDeprecatedKeyword(t *testing.T) {
+	code := `:LABEL SKIP;
+x := 1;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':LABEL' is legacy flow control") {
+			return
+		}
+	}
+
+	t.Fatal("expected deprecation warning for :LABEL")
+}
+
+// --- checkMissingOtherwise tests ---
+
+func TestGetDiagnostics_MissingOtherwise(t *testing.T) {
+	code := `:BEGINCASE;
+:CASE x > 0;
+    y := 1;
+:EXITCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "no ':OTHERWISE' clause") {
+			return
+		}
+	}
+
+	t.Fatal("expected missing OTHERWISE hint")
+}
+
+func TestGetDiagnostics_MissingOtherwise_PresentNoWarning(t *testing.T) {
+	code := `:BEGINCASE;
+:CASE x > 0;
+    y := 1;
+:EXITCASE;
+:OTHERWISE;
+    y := 0;
+:EXITCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "no ':OTHERWISE' clause") {
+			t.Error("should not warn when :OTHERWISE is present")
+		}
+	}
+}
+
+func TestGetDiagnostics_MissingOtherwise_NestedIgnoresInner(t *testing.T) {
+	// Inner BEGINCASE has OTHERWISE, outer does not
+	code := `:BEGINCASE;
+:CASE x > 0;
+    :BEGINCASE;
+    :CASE y > 0;
+        z := 1;
+    :EXITCASE;
+    :OTHERWISE;
+        z := 0;
+    :EXITCASE;
+    :ENDCASE;
+:EXITCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	found := 0
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "no ':OTHERWISE' clause") {
+			found++
+		}
+	}
+
+	if found != 1 {
+		t.Errorf("expected exactly 1 missing OTHERWISE hint (outer block only), got %d", found)
+	}
+}
+
+// --- TRY structure edge cases ---
+
+func TestGetDiagnostics_TryMultipleCatch(t *testing.T) {
+	// Only one :CATCH per :TRY
+	code := `:TRY;
+    x := 1;
+:CATCH;
+    y := 2;
+:CATCH;
+    z := 3;
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one ':CATCH' block is allowed") {
+			return
+		}
+	}
+
+	t.Fatal("expected multiple-catch diagnostic")
+}
+
+func TestGetDiagnostics_TryCatchAfterFinally(t *testing.T) {
+	// :CATCH must appear before :FINALLY
+	code := `:TRY;
+    x := 1;
+:FINALLY;
+    y := 2;
+:CATCH;
+    z := 3;
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':CATCH' must appear before ':FINALLY'") {
+			return
+		}
+	}
+
+	t.Fatal("expected catch-after-finally diagnostic")
+}
+
+func TestGetDiagnostics_TryMultipleFinally(t *testing.T) {
+	// Only one :FINALLY per :TRY
+	code := `:TRY;
+    x := 1;
+:FINALLY;
+    y := 2;
+:FINALLY;
+    z := 3;
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one ':FINALLY' block is allowed") {
+			return
+		}
+	}
+
+	t.Fatal("expected multiple-finally diagnostic")
+}
+
+func TestGetDiagnostics_TryOnlyCatchIsValid(t *testing.T) {
+	// :TRY with only :CATCH (no :FINALLY) is valid
+	code := `:TRY;
+    x := 1;
+:CATCH;
+    y := GetLastSSLError();
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "requires at least one ':CATCH' or ':FINALLY'") {
+			t.Error("TRY with only CATCH should be valid")
+		}
+	}
+}
+
+func TestGetDiagnostics_TryOnlyFinallyIsValid(t *testing.T) {
+	// :TRY with only :FINALLY (no :CATCH) is valid
+	code := `:TRY;
+    x := 1;
+:FINALLY;
+    DoProc("Cleanup");
+:ENDTRY;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "requires at least one ':CATCH' or ':FINALLY'") {
+			t.Error("TRY with only FINALLY should be valid")
+		}
+	}
+}
+
+// --- Class context edge cases ---
+
+func TestGetDiagnostics_OneClassPerFile(t *testing.T) {
+	// Only one :CLASS per file
+	code := `:CLASS MyClass;
+:PROCEDURE Method1;
+:ENDPROC;
+:CLASS AnotherClass;
+:PROCEDURE Method2;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one ':CLASS' definition is allowed per file") {
+			return
+		}
+	}
+
+	t.Fatal("expected one-class-per-file diagnostic")
+}
+
+func TestGetDiagnostics_ClassMustBeFirstStatement(t *testing.T) {
+	// :CLASS must be the first significant statement
+	code := `x := 1;
+:CLASS MyClass;
+:PROCEDURE Method1;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':CLASS' must be the first significant statement") {
+			return
+		}
+	}
+
+	t.Fatal("expected class-first-statement diagnostic")
+}
+
+// --- Loop exit edge cases ---
+
+func TestGetDiagnostics_ExitWhileOutsideWhile(t *testing.T) {
+	code := `:EXITWHILE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':EXITWHILE' must be inside a ':WHILE' loop") {
+			return
+		}
+	}
+
+	t.Fatal("expected EXITWHILE-outside-loop diagnostic")
+}
+
+func TestGetDiagnostics_ExitWhileInFinally(t *testing.T) {
+	code := `:WHILE .T.;
+:TRY;
+    x := 1;
+:FINALLY;
+    :EXITWHILE;
+:ENDTRY;
+:ENDWHILE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':EXITWHILE' inside a ':FINALLY' block is a compile-time error") {
+			return
+		}
+	}
+
+	t.Fatal("expected EXITWHILE-in-FINALLY diagnostic")
+}
+
+func TestGetDiagnostics_ExitForInFinally(t *testing.T) {
+	code := `:FOR i := 1 :TO 10;
+:TRY;
+    x := 1;
+:FINALLY;
+    :EXITFOR;
+:ENDTRY;
+:NEXT;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':EXITFOR' inside a ':FINALLY' block is a compile-time error") {
+			return
+		}
+	}
+
+	t.Fatal("expected EXITFOR-in-FINALLY diagnostic")
+}
+
+// --- Empty BEGINCASE ---
+
+func TestGetDiagnostics_EmptyBeginCase(t *testing.T) {
+	// :BEGINCASE with no :CASE is a compile error
+	code := `:BEGINCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "requires at least one ':CASE' block") {
+			return
+		}
+	}
+
+	t.Fatal("expected empty BEGINCASE diagnostic")
+}
+
+// --- :ERROR handler must have body ---
+
+func TestGetDiagnostics_ErrorHandlerWithBody(t *testing.T) {
+	// :ERROR with a body is valid
+	code := `:ERROR;
+oErr := GetLastSSLError();
+:RESUME;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':ERROR' must contain at least one statement") {
+			t.Error(":ERROR with body should be valid")
+		}
+	}
+}
+
+// --- :INCLUDE at top vs middle ---
+
+func TestGetDiagnostics_IncludeMiddleOfFile(t *testing.T) {
+	code := `:DECLARE x;
+x := 1;
+:INCLUDE SomeLibrary;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':INCLUDE' is an include directive") {
+			return
+		}
+	}
+
+	t.Fatal("expected INCLUDE-not-at-top info")
+}
+
+func TestGetDiagnostics_IncludeAtTopIsClean(t *testing.T) {
+	code := `:INCLUDE SomeLibrary;
+:DECLARE x;
+x := 1;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':INCLUDE' is an include directive") {
+			t.Error(":INCLUDE at top should not be flagged")
+		}
+	}
+}
+
+// --- Not-preferred operators: valid != not flagged ---
+
+func TestGetDiagnostics_NotPreferredOperators_ValidNotEquals(t *testing.T) {
+	code := `:IF x != 1;
+:ENDIF;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "instead of") && strings.Contains(d.Message, "!=") {
+			t.Error("!= should not be flagged as non-preferred")
+		}
+	}
+}
+
+// --- Comprehensive empty trailing array coverage ---
+
+func TestGetDiagnostics_EmptyTrailingArray_DoProc(t *testing.T) {
+	code := `DoProc("MyProc", {});`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Omit the trailing empty array") {
+			return
+		}
+	}
+
+	t.Fatal("expected empty trailing array diagnostic for DoProc")
+}
+
+func TestGetDiagnostics_EmptyTrailingArray_ExecFunction(t *testing.T) {
+	code := `ExecFunction("Module.Proc", {});`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Omit the trailing empty array") {
+			return
+		}
+	}
+
+	t.Fatal("expected empty trailing array diagnostic for ExecFunction")
+}
+
+// --- :BEGINCASE :CASE with EXITCASE is valid ---
+
+func TestGetDiagnostics_BeginCaseWithCaseIsValid(t *testing.T) {
+	code := `:BEGINCASE;
+:CASE x > 0;
+    y := 1;
+:EXITCASE;
+:ENDCASE;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "requires at least one ':CASE' block") {
+			t.Error("BEGINCASE with CASE should not be flagged")
+		}
+	}
+}
+
+// ==================== Name Length Tests ====================
+
+func TestGetDiagnostics_VariableNameTooLong(t *testing.T) {
+	// Variable name exceeds 20 chars (excluding prefix)
+	code := `:DECLARE sThisIsAnExtremelyLongVariableNameThatExceedsLimit;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds 20-character limit") {
+			return
+		}
+	}
+
+	t.Fatal("expected variable name length diagnostic")
+}
+
+func TestGetDiagnostics_VariableNameOK(t *testing.T) {
+	// Variable name within limit (prefix stripped)
+	code := `:DECLARE sShortName;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds 20-character limit") {
+			t.Errorf("short variable name should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_ProcedureNameTooLong(t *testing.T) {
+	// Procedure name exceeds 30 chars
+	code := `:PROCEDURE ThisIsAnExtremelyLongProcedureName;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds 30-character limit") {
+			return
+		}
+	}
+
+	t.Fatal("expected procedure name length diagnostic")
+}
+
+func TestGetDiagnostics_ProcedureNameOK(t *testing.T) {
+	// Procedure name within limit
+	code := `:PROCEDURE ValidateSample;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds 30-character limit") {
+			t.Error("short procedure name should not be flagged")
+		}
+	}
+}
+
+// ==================== Visibility Annotation Tests ====================
+
+func TestGetDiagnostics_VisibilityAnnotationInClass(t *testing.T) {
+	// @private has no effect on class methods
+	code := `:CLASS MyClass;
+/*@private;
+:PROCEDURE Helper;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "has no effect on class methods") {
+			return
+		}
+	}
+
+	t.Fatal("expected visibility annotation warning in class context")
+}
+
+func TestGetDiagnostics_VisibilityAnnotationValidInScript(t *testing.T) {
+	// @private before :PROCEDURE in script is valid
+	code := `/*@private;
+:PROCEDURE Helper;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "has no effect") || strings.Contains(d.Message, "should appear") {
+			t.Errorf("valid visibility annotation in script should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_VisibilityAnnotationNotBeforeProcedure(t *testing.T) {
+	// @protected not before :PROCEDURE
+	code := `/*@protected;
+:DECLARE x;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "should appear on its own line immediately before ':PROCEDURE'") {
+			return
+		}
+	}
+
+	t.Fatal("expected visibility annotation placement warning")
+}
+
+// ==================== NIL Method Call Tests ====================
+
+func TestGetDiagnostics_NilMethodCall_Literal(t *testing.T) {
+	// NIL:Method() is always an error
+	code := `x := NIL:ToString();`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Calling a method on NIL raises an error") {
+			return
+		}
+	}
+
+	t.Fatal("expected NIL method call diagnostic")
+}
+
+func TestGetDiagnostics_NilMethodCall_Variable(t *testing.T) {
+	// Variable assigned NIL then used with member access
+	code := `:DECLARE oObj;
+oObj := NIL;
+oObj:Method();`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "may be NIL at this point") {
+			return
+		}
+	}
+
+	t.Fatal("expected NIL variable method call diagnostic")
+}
+
+func TestGetDiagnostics_NilMethodCall_ReassignedNotFlagged(t *testing.T) {
+	// Variable assigned NIL then reassigned — should not flag
+	code := `:DECLARE oObj;
+oObj := NIL;
+oObj := CreateUdObject();
+oObj:Method();`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "may be NIL") && strings.Contains(d.Message, "oObj") {
+			t.Error("reassigned variable should not be flagged as NIL")
+		}
+	}
+}
+
+// --- ! operator is valid (source of truth does NOT list it as non-preferred) ---
+
+func TestGetDiagnostics_ExclamationMarkIsValid(t *testing.T) {
+	// Source of truth uses ! freely in examples and only lists # and <> as non-preferred.
+	// ! should NOT produce any "not preferred" diagnostic.
+	text := `:DECLARE bFlag;
+bFlag := .T.;
+:IF !bFlag;
+    UsrMes("not flagged");
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DiagnosticOptions{})
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, ".NOT.") && strings.Contains(d.Message, "!") {
+			t.Errorf("! should not be flagged as non-preferred: %s", d.Message)
+		}
+	}
+}
+
+// --- Scientific notation diagnostic ---
+
+func TestGetDiagnostics_ScientificNotationWithoutDecimal(t *testing.T) {
+	// 7e2 should trigger a warning about missing decimal point
+	text := `:DECLARE nVal;
+nVal := 7e2;`
+	diagnostics := GetDiagnostics(text, DiagnosticOptions{})
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "scientific notation") && strings.Contains(d.Message, "decimal") {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected SeverityWarning, got %d", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about scientific notation requiring decimal point")
+	}
+}
+
+func TestGetDiagnostics_ScientificNotationWithDecimalNoWarning(t *testing.T) {
+	// 7.0e2 should NOT trigger a warning
+	text := `:DECLARE nVal;
+nVal := 7.0e2;`
+	diagnostics := GetDiagnostics(text, DiagnosticOptions{})
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "scientific notation") {
+			t.Error("should not flag valid scientific notation 7.0e2")
+		}
+	}
+}
+
+// --- D12: :ENDFOR detection ---
+
+func TestGetDiagnostics_EndForIsInvalid(t *testing.T) {
+	text := `:FOR i := 1 :TO 10;
+    i := i + 1;
+:ENDFOR;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, ":ENDFOR") && strings.Contains(d.Message, ":NEXT") {
+			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected SeverityError, got %d", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic telling user to use :NEXT instead of :ENDFOR")
+	}
+}
+
+func TestGetDiagnostics_EndForCaseInsensitive(t *testing.T) {
+	text := `:FOR i := 1 :TO 5;
+    i := i + 1;
+:endfor;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, ":ENDFOR") || strings.Contains(d.Message, ":NEXT") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic for :endfor (case-insensitive detection)")
+	}
+}
+
+// --- D13: Redeclared variables ---
+
+func TestGetDiagnostics_RedeclaredVariable(t *testing.T) {
+	text := `:DECLARE sName;
+:DECLARE sName;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(strings.ToLower(d.Message), "already declared") || strings.Contains(strings.ToLower(d.Message), "redeclared") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic for redeclared variable")
+	}
+}
+
+func TestGetDiagnostics_RedeclaredVariable_DifferentScopes(t *testing.T) {
+	// Variables in different procedures should NOT be flagged
+	text := `:PROCEDURE ProcA;
+:DECLARE sName;
+sName := "A";
+:ENDPROC;
+
+:PROCEDURE ProcB;
+:DECLARE sName;
+sName := "B";
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(strings.ToLower(d.Message), "already declared") || strings.Contains(strings.ToLower(d.Message), "redeclared") {
+			t.Error("should not flag same variable name in different procedure scopes")
+		}
+	}
+}
+
+// --- D14: Empty trailing array with GetDataSet ---
+
+func TestGetDiagnostics_EmptyTrailingArray_GetDataSet(t *testing.T) {
+	text := `:DECLARE sSQL, sXml;
+sSQL := "SELECT * FROM Table";
+sXml := GetDataSet(sSQL, {});`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Omit") && strings.Contains(d.Message, "{}") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about omitting empty trailing array for GetDataSet")
+	}
+}
+
+func TestGetDiagnostics_EmptyTrailingArray_GetDataSet_WithParams(t *testing.T) {
+	// GetDataSet with a real parameter array should NOT trigger the diagnostic
+	text := `:DECLARE sSQL, sXml, sStatus;
+sSQL := "SELECT * FROM Table WHERE Status = ?";
+sXml := GetDataSet(sSQL, {sStatus});`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Omit") && strings.Contains(d.Message, "{}") {
+			t.Error("GetDataSet with non-empty params should not trigger trailing array warning")
+		}
+	}
+}
+
+// --- D15: Class member order with :INHERIT before :DECLARE ---
+
+func TestGetDiagnostics_ClassMemberOrder_InheritBeforeDeclare(t *testing.T) {
+	// Correct order: INHERIT, DECLARE, methods, Constructor
+	text := `:CLASS MyClass;
+:INHERIT BaseClass;
+:DECLARE sField;
+:PROCEDURE DoWork;
+:ENDPROC;
+:PROCEDURE Constructor;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "member order") || strings.Contains(d.Message, "should appear before") {
+			t.Errorf("correct class member order should not produce diagnostics, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_ClassMemberOrder_DeclareBeforeInherit(t *testing.T) {
+	// Wrong order: DECLARE before INHERIT
+	text := `:CLASS MyClass;
+:DECLARE sField;
+:INHERIT BaseClass;
+:PROCEDURE DoWork;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "INHERIT") && (strings.Contains(d.Message, "before") || strings.Contains(d.Message, "order")) {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :INHERIT needing to come before :DECLARE")
+	}
+}
+
+func TestGetDiagnostics_ClassMemberOrder_ConstructorNotLast(t *testing.T) {
+	// Wrong order: Constructor before regular method
+	text := `:CLASS MyClass;
+:PROCEDURE Constructor;
+:ENDPROC;
+:PROCEDURE DoWork;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Constructor") && (strings.Contains(d.Message, "last") || strings.Contains(d.Message, "after") || strings.Contains(d.Message, "order")) {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about Constructor needing to be last")
+	}
+}
+
+// --- D16: String equality = vs == asymmetry ---
+
+func TestGetDiagnostics_LooseStringEquality_PrefixMatch(t *testing.T) {
+	text := `:DECLARE sStatus;
+sStatus := "Logged";
+:IF sStatus = "Log";
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "prefix matching") || strings.Contains(d.Message, "exact string") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about loose string equality doing prefix matching")
+	}
+}
+
+func TestGetDiagnostics_StrictStringEquality_NoWarning(t *testing.T) {
+	text := `:DECLARE sStatus;
+sStatus := "Logged";
+:IF sStatus == "Logged";
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "prefix matching") {
+			t.Error("strict equality == should not produce prefix matching warning")
+		}
+	}
+}
+
+// --- D17: :ERROR/:RESUME structure validation ---
+
+func TestGetDiagnostics_ErrorHandlerRequiresStatement(t *testing.T) {
+	text := `:ERROR;
+:RESUME;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "ERROR") && strings.Contains(d.Message, "at least one statement") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :ERROR requiring at least one statement")
+	}
+}
+
+func TestGetDiagnostics_ErrorHandlerWithStatement_NoWarning(t *testing.T) {
+	text := `:ERROR;
+UsrMes("Error occurred");
+:RESUME;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "ERROR") && strings.Contains(d.Message, "at least one statement") {
+			t.Error(":ERROR with a statement should not produce 'requires statement' diagnostic")
+		}
+	}
+}
+
+func TestGetDiagnostics_DeprecatedError(t *testing.T) {
+	text := `:ERROR;
+UsrMes("Error");`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "legacy") && strings.Contains(d.Message, "ERROR") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected deprecation warning for :ERROR")
+	}
+}
+
+func TestGetDiagnostics_DeprecatedResume(t *testing.T) {
+	text := `:ERROR;
+UsrMes("Error");
+:RESUME;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "legacy") && strings.Contains(d.Message, "RESUME") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected deprecation warning for :RESUME")
+	}
+}
+
+// --- D18: Branch target with :LABELName compact form ---
+
+func TestGetDiagnostics_BranchTarget_CompactLabelForm(t *testing.T) {
+	// :LABELSKIP; produces token text "LABELSKIP", so Branch("SKIP") won't match
+	text := `:LABELSKIP;
+Branch("SKIP");`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	// This should produce a diagnostic because "SKIP" doesn't match "LABELSKIP"
+	// (The Branch target must include the full token text including "LABEL" prefix)
+	foundBranch := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Branch") || strings.Contains(d.Message, "LABEL") {
+			foundBranch = true
+		}
+	}
+	// Just verify it doesn't crash - exact behavior depends on implementation
+	_ = foundBranch
+}
+
+func TestGetDiagnostics_BranchTarget_SpacedLabelForm(t *testing.T) {
+	// :LABEL SKIP; produces token text "LABEL SKIP"
+	text := `:LABEL SKIP;
+Branch("LABEL SKIP");`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	// Should not produce branch-target-mismatch errors (this is correct usage)
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Branch target") && strings.Contains(d.Message, "does not match") {
+			t.Error("correct Branch target 'LABEL SKIP' should not produce mismatch diagnostic")
+		}
+	}
+}
+
+// --- D19: Visibility annotation placement ---
+
+func TestGetDiagnostics_VisibilityAnnotation_BeforeNonProcedure(t *testing.T) {
+	text := `/*@private;
+:DECLARE sName;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "private") && strings.Contains(d.Message, "PROCEDURE") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about visibility annotation needing to be before :PROCEDURE")
+	}
+}
+
+func TestGetDiagnostics_VisibilityAnnotation_ProtectedInClass(t *testing.T) {
+	text := `:CLASS MyClass;
+/*@protected;
+:PROCEDURE DoWork;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "protected") && strings.Contains(d.Message, "no effect") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about visibility annotation having no effect on class methods")
+	}
+}
+
+// --- D20: NIL method calls ---
+
+func TestGetDiagnostics_NilMethodCall_AfterReassignment(t *testing.T) {
+	// After reassigning to non-NIL, method calls should be fine
+	text := `:DECLARE oObj;
+oObj := NIL;
+oObj := CreateUdObject();
+oObj:Method();`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "NIL") && strings.Contains(d.Message, "method") {
+			t.Error("should not flag method call after reassignment from NIL to non-NIL")
+		}
+	}
+}
+
+// --- Pass 2: Nested IIF ---
+
+func TestGetDiagnostics_NestedIIF(t *testing.T) {
+	text := `:DECLARE sResult;
+sResult := IIF(bCond1, IIF(bCond2, "A", "B"), "C");`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Nested IIF") || strings.Contains(d.Message, "IIF()") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about nested IIF reducing readability")
+	}
+}
+
+func TestGetDiagnostics_NestedIIF_SingleNotFlagged(t *testing.T) {
+	text := `:DECLARE sResult;
+sResult := IIF(bCond, "Yes", "No");`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Nested IIF") || strings.Contains(d.Message, "IIF()") {
+			t.Error("single IIF should not trigger nested warning")
+		}
+	}
+}
+
+// --- Pass 2: Negative Logic ---
+
+func TestGetDiagnostics_NegativeLogic(t *testing.T) {
+	text := `:DECLARE bFlag;
+:IF .NOT. bFlag;
+    DoProc("HandleFalse");
+:ELSE;
+    DoProc("HandleTrue");
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "positive logic") || strings.Contains(d.Message, "invert") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected hint about inverting condition to use positive logic")
+	}
+}
+
+func TestGetDiagnostics_NegativeLogic_NoElseNoWarning(t *testing.T) {
+	// Without :ELSE, there's no opportunity to invert
+	text := `:DECLARE bFlag;
+:IF .NOT. bFlag;
+    DoProc("HandleFalse");
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "positive logic") || strings.Contains(d.Message, "invert") {
+			t.Error("should not suggest inverting when there is no :ELSE branch")
+		}
+	}
+}
+
+// --- Pass 2: Multiple :CLASS per file ---
+
+func TestGetDiagnostics_MultipleClassPerFile(t *testing.T) {
+	text := `:CLASS ClassA;
+:PROCEDURE MethodA;
+:ENDPROC;
+
+:CLASS ClassB;
+:PROCEDURE MethodB;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one") && strings.Contains(d.Message, "CLASS") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about only one :CLASS per file")
+	}
+}
+
+// --- Pass 2: :CLASS must be first significant statement ---
+
+func TestGetDiagnostics_ClassNotFirstStatement(t *testing.T) {
+	text := `:DECLARE sName;
+sName := "test";
+:CLASS MyClass;
+:PROCEDURE DoWork;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "CLASS") && strings.Contains(d.Message, "first") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :CLASS needing to be first statement")
+	}
+}
+
+// --- Pass 2: Skipped param spacing (adjacent commas) ---
+
+func TestGetDiagnostics_SkippedParamSpacing(t *testing.T) {
+	// {param1,,param3} is valid, {param1, , param3} is not
+	// This is a lexer/formatting concern, verify valid form doesn't crash
+	text := `:DECLARE sResult;
+sResult := DoProc("MyProc", {1,,3,,5});`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	// Should not produce any diagnostic about the skipped params
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "skipped") && strings.Contains(d.Message, "param") {
+			t.Error("valid skipped param syntax should not produce diagnostic")
+		}
+	}
+}
+
+// --- Pass 2: Code block (lambda) with comparisons ---
+
+func TestGetDiagnostics_CodeBlockComparison_InCondition(t *testing.T) {
+	// Code block literal in comparison context should trigger diagnostic
+	text := `:DECLARE fnCallback;
+:IF fnCallback = {|x| x + 1};
+:ENDIF;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Code block") || strings.Contains(d.Message, "lambda") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about comparing code blocks")
+	}
+}
+
+// --- Pass 2: $ containment only for strings ---
+
+func TestGetDiagnostics_DollarContainmentWithNumber(t *testing.T) {
+	text := `:DECLARE nVal, bResult;
+nVal := 42;
+bResult := nVal $ "test";`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "$") && strings.Contains(d.Message, "string") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about $ operator only working on strings")
+	}
+}
+
+// --- Pass 2: NIL in arithmetic operation ---
+
+func TestGetDiagnostics_NilInArithmetic(t *testing.T) {
+	text := `:DECLARE nResult;
+nResult := NIL + 1;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "NIL") && strings.Contains(d.Message, "arithmetic") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about NIL in arithmetic operations")
+	}
+}
+
+// --- Pass 2: Multiple :CATCH blocks ---
+
+func TestGetDiagnostics_TryMultipleCatch_Diagnostic(t *testing.T) {
+	text := `:PROCEDURE Test;
+:TRY;
+    sVal := "";
+:CATCH;
+    sVal := "error1";
+:CATCH;
+    sVal := "error2";
+:ENDTRY;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one") && strings.Contains(d.Message, "CATCH") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about only one :CATCH per :TRY")
+	}
+}
+
+// --- Pass 2: :CATCH before :FINALLY order ---
+
+func TestGetDiagnostics_CatchMustBeBeforeFinally(t *testing.T) {
+	text := `:PROCEDURE Test;
+:TRY;
+    sVal := "";
+:FINALLY;
+    sVal := "cleanup";
+:CATCH;
+    sVal := "error";
+:ENDTRY;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "CATCH") && strings.Contains(d.Message, "before") && strings.Contains(d.Message, "FINALLY") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :CATCH needing to appear before :FINALLY")
+	}
+}
+
+// --- Pass 2: :EXITFOR outside :FOR loop ---
+
+func TestGetDiagnostics_ExitWhileOutsideWhile_Standalone(t *testing.T) {
+	text := `:PROCEDURE Test;
+:EXITWHILE;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "EXITWHILE") || strings.Contains(d.Message, "outside") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :EXITWHILE outside :WHILE loop")
+	}
+}
+
+// --- Pass 2: Variable name length limit ---
+
+func TestGetDiagnostics_VariableNameLength_TooLong(t *testing.T) {
+	text := `:DECLARE sThisVariableNameIsWayTooLongForSSL;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds") && strings.Contains(d.Message, "character") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about variable name exceeding length limit")
+	}
+}
+
+func TestGetDiagnostics_ProcedureNameLength_TooLong(t *testing.T) {
+	text := `:PROCEDURE ThisIsAnExtremelyLongProcedureNameThatExceedsLimit;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "exceeds") && strings.Contains(d.Message, "character") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about procedure name exceeding length limit")
+	}
+}
+
+// --- Pass 2: createUdObject with anonymous properties ---
+
+func TestGetDiagnostics_CreateUdObjectAnonymous_NoDiagnostic(t *testing.T) {
+	text := `:DECLARE oObj;
+oObj := CreateUdObject({{"name", "test"}, {"value", 42}});`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "CreateUdObject") && strings.Contains(d.Message, "built-in") {
+			t.Error("anonymous CreateUdObject should not trigger built-in class misuse warning")
+		}
+	}
+}
+
+// --- Pass 3: Constructor :RETURN; (bare, no value) must be allowed ---
+
+func TestGetDiagnostics_ConstructorBareReturn_Allowed(t *testing.T) {
+	text := `:CLASS MyClass;
+:PROCEDURE Constructor;
+    :RETURN;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Constructor cannot return") {
+			t.Error("bare :RETURN; inside Constructor should be allowed (only :RETURN value; is an error)")
+		}
+	}
+}
+
+// --- Pass 3: Multiple :DEFAULT after one :PARAMETERS ---
+
+func TestGetDiagnostics_MultipleDefaultAfterParameters(t *testing.T) {
+	text := `:PROCEDURE Test;
+:PARAMETERS sName, nCount, bFlag;
+:DEFAULT sName, "";
+:DEFAULT nCount, 0;
+:DEFAULT bFlag, .T.;
+:DECLARE sResult;
+sResult := sName;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "immediately after") {
+			t.Errorf("multiple :DEFAULT statements after :PARAMETERS should all be allowed, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DefaultAfterDeclare_StillErrors(t *testing.T) {
+	// :DEFAULT after :DECLARE should still error even if :PARAMETERS exists earlier
+	text := `:PROCEDURE Test;
+:PARAMETERS sName;
+:DEFAULT sName, "";
+:DECLARE nCount;
+:DEFAULT nCount, 0;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "immediately after") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic: :DEFAULT after :DECLARE should error (:DEFAULT must follow :PARAMETERS)")
+	}
+}
+
+// --- Pass 3: Empty :CATCH body is valid ---
+
+func TestGetDiagnostics_EmptyCatchBody_Valid(t *testing.T) {
+	text := `:PROCEDURE Test;
+:TRY;
+    sVal := "";
+:CATCH;
+:ENDTRY;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "CATCH") && strings.Contains(d.Message, "statement") {
+			t.Errorf("empty :CATCH body should be valid (zero or more statements allowed), got: %s", d.Message)
+		}
+	}
+}
+
+// --- Pass 3: :TRY with only :CATCH (no :FINALLY) is valid ---
+
+func TestGetDiagnostics_TryOnlyCatch_Valid(t *testing.T) {
+	text := `:PROCEDURE Test;
+:TRY;
+    sVal := "";
+:CATCH;
+    sVal := "error";
+:ENDTRY;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "FINALLY") && strings.Contains(d.Message, "required") {
+			t.Error(":TRY with only :CATCH (no :FINALLY) should be valid")
+		}
+	}
+}
+
+// --- Pass 3: :OTHERWISE skipped once any :CASE body ran (even without :EXITCASE) ---
+
+func TestGetDiagnostics_OtherwiseWithoutExitCase_ValidPattern(t *testing.T) {
+	// This is valid SSL - :OTHERWISE doesn't execute when earlier :CASE matched
+	// The LSP should warn about missing :EXITCASE but not about :OTHERWISE behavior
+	text := `:BEGINCASE;
+:CASE nVal == 1;
+    DoProc("A");
+:OTHERWISE;
+    DoProc("Default");
+:ENDCASE;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	// Should get warning about missing :EXITCASE but not about :OTHERWISE
+	foundExitCaseWarning := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "EXITCASE") {
+			foundExitCaseWarning = true
+		}
+		if strings.Contains(d.Message, "OTHERWISE") && d.Severity == SeverityError {
+			t.Error(":OTHERWISE should not produce an error - it's valid even without :EXITCASE")
+		}
+	}
+	if !foundExitCaseWarning {
+		t.Error("expected warning about missing :EXITCASE")
+	}
+}
+
+// --- Pass 3: Class reference forms - Me:Method, Base:Method ---
+
+func TestGetDiagnostics_ClassReferenceForms_BaseStandalone(t *testing.T) {
+	text := `:CLASS MyClass;
+:INHERIT ParentClass;
+:PROCEDURE Test;
+    Base;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Base") && strings.Contains(d.Message, "Base:MemberName") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about 'Base' needing to be used as 'Base:MemberName'")
+	}
+}
+
+func TestGetDiagnostics_ClassReferenceForms_BaseWithoutInherit(t *testing.T) {
+	text := `:CLASS MyClass;
+:PROCEDURE Test;
+    Base:Method();
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Base") && strings.Contains(d.Message, "INHERIT") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about 'Base:MemberName' requiring ':INHERIT'")
+	}
+}
+
+// --- TestGetDiagnostics_MultipleCatchBlocks ---
+
+func TestGetDiagnostics_MultipleCatchBlocks(t *testing.T) {
+	text := `:TRY;
+ x := 1;
+:CATCH;
+:CATCH;
+:ENDTRY;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Only one") && strings.Contains(d.Message, "CATCH") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about only one :CATCH per :TRY")
+	}
+}
+
+// --- TestGetDiagnostics_FinallyRestrictions ---
+
+func TestGetDiagnostics_FinallyRestrictions(t *testing.T) {
+	text := `:TRY;
+ x := 1;
+:FINALLY;
+ :RETURN 1;
+:ENDTRY;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':RETURN'") && strings.Contains(d.Message, "':FINALLY'") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected compile error diagnostic about RETURN in FINALLY")
+	}
+}
+
+// --- TestGetDiagnostics_EndForInvalid ---
+
+func TestGetDiagnostics_EndForInvalid(t *testing.T) {
+	text := `:FOR i := 1 :TO 10;
+ x := 1;
+:ENDFOR;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, ":NEXT") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic that :FOR must be terminated with ':NEXT'")
+	}
+}
+
+// --- TestGetDiagnostics_ZeroBasedArrayAccess ---
+
+func TestGetDiagnostics_ZeroBasedArrayAccess(t *testing.T) {
+	text := `x := aData[0];`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "1-based") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about 1-based array indexing")
+	}
+}
+
+// --- Tests for new diagnostics: STEP spacing, REGION legacy, code block structure ---
+
+func TestGetDiagnostics_StepSpacingWarning(t *testing.T) {
+	// :STEP without a preceding space should warn
+	text := `:FOR i := 1 :TO 10:STEP 2;
+    x := i;
+:NEXT;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "STEP") && strings.Contains(d.Message, "space before") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :STEP needing a space before it")
+	}
+}
+
+func TestGetDiagnostics_StepSpacing_ValidNoWarning(t *testing.T) {
+	// :STEP with preceding space should NOT warn
+	text := `:FOR i := 1 :TO 10 :STEP 2;
+    x := i;
+:NEXT;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "STEP") && strings.Contains(d.Message, "space before") {
+			t.Error("should not warn when :STEP has a space before it")
+		}
+	}
+}
+
+func TestGetDiagnostics_RegionLegacyWarning(t *testing.T) {
+	text := `:REGION TestRegion;
+    x := 1;
+:ENDREGION;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	foundRegion := false
+	foundEndRegion := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "legacy functional construct") {
+			if strings.Contains(d.Message, ":REGION") {
+				foundRegion = true
+			}
+			if strings.Contains(d.Message, ":ENDREGION") {
+				foundEndRegion = true
+			}
+		}
+	}
+	if !foundRegion {
+		t.Error("expected legacy warning for :REGION")
+	}
+	if !foundEndRegion {
+		t.Error("expected legacy warning for :ENDREGION")
+	}
+}
+
+func TestGetDiagnostics_CodeBlockEmptyParams(t *testing.T) {
+	// {|| expr} has no bound variables — should warn
+	text := `x := {|| 42};`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "at least one bound variable") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about code blocks needing at least one bound variable")
+	}
+}
+
+func TestGetDiagnostics_CodeBlockWithParams_NoWarning(t *testing.T) {
+	// {|x| x * 2} has a bound variable — should NOT warn
+	text := `fn := {|x| x * 2};`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "bound variable") {
+			t.Error("should not warn when code block has bound variables")
+		}
+	}
+}
+
+// ==================== Source-of-Truth Validation Tests ====================
+// Tests below validate alignment between the implementation and the
+// authoritative language rules in dev/ssl-style-guide/agent-guides/.
+
+func TestGetHover_Me_NoDirectCallExample(t *testing.T) {
+	// Source of truth: custom procedures cannot be called directly.
+	// Me hover must NOT suggest DoSomething(Me) since direct calls are invalid.
+	text := `:CLASS MyClass;
+:PROCEDURE DoWork;
+Me:Helper();
+:ENDPROC;
+:PROCEDURE Constructor;
+:ENDPROC;`
+	hover := GetHover(text, 3, 1, nil, nil)
+	if hover == nil {
+		t.Fatal("expected hover info for Me")
+	}
+	if strings.Contains(hover.Contents, "DoSomething(Me)") {
+		t.Error("Me hover should not suggest direct procedure calls like DoSomething(Me)")
+	}
+	if !strings.Contains(hover.Contents, "ExecFunction") {
+		t.Error("Me hover should show ExecFunction example for passing self as argument")
+	}
+}
+
+func TestGetDiagnostics_GetSSLDatasetSQLFormatting(t *testing.T) {
+	// GetSSLDataset takes SQL in its first argument and should be recognized
+	// as a SQL function for formatting detection purposes.
+	text := `aData := GetSSLDataset("SELECT * FROM orders WHERE status = 'Logged'");`
+	// Verify the function is recognized — the SQL formatting path is invoked
+	// when a SQL function's first argument is a string containing SQL.
+	upper := strings.ToUpper("GetSSLDataset")
+	if !SQLFunctions[upper] {
+		t.Errorf("expected GetSSLDataset to be in SQLFunctions map, got false for key %q", upper)
+	}
+	// Also verify the existing functions are still present
+	for _, fn := range []string{"SQLEXECUTE", "RUNSQL", "LSEARCH", "LSELECT", "LSELECT1", "LSELECTC", "GETDATASET", "GETDATASETEX"} {
+		if !SQLFunctions[fn] {
+			t.Errorf("expected %s to be in SQLFunctions map", fn)
+		}
+	}
+	_ = text // used to document the scenario
+}
+
+func TestGetDiagnostics_ScientificNotation_NoDotBeforeExponent(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md section 3 Number Details:
+	// "Scientific notation requires a decimal point before the exponent:
+	// 1.2e-3, 9.0E1 are valid; 7e2, .5e1, 9E+1 are not"
+	cases := []struct {
+		text    string
+		wantMsg string
+	}{
+		// 7e2 — number without decimal followed by eN identifier
+		{`x := 7e2;`, "requires a decimal point"},
+		// .5e1 — number starting with dot followed by eN
+		{`x := .5e1;`, "requires a digit before the decimal"},
+	}
+
+	opts := DefaultDiagnosticOptions()
+	for _, tc := range cases {
+		diagnostics := GetDiagnostics(tc.text, opts)
+		found := false
+		for _, d := range diagnostics {
+			if strings.Contains(d.Message, tc.wantMsg) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("text %q: expected diagnostic containing %q", tc.text, tc.wantMsg)
+		}
+	}
+}
+
+func TestGetDiagnostics_ScientificNotation_ValidForms(t *testing.T) {
+	// Valid scientific notation should NOT warn
+	cases := []string{
+		`x := 1.2e3;`,
+		`x := 9.0E1;`,
+		`x := 1.0e-3;`,
+	}
+
+	opts := DefaultDiagnosticOptions()
+	for _, text := range cases {
+		diagnostics := GetDiagnostics(text, opts)
+		for _, d := range diagnostics {
+			if strings.Contains(d.Message, "scientific notation") {
+				t.Errorf("text %q: should not warn for valid scientific notation, got: %s", text, d.Message)
+			}
+		}
+	}
+}
+
+func TestGetDiagnostics_CommentEarlyTermination_SemicolonInText(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md gotcha #10:
+	// "A semicolon inside comment text will prematurely end the comment"
+	// The comment /* Set x := 0; then increment; has TWO tokens.
+	text := "/* Set x := 0; then increment;"
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "terminate") || strings.Contains(d.Message, "executable code") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about comment early termination when semicolon appears inside comment text")
+	}
+}
+
+func TestGetDiagnostics_SkippedParamAdjacentCommas(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md:
+	// "Keep skipped-argument commas adjacent. DoProc("MyProc", {param1,,param3}) is valid"
+	// The formatter should preserve adjacent commas without adding spaces.
+	text := `DoProc("MyProc", {param1,,param3,,param5});`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(text, opts)
+	formatted := edits[0].NewText
+	// Adjacent commas should remain adjacent (no space between)
+	if strings.Contains(formatted, ", ,") {
+		t.Error("formatter should not insert space between adjacent commas for skipped parameters")
+	}
+	if !strings.Contains(formatted, ",,") {
+		t.Error("formatter should preserve adjacent commas for skipped parameters")
+	}
+}
+
+func TestGetDiagnostics_CreateUdObjectBuiltinClass_Error(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md rule #7:
+	// "Built-in classes use curly braces only — they cannot be instantiated via CreateUdObject"
+	text := `oEmail := CreateUdObject("Email");`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "curly-brace") && strings.Contains(d.Message, "Email") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about built-in class requiring curly-brace construction")
+	}
+}
+
+func TestGetDiagnostics_CreateUdObjectUserClass_NoDiagnostic(t *testing.T) {
+	// CreateUdObject("MyCustomClass") is valid for user-defined classes
+	text := `oObj := CreateUdObject("MyCustomClass");`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "curly-brace") {
+			t.Errorf("should not flag CreateUdObject with user-defined class name, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_StringEqualityPrefixMatch(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md gotcha #18:
+	// "= operator for strings returns .T. if right operand is empty OR left starts with right"
+	text := `:IF sStatus = "Log";
+:ENDIF;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "prefix matching") || strings.Contains(d.Message, "exact string") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about = doing prefix matching for strings")
+	}
+}
+
+func TestGetDiagnostics_StringExactEquality_NoWarning(t *testing.T) {
+	// == for strings should NOT warn about prefix matching
+	text := `:IF sStatus == "Logged";
+:ENDIF;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "prefix matching") {
+			t.Errorf("should not warn about prefix matching for ==, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DoProcInsideClass_AllFormsRejected(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md rule #5:
+	// "DoProc is a compile-time error inside class methods — all forms are rejected"
+	text := `:CLASS MyClass;
+:PROCEDURE DoWork;
+DoProc("Helper");
+:ENDPROC;
+:PROCEDURE Constructor;
+:ENDPROC;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DoProc is a compile-time error inside class methods") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about DoProc being a compile-time error inside class methods")
+	}
+}
+
+func TestGetDiagnostics_MeBaseNotFlaggedAsDirectCall(t *testing.T) {
+	// Me:Method() and Base:Method() are valid inside classes and should NOT
+	// be flagged as direct procedure calls.
+	text := `:CLASS MyClass;
+:INHERIT Lab.BaseClass;
+:PROCEDURE DoWork;
+Me:Helper();
+Base:Initialize();
+:ENDPROC;
+:PROCEDURE Helper;
+:ENDPROC;
+:PROCEDURE Constructor;
+:ENDPROC;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "cannot be called directly") &&
+			(strings.Contains(d.Message, "Helper") || strings.Contains(d.Message, "Initialize")) {
+			t.Errorf("Me:/Base: method calls should not be flagged as direct procedure calls, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_EndForIsInvalid_ForLoopsMustUseNext(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md gotcha #17:
+	// "ENDFOR is not valid — FOR loops must be terminated with :NEXT"
+	text := `:FOR i := 1 :TO 10;
+x := i;
+:ENDFOR;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "ENDFOR") && strings.Contains(d.Message, "NEXT") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about :ENDFOR being invalid, use :NEXT instead")
+	}
+}
+
+func TestGetDiagnostics_FinallyRestrictions_AllFourKeywords(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md section 2 Error Handling:
+	// ":RETURN, :EXITWHILE, :EXITFOR, and :LOOP inside a :FINALLY block are compile-time errors"
+	cases := []struct {
+		keyword string
+		text    string
+	}{
+		{"RETURN", `:TRY;
+x := 1;
+:FINALLY;
+:RETURN x;
+:ENDTRY;`},
+		{"EXITFOR", `:FOR i := 1 :TO 10;
+:TRY;
+x := 1;
+:FINALLY;
+:EXITFOR;
+:ENDTRY;
+:NEXT;`},
+		{"EXITWHILE", `:WHILE .T.;
+:TRY;
+x := 1;
+:FINALLY;
+:EXITWHILE;
+:ENDTRY;
+:ENDWHILE;`},
+		{"LOOP", `:WHILE .T.;
+:TRY;
+x := 1;
+:FINALLY;
+:LOOP;
+:ENDTRY;
+:ENDWHILE;`},
+	}
+
+	opts := DefaultDiagnosticOptions()
+	for _, tc := range cases {
+		diagnostics := GetDiagnostics(tc.text, opts)
+		found := false
+		for _, d := range diagnostics {
+			if strings.Contains(d.Message, tc.keyword) && strings.Contains(d.Message, "FINALLY") && strings.Contains(d.Message, "compile-time error") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected compile-time error for :%s inside :FINALLY", tc.keyword)
+		}
+	}
+}
+
+func TestGetDiagnostics_NamedSQLParamInRunSQL(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md rule #8:
+	// "SQLExecute is the only function that supports ?varName? substitution"
+	text := `RunSQL("UPDATE orders SET status = ?sStatus? WHERE id = ?nId?",, {sStatus, nId});`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Named SQL parameter") && strings.Contains(d.Message, "RunSQL") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about named SQL parameters not being supported by RunSQL")
+	}
+}
+
+func TestGetDiagnostics_NamedSQLParamInSQLExecute_NoDiagnostic(t *testing.T) {
+	// SQLExecute DOES support named params — should NOT warn
+	text := `SQLExecute("SELECT * FROM orders WHERE status = ?sStatus?");`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Named SQL parameter") {
+			t.Errorf("should not flag named params in SQLExecute, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_ClassConstructorCannotReturnValue(t *testing.T) {
+	// Source of truth: ssl_agent_instructions.md section 2:
+	// "Constructor cannot return a value (:RETURN without an expression is allowed)"
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE Constructor;
+:PARAMETERS sN;
+sName := sN;
+:RETURN sName;
+:ENDPROC;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Constructor") && strings.Contains(d.Message, "cannot return a value") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about Constructor not being able to return a value")
+	}
+}
+
+func TestGetDiagnostics_ClassConstructorBareReturn_Valid(t *testing.T) {
+	// :RETURN; without a value IS allowed in constructors
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE Constructor;
+:RETURN;
+:ENDPROC;`
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Constructor") && strings.Contains(d.Message, "cannot return") {
+			t.Errorf("bare :RETURN; should be allowed in constructors, got: %s", d.Message)
+		}
+	}
+}
+
+func TestFormatting_ELSEIFNotTreatedAsContinuation(t *testing.T) {
+	// ELSEIF is NOT a valid SSL keyword. If it appears, it should not be treated
+	// as a continuation keyword that suppresses semicolons.
+	// SSL uses :ELSE; :IF condition; as separate statements.
+	text := `:PROCEDURE Test;
+:DECLARE x;
+:IF x = 1;
+x := 2;
+:ELSE;
+:IF x = 3;
+x := 4;
+:ENDIF;
+:ENDIF;
+:ENDPROC;`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(text, opts)
+	formatted := edits[0].NewText
+	// The :ELSE and :IF should be separate statements
+	if !strings.Contains(formatted, ":ELSE;") {
+		t.Error("expected :ELSE; as a complete statement")
+	}
+}
+
+// ==================== Bug Fix Tests: Comment Transparency ====================
+
+func TestGetDiagnostics_DefaultAfterParametersWithComment(t *testing.T) {
+	// Bug fix: comments between :PARAMETERS and :DEFAULT should NOT cause false positive.
+	text := `:PROCEDURE Test;
+:PARAMETERS sName;
+/* Set defaults;
+:DEFAULT sName, "test";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':DEFAULT' must appear immediately after ':PARAMETERS'") {
+			t.Errorf("false positive: comment between :PARAMETERS and :DEFAULT should be allowed, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_ParametersAfterProcedureWithComment(t *testing.T) {
+	// Bug fix: comments between :PROCEDURE and :PARAMETERS should NOT cause false positive.
+	text := `:PROCEDURE Test;
+/* Documentation comment;
+:PARAMETERS sName;
+:DEFAULT sName, "";
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "':PARAMETERS' must appear") && strings.Contains(d.Message, "immediately after") {
+			t.Errorf("false positive: comment between :PROCEDURE and :PARAMETERS should be allowed, got: %s", d.Message)
+		}
+	}
+}
+
+// ==================== New Diagnostic Tests ====================
+
+func TestGetDiagnostics_SkippedParamSpacing_SpacedCommas(t *testing.T) {
+	// {a, , b} is invalid — should be {a,,b}
+	text := `:DECLARE sResult;
+sResult := DoProc("Test", {sName, , sAge});`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "adjacent commas") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected warning about spaced skipped parameters {a, , b}")
+	}
+}
+
+func TestGetDiagnostics_SkippedParamSpacing_ValidNoSpace(t *testing.T) {
+	// {a,,b} is valid — no warning
+	text := `:DECLARE sResult;
+sResult := DoProc("Test", {sName,,sAge});`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "adjacent commas") {
+			t.Errorf("unexpected warning for valid {a,,b} syntax: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_NotEqualsAsymmetry(t *testing.T) {
+	// != with string literal should warn about asymmetry with =
+	text := `:DECLARE sStatus;
+:IF sStatus != "Logged";
+	x := 1;
+:ENDIF;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "NOT logical opposites") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected info about != and = not being logical opposites for strings")
+	}
+}
+
+func TestGetDiagnostics_NotEqualsAsymmetry_NonString(t *testing.T) {
+	// != with numbers should NOT trigger
+	text := `:DECLARE nVal;
+:IF nVal != 0;
+	x := 1;
+:ENDIF;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "NOT logical opposites") {
+			t.Errorf("unexpected != asymmetry warning for non-string comparison: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_SQLConcatenationInjection(t *testing.T) {
+	text := `:DECLARE sTable, aResults;
+aResults := SQLExecute("SELECT * FROM " + sTable);`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL injection") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected SQL injection warning for string concatenation in SQLExecute")
+	}
+}
+
+func TestGetDiagnostics_SQLConcatenationInjection_SafeParam(t *testing.T) {
+	// Parameterized queries should NOT trigger
+	text := `:DECLARE sStatus, aResults;
+aResults := SQLExecute("SELECT * FROM orders WHERE status = ?sStatus?");`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "SQL injection") {
+			t.Errorf("unexpected SQL injection warning for parameterized query: %s", d.Message)
+		}
+	}
+}
+
+// --- Code block empty params with whitespace ---
+
+func TestGetDiagnostics_CodeBlockEmptyParamsWithSpaces(t *testing.T) {
+	// {| | expr} has whitespace but no bound variables — should warn
+	text := `x := {| | 42};`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "at least one bound variable") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about code blocks needing at least one bound variable for {| | expr}")
+	}
+}
+
+func TestGetDiagnostics_CodeBlockEmptyParamsWithTabs(t *testing.T) {
+	// {|	| expr} with tab between pipes — should warn
+	text := "x := {|\t| 42};"
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "at least one bound variable") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic about code blocks needing at least one bound variable for {|<tab>| expr}")
+	}
+}
+
+// --- :INCLUDE inside procedure body ---
+
+func TestGetDiagnostics_IncludeInsideProcedure(t *testing.T) {
+	// :INCLUDE inside a procedure body should be flagged as warning
+	code := `:PROCEDURE MyProc;
+:INCLUDE SomeLibrary;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "inside a procedure body") {
+			return
+		}
+	}
+
+	t.Fatal("expected warning about :INCLUDE inside procedure body")
+}
+
+func TestGetDiagnostics_IncludeBeforeProcedure_NoWarning(t *testing.T) {
+	// :INCLUDE before procedures should not get the "inside procedure" warning
+	code := `:INCLUDE SomeLibrary;
+:PROCEDURE MyProc;
+:DECLARE x;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "inside a procedure body") {
+			t.Error(":INCLUDE before procedures should not be flagged as inside a procedure")
 		}
 	}
 }

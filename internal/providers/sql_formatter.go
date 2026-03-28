@@ -57,7 +57,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	lexer := NewSQLLexer(sql)
 	tokens := lexer.Tokenize()
 
-	// Filter out whitespace tokens for formatting
+	// Filter out whitespace tokens for formatting (preserve hints and comments)
 	var nonWSTokens []SQLToken
 	for _, t := range tokens {
 		if t.Type != SQLTokenWhitespace {
@@ -81,6 +81,22 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	var rootCommand string
 	parenDepth := 0
 	inSelectColumns := false
+	addBlankLineBeforeNextBreak := false
+	subqueryParenDepths := make(map[int]bool)
+	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
+
+	// CASE in SELECT tracking (Gap 6)
+	caseInSelectColumns := false
+	caseDepth := 0
+
+	// OVER() clause tracking (Gap 8)
+	inOverClause := false
+	overParenDepth := 0
+
+	// DECODE function tracking (Gap 7)
+	inDecodeCall := false
+	decodeParenDepth := 0
+	decodeArgCount := 0
 
 	for i := 0; i < len(nonWSTokens); i++ {
 		t := nonWSTokens[i]
@@ -112,6 +128,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				currentClause = "VALUES"
 			case "ORDER", "GROUP":
 				currentClause = upperText
+			case "RETURNING":
+				currentClause = "RETURNING"
 			}
 		}
 
@@ -122,6 +140,40 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			if parenDepth < 0 {
 				parenDepth = 0
 			}
+		}
+
+		// Track BETWEEN for BETWEEN...AND suppression
+		if upperText == "BETWEEN" && t.Type == SQLTokenKeyword {
+			afterBetween = true
+		}
+
+		// Track CASE blocks in SELECT columns (Gap 6)
+		// Note: END tracking must happen AFTER formatting decisions (below)
+		// so caseInSelectColumns is still true when END is being formatted.
+		if upperText == "CASE" && t.Type == SQLTokenKeyword {
+			if caseDepth == 0 && inSelectColumns {
+				caseInSelectColumns = true
+			}
+			caseDepth++
+		}
+
+		// Track OVER() clause (Gap 8)
+		if upperText == "OVER" && (t.Type == SQLTokenKeyword || t.Type == SQLTokenFunction) {
+			inOverClause = true
+			overParenDepth = parenDepth + 1
+		}
+		if t.Text == ")" && inOverClause && parenDepth == overParenDepth-1 {
+			inOverClause = false
+		}
+
+		// Track DECODE function (Gap 7)
+		if upperText == "DECODE" && t.Type == SQLTokenFunction {
+			inDecodeCall = true
+			decodeParenDepth = parenDepth + 1
+			decodeArgCount = 0
+		}
+		if t.Text == ")" && inDecodeCall && parenDepth == decodeParenDepth-1 {
+			inDecodeCall = false
 		}
 
 		// Apply casing
@@ -148,7 +200,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				// Don't break before JOIN if preceded by modifier
 				if upperText == "JOIN" && prev != nil && SQLJoinModifiers[prevUpper] {
 					needsBreak = false
-				} else if upperText == "INTO" && prevUpper == "INSERT" {
+				} else if upperText == "INTO" && (prevUpper == "INSERT" || prevUpper == "MERGE" || prevUpper == "RETURNING" || currentClause == "RETURNING") {
+					// MERGE INTO, INSERT INTO, and RETURNING ... INTO stay on one line
+					needsBreak = false
+				} else if upperText == "FROM" && prevUpper == "DELETE" {
+					// DELETE FROM stays on one line
+					needsBreak = false
+				} else if upperText == "UPDATE" && prevUpper == "FOR" {
+					// FOR UPDATE is a compound clause — stays on one line
 					needsBreak = false
 				} else {
 					needsBreak = true
@@ -159,8 +218,22 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// Indented keywords (AND, OR) - only for canonicalCompact and expanded styles
 			if (style == "canonicalCompact" || style == "expanded") &&
 				SQLIndentedKeywords[upperText] && t.Type == SQLTokenKeyword {
-				needsBreak = true
-				extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
+				// Suppress line break for AND that is part of BETWEEN...AND
+				if upperText == "AND" && afterBetween {
+					afterBetween = false
+				} else {
+					needsBreak = true
+					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
+				}
+			}
+
+			// MERGE sub-statement indentation: UPDATE SET / INSERT / DELETE indented under WHEN
+			if rootCommand == "MERGE" && parenDepth == 0 &&
+				(style == "canonicalCompact" || style == "expanded") {
+				if upperText == "UPDATE" || upperText == "INSERT" || upperText == "DELETE" {
+					needsBreak = true
+					extraIndent = f.indentString
+				}
 			}
 
 			// SET clause formatting
@@ -177,18 +250,17 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				}
 			}
 
-			// VALUES paren
+			// VALUES paren — opening paren stays on VALUES line, content indented inside
 			if style != "compact" && t.Text == "(" && prevUpper == "VALUES" {
-				needsBreak = true
-				if style == "canonicalCompact" || style == "expanded" {
-					extraIndent = f.indentString
-				}
+				// Don't break before the paren; it stays on the VALUES line.
+				// The content inside gets indented via parenDepth.
+				subqueryParenDepths[parenDepth] = true
 			}
 
-			// Subquery SELECT
+			// Subquery SELECT — parenDepth already provides one level of indent
 			if style != "compact" && upperText == "SELECT" && prev != nil && prev.Text == "(" {
 				needsBreak = true
-				extraIndent = f.indentString
+				subqueryParenDepths[parenDepth] = true
 			}
 
 			// Proactive line wrapping (only for canonicalCompact and expanded)
@@ -215,8 +287,88 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 		}
 
+		// SELECT after set operation needs its own line
+		if !needsBreak && upperText == "SELECT" && prev != nil {
+			pUpper := strings.ToUpper(prev.Text)
+			if pUpper == "ALL" || pUpper == "UNION" || pUpper == "INTERSECT" || pUpper == "MINUS" || pUpper == "EXCEPT" {
+				needsBreak = true
+			}
+		}
+
+		// CASE/END in SELECT columns: break with col-7 alignment instead of col 0
+		if needsBreak && inSelectColumns {
+			if upperText == "CASE" {
+				extraIndent = strings.Repeat(" ", 7) // align with SELECT columns
+			} else if upperText == "END" && caseInSelectColumns {
+				extraIndent = strings.Repeat(" ", 7) // END aligns with CASE
+			}
+		}
+
+		// WHEN/ELSE inside CASE in SELECT columns: align at col 11 (7 + 4)
+		if caseInSelectColumns && (upperText == "WHEN" || upperText == "ELSE") && t.Type == SQLTokenKeyword {
+			needsBreak = true
+			extraIndent = strings.Repeat(" ", 11)
+		}
+
+		// OVER() internal formatting: PARTITION BY / ORDER BY on their own lines (Gap 8)
+		if inOverClause && parenDepth >= overParenDepth && t.Type == SQLTokenKeyword {
+			if upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE" {
+				needsBreak = true
+				extraIndent = strings.Repeat(" ", 11)
+			}
+		}
+		// Closing ) of OVER on its own line aligned with OVER
+		if t.Text == ")" && inOverClause && parenDepth+1 == overParenDepth {
+			needsBreak = true
+			extraIndent = strings.Repeat(" ", 7)
+		}
+
+		// DECODE argument alignment: break after first value pair when many args (Gap 7)
+		if inDecodeCall && parenDepth == decodeParenDepth {
+			if prev != nil && prev.Text == "," {
+				decodeArgCount++
+			}
+			// Break after the first value pair (arg index 3+) when there are many args
+			if prev != nil && prev.Text == "," && decodeArgCount >= 3 {
+				needsBreak = true
+				extraIndent = strings.Repeat(" ", 14) // align after "DECODE("
+			}
+		}
+
+		// Closing paren on its own line for subqueries/VALUES blocks
+		if t.Text == ")" && subqueryParenDepths[parenDepth+1] {
+			needsBreak = true
+			delete(subqueryParenDepths, parenDepth+1)
+		}
+
+		// Blank line before set operations (sql-canonical-compact-reference §2.8)
+		isSetOp := needsBreak && t.Type == SQLTokenKeyword &&
+			(upperText == "UNION" || upperText == "INTERSECT" || upperText == "MINUS" || upperText == "EXCEPT")
+		if isSetOp {
+			addBlankLineBeforeNextBreak = true // blank line after set-op line
+		}
+
+		// Preserve SQL comments — write inline with a preceding space
+		if t.Type == SQLTokenComment {
+			if !isFirstToken {
+				result.WriteString(" ")
+				currentLineLen++
+			}
+			result.WriteString(t.Text)
+			currentLineLen += len(t.Text)
+			isFirstToken = false
+			continue
+		}
+
 		// Write output
 		if needsBreak {
+			if isSetOp {
+				result.WriteString("\n") // blank line before set operation
+			}
+			if addBlankLineBeforeNextBreak && !isSetOp {
+				result.WriteString("\n") // blank line after set operation
+				addBlankLineBeforeNextBreak = false
+			}
 			result.WriteString("\n")
 			parenIndent := strings.Repeat(f.indentString, parenDepth)
 			result.WriteString(baseIndent)
@@ -231,6 +383,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		result.WriteString(tokenText)
 		currentLineLen += len(tokenText)
 		isFirstToken = false
+
+		// Post-token: decrement CASE depth after END has been formatted
+		if upperText == "END" && t.Type == SQLTokenKeyword && caseDepth > 0 {
+			caseDepth--
+			if caseDepth == 0 {
+				caseInSelectColumns = false
+			}
+		}
 	}
 
 	return result.String()
@@ -243,6 +403,10 @@ func (f *SQLFormatter) keywordIndent(style, keyword, currentClause, rootCommand 
 		case "AND", "OR", "ON", "HAVING", "WHEN", "ELSE":
 			if rootCommand == "MERGE" && parenDepth == 0 && (keyword == "ON" || keyword == "WHEN") {
 				return ""
+			}
+			// MERGE ON conditions: AND/OR indented 4 spaces (aligned under first condition)
+			if rootCommand == "MERGE" && parenDepth == 0 && (keyword == "AND" || keyword == "OR") {
+				return f.indentString // 4 spaces
 			}
 			return "  "
 		}
@@ -266,7 +430,9 @@ func (f *SQLFormatter) isComplexSQL(tokens []SQLToken) bool {
 		upper := strings.ToUpper(t.Text)
 		if upper == "FROM" || upper == "WHERE" || upper == "JOIN" ||
 			upper == "GROUP" || upper == "ORDER" || upper == "UNION" ||
-			upper == "VALUES" || upper == "SET" {
+			upper == "VALUES" || upper == "SET" || upper == "MERGE" ||
+			upper == "HAVING" || upper == "CASE" || upper == "PIVOT" ||
+			upper == "START" || upper == "CONNECT" {
 			return true
 		}
 		if upper == "SELECT" && len(tokens) > 5 {
@@ -278,6 +444,11 @@ func (f *SQLFormatter) isComplexSQL(tokens []SQLToken) bool {
 
 // applyKeywordCasing applies keyword casing rules.
 func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
+	// Preserve optimizer hints exactly as-is
+	if t.Type == SQLTokenHint {
+		return t.Text
+	}
+
 	// Apply casing to keywords and built-in functions
 	if t.Type == SQLTokenKeyword || t.Type == SQLTokenFunction {
 		switch f.opts.KeywordCase {
@@ -290,8 +461,12 @@ func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
 		}
 	}
 
-	// Identifiers (table names, column names) stay lowercase
+	// Identifiers (table names, column names) stay lowercase,
+	// but preserve casing for double-quoted identifiers (external schema objects).
 	if t.Type == SQLTokenIdentifier {
+		if len(t.Text) >= 2 && t.Text[0] == '"' && t.Text[len(t.Text)-1] == '"' {
+			return t.Text
+		}
 		return strings.ToLower(t.Text)
 	}
 
@@ -304,8 +479,13 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 		return false
 	}
 
-	// Keyword followed by ( - add space (e.g., "WHERE (")
+	// Keyword followed by ( - add space (e.g., "WHERE ("),
+	// UNLESS the keyword is also a known built-in function (e.g., LEFT, RIGHT, REPLACE)
 	if prev.Type == SQLTokenKeyword && curr.Text == "(" {
+		upper := strings.ToUpper(prev.Text)
+		if SQLBuiltinFunctions[upper] {
+			return false // Function-like usage: LEFT(x, 3), REPLACE(s, 'a', 'b')
+		}
 		return true
 	}
 
@@ -336,21 +516,18 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 
 	// Space around operators
 	if prev.Type == SQLTokenOperator || curr.Type == SQLTokenOperator {
-		// Exception: negative numbers
-		if (prev.Text == "-" || prev.Text == "+") && curr.Type == SQLTokenNumber {
-			return false
-		}
 		return true
 	}
 
-	// Space between atoms (keywords, functions, identifiers, numbers, strings, placeholders)
+	// Space between atoms (keywords, functions, identifiers, numbers, strings, placeholders, hints)
 	isAtom := func(t *SQLToken) bool {
 		return t.Type == SQLTokenKeyword ||
 			t.Type == SQLTokenFunction ||
 			t.Type == SQLTokenIdentifier ||
 			t.Type == SQLTokenNumber ||
 			t.Type == SQLTokenString ||
-			t.Type == SQLTokenPlaceholder
+			t.Type == SQLTokenPlaceholder ||
+			t.Type == SQLTokenHint
 	}
 
 	if isAtom(prev) && isAtom(curr) {

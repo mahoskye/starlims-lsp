@@ -104,6 +104,8 @@ Hovering over `Constructor` shows that it is the reserved constructor name insid
 
 **Named Parameters (`?varName?`, `?oObj:Prop?`, `?aArr[i]?`, `?Func()?`):**
 
+Named `?varName?` placeholders are exclusive to `SQLExecute`. Other database functions (`RunSQL`, `LSearch`, `LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`) use positional `?` with explicit value arrays.
+
 Hovering over `?myVar?` inside a SQL string shows:
 - Parameter name and placeholder kind
 - Runtime substitution note
@@ -238,7 +240,21 @@ x := "SQLExecute is a function";
 /* Expected: No hover (or null response);
 ```
 
-### 6.10 SQL Placeholder Hover
+### 6.10 Constructor Hover
+
+```ssl
+/* Test: Hover over Constructor in class;
+:CLASS MyClass;
+:PROCEDURE Constructor;
+:ENDPROC;
+/* Hover position: over "Constructor";
+/* Expected:
+   Constructor — reserved constructor name inside :CLASS
+   :RETURN cannot return a value from a constructor
+;
+```
+
+### 6.11 SQL Placeholder Hover
 
 ```ssl
 /* Test: Hover over named SQL parameter;
@@ -287,7 +303,7 @@ The current server returns hover contents without an explicit hover range.
 
 ### 8.3 Function Signature Database
 
-All 354 source-aligned built-in functions are exposed through the source-aligned inventory in `internal/constants/source_alignment.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
+All 354 canonical built-in functions are exposed through the canonical inventory in `internal/constants/canonical.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
 - Function name
 - Parameter list (name, type, optional flag)
 - Return type

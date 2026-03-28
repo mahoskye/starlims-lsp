@@ -47,7 +47,7 @@ Each parameter includes:
 
 ### 2.5 Coverage
 
-- **354 source-aligned built-in functions** with parameter documentation
+- **354 canonical built-in functions** with parameter documentation
 - Built-in dispatch helpers such as `DoProc` and `ExecFunction`
 - No direct user-procedure signature resolution beyond those built-in dispatch helpers
 

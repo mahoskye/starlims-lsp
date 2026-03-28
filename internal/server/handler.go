@@ -212,6 +212,8 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 	query := params.Query
 	results := make([]protocol.SymbolInformation, 0)
 
+	// Phase 1: Results from open documents (highest priority — most up-to-date)
+	openURIs := s.documents.OpenURIs()
 	for _, uri := range s.documents.AllDocuments() {
 		version := s.documentVersion[uri]
 		cache := s.documents.ParseDocument(uri, version)
@@ -229,6 +231,26 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 				Location: protocol.Location{URI: uri, Range: toProtocolRange(rangeInfo)},
 			})
 		}
+	}
+
+	// Phase 2: Results from workspace index (excludes open documents)
+	if s.workspaceIndex != nil {
+		for _, sym := range s.workspaceIndex.SearchSymbols(query, openURIs) {
+			rangeInfo := providers.Range{
+				Start: providers.Position{Line: sym.StartLine - 1, Character: 0},
+				End:   providers.Position{Line: sym.EndLine - 1, Character: 0},
+			}
+			results = append(results, protocol.SymbolInformation{
+				Name:     sym.Name,
+				Kind:     protocol.SymbolKind(sym.Kind),
+				Location: protocol.Location{URI: sym.URI, Range: toProtocolRange(rangeInfo)},
+			})
+		}
+	}
+
+	// Cap results
+	if len(results) > maxSymbolResults {
+		results = results[:maxSymbolResults]
 	}
 
 	if len(results) == 0 {

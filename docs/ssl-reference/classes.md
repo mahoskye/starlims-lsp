@@ -2,18 +2,19 @@
 
 This document lists the developer-facing built-in classes available in SSL.
 
-**Primary Sources:** `dev/ssl-style-guide/README.md`, `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md`, `internal/constants/source_alignment.go`, `internal/constants/constants.go`
+**Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/constants.go`
 
 ---
 
-## Built-in Classes (21)
+## Built-in Classes (22)
 
-The starlims-lsp provides completion and hover support for these built-in classes:
+The starlims-lsp provides completion and hover support for these 22 directly-instantiable built-in classes. The authoritative `ssl-element-list.json` documents 26 classes total; 4 `CData*` return-value-only types (`CDataColumn`, `CDataColumns`, `CDataField`, `CDataRow`) are excluded from LSP completion because they are not directly instantiated — they are obtained exclusively as return values from `TablesImport:GetTable(name)`. `CDataTable` is included because it supports direct construction via `CDataTable{}`. See `internal/constants/canonical.go` for the full exclusion rationale.
 
 ### Core Classes
 
 | Class | Description |
 |-------|-------------|
+| `CDataTable` | In-memory data table (directly instantiable via `CDataTable{}`) |
 | `SSLExpando` | Dynamic object with arbitrary properties |
 | `SSLDataset` | In-memory data table |
 | `SSLBaseDictionary` | Base dictionary class |
@@ -103,7 +104,7 @@ The most commonly used class for dynamic objects. Supports arbitrary named prope
 | Method | Description |
 |--------|-------------|
 | `AddProperty(name)` | Add a new dynamic property |
-| `clone()` | Return a shallow copy |
+| `clone()` | Return a deep copy (recursively clones all elements) |
 | `Deserialize(s)` | Populate from serialized string |
 | `Destroy()` | Release the object |
 | `GetDynPropList()` | Return array of dynamic property names |
@@ -154,17 +155,17 @@ sCopy := oData:clone();
 
 ## SSLDataset Details
 
-In-memory data table returned by `GetSSLDataset` or `RunDS`. Used for converting dataset results.
+Dataset wrapper for query results. Obtain via `GetSSLDataset(...)` or `RunDS(..., "ssldataset")`.
+
+**Construction:** `SSLDataset{}` or `SSLDataset{vData, vNullAsBlank}`
 
 **Methods:**
 
-| Method | Description |
-|--------|-------------|
-| `ToArray()` | Convert to 2D array |
-| `ToDataSet()` | Convert to XML dataset string |
-| `ToXml()` | Convert to XML string |
-
-**Construction:**
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `ToArray()` | Array | Convert to 2D array |
+| `ToDataSet()` | Object | Convert to XML dataset object |
+| `ToXml()` | String | Convert to XML string |
 
 ```ssl
 :DECLARE oDS;
@@ -193,10 +194,10 @@ Base dictionary class providing keyed storage.
 | `AddValue(key, value)` | Add or update a key/value pair |
 | `Clear()` | Remove all entries |
 | `Contains(key)` | Return `.T.` if key exists |
-| `GetValue(key)` | Return value for key |
+| `GetValue(key, vDefault)` | Return value for key, or `vDefault` if not found |
 | `Invoke(key, args)` | Invoke stored code block |
 | `Remove(key)` | Remove a key/value pair |
-| `TryGetValue(key, @outValue)` | Get value if key exists; return `.T.` on success |
+| `TryGetValue(key)` | Return `{Exists, Value}` object; `Exists` is `.T.` if key found |
 
 **Properties:**
 
@@ -220,9 +221,9 @@ Integer-keyed dictionary. Inherits from `SSLBaseDictionary`.
 |--------|-------------|
 | `AddValue(key, value)` | Add or update integer key |
 | `Contains(key)` | Return `.T.` if integer key exists |
-| `GetValue(key)` | Return value for integer key |
+| `GetValue(key, vDefault)` | Return value for integer key, or `vDefault` if not found |
 | `Remove(key)` | Remove integer key |
-| `TryGetValue(key, @outValue)` | Get value if key exists |
+| `TryGetValue(key)` | Return `{Exists, Value}` object; `Exists` is `.T.` if key found |
 
 ---
 
@@ -230,7 +231,7 @@ Integer-keyed dictionary. Inherits from `SSLBaseDictionary`.
 
 String-keyed dictionary. Inherits from `SSLBaseDictionary`.
 
-**Construction:** `SSLStringDictionary{}` or `SSLStringDictionary{xCaseSensitive, nLength}`
+**Construction:** `SSLStringDictionary{}` or `SSLStringDictionary{vCaseSensitive, nLength}`
 
 **Methods:**
 
@@ -238,9 +239,9 @@ String-keyed dictionary. Inherits from `SSLBaseDictionary`.
 |--------|-------------|
 | `AddValue(key, value)` | Add or update string key |
 | `Contains(key)` | Return `.T.` if string key exists |
-| `GetValue(key)` | Return value for string key |
+| `GetValue(key, vDefault)` | Return value for string key, or `vDefault` if not found |
 | `Remove(key)` | Remove string key |
-| `TryGetValue(key, @outValue)` | Get value if key exists |
+| `TryGetValue(key)` | Return `{Exists, Value}` object; `Exists` is `.T.` if key found |
 
 ---
 
@@ -254,7 +255,7 @@ Regular expression operations.
 
 | Method | Description |
 |--------|-------------|
-| `IsMatch(s)` | Return `.T.` if string matches pattern |
+| `IsMatch(sInput, nStartAt)` | Return `.T.` if string matches pattern starting at `nStartAt` |
 
 **Properties:**
 
@@ -264,7 +265,7 @@ Regular expression operations.
 
 ```ssl
 oRe := SSLRegex{'\d{4}-\d{2}-\d{2}'};
-bMatch := oRe:IsMatch("2024-12-25");
+bMatch := oRe:IsMatch("2024-12-25", 1);
 ```
 
 ---
@@ -304,18 +305,38 @@ Email sending functionality.
 
 **Methods:**
 
-| Method | Description |
-|--------|-------------|
-| `LoadMessage(path)` | Load email from file |
-| `SaveMessage(path)` | Save email to file |
-| `Send()` | Send the email |
-| `SendToOutbox()` | Place in outbox queue |
-| `SetEncryptCertificateFromPath(path)` | Set encryption certificate from file path |
-| `SetEncryptCertificateFromStore(name)` | Set encryption certificate from store |
-| `SetSignCertificateFromPath(path)` | Set signing certificate from file path |
-| `SetSignCertificateFromStore(name)` | Set signing certificate from store |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Send()` | Boolean | Send the email |
+| `SendToOutbox()` | Boolean | Place in outbox queue |
+| `SaveMessage(sPath)` | Boolean | Save email to file |
+| `LoadMessage(sPath)` | Boolean | Load email from file |
+| `SetSignCertificateFromStore(sEmail, sStoreName)` | Boolean | Set signing certificate from store |
+| `SetEncryptCertificateFromStore(sEmail, sStoreName)` | Boolean | Set encryption certificate from store |
+| `SetSignCertificateFromPath(sCertPath, sPassword)` | Boolean | Set signing certificate from file path |
+| `SetEncryptCertificateFromPath(sCertPath, sPassword)` | Boolean | Set encryption certificate from file path |
 
-**Properties:** `LogSMTP`, `From`, `To`, `CC`, `BCC`, `IgnoreExceptions`, `Subject`, `Body`, `IsHTMLBody`, `Attachments`, `SMTPServerName`, `SMTPServerPort`, `SMTPTimeout`, `SMTPSecureConnection`, `SMTPServerUserName`, `SMTPServerUserPassword`, `Exception`
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `LogSMTP` | Boolean | read/write |
+| `From` | String | read/write |
+| `To` | Array | read/write |
+| `CC` | Array | read/write |
+| `BCC` | Array | read/write |
+| `IgnoreExceptions` | Boolean | read/write |
+| `Subject` | String | read/write |
+| `Body` | String | read/write |
+| `IsHTMLBody` | Boolean | read/write |
+| `Attachments` | Array | read/write |
+| `SMTPServerName` | String | read/write |
+| `SMTPServerPort` | Number | read/write |
+| `SMTPTimeout` | Number | read/write |
+| `SMTPSecureConnection` | Boolean | read/write |
+| `SMTPServerUserName` | String | read/write |
+| `SMTPServerUserPassword` | String | read/write |
+| `Exception` | Object | read-only |
 
 ---
 
@@ -340,7 +361,25 @@ Azure storage integration.
 
 **Construction:** `AzureStorage{}`, `AzureStorage{cConnectionName}`, `AzureStorage{cAccountName, cAccountKey}`, or `AzureStorage{cAccountName, cAccountKey, lUseHttps}`
 
-**Methods:** `CreateContainer`, `CreateTable`, `DeleteBlob`, `DeleteContainer`, `DeleteEntities`, `DeleteEntity`, `DeleteTable`, `GetBlob`, `InsertEntities`, `InsertEntity`, `PutBlob`, `ReadBlobAsText`, `SelectEntities`, `SelectEntity`, `UpdateEntity`
+**Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `CreateTable(sTableName)` | | Create a table |
+| `DeleteTable(sTableName)` | | Delete a table |
+| `InsertEntity(sTableName, oEntity)` | | Insert a single entity |
+| `InsertEntities(sTableName, aEntities)` | | Insert multiple entities |
+| `SelectEntity(sTableName, sPartitionKey, sRowKey)` | Object | Select a single entity |
+| `SelectEntities(sTableName, oAttributes)` | Array | Select multiple entities |
+| `DeleteEntity(sTableName, sPartitionKey, sRowKey)` | | Delete a single entity |
+| `DeleteEntities(sTableName, aEntities)` | | Delete multiple entities |
+| `UpdateEntity(sTableName, oEntity)` | Boolean | Update an entity |
+| `CreateContainer(sContainerName)` | | Create a blob container |
+| `DeleteContainer(sContainerName)` | | Delete a blob container |
+| `PutBlob(sContainerName, sLocalPath, sBlobName)` | | Upload a blob |
+| `GetBlob(sContainerName, sBlobName, sDestPath)` | String | Download a blob |
+| `DeleteBlob(sContainerName, sBlobName)` | | Delete a blob |
+| `ReadBlobAsText(sContainerName, sBlobName)` | String | Read blob as text |
 
 ---
 
@@ -350,7 +389,29 @@ FTPS file transfer.
 
 **Construction:** `FtpsClient{}`
 
-**Methods:** `CheckOnFtps`, `Connect`, `CopyToFtps`, `DeleteDirOnFtps`, `DeleteFromFtps`, `Disconnect`, `GetDirFromFtps`, `GetDirNamesFromFtps`, `GetFromFtps`, `Login`, `MakeDirOnFtps`, `MoveInFtps`, `ReadFromFtps`, `RenameOnFtps`, `Secure`, `SendToFtps`, `SetFtpsProxy`, `SetTlsParameters`, `WriteToFtps`
+**Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `SetFtpsProxy(sProxyType, sProxy, nPort, sUser, sPassword)` | | Configure proxy |
+| `SetTlsParameters(sAllowedSuites, sCommonName, sVersion, sCertLocation, sCertPath, sCertPassword)` | | Configure TLS |
+| `Connect(sServer, nPort, sSecurity)` | String | Connect to server |
+| `Disconnect()` | String | Disconnect |
+| `Login(sUserName, sPassword, sAccount)` | String | Authenticate |
+| `Secure()` | | Enable security |
+| `CheckOnFtps(sRemoteDir, sFileName)` | Boolean | Check if file exists |
+| `CopyToFtps(sRemoteDir, aRemoteFileNames, sContents)` | Boolean | Copy content to remote |
+| `DeleteDirOnFtps(sRemoteDir)` | Boolean | Delete remote directory |
+| `DeleteFromFtps(sRemoteDir, sFileName)` | Boolean | Delete remote file |
+| `GetDirFromFtps(sRemoteDir)` | Array | Get directory listing |
+| `GetDirNamesFromFtps(sRemoteDir)` | Array | Get directory names |
+| `GetFromFtps(sRemoteDir, sRemoteFile, sLocalFile)` | Boolean | Download file |
+| `MakeDirOnFtps(sRemoteDir)` | Boolean | Create remote directory |
+| `MoveInFtps(sFromDir, sToDir, sFromFile, sToFile)` | Boolean | Move remote file |
+| `ReadFromFtps(sRemoteDir, sFileName, nMaxSize)` | String | Read remote file content |
+| `RenameOnFtps(sRemoteDir, sOldName, sNewName)` | Boolean | Rename remote file |
+| `SendToFtps(sRemoteDir, sRemoteFile, sLocalFile)` | Boolean | Upload file |
+| `WriteToFtps(sRemoteDir, sRemoteFile, sContents)` | Boolean | Write content to remote |
 
 ---
 
@@ -360,9 +421,36 @@ PDF generation and manipulation.
 
 **Construction:** `PdfSupport{}`
 
-**Methods:** `AddPageFromImage`, `AddPDFDocument`, `AddTextOnPage`, `Open`, `OpenProtectedDocument`, `Print`, `Protect`, `Save`, `SetTextStyle`
+**Methods:**
 
-**Properties:** `UserPassword`, `OwnerPassword`, `DocumentSecurityLevel`, `PermitAccessibilityExtractContent`, `PermitAnnotations`, `PermitAssembleDocument`, `PermitExtractContent`, `PermitFormsFill`, `PermitFullQualityPrint`, `PermitModifyDocument`, `PermitPrint`, `PageCount`
+| Method | Description |
+|--------|-------------|
+| `Open(sFileName)` | Open a PDF file |
+| `OpenProtectedDocument(sFileName, sPassword)` | Open a password-protected PDF |
+| `Save(sFileName)` | Save the PDF to file |
+| `AddPageFromImage(sImagePath)` | Add a page from an image file |
+| `AddPDFDocument(sPdfPath)` | Append another PDF document |
+| `SetTextStyle(sFontName, nFontSize, sFontStyle, sFontColor)` | Set text rendering style |
+| `AddTextOnPage(sText, nPageNum, nX, nY)` | Add text at a position on a page |
+| `Print(sAdobePath, sFileName, sPrinterName)` | Print the PDF |
+| `Protect(sPassword)` | Password-protect the PDF |
+
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `UserPassword` | String | write-only |
+| `OwnerPassword` | String | write-only |
+| `DocumentSecurityLevel` | String | read/write |
+| `PermitAccessibilityExtractContent` | Boolean | read/write |
+| `PermitAnnotations` | Boolean | read/write |
+| `PermitAssembleDocument` | Boolean | read/write |
+| `PermitExtractContent` | Boolean | read/write |
+| `PermitFormsFill` | Boolean | read/write |
+| `PermitFullQualityPrint` | Boolean | read/write |
+| `PermitModifyDocument` | Boolean | read/write |
+| `PermitPrint` | Boolean | read/write |
+| `PageCount` | Number | read-only |
 
 ---
 
@@ -379,7 +467,13 @@ HTML conversion utilities.
 | `ClearLog()` | Clear the conversion log |
 | `Convert()` | Perform the conversion |
 
-**Properties:** `OptionsXml`, `Log`, `SimplifiedLog`
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `OptionsXml` | String | write-only |
+| `Log` | String | read-only |
+| `SimplifiedLog` | String | read-only |
 
 ---
 
@@ -389,9 +483,27 @@ Scientific Data Management System integration.
 
 **Construction:** `SDMS{}` or `SDMS{oCredentials}`
 
-**Methods:** `CheckOutDocument`, `CreateDocUploader`, `CreateUnifiedXmlDOM`, `DownloadDocument`, `DownloadDocument2`, `DownloadOriginalDocument`, `DownloadOriginalDocument2`, `DownloadUnifiedXmlDocument`, `DownloadUnifiedXmlDocument2`, `DownloadUnifiedXmlTemplate`, `GetHttpPassHash`, `GetSoapPassHash`, `SetSDMSConnection`, `UploadDocument`
+**Methods:**
 
-**Properties:** `ErrorMessage`, `SessionId`, `IsSessionExpired`
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `CreateUnifiedXmlDOM()` | Object | Create unified XML DOM |
+| `GetSoapPassHash(sDictPass)` | String | Get SOAP password hash |
+| `GetHttpPassHash(sDictPass)` | String | Get HTTP password hash |
+| `CreateDocUploader(oCredentials)` | SDMSDocUploader | Create a document uploader |
+| `DownloadDocument2(sDocId, sDocType, sPath)` | Boolean | Download document |
+| `DownloadOriginalDocument2(sDocId, sPath)` | Boolean | Download original document |
+| `DownloadUnifiedXmlDocument2(sDocId, sPath)` | Boolean | Download unified XML document |
+| `DownloadUnifiedXmlTemplate(sTemplateId, sPath)` | Boolean | Download unified XML template |
+| `CheckOutDocument(sDocId, sPath)` | Boolean | Check out document |
+
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `SessionId` | String | read/write |
+| `ErrorMessage` | String | read-only |
+| `IsSessionExpired` | Boolean | read-only |
 
 ---
 
@@ -401,9 +513,36 @@ SDMS document upload helper.
 
 **Construction:** `SDMSDocUploader{oCredentials}` or `SDMSDocUploader{}`
 
-**Methods:** `AddHeader`, `AttachDocToWorkflow`, `AttachFileToDocument`, `CheckInDocument`, `CheckInWorkflowDocument`, `DoUpload`, `RemoveHeader`, `UploadELNDocument`, `UploadNewRevisionForWorkflowDocument`, `UploadOfficeTemplate`, `UploadOriginalDoc`
+**Methods:**
 
-**Properties:** `FilePath`, `DocName`, `DocId`, `FileType`, `ProjectName`, `WorkflowId`, `StageId`, `ActionId`, `Metadata`, `UXmlTemplate`
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `UploadOriginalDoc()` | Boolean | Upload original document |
+| `AttachDocToWorkflow()` | Boolean | Attach document to workflow |
+| `CheckInDocument(sRevision, sStatus)` | Boolean | Check in document |
+| `AttachFileToDocument()` | Boolean | Attach file to document |
+| `UploadOfficeTemplate()` | Boolean | Upload Office template |
+| `UploadELNDocument()` | Boolean | Upload ELN document |
+| `AddHeader(sKey, sValue)` | | Add HTTP header |
+| `RemoveHeader(sKey)` | | Remove HTTP header |
+| `DoUpload(sFilePath, sSdmsUrl)` | Number | Upload file to SDMS URL |
+| `CheckInWorkflowDocument(sRevision, sStatus, nEntryPoint)` | Boolean | Check in workflow document |
+| `UploadNewRevisionForWorkflowDocument(sMessage)` | Boolean | Upload new revision for workflow document |
+
+**Properties:**
+
+| Property | Type |
+|----------|------|
+| `FilePath` | String |
+| `DocName` | String |
+| `DocId` | Number |
+| `FileType` | String |
+| `ProjectName` | String |
+| `WorkflowId` | Number |
+| `StageId` | Number |
+| `ActionId` | Number |
+| `Metadata` | Array |
+| `UXmlTemplate` | String |
 
 ---
 
@@ -440,7 +579,14 @@ System patching utilities.
 | `ConnectToExternalSystem()` | Connect to the external system |
 | `GetDataFromWholeDictionary()` | Retrieve all dictionary data |
 
-**Properties:** `DiffDataTable`, `InternalErrors`, `LogFilePath`, `ResultTable`
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `LogFilePath` | String | read/write |
+| `ResultTable` | Object | read-only |
+| `InternalErrors` | Object | read-only |
+| `DiffDataTable` | Object | read-only |
 
 ---
 
@@ -472,10 +618,18 @@ Sequence generation for unique identifiers.
 |--------|-------------|
 | `Create()` | Create the sequence |
 | `Drop()` | Drop/delete the sequence |
-| `Reset()` | Reset the sequence value |
-| `SetDatabase(db)` | Set the target database |
+| `Reset(nNewValue)` | Reset the sequence to a new value |
+| `SetDatabase(sDatabase)` | Set the target database |
 
-**Properties:** `StartWith`, `CacheSize`, `SequenceName`, `Exists`, `NextValue`
+**Properties:**
+
+| Property | Type | Access |
+|----------|------|--------|
+| `StartWith` | Number | read/write |
+| `CacheSize` | Number | read/write |
+| `SequenceName` | String | read-only |
+| `Exists` | Boolean | read-only |
+| `NextValue` | Number | read-only |
 
 ---
 
@@ -511,14 +665,47 @@ Table import functionality.
 
 ---
 
+## SSLError Details
+
+Error object returned by `GetLastSSLError()` inside a `:CATCH` or `:ERROR` block. Not directly instantiated.
+
+**Properties:**
+
+| Property | Description |
+|----------|-------------|
+| `Message` | Short error message |
+| `Description` | Detailed error description |
+| `Operation` | Operation that caused the error |
+| `Code` | Error code |
+| `GenCode` | General error code |
+| `FullDescription` | Full error description |
+| `FullDescriptionEx` | Extended full description |
+| `InnerException` | Nested inner exception object |
+| `NETException` | Underlying .NET exception object |
+
+```ssl
+:TRY;
+    /* Code that might error;
+:CATCH;
+    oErr := GetLastSSLError();
+    UsrMes(oErr:Message);
+    UsrMes(oErr:FullDescription);
+:ENDTRY;
+```
+
+**Note:** `SSLError` is not in the 22 directly-instantiable classes. It is always obtained via `GetLastSSLError()` or `ClearLastSSLError()`.
+
+---
+
 ## Class Support in LSP
 
 Class-style notes from the guide:
-- User-defined class files prefer `:INHERIT`, then `:DECLARE`, then regular methods, then `Constructor`
+- User-defined class files must follow the order: `:INHERIT`, then `:DECLARE`, then regular methods, then `Constructor` — tooling enforces this
 - Bare and qualified `:INHERIT` names are both accepted
 - Without `:INHERIT`, classes inherit from `SSLObject` by default
 - `Me` is only meaningful inside a `:CLASS`; `Base` must be used as `Base:MemberName` and requires `:INHERIT`
 - Underscore-prefixed members such as `_sInternal` follow the SSL private convention and are excluded from reflection
+- `DoProc(...)` is a **compile-time error** inside class methods — use `Me:MethodName()` / `Base:MethodName()` instead
 - `/*@private;` and `/*@protected;` annotations do not affect class-method visibility
 
 The LSP provides:

@@ -86,7 +86,7 @@ func getMeKeywordHover(word string) *Hover {
 				"**Usage:**\n" +
 				"- Access class members: `Me:PropertyName`\n" +
 				"- Call class methods: `Me:MethodName()`\n" +
-				"- Pass self to other functions: `DoSomething(Me)`",
+				"- Pass self as argument: `ExecFunction(\"Module.Script\", {Me})`",
 		}
 	}
 	return nil
@@ -301,7 +301,11 @@ type SQLPlaceholder struct {
 	IsNamed  bool   // True if this is a named parameter (?name?)
 }
 
-var simpleNamedParamPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+// simpleNamedParamPattern matches standard SQLExecute placeholder forms:
+// simple variables (?sVar?), property access (?oObj:Prop?), array indexing (?aArr[i]?),
+// and parameterless function calls (?Today()?). Complex expressions with arithmetic
+// operators (?sPrefix + sSuffix?) do NOT match and trigger a performance warning.
+var simpleNamedParamPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_.:[\](),']*$`)
 
 // ParseSQLPlaceholders extracts all SQL placeholders from a string.
 // It handles both named parameters (?paramName?) and positional parameters (?).
@@ -378,6 +382,8 @@ func isNamedPlaceholderContent(name string) bool {
 		case ch >= 'A' && ch <= 'Z':
 		case ch >= '0' && ch <= '9':
 		case ch == '_', ch == ':', ch == '[', ch == ']', ch == '(', ch == ')', ch == '.':
+		case ch == ' ', ch == '+', ch == '-', ch == '*', ch == '/', ch == ',', ch == '\'':
+			// Allow complex expression characters so they can be parsed and flagged
 		default:
 			return false
 		}

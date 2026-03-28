@@ -208,6 +208,7 @@ type formatState struct {
 	prevKeyword           string
 	inProcedure           bool
 	afterEndProc          bool
+	afterEndRegion        bool
 	currentLineLen        int
 	parenDepth            int
 	continuationIndent    int // Additional indent for continuation lines inside parens
@@ -217,6 +218,7 @@ type formatState struct {
 	sqlFormatter          *SQLFormatter
 	pendingComment        *lexer.Token // End-of-line comment to write before newline
 	pendingStatementBreak bool
+	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
@@ -235,8 +237,14 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 
 	normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 
-	// Handle block end keywords - dedent before
+	// Handle block end keywords - dedent before.
+	// If we're in an :ERROR handler, the scope-based handler ends too,
+	// so we need an extra dedent to close it.
 	if constants.IsBlockEndKeyword(normalized) {
+		if s.inErrorHandler {
+			s.indent--
+			s.inErrorHandler = false
+		}
 		s.indent--
 		if s.indent < 0 {
 			s.indent = 0
@@ -245,8 +253,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 
 	// Handle middle keywords (ELSE, CASE, CATCH, etc.) - dedent before
 	// They will re-indent in finalizeToken if they're in BlockStartKeywords
-	// (EXITCASE is in BlockMiddleKeywords but NOT in BlockStartKeywords,
-	// so it will dedent here but not re-indent after)
+	// Note: EXITCASE is NOT in BlockMiddleKeywords — it stays at content level
+	// like a break statement, causing no indent change at all.
 	if constants.IsBlockMiddleKeyword(normalized) {
 		s.indent--
 		if s.indent < 0 {
@@ -254,7 +262,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		}
 	}
 
-	if normalized == "PROCEDURE" {
+	switch normalized {
+	case "PROCEDURE":
 		if s.afterEndProc && s.opts.BlankLinesBetweenProcs > 0 {
 			for j := 0; j < s.opts.BlankLinesBetweenProcs; j++ {
 				s.builder.WriteString("\n")
@@ -262,11 +271,38 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		}
 		s.inProcedure = true
 		s.afterEndProc = false
-	} else if normalized == "ENDPROC" {
+		s.afterEndRegion = false
+	case "ENDPROC":
 		s.inProcedure = false
 		s.afterEndProc = true
-	} else {
+	case "REGION":
+		if s.afterEndRegion && s.opts.BlankLinesBetweenProcs > 0 {
+			for j := 0; j < s.opts.BlankLinesBetweenProcs; j++ {
+				s.builder.WriteString("\n")
+			}
+		}
+		s.afterEndRegion = false
 		s.afterEndProc = false
+	case "ENDREGION":
+		s.afterEndRegion = true
+	case "ERROR":
+		// :ERROR is scope-based (no explicit closer). Indent its body.
+		s.inErrorHandler = true
+		s.afterEndProc = false
+		s.afterEndRegion = false
+	case "RESUME":
+		// :RESUME is a middle keyword within :ERROR — dedent before, indent after.
+		if s.inErrorHandler {
+			s.indent--
+			if s.indent < 0 {
+				s.indent = 0
+			}
+		}
+		s.afterEndProc = false
+		s.afterEndRegion = false
+	default:
+		s.afterEndProc = false
+		s.afterEndRegion = false
 	}
 }
 
@@ -350,16 +386,65 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		s.currentLineLen = 0
 		s.pendingStatementBreak = false
 
-		// Set continuation indent for lines inside parentheses
-		// This will be applied when the next token is written
-		s.continuationIndent = s.parenDepth
+		// Set continuation indent for lines inside parentheses.
+		// Schema specifies continuation_indent: 1 (fixed, not proportional to depth).
+		if s.parenDepth > 0 {
+			s.continuationIndent = 1
+		} else {
+			s.continuationIndent = 0
+		}
 	} else if !s.lineStart {
+		// Suppress space before ( in function calls: "MyFunc (" -> "MyFunc("
+		if s.lastNonWSToken.Type == lexer.TokenIdentifier {
+			if next := findNextNonWS(tokens, index); next != nil && next.Text == "(" {
+				s.prevToken = token
+				return true
+			}
+		}
+		// Suppress space around : in member access: "obj : prop" -> "obj:prop"
+		// (colon as TokenPunctuation is member access; := is TokenOperator, :IF is TokenKeyword)
+		if s.lastNonWSToken.Text == ":" && s.lastNonWSToken.Type == lexer.TokenPunctuation {
+			s.prevToken = token
+			return true
+		}
+		// Also suppress before : when preceded by ), ], or identifier (chained access)
+		if s.lastNonWSToken.Type == lexer.TokenIdentifier || s.lastNonWSToken.Text == ")" || s.lastNonWSToken.Text == "]" {
+			if next := findNextNonWS(tokens, index); next != nil && next.Text == ":" && next.Type == lexer.TokenPunctuation {
+				s.prevToken = token
+				return true
+			}
+		}
+		// Suppress space after opening delimiters: "( x" -> "(x", "{ x" -> "{x"
+		if isOpenParen(s.lastNonWSToken) {
+			s.prevToken = token
+			return true
+		}
+		// Suppress space before closing delimiters: "x )" -> "x)", "x }" -> "x}"
+		if next := findNextNonWS(tokens, index); next != nil && isCloseParen(*next) {
+			s.prevToken = token
+			return true
+		}
+		// Suppress space before semicolons: "x ;" -> "x;"
+		if next := findNextNonWS(tokens, index); next != nil && next.Text == ";" {
+			s.prevToken = token
+			return true
+		}
 		s.builder.WriteString(" ")
 		s.currentLineLen++
 	}
 
 	s.prevToken = token
 	return true
+}
+
+// findNextNonWS returns the next non-whitespace token starting from startIdx+1, or nil.
+func findNextNonWS(tokens []lexer.Token, startIdx int) *lexer.Token {
+	for i := startIdx + 1; i < len(tokens); i++ {
+		if tokens[i].Type != lexer.TokenWhitespace {
+			return &tokens[i]
+		}
+	}
+	return nil
 }
 
 func (s *formatState) applyLineWrap(token lexer.Token) {
@@ -377,10 +462,7 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 	}
 
 	s.builder.WriteString("\n")
-	contIndent := s.indent
-	if s.parenDepth > 0 {
-		contIndent += s.parenDepth
-	}
+	contIndent := s.indent + 1 // Fixed 1-level continuation indent per schema
 	s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
 	s.lineStart = false
 }
@@ -406,13 +488,17 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 	if s.opts.CommaSpacing && token.Text == "," {
 		s.builder.WriteString(",")
 		s.currentLineLen++
+		// Skipped parameters: adjacent commas get no space (e.g., DoProc("P", {a,,b}))
+		if index+1 < len(tokens) && tokens[index+1].Text == "," {
+			return true
+		}
 		if s.opts.MaxLineLength > 0 && index+1 < len(tokens) {
 			next := tokens[index+1]
 			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF {
 				remainingLen := estimateRemainingLineLen(tokens, index+1)
 				if s.currentLineLen+1+remainingLen > s.opts.MaxLineLength && s.parenDepth > 0 {
 					s.builder.WriteString("\n")
-					contIndent := s.indent + s.parenDepth
+					contIndent := s.indent + 1 // Fixed 1-level continuation indent
 					s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
 					s.lineStart = false
 				} else {
@@ -422,7 +508,7 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			}
 		} else if index+1 < len(tokens) {
 			next := tokens[index+1]
-			if next.Type != lexer.TokenWhitespace {
+			if next.Type != lexer.TokenWhitespace && next.Text != "," {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
@@ -498,6 +584,10 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		if constants.IsBlockStartKeyword(s.prevKeyword) {
 			s.indent++
 		}
+		// :ERROR and :RESUME are scope-based — indent body after them
+		if s.prevKeyword == "ERROR" || s.prevKeyword == "RESUME" {
+			s.indent++
+		}
 	}
 
 	if token.Text == ";" {
@@ -543,8 +633,21 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			tokenWritten = state.writeTokenWithSQLFormatting(token)
 		}
 		if !tokenWritten {
-			state.builder.WriteString(token.Text)
-			state.currentLineLen += len(token.Text)
+			// Normalize mashed :LABELName -> :LABEL Name
+			if token.Type == lexer.TokenKeyword && isLabelKeywordMashed(token.Text) {
+				labelName := token.Text[1+len("LABEL"):] // skip ":" + "LABEL"
+				out := ":LABEL " + labelName
+				state.builder.WriteString(out)
+				state.currentLineLen += len(out)
+			} else if token.Type == lexer.TokenKeyword {
+				// Normalize keyword casing: :if -> :IF, :endIf -> :ENDIF
+				normalized := ":" + strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+				state.builder.WriteString(normalized)
+				state.currentLineLen += len(normalized)
+			} else {
+				state.builder.WriteString(token.Text)
+				state.currentLineLen += len(token.Text)
+			}
 		}
 
 		state.finalizeToken(token)
@@ -557,6 +660,14 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 	}
 
 	formatted := state.builder.String()
+
+	// Trim trailing whitespace from each line
+	lines := strings.Split(formatted, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " \t")
+	}
+	formatted = strings.Join(lines, "\n")
+
 	if len(formatted) > 0 && !strings.HasSuffix(formatted, "\n") {
 		formatted += "\n"
 	}
@@ -616,6 +727,23 @@ func canWrapBefore(token, prevToken lexer.Token, parenDepth int) bool {
 	// Wrap before identifiers/keywords inside parentheses
 	if parenDepth > 0 && (token.Type == lexer.TokenIdentifier || token.Type == lexer.TokenKeyword) {
 		return true
+	}
+	// Schema: wrap_long_lines.break_on includes "before_operator".
+	// Only wrap before operators that are natural statement-level break points.
+	// Comparison operators (=, ==, !=, <, >, <=, >=, <>) bind tightly to their
+	// operands (e.g. "a = 1") and should not be separated from them.
+	if token.Type == lexer.TokenOperator {
+		upper := strings.ToUpper(token.Text)
+		switch upper {
+		case ".AND.", ".OR.", ".NOT.":
+			return true
+		case "+", "-", "*", "/", "%", "^", "**":
+			return true
+		case "+=", "-=", "*=", "/=", "%=", "^=":
+			return true
+		case "$":
+			return true
+		}
 	}
 	return false
 }
@@ -680,7 +808,6 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 			// Keywords that are continuations (don't need semicolon before)
 			continuationKeywords := map[string]bool{
 				"ELSE":      true,
-				"ELSEIF":    true,
 				"CATCH":     true,
 				"FINALLY":   true,
 				"CASE":      true,
@@ -718,7 +845,7 @@ func isStatementContent(token lexer.Token) bool {
 	if token.Type == lexer.TokenNumber {
 		return true
 	}
-	if token.Type == lexer.TokenString {
+	if token.Type == lexer.TokenString || token.Type == lexer.TokenCodeBlock {
 		return true
 	}
 	if isCloseParen(token) {
@@ -761,8 +888,13 @@ func isBlockEndKeyword(keyword string) bool {
 }
 
 // isOperator checks if a token is an operator that needs spacing.
+// Increment (++) and decrement (--) are excluded — they attach to their operand.
 func isOperator(token lexer.Token) bool {
 	if token.Type == lexer.TokenOperator {
+		// Exclude unary operators — no spaces around these
+		if token.Text == "++" || token.Text == "--" || token.Text == "!" {
+			return false
+		}
 		return true
 	}
 	// Assignment operator
@@ -779,6 +911,15 @@ func isOperator(token lexer.Token) bool {
 }
 
 // isOpenParen checks if token is an opening delimiter.
+// isLabelKeywordMashed detects :LABELName (mashed form without space).
+func isLabelKeywordMashed(text string) bool {
+	if !strings.HasPrefix(text, ":") {
+		return false
+	}
+	trimmed := text[1:]
+	return len(trimmed) > len("LABEL") && strings.HasPrefix(strings.ToUpper(trimmed), "LABEL")
+}
+
 func isOpenParen(token lexer.Token) bool {
 	return token.Text == "(" || token.Text == "[" || token.Text == "{"
 }

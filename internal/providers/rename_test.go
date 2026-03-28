@@ -318,6 +318,38 @@ SNAME := sname;
 	}
 }
 
+func TestPrepareRename_BaseKeyword_NotAllowed(t *testing.T) {
+	text := `:CLASS MyClass;
+:INHERIT ParentClass;
+:PROCEDURE Init;
+Base:Init();
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Position on Base keyword (line 4, column 1)
+	result := PrepareRename(text, 4, 1, "file:///test.ssl", procedures, variables)
+
+	if result != nil {
+		t.Error("expected prepare rename to fail for Base keyword")
+	}
+}
+
+func TestPrepareRename_ConstructorKeyword_NotAllowed(t *testing.T) {
+	text := `:CLASS MyClass;
+:PROCEDURE Constructor;
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Position on Constructor (line 2, column 12)
+	result := PrepareRename(text, 2, 12, "file:///test.ssl", procedures, variables)
+
+	if result != nil {
+		t.Error("expected prepare rename to fail for Constructor keyword")
+	}
+}
+
 // ==================== Validation Tests ====================
 
 func TestIsValidIdentifier_Valid(t *testing.T) {
@@ -342,8 +374,11 @@ func TestIsValidIdentifier_Invalid(t *testing.T) {
 		"123abc",
 		"my-name",
 		"my name",
-		"IF",      // keyword
-		"DECLARE", // keyword
+		"IF",          // keyword
+		"DECLARE",     // keyword
+		"Me",          // class-context form
+		"Base",        // class-context form
+		"Constructor", // class-context form
 	}
 
 	for _, name := range invalidNames {

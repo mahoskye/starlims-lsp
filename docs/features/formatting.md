@@ -224,7 +224,19 @@ sSQL := "
 
 This feature is controlled by `ssl.format.sql.detectSQLStrings` (default: `true`).
 
-The default SQL style is `canonicalCompact`, which matches the compact reference in `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md`: clause keywords aligned at the SQL margin, continuation columns aligned under `SELECT`, and `AND` / `OR` / `ON` indented two spaces beneath their parent clause.
+The default SQL style is `canonicalCompact`, which matches the compact reference in `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md`:
+
+- **Major clauses** (`SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `ORDER BY`, etc.) at column 0 relative to the 4-space SQL indent
+- **SELECT continuations** aligned to first column (col 7 from clause start)
+- **AND/OR** indented 2 spaces under their parent clause (`WHERE`, `ON`, `HAVING`)
+- **ON** indented 2 spaces under `JOIN`
+- **HAVING** indented 2 spaces under `GROUP BY`
+- **WHEN/ELSE** indented 4 spaces under `CASE` (2 spaces when `CASE` is at column 0)
+- **INSERT** uses block-style parens: opening `(` on the `INSERT INTO` line, closing `)` on its own line
+- **UPDATE SET** stays on the same line as `UPDATE`; assignments indented below
+- **Set operations** (`UNION`, `INTERSECT`, `MINUS`) surrounded by blank lines
+- **SQL keywords and functions** UPPERCASE; identifiers lowercase
+- **Trailing commas**, ~90 char line limit
 
 ---
 

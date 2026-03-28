@@ -31,7 +31,7 @@ Completion is triggered automatically on these characters:
 |------|-------|---------|-------------------|
 | Keywords | 38 | `:IF`, `:WHILE`, `:DECLARE` | Keyword (14) |
 | Built-in Functions | 354 | `SQLExecute`, `Len`, `Upper` | Function (3) |
-| Built-in Classes | 21 | `SSLExpando`, `SSLDataset`, `Email` | Class (7) |
+| Built-in Classes | 22 | `SSLExpando`, `SSLDataset`, `Email` | Class (7) |
 | Class-context forms | Contextual | `Me`, `Base`, `Constructor` | Keyword/Constructor |
 | Literals | 3 | `.T.`, `.F.`, `NIL` | Constant (21) |
 | Operators | 3 | `.AND.`, `.OR.`, `.NOT.` | Operator (24) |
@@ -113,7 +113,7 @@ Snippet templates follow the bundled style-guide defaults:
 - SQL snippets use `SQLExecute` named-parameter style and `RunSQL` positional-parameter style
 - Class snippets avoid an extra class-body indent because `:CLASS` extends to EOF and has no `:ENDCLASS`
 - Region snippets use comment-based `/* region ...;` / `/* endregion;` rather than legacy functional `:REGION`
-- Procedure completions insert `DoProc(...)` dispatch snippets in script files, and `Me:MethodName(...)` snippets when completion is requested inside a `:CLASS` method
+- Procedure completions insert `DoProc(...)` dispatch snippets in script files, and `Me:MethodName(...)` snippets when completion is requested inside a `:CLASS` method (because `DoProc` is a compile-time error inside class methods — all forms are rejected)
 - Class-context forms (`Me`, `Base`, `Constructor`) are only offered in class-method context
 
 ---

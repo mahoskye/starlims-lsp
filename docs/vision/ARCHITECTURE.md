@@ -66,7 +66,7 @@ starlims-lsp/
 │   │   └── parser.go            # SSL parser
 │   └── constants/
 │       ├── constants.go         # Keywords, literals, operators, legacy inventories
-│       ├── source_alignment.go  # Source-aligned public functions/classes
+│       ├── canonical.go         # Canonical public functions/classes
 │       └── signatures.go        # Legacy signature corpus
 └── docs/                        # This documentation
 ```
@@ -162,9 +162,9 @@ Static SSL language data:
 │  ├── Operators (.AND., .OR., .NOT.)                     │
 │  └── Legacy function/class inventories                  │
 ├─────────────────────────────────────────────────────────┤
-│  source_alignment.go                                    │
+│  canonical.go                                           │
 │  ├── Built-in Functions (354)                           │
-│  ├── Built-in Classes (21)                              │
+│  ├── Built-in Classes (22)                              │
 │  └── Source-only additions / exclusions / canonicalize  │
 ├─────────────────────────────────────────────────────────┤
 │  signatures.go                                          │
@@ -320,7 +320,7 @@ type Document struct {
 }
 ```
 
-In this configuration, `indentStyle: "tab"` is the source-aligned default. `indentSize: 4` is only consulted if the client switches SSL indentation to spaces; it is not the width of a tab-indented SSL block.
+In this configuration, `indentStyle: "tab"` is the style-guide default. `indentSize: 4` is only consulted if the client switches SSL indentation to spaces; it is not the width of a tab-indented SSL block.
 
 **Lifecycle:**
 - `didOpen`: Create entry, parse, publish diagnostics

@@ -89,12 +89,12 @@ func TestFunctionSignatureMappings(t *testing.T) {
 	}
 }
 
-func TestSourceAlignedInventories(t *testing.T) {
+func TestCanonicalInventories(t *testing.T) {
 	if len(SSLFunctionNames) != 354 {
-		t.Fatalf("expected 354 source-aligned functions, got %d", len(SSLFunctionNames))
+		t.Fatalf("expected 354 canonical functions, got %d", len(SSLFunctionNames))
 	}
-	if len(SSLClassNames) != 21 {
-		t.Fatalf("expected 21 source-aligned classes, got %d", len(SSLClassNames))
+	if len(SSLClassNames) != 22 {
+		t.Fatalf("expected 22 canonical classes, got %d", len(SSLClassNames))
 	}
 
 	for _, name := range []string{"Branch", "Eval"} {
@@ -106,13 +106,74 @@ func TestSourceAlignedInventories(t *testing.T) {
 		}
 	}
 
-	for _, removed := range []string{"Break", "TryConnect", "EnterpriseImpExBase", "InList", "SSLError", "SSLSQLError", "CDataTable", "SQLConnection"} {
+	for _, removed := range []string{"Break", "TryConnect", "EnterpriseImpExBase", "InList", "SSLError", "SSLSQLError", "CDataColumn", "SQLConnection"} {
 		if IsSSLFunction(removed) || IsSSLClass(removed) {
-			t.Fatalf("expected %s to be excluded from the source-aligned public inventory", removed)
+			t.Fatalf("expected %s to be excluded from the canonical public inventory", removed)
 		}
 	}
 
 	if sig, ok := GetFunctionSignature("branch"); !ok || sig.Name != "Branch" {
-		t.Fatalf("expected Branch to have a source-aligned signature, got ok=%v sig=%+v", ok, sig)
+		t.Fatalf("expected Branch to have a canonical signature, got ok=%v sig=%+v", ok, sig)
+	}
+}
+
+func TestClassContextForms(t *testing.T) {
+	trueCases := []string{"Me", "me", "BASE", "constructor"}
+	for _, form := range trueCases {
+		if !IsSSLClassContextForm(form) {
+			t.Errorf("expected IsSSLClassContextForm(%q) to be true", form)
+		}
+	}
+
+	if IsSSLClassContextForm("NotAForm") {
+		t.Error("expected IsSSLClassContextForm(\"NotAForm\") to be false")
+	}
+}
+
+func TestKeywordAndOperatorDescriptions(t *testing.T) {
+	// Source-of-truth alignment: keyword descriptions must reflect authoritative language rules
+
+	// EXITCASE must mention fall-through / multi-match behavior
+	desc := SSLKeywordDescriptions["EXITCASE"]
+	if !strings.Contains(desc, "without it") || !strings.Contains(desc, "evaluated") {
+		t.Errorf("EXITCASE description must explain that without it, later :CASE blocks are still evaluated; got: %q", desc)
+	}
+
+	// FINALLY must list all four restricted keywords
+	desc = SSLKeywordDescriptions["FINALLY"]
+	for _, kw := range []string{":RETURN", ":EXITFOR", ":EXITWHILE", ":LOOP"} {
+		if !strings.Contains(desc, kw) {
+			t.Errorf("FINALLY description must mention %s restriction; got: %q", kw, desc)
+		}
+	}
+
+	// = operator must mention prefix/loose matching
+	desc = SSLOperatorDescriptions["="]
+	if !strings.Contains(desc, "prefix") || !strings.Contains(desc, "loose") {
+		t.Errorf("= description must mention loose prefix matching; got: %q", desc)
+	}
+
+	// != operator must mention it negates == not =
+	desc = SSLOperatorDescriptions["!="]
+	if !strings.Contains(desc, "negates ==") {
+		t.Errorf("!= description must mention it negates == (not =); got: %q", desc)
+	}
+
+	// $ operator must explain containment direction
+	desc = SSLOperatorDescriptions["$"]
+	if !strings.Contains(desc, "left") && !strings.Contains(desc, "right") {
+		t.Errorf("$ description should clarify containment direction; got: %q", desc)
+	}
+}
+
+func TestCompoundOperatorsExcludesAssignment(t *testing.T) {
+	for _, op := range SSLCompoundOperators {
+		if op == ":=" {
+			t.Fatal(":= should NOT be in SSLCompoundOperators (it is simple assignment, not compound)")
+		}
+	}
+
+	if IsSSLCompoundOperator(":=") {
+		t.Fatal("IsSSLCompoundOperator should return false for ':='")
 	}
 }

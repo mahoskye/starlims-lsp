@@ -20,6 +20,25 @@ var SQLKeywords = map[string]bool{
 	"START": true, "CONNECT": true, "PRIOR": true, "SIBLINGS": true,
 	"PIVOT": true, "UNPIVOT": true, "LATERAL": true, "OF": true,
 	"NOWAIT": true, "WAIT": true, "FETCH": true, "NEXT": true, "ONLY": true,
+	// DDL keywords
+	"CREATE": true, "ALTER": true, "DROP": true, "TRUNCATE": true,
+	"TABLE": true, "VIEW": true, "INDEX": true,
+	"CONSTRAINT": true, "PRIMARY": true, "KEY": true, "FOREIGN": true,
+	"REFERENCES": true, "UNIQUE": true, "CHECK": true, "DEFAULT": true,
+	"ADD": true, "MODIFY": true,
+	// Additional
+	"OUTER": true, "FOR": true, "WITHIN": true, "UNBOUNDED": true,
+	"OVERFLOW": true,
+	// Oracle data types and pseudocolumns (uppercased in SQL context)
+	"NUMBER": true, "VARCHAR2": true, "DATE": true, "INTERVAL": true,
+	"LEVEL": true, "NEXTVAL": true, "CURRVAL": true,
+	// ORDER BY modifiers
+	"NULLS": true, "LAST": true, "FIRST": true,
+	// DDL modifiers
+	"PURGE": true, "REPLACE": true, "SEQUENCE": true,
+	"CASCADE": true, "NATURAL": true, "PERCENT": true,
+	// DML command keywords (also need uppercasing)
+	"GRANT": true, "REVOKE": true,
 }
 
 // SQLBuiltinFunctions contains common SQL aggregate and scalar functions.
@@ -45,10 +64,23 @@ var SQLBuiltinFunctions = map[string]bool{
 	// Math functions
 	"ABS": true, "CEILING": true, "FLOOR": true, "ROUND": true,
 	"POWER": true, "SQRT": true, "SIGN": true, "MOD": true,
-	// Other common functions
+	// Window / analytic functions
 	"ROW_NUMBER": true, "RANK": true, "DENSE_RANK": true, "NTILE": true,
+	"LAG": true, "LEAD": true, "FIRST_VALUE": true, "LAST_VALUE": true,
+	"LISTAGG": true,
 	"OVER": true, "PARTITION": true,
+	// Oracle functions
+	"TO_DATE": true, "TO_CHAR": true, "TO_NUMBER": true,
+	"DECODE": true, "NVL2": true,
+	"TRUNC": true, "SYSDATE": true, "SYSTIMESTAMP": true,
+	"LPAD": true, "RPAD": true,
+	"ADD_MONTHS": true, "SYS_CONNECT_BY_PATH": true, "CONNECT_BY_ROOT": true,
+	// Other common functions
 	"IIF": true, "CHOOSE": true,
+	// Oracle date functions
+	"MONTHS_BETWEEN": true,
+	// Oracle pseudocolumns
+	"ROWNUM": true, "ROWID": true,
 }
 
 // SQLBreakBeforeKeywords are keywords that trigger line breaks before them.
@@ -57,7 +89,12 @@ var SQLBreakBeforeKeywords = map[string]bool{
 	"RIGHT": true, "FULL": true, "CROSS": true, "ORDER": true,
 	"GROUP": true, "HAVING": true, "UNION": true, "VALUES": true,
 	"INTO": true, "USING": true, "ON": true, "CASE": true, "WHEN": true,
-	"ELSE": true, "END": true,
+	"ELSE": true, "END": true, "FOR": true,
+	// Set operations and Oracle-specific clauses
+	"INTERSECT": true, "MINUS": true, "EXCEPT": true,
+	"START": true, "CONNECT": true,
+	"PIVOT": true, "UNPIVOT": true,
+	"RETURNING": true,
 }
 
 // SQLJoinModifiers are keywords that modify JOIN and shouldn't break before JOIN.
@@ -67,7 +104,7 @@ var SQLJoinModifiers = map[string]bool{
 
 // SQLIndentedKeywords get extra indentation.
 var SQLIndentedKeywords = map[string]bool{
-	"AND": true, "OR": true, "ON": true, "WHEN": true, "ELSE": true,
+	"AND": true, "OR": true, "ON": true, "HAVING": true, "WHEN": true, "ELSE": true,
 }
 
 // SQLFunctions that take SQL strings in SSL code.
@@ -83,6 +120,9 @@ var SQLFunctions = map[string]bool{
 	"LSELECT1":                       true,
 	"LSELECTC":                       true,
 	"GETDATASETEX":                   true,
+	"GETTABLES":                      true,
+	"XMLEXPORTSQL":                   true,
+	"GETSSLDATASET":                  true,
 }
 
 // SQLCommandKeywords are SQL statement-starting keywords used for detection.

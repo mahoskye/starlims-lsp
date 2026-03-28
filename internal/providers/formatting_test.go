@@ -958,15 +958,15 @@ func TestFormatDocument_MultiLineStructurePreserved(t *testing.T) {
 		t.Error("InnerFunction should be on its own line, not collapsed with OuterFunction")
 	}
 
-	// Verify indentation levels:
+	// Verify indentation levels (fixed 1-level continuation per schema):
 	// Line 1: result := OuterFunction( - 0 tabs
-	// Line 2: InnerFunction( - 1 tab (inside 1 paren)
-	// Line 3: arg1, - 2 tabs (inside 2 parens)
-	// Line 4: arg2 - 2 tabs (inside 2 parens)
-	// Line 5: ), - 1 tab (closing inner paren)
-	// Line 6: arg3 - 1 tab (inside 1 paren)
+	// Line 2: InnerFunction( - 1 tab (continuation inside parens)
+	// Line 3: arg1, - 1 tab (continuation, fixed 1 level)
+	// Line 4: arg2 - 1 tab (continuation, fixed 1 level)
+	// Line 5: ), - 0 tabs (closing paren aligns with opening level)
+	// Line 6: arg3 - 1 tab (continuation inside parens)
 	// Line 7: ); - 0 tabs (closing outer paren)
-	expectedIndents := []int{0, 1, 2, 2, 1, 1, 0}
+	expectedIndents := []int{0, 1, 1, 1, 0, 1, 0}
 	for i, line := range lines {
 		if i >= len(expectedIndents) {
 			break
@@ -1167,6 +1167,200 @@ func TestFormatDocument_InvalidSQLNotFormatted(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// --- TestFormatDocument_SkippedParameterCommas ---
+
+func TestFormatDocument_SkippedParameterCommas(t *testing.T) {
+	input := `DoProc("P",{a,,b,,c});`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// Space after first comma (after "P") but adjacent commas (,,) stay together
+	if !strings.Contains(formatted, ",,") {
+		t.Error("adjacent commas (skipped parameters) should be preserved without space between them")
+	}
+	if !strings.Contains(formatted, `"P", {`) {
+		t.Error("expected space after first comma separating arguments")
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_ClassBodyNotIndented ---
+
+func TestFormatDocument_ClassBodyNotIndented(t *testing.T) {
+	input := `:CLASS MyClass;
+:DECLARE sField;
+:PROCEDURE Test;
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, "\t "))
+		// Top-level class members (:DECLARE, :PROCEDURE, :ENDPROC) should be at indent 0
+		if strings.HasPrefix(trimmed, ":CLASS") || strings.HasPrefix(trimmed, ":DECLARE") ||
+			strings.HasPrefix(trimmed, ":PROCEDURE") || strings.HasPrefix(trimmed, ":ENDPROC") {
+			if indent != 0 {
+				t.Errorf("expected %q at indent level 0, got %d", trimmed, indent)
+			}
+		}
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_WhileLoopIndentation ---
+
+func TestFormatDocument_WhileLoopIndentation(t *testing.T) {
+	input := `:WHILE x > 0;
+x := x - 1;
+:ENDWHILE;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+
+	var whileIndent, bodyIndent, endWhileIndent int
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+		switch {
+		case strings.HasPrefix(trimmed, ":WHILE"):
+			whileIndent = indent
+		case strings.HasPrefix(trimmed, "x :=") || strings.HasPrefix(trimmed, "x:="):
+			bodyIndent = indent
+		case strings.HasPrefix(trimmed, ":ENDWHILE"):
+			endWhileIndent = indent
+		}
+	}
+
+	if bodyIndent != whileIndent+1 {
+		t.Errorf("body should be indented one level from :WHILE, got body=%d while=%d", bodyIndent, whileIndent)
+	}
+	if endWhileIndent != whileIndent {
+		t.Errorf(":ENDWHILE should be at same level as :WHILE, got endwhile=%d while=%d", endWhileIndent, whileIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_ForLoopIndentation ---
+
+func TestFormatDocument_ForLoopIndentation(t *testing.T) {
+	input := `:FOR i := 1 :TO 10;
+x := i;
+:NEXT;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+
+	var forIndent, bodyIndent, nextIndent int
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		indent := len(line) - len(strings.TrimLeft(line, "\t"))
+		switch {
+		case strings.HasPrefix(trimmed, ":FOR"):
+			forIndent = indent
+		case strings.HasPrefix(trimmed, "x :=") || strings.HasPrefix(trimmed, "x:="):
+			bodyIndent = indent
+		case strings.HasPrefix(trimmed, ":NEXT"):
+			nextIndent = indent
+		}
+	}
+
+	if bodyIndent != forIndent+1 {
+		t.Errorf("body should be indented one level from :FOR, got body=%d for=%d", bodyIndent, forIndent)
+	}
+	if nextIndent != forIndent {
+		t.Errorf(":NEXT should be at same level as :FOR, got next=%d for=%d", nextIndent, forIndent)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_IncrementDecrementNoSpaces ---
+
+func TestFormatDocument_IncrementDecrementNoSpaces(t *testing.T) {
+	// Source of truth: increment/decrement operators should NOT have spaces around them
+	input := `:DECLARE i;
+i++;
+--i;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	// ++ and -- should stay attached to their operand, not get spaces
+	if strings.Contains(formatted, "i ++") || strings.Contains(formatted, "++ ;") {
+		t.Errorf("increment operator should not have spaces around it, got:\n%s", formatted)
+	}
+	if strings.Contains(formatted, "-- i") {
+		t.Errorf("decrement operator should not have spaces around it, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_UnaryNotNoLeadingSpace ---
+
+func TestFormatDocument_UnaryNotNoLeadingSpace(t *testing.T) {
+	// Source of truth: ! is a unary prefix operator, no space after it
+	input := `:DECLARE bFlag;
+:IF !bFlag;
+:ENDIF;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	if strings.Contains(formatted, "! bFlag") {
+		t.Errorf("unary ! should not have a space after it, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "!bFlag") {
+		t.Errorf("expected !bFlag without space, got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- TestFormatDocument_LogicalOperatorSpacing ---
+
+func TestFormatDocument_LogicalOperatorSpacing(t *testing.T) {
+	// Source of truth: .AND., .OR., .NOT. must have spaces around them
+	input := `:DECLARE a, b;
+:IF a .AND. b;
+:ENDIF;
+:IF a .OR. b;
+:ENDIF;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	if !strings.Contains(formatted, "a .AND. b") {
+		t.Errorf("expected spaces around .AND., got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "a .OR. b") {
+		t.Errorf("expected spaces around .OR., got:\n%s", formatted)
+	}
+
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
 func TestFormatDocument_SQLInsideNestedProcedure(t *testing.T) {
 	// SQL detection should work inside procedures with proper indentation
 	input := `:PROCEDURE Test;
@@ -1190,5 +1384,296 @@ sSQL := "select id, name from users where active = 1";
 		t.Log("SQL is properly formatted with line breaks")
 	}
 
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Gap 2: .AND./.OR. line wrapping ---
+
+func TestFormatDocument_WrapBeforeAndOr(t *testing.T) {
+	input := `:IF longConditionVariableA = 1 .AND. longConditionVariableB = 2 .OR. longConditionVariableC = 3;
+:ENDIF;`
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 50
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	// With before_operator wrapping, any operator (=, .AND., .OR.) is a valid wrap point.
+	// The formatter wraps before the first operator that would cause overflow.
+	lines := strings.Split(formatted, "\n")
+	if len(lines) < 3 {
+		t.Errorf("expected at least 3 lines from wrapping long condition, got %d:\n%s", len(lines), formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_WrapBeforeStringConcatOperator(t *testing.T) {
+	input := `sMsg := "Hello " + "World " + "this is a very long concatenated string " + "that should wrap";`
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 60
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	foundWrap := false
+	for _, line := range strings.Split(formatted, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "+ ") || strings.HasPrefix(trimmed, "+\t") {
+			foundWrap = true
+		}
+	}
+	if !foundWrap {
+		t.Errorf("expected wrap before '+' operator in long concatenation, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_WrapBeforeArithmeticOperator(t *testing.T) {
+	input := `nResult := nLongVariableName + nAnotherLongVariableName * nYetAnotherVariable - nFinalLongVariable;`
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 60
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	foundWrap := false
+	for _, line := range strings.Split(formatted, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "-") {
+			foundWrap = true
+		}
+	}
+	if !foundWrap {
+		t.Errorf("expected wrap before arithmetic operator, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_NoWrapBeforeComparisonOperator(t *testing.T) {
+	// Comparison operators bind tightly to operands — "a = 1" should not split.
+	input := `:IF longVariableNameA = 1 .AND. longVariableNameB = 2;
+:ENDIF;`
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 50
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	for _, line := range strings.Split(formatted, "\n") {
+		trimmed := strings.TrimSpace(line)
+		// A line should never start with a bare comparison operator
+		if strings.HasPrefix(trimmed, "= ") || strings.HasPrefix(trimmed, "!= ") ||
+			strings.HasPrefix(trimmed, "> ") || strings.HasPrefix(trimmed, "< ") ||
+			strings.HasPrefix(trimmed, ">= ") || strings.HasPrefix(trimmed, "<= ") {
+			t.Errorf("comparison operator should not be a wrap point, got line: %q", trimmed)
+		}
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Gap 1: Blank lines between :REGION blocks ---
+
+func TestFormatDocument_BlankLinesBetweenRegions(t *testing.T) {
+	input := `:REGION Reg1;
+x := 1;
+:ENDREGION;
+:REGION Reg2;
+y := 2;
+:ENDREGION;`
+	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenProcs = 1
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	// Between :ENDREGION; and :REGION should be at least 2 newlines (line break + blank line)
+	if !strings.Contains(formatted, ":ENDREGION;\n\n:REGION") {
+		t.Errorf("expected blank line between regions, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Gap 3: No space before ( ---
+
+func TestFormatDocument_NoSpaceBeforeFunctionParen(t *testing.T) {
+	input := `result := MyFunc (a, b);`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	if strings.Contains(formatted, "MyFunc (") {
+		t.Errorf("expected no space before ( in function call, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "MyFunc(") {
+		t.Errorf("expected MyFunc( without space, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Gap 4: Member access colon normalization ---
+
+func TestFormatDocument_MemberAccessColonNoSpace(t *testing.T) {
+	input := `x := obj : prop;`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	if !strings.Contains(formatted, "obj:prop") {
+		t.Errorf("expected obj:prop with no spaces around colon, got:\n%s", formatted)
+	}
+	// Make sure := assignment is NOT affected
+	if !strings.Contains(formatted, " := ") {
+		t.Errorf("expected spaces around :=, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+func TestFormatDocument_ChainedMemberAccessNoSpaces(t *testing.T) {
+	// Chained member access: obj:method():prop should have no spaces around either colon
+	input := `x := obj : method() : prop;`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	if !strings.Contains(formatted, "obj:method():prop") {
+		t.Errorf("expected obj:method():prop with no spaces around colons, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Gap 5: Mashed :LABELName normalization ---
+
+func TestFormatDocument_MashedLabelNormalization(t *testing.T) {
+	input := `:LABELMyLabel;
+x := 1;`
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+	if strings.Contains(formatted, ":LABELMyLabel") {
+		t.Errorf("expected mashed label to be split, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, ":LABEL MyLabel") {
+		t.Errorf("expected ':LABEL MyLabel', got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Keyword casing normalization ---
+
+func TestFormatDocument_KeywordCasingNormalized(t *testing.T) {
+	input := `:if x = 1;
+	y := 2;
+:endif;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	if strings.Contains(formatted, ":if ") {
+		t.Errorf("expected :if to be normalized to :IF, got:\n%s", formatted)
+	}
+	if strings.Contains(formatted, ":endif") {
+		t.Errorf("expected :endif to be normalized to :ENDIF, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, ":IF") {
+		t.Errorf("expected :IF in output, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, ":ENDIF") {
+		t.Errorf("expected :ENDIF in output, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Trailing whitespace trimming ---
+
+func TestFormatDocument_TrailingWhitespaceTrimmed(t *testing.T) {
+	input := "x := 1;   \ny := 2;\t\t\n"
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(formatted, "\n")
+	for i, line := range lines {
+		if line != strings.TrimRight(line, " \t") {
+			t.Errorf("line %d has trailing whitespace: %q", i+1, line)
+		}
+	}
+}
+
+// --- Space inside parens stripped ---
+
+func TestFormatDocument_SpaceInsideParensStripped(t *testing.T) {
+	input := `Len( sValue );`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	if strings.Contains(formatted, "( ") {
+		t.Errorf("expected space after ( to be stripped, got:\n%s", formatted)
+	}
+	if strings.Contains(formatted, " )") {
+		t.Errorf("expected space before ) to be stripped, got:\n%s", formatted)
+	}
+	if !strings.Contains(formatted, "Len(sValue)") {
+		t.Errorf("expected Len(sValue) with no inner spaces, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- Space before semicolons stripped ---
+
+func TestFormatDocument_SpaceBeforeSemicolonStripped(t *testing.T) {
+	input := `x := 1 ;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	if strings.Contains(formatted, " ;") {
+		t.Errorf("expected space before semicolon to be stripped, got:\n%s", formatted)
+	}
+	t.Logf("Formatted output:\n%s", formatted)
+}
+
+// --- :ERROR/:RESUME indentation ---
+
+func TestFormatDocument_ErrorResumeIndentation(t *testing.T) {
+	input := `:PROCEDURE Test;
+:ERROR;
+x := 1;
+:RESUME;
+y := 2;
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	formatted := edits[0].NewText
+
+	lines := strings.Split(strings.TrimSuffix(formatted, "\n"), "\n")
+	// Expected structure:
+	// :PROCEDURE Test;        (0 tabs)
+	// \t:ERROR;               (1 tab - inside PROCEDURE)
+	// \t\tx := 1;             (2 tabs - inside ERROR body)
+	// \t:RESUME;              (1 tab - middle keyword, dedented)
+	// \t\ty := 2;             (2 tabs - inside RESUME body)
+	// :ENDPROC;               (0 tabs)
+
+	for _, line := range lines {
+		if strings.Contains(line, "x := 1") {
+			tabCount := 0
+			for _, r := range line {
+				if r == '\t' {
+					tabCount++
+				} else {
+					break
+				}
+			}
+			if tabCount < 2 {
+				t.Errorf("expected :ERROR body indented 2 levels, got %d tabs: %q", tabCount, line)
+			}
+		}
+		if strings.Contains(line, ":RESUME") {
+			tabCount := 0
+			for _, r := range line {
+				if r == '\t' {
+					tabCount++
+				} else {
+					break
+				}
+			}
+			if tabCount != 1 {
+				t.Errorf("expected :RESUME at 1 tab (middle keyword), got %d tabs: %q", tabCount, line)
+			}
+		}
+	}
 	t.Logf("Formatted output:\n%s", formatted)
 }

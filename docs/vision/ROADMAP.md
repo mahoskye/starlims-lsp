@@ -22,7 +22,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 |----------|---------|--------|
 | Completion | Keywords, functions, classes, snippets | ✅ Complete |
 | Hover | Function signatures, keyword docs, SQL placeholders, `Me` keyword | ✅ Complete |
-| Signature Help | 354 source-aligned built-in functions and dispatch helpers | ✅ Complete |
+| Signature Help | 354 canonical built-in functions and dispatch helpers | ✅ Complete |
 | Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
 | Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
 | Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
@@ -123,7 +123,7 @@ See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL 
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Define class member structure | Properties/methods for 21 source-aligned built-in classes | ⏳ Pending |
+| Define class member structure | Properties/methods for 22 canonical built-in classes | ⏳ Pending |
 | Add SSLDataset members | Most commonly used class | ⏳ Pending |
 | Add Email members | Common utility class | ⏳ Pending |
 | Add SSLExpando members | Dynamic object class | ⏳ Pending |
@@ -171,19 +171,24 @@ See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL 
 
 ### Major Features
 
-| Feature | Description | Effort |
-|---------|-------------|--------|
-| Workspace Indexing | Index all SSL files in workspace | Large |
-| Cross-file Definition | Navigate to definitions in other files | Large |
-| Cross-file References | Find references across workspace | Large |
-| `:INCLUDE` Resolution | Follow include paths | Medium |
-| Namespace Navigation | Navigate `Namespace.Script.Proc` | Medium |
+| Feature | Description | Effort | Status |
+|---------|-------------|--------|--------|
+| Workspace Indexing | Index all SSL files in workspace | Large | DONE |
+| File Watching | Dynamic registration via `client/registerCapability` | Medium | DONE |
+| Workspace Symbols | Search procedures across all indexed files | Medium | DONE |
+| Cross-file Definition | Navigate to definitions in other files | Large | Planned |
+| Cross-file References | Find references across workspace | Large | Planned |
+| `:INCLUDE` Resolution | Follow include paths | Medium | Planned |
+| Namespace Navigation | Navigate `Category.Script.Procedure` paths | Medium | Planned |
 
-**Prerequisites:**
-- File system watching
-- Background indexing
-- Index persistence
-- Incremental updates
+**Completed prerequisites:**
+- File system watching (dynamic registration for `.srvscr`, `.ssl`, `.ssl.txt`, `.ds`, `.ds.txt`)
+- Background indexing (4-worker bounded concurrency)
+- Incremental updates (file watcher events + re-index on document close)
+
+**Remaining prerequisites for cross-file navigation:**
+- Namespace path resolution (`Category.Script.Procedure` to filesystem path)
+- STARLIMS filesystem layout mapping (`Server Scripts/CATEGORY/SCRIPT.srvscr`)
 
 ### Additional Features
 

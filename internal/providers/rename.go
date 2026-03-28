@@ -126,8 +126,8 @@ func isRenameableSymbol(word string, line, column int, text string, procedures [
 		return false
 	}
 
-	// Cannot rename 'Me' keyword
-	if wordLower == "me" {
+	// Cannot rename class-context forms (Me, Base, Constructor)
+	if constants.IsSSLClassContextForm(word) {
 		return false
 	}
 
@@ -189,6 +189,11 @@ func isValidIdentifier(name string) bool {
 
 	// Cannot be a built-in function
 	if _, ok := constants.GetFunctionSignature(name); ok {
+		return false
+	}
+
+	// Cannot be a class-context form (Me, Base, Constructor)
+	if constants.IsSSLClassContextForm(name) {
 		return false
 	}
 

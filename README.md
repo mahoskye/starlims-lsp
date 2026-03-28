@@ -22,7 +22,7 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 ## Features
 
 - **Auto-completion** for keywords, built-in functions, classes, procedures, and variables
-  - Procedure completions are source-aligned: script contexts dispatch with `DoProc(...)`, class-method contexts suggest `Me:MethodName(...)`
+  - Procedure completions are style-guide-aware: script contexts dispatch with `DoProc(...)`, class-method contexts suggest `Me:MethodName(...)`
 - **Hover information** for keywords, functions, classes, and user-defined symbols
 - **Signature help** for built-in functions, including dispatch helpers such as `DoProc` and `ExecFunction`
 - **Go to Definition** for procedures and variables
@@ -185,7 +185,7 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
 }
 ```
 
-`indentStyle: "tab"` is the source-aligned default. `indentSize` is only used when `indentStyle` is `"space"`; the bundled value `4` is the fallback space width, not the width of a tab-indented SSL block.
+`indentStyle: "tab"` is the style-guide default. `indentSize` is only used when `indentStyle` is `"space"`; the bundled value `4` is the fallback space width, not the width of a tab-indented SSL block.
 
 Diagnostics settings default to server defaults. When `hungarianNotation` is enabled, the LSP warns on declared variables that do not use an allowed Hungarian prefix. Global variables can be declared via `globals` array; assignments to these variables will trigger an error. Always-on diagnostics enforce major rules from the authoritative material under `dev/ssl-style-guide/`; [`docs/ssl-reference/style-guide.md`](docs/ssl-reference/style-guide.md) is the bundled public summary.
 
@@ -259,8 +259,8 @@ starlims-lsp/
 │   │   └── parser.go         # AST parser
 │   ├── constants/
 │   │   ├── constants.go      # Keywords, literals, operators, legacy inventories
-│   │   ├── source_alignment.go # Source-aligned public function/class inventories
-│   │   └── signatures.go     # Legacy signature corpus used by source alignment
+│   │   ├── canonical.go        # Canonical public function/class inventories
+│   │   └── signatures.go     # Legacy signature corpus
 │   ├── providers/
 │   │   ├── completion.go     # Auto-completion
 │   │   ├── hover.go          # Hover information

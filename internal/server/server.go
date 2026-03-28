@@ -81,6 +81,8 @@ type SSLServer struct {
 	handler         protocol.Handler
 	settings        Settings
 	documentVersion map[string]int
+	workspaceIndex  *WorkspaceIndex
+	rootURIs        []string
 }
 
 // Settings contains server settings.
@@ -130,6 +132,7 @@ func NewSSLServer() *SSLServer {
 		TextDocumentPrepareRename:       s.handlePrepareRename,
 		WorkspaceSymbol:                 s.handleWorkspaceSymbol,
 		WorkspaceDidChangeConfiguration: s.handleDidChangeConfiguration,
+		WorkspaceDidChangeWatchedFiles:  s.handleDidChangeWatchedFiles,
 	}
 
 	return s
@@ -144,6 +147,17 @@ func (s *SSLServer) Run() error {
 
 // handleInitialize handles the initialize request.
 func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
+	// Capture workspace roots for indexing
+	if len(params.WorkspaceFolders) > 0 {
+		for _, folder := range params.WorkspaceFolders {
+			s.rootURIs = append(s.rootURIs, folder.URI)
+		}
+	} else if params.RootURI != nil {
+		s.rootURIs = []string{*params.RootURI}
+	} else if params.RootPath != nil {
+		s.rootURIs = []string{pathToURI(*params.RootPath)}
+	}
+
 	capabilities := s.handler.CreateServerCapabilities()
 
 	capabilities.TextDocumentSync = protocol.TextDocumentSyncKindIncremental
@@ -181,11 +195,38 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 
 // handleInitialized handles the initialized notification.
 func (s *SSLServer) handleInitialized(context *glsp.Context, params *protocol.InitializedParams) error {
+	// Start workspace indexing if we have roots
+	if len(s.rootURIs) > 0 {
+		s.workspaceIndex = NewWorkspaceIndex(s.rootURIs)
+		s.workspaceIndex.StartBackgroundIndex()
+
+		// Register file watchers for SSL file types
+		context.Call(string(protocol.ServerClientRegisterCapability),
+			protocol.RegistrationParams{
+				Registrations: []protocol.Registration{{
+					ID:     "ssl-file-watcher",
+					Method: string(protocol.MethodWorkspaceDidChangeWatchedFiles),
+					RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
+						Watchers: []protocol.FileSystemWatcher{
+							{GlobPattern: "**/*.srvscr"},
+							{GlobPattern: "**/*.ssl"},
+							{GlobPattern: "**/*.ssl.txt"},
+							{GlobPattern: "**/*.ds"},
+							{GlobPattern: "**/*.ds.txt"},
+						},
+					},
+				}},
+			}, nil)
+	}
+
 	return nil
 }
 
 // handleShutdown handles the shutdown request.
 func (s *SSLServer) handleShutdown(context *glsp.Context) error {
+	if s.workspaceIndex != nil {
+		s.workspaceIndex.Stop()
+	}
 	return nil
 }
 
@@ -238,6 +279,12 @@ func (s *SSLServer) handleDidClose(context *glsp.Context, params *protocol.DidCl
 	uri := params.TextDocument.URI
 	s.documents.RemoveDocument(uri)
 	delete(s.documentVersion, uri)
+
+	// Re-index from disk so the workspace index has the latest saved content
+	if s.workspaceIndex != nil {
+		go s.workspaceIndex.IndexFile(uri)
+	}
+
 	return nil
 }
 
@@ -245,6 +292,26 @@ func (s *SSLServer) handleDidClose(context *glsp.Context, params *protocol.DidCl
 func (s *SSLServer) handleDidSave(context *glsp.Context, params *protocol.DidSaveTextDocumentParams) error {
 	// Re-validate on save
 	s.validateDocument(context, params.TextDocument.URI)
+	return nil
+}
+
+// handleDidChangeWatchedFiles handles file system change events.
+func (s *SSLServer) handleDidChangeWatchedFiles(context *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
+	if s.workspaceIndex == nil {
+		return nil
+	}
+	for _, event := range params.Changes {
+		uri := event.URI
+		switch event.Type {
+		case protocol.FileChangeTypeCreated, protocol.FileChangeTypeChanged:
+			// Skip if file is currently open (open document is more up-to-date)
+			if _, open := s.documents.GetDocument(uri); !open {
+				s.workspaceIndex.IndexFile(uri)
+			}
+		case protocol.FileChangeTypeDeleted:
+			s.workspaceIndex.RemoveFile(uri)
+		}
+	}
 	return nil
 }
 

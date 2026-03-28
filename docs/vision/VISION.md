@@ -165,8 +165,6 @@ Honor SSL's unique characteristics:
 
 | Capability | Notes |
 |------------|-------|
-| Workspace Indexing | Would enable cross-file navigation |
-| Inlay Hints | Parameter name hints in function calls |
 | Semantic Tokens | Enhanced syntax highlighting |
 | Call Hierarchy | Incoming/outgoing call analysis |
 

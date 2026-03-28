@@ -77,7 +77,7 @@ See the [main README](../README.md) for full installation instructions.
 | Go to Definition | IMPLEMENTED | [definition.md](./features/definition.md) |
 | Find References | IMPLEMENTED | [references.md](./features/references.md) |
 | Document Symbols | IMPLEMENTED | [document-symbols.md](./features/document-symbols.md) |
-| Workspace Symbols | PARTIAL | [workspace-symbols.md](./features/workspace-symbols.md) |
+| Workspace Symbols | IMPLEMENTED | [workspace-symbols.md](./features/workspace-symbols.md) |
 | Formatting | IMPLEMENTED | [formatting.md](./features/formatting.md) |
 | Diagnostics | IMPLEMENTED | [diagnostics.md](./features/diagnostics.md) |
 | Folding Ranges | IMPLEMENTED | [folding-ranges.md](./features/folding-ranges.md) |

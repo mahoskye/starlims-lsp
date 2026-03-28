@@ -475,14 +475,14 @@ When provider-level undeclared-variable or SQL-parameter validation is enabled, 
 | Property | Value |
 |----------|-------|
 | **Type** | `number` |
-| **Default** | `10` |
+| **Default** | `4` |
 | **Range** | `0` (disabled) or greater |
 | **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
 
 Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `0` to disable the check.
 
 ```json
-{ "ssl.diagnostics.maxBlockDepth": 10 }
+{ "ssl.diagnostics.maxBlockDepth": 4 }
 ```
 
 ---

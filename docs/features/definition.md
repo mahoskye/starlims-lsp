@@ -76,9 +76,9 @@ If the same name appears in multiple scopes, return the most relevant:
 1. Local scope (current procedure) first
 2. Then global scope (`:PUBLIC`)
 
-### 4.5 Cross-File Definition - NOT IMPLEMENTED
+### 4.5 Cross-File Definition - PLANNED
 
-Currently, definition only works within the same file. `:INCLUDE` paths and `DoProc`/`ExecFunction` targets are not resolved across files.
+Currently, definition only works within the same file. `:INCLUDE` paths and `DoProc`/`ExecFunction` targets are not resolved across files. Workspace indexing is now implemented, providing the foundation for cross-file navigation.
 
 ### 4.6 DoProc/ExecFunction String Targets - PARTIAL
 
@@ -101,7 +101,7 @@ Go-to-definition works for procedure names inside `DoProc()` and `ExecFunction()
 - Namespace path resolution
 - Procedures in `:INCLUDE`d files
 
-Cross-file support requires workspace indexing (planned for v2.0).
+Cross-file definition support requires namespace path resolution on top of the workspace index (planned).
 
 ---
 
@@ -109,9 +109,9 @@ Cross-file support requires workspace indexing (planned for v2.0).
 
 | Limitation | Notes |
 |------------|-------|
-| Single-file only | Cannot navigate to other files |
+| Single-file only | Cannot navigate to other files (workspace index provides foundation; namespace resolution planned) |
 | No `:INCLUDE` resolution | Cannot follow include paths |
-| DoProc/ExecFunction cross-file | Same-file works; cross-file requires workspace indexing |
+| DoProc/ExecFunction cross-file | Same-file works; cross-file requires namespace path resolution on top of workspace index |
 | No built-in source | Built-in functions have no navigable source |
 
 ---

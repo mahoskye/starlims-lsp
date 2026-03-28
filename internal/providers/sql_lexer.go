@@ -18,6 +18,8 @@ const (
 	SQLTokenOperator
 	SQLTokenPunctuation
 	SQLTokenWhitespace
+	SQLTokenHint    // optimizer hints /*+ ... */
+	SQLTokenComment // regular SQL comments (-- and /* */)
 	SQLTokenPlaceholder
 	SQLTokenUnknown
 )
@@ -134,8 +136,7 @@ func (l *SQLLexer) readLineComment() SQLToken {
 		l.advance()
 	}
 
-	// Treat comments as whitespace for formatting
-	return SQLToken{Type: SQLTokenWhitespace, Text: text.String(), Line: line, Column: col}
+	return SQLToken{Type: SQLTokenComment, Text: text.String(), Line: line, Column: col}
 }
 
 func (l *SQLLexer) readBlockComment() SQLToken {
@@ -149,6 +150,9 @@ func (l *SQLLexer) readBlockComment() SQLToken {
 	text.WriteByte(l.input[l.pos])
 	l.advance()
 
+	// Check for optimizer hint: /*+ ... */
+	isHint := l.pos < len(l.input) && l.input[l.pos] == '+'
+
 	// Read until */
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
@@ -161,7 +165,10 @@ func (l *SQLLexer) readBlockComment() SQLToken {
 		}
 	}
 
-	return SQLToken{Type: SQLTokenWhitespace, Text: text.String(), Line: line, Column: col}
+	if isHint {
+		return SQLToken{Type: SQLTokenHint, Text: text.String(), Line: line, Column: col}
+	}
+	return SQLToken{Type: SQLTokenComment, Text: text.String(), Line: line, Column: col}
 }
 
 func (l *SQLLexer) readString() SQLToken {

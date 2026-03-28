@@ -64,7 +64,7 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 		CheckSQLParams:         false,
 		CheckHungarianNotation: false,
 		HungarianPrefixes:      []string{"a", "b", "d", "fn", "n", "o", "s", "v"},
-		MaxBlockDepth:          10,
+		MaxBlockDepth:          4,
 	}
 }
 
@@ -127,6 +127,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// SSL language rule enforcement (always enabled)
 	diagnostics = append(diagnostics, checkKeywordForms(tokens)...)
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
+	diagnostics = append(diagnostics, checkMissingOtherwise(tokens)...)
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
 	diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
@@ -144,12 +145,19 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkLiteralTypeSafety(tokens, typeInfo)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
-	diagnostics = append(diagnostics, checkProcedureParameterCounts(p.ExtractProcedures(ast))...)
+	procedures := p.ExtractProcedures(ast)
+	diagnostics = append(diagnostics, checkProcedureParameterCounts(procedures)...)
+	diagnostics = append(diagnostics, checkNameLengths(variables, procedures, opts.HungarianPrefixes)...)
+	diagnostics = append(diagnostics, checkRedeclaredVariables(tokens)...)
+	diagnostics = append(diagnostics, checkNestedIIF(tokens)...)
+	diagnostics = append(diagnostics, checkNegativeLogic(tokens)...)
+	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens)...)
+	diagnostics = append(diagnostics, checkNilMethodCalls(tokens)...)
 
-	// Check for assignment to global variables
-	if len(opts.GlobalVariables) > 0 {
-		diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
-	}
+	// Check for assignment to global variables.
+	// Always runs to catch writes to built-in predefined globals (e.g. MYUSERNAME).
+	// Also enforces user-configured globals when provided.
+	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
@@ -173,11 +181,19 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkCreateUdObjectBuiltinClassMisuse(tokens)...)
 	diagnostics = append(diagnostics, checkZeroBasedArrayIndex(tokens)...)
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
+	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkDirectProcedureCalls(tokens, ast, p)...)
 	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
 	diagnostics = append(diagnostics, checkBranchTargetLabels(tokens)...)
 	diagnostics = append(diagnostics, checkClassContextRules(tokens, ast, p)...)
 	diagnostics = append(diagnostics, checkClassReferenceForms(tokens)...)
+	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
+	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
+	diagnostics = append(diagnostics, checkRegionLegacyWarning(tokens)...)
+	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
+	diagnostics = append(diagnostics, checkSkippedParamSpacing(tokens)...)
+	diagnostics = append(diagnostics, checkNotEqualsAsymmetry(tokens)...)
+	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
 	return diagnostics
 }
@@ -208,12 +224,22 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 			}
 
 			if !constants.IsKeyword(normalized) {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
-					Range:    tokenToRange(token),
-					Message:  fmt.Sprintf("Unknown SSL keyword: '%s'", text),
-					Source:   "ssl-lsp",
-				})
+				// Special case: :ENDFOR is a recognized token but NOT usable — use :NEXT
+				if normalized == "ENDFOR" {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  "':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'",
+						Source:   "ssl-lsp",
+					})
+				} else {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Unknown SSL keyword: '%s'", text),
+						Source:   "ssl-lsp",
+					})
+				}
 				continue
 			}
 
@@ -700,6 +726,77 @@ func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// checkComplexSQLPlaceholders warns when SQLExecute calls contain named placeholders
+// with complex expressions (property access, array indexing, function calls).
+// These are evaluated on every query execution and should be pre-computed into variables.
+// Gotcha #20 in gotchas.md.
+func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		if !strings.EqualFold(token.Text, "SQLExecute") {
+			continue
+		}
+
+		// Look ahead for '(' then find the first string argument
+		inCall := false
+		parenDepth := 0
+		for j := i + 1; j < len(tokens); j++ {
+			t := tokens[j]
+
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == "(" {
+				if !inCall {
+					inCall = true
+				}
+				parenDepth++
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == ")" {
+				parenDepth--
+				if parenDepth <= 0 {
+					break
+				}
+				continue
+			}
+
+			// Found a string in the function call — check its placeholders
+			if inCall && parenDepth == 1 && t.Type == lexer.TokenString {
+				content := t.Text
+				if len(content) >= 2 {
+					content = content[1 : len(content)-1]
+				}
+				placeholders := ParseSQLPlaceholders(content)
+				for _, ph := range placeholders {
+					if ph.IsNamed && !isSimpleNamedPlaceholder(ph.Name) {
+						paramColumn := t.Column + 1 + ph.Start
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityInfo,
+							Range: Range{
+								Start: Position{Line: t.Line - 1, Character: paramColumn - 1},
+								End:   Position{Line: t.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2},
+							},
+							Message: fmt.Sprintf("Complex expression '?%s?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.", ph.Name),
+							Source:  "ssl-lsp",
+						})
+					}
+				}
+				break // Only check first string argument
+			}
+		}
+	}
+
+	return diagnostics
+}
+
 // checkDirectProcedureCalls detects attempts to call procedures directly.
 // SSL requires DoProc("name", {params}) or ExecFunction("Module.name", {params}).
 // Gotcha #1 in gotchas.md.
@@ -924,7 +1021,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
 					Range:    tokenToRange(token),
-					Message:  "Inside class methods, call sibling or inherited methods with 'Me:MethodName()' or 'Base:MethodName()' instead of 'DoProc(...)'",
+					Message:  "DoProc is a compile-time error inside class methods — all forms are rejected. Use Me:MethodName() / Base:MethodName() instead.",
 					Source:   "ssl-lsp",
 				})
 			}
@@ -1138,7 +1235,7 @@ func checkClassMemberOrder(tokens []lexer.Token, classToken lexer.Token) []Diagn
 
 		if order < maxOrder {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
+				Severity: SeverityInfo,
 				Range:    tokenToRange(token),
 				Message:  orderMessage,
 				Source:   "ssl-lsp",
@@ -1516,10 +1613,23 @@ func contains(slice []string, val string) bool {
 func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	// Track state within BEGINCASE/ENDCASE blocks
-	inBeginCase := false
-	var currentCaseToken *lexer.Token
-	hasExitCase := false
+	// Use a stack to handle nested BEGINCASE blocks correctly
+	type caseState struct {
+		currentCaseToken *lexer.Token
+		hasExitCase      bool
+	}
+	var stack []caseState
+
+	reportMissing := func(caseToken *lexer.Token) {
+		if caseToken != nil {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(*caseToken),
+				Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(caseToken.Text, ":"))),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
 
 	for i := range tokens {
 		token := &tokens[i]
@@ -1531,43 +1641,82 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 
 		switch normalized {
 		case "BEGINCASE":
-			inBeginCase = true
-			currentCaseToken = nil
-			hasExitCase = false
+			stack = append(stack, caseState{})
 
 		case "CASE", "OTHERWISE":
-			if inBeginCase {
+			if len(stack) > 0 {
+				top := &stack[len(stack)-1]
 				// If we had a previous CASE/OTHERWISE without EXITCASE, report it
-				if currentCaseToken != nil && !hasExitCase {
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityWarning,
-						Range:    tokenToRange(*currentCaseToken),
-						Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(currentCaseToken.Text, ":"))),
-						Source:   "ssl-lsp",
-					})
+				if !top.hasExitCase {
+					reportMissing(top.currentCaseToken)
 				}
-				currentCaseToken = token
-				hasExitCase = false
+				top.currentCaseToken = token
+				top.hasExitCase = false
 			}
 
 		case "EXITCASE":
-			hasExitCase = true
+			if len(stack) > 0 {
+				stack[len(stack)-1].hasExitCase = true
+			}
 
 		case "ENDCASE":
-			if inBeginCase {
+			if len(stack) > 0 {
+				top := &stack[len(stack)-1]
 				// Check the last CASE/OTHERWISE block
-				if currentCaseToken != nil && !hasExitCase {
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityWarning,
-						Range:    tokenToRange(*currentCaseToken),
-						Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(currentCaseToken.Text, ":"))),
-						Source:   "ssl-lsp",
-					})
+				if !top.hasExitCase {
+					reportMissing(top.currentCaseToken)
 				}
+				stack = stack[:len(stack)-1]
 			}
-			inBeginCase = false
-			currentCaseToken = nil
-			hasExitCase = false
+		}
+	}
+
+	return diagnostics
+}
+
+// checkMissingOtherwise warns when a :BEGINCASE block has no :OTHERWISE clause.
+// Style guide recommends including :OTHERWISE for default handling (advisory).
+func checkMissingOtherwise(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	var beginCaseToken *lexer.Token
+	hasOtherwise := false
+	depth := 0
+
+	for i := range tokens {
+		token := &tokens[i]
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+
+		switch normalized {
+		case "BEGINCASE":
+			if depth == 0 {
+				beginCaseToken = token
+				hasOtherwise = false
+			}
+			depth++
+		case "OTHERWISE":
+			if depth == 1 {
+				hasOtherwise = true
+			}
+		case "ENDCASE":
+			depth--
+			if depth == 0 && beginCaseToken != nil && !hasOtherwise {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityHint,
+					Range:    tokenToRange(*beginCaseToken),
+					Message:  "':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling",
+					Source:   "ssl-lsp",
+				})
+			}
+			if depth <= 0 {
+				beginCaseToken = nil
+				hasOtherwise = false
+				depth = 0
+			}
 		}
 	}
 
@@ -1607,12 +1756,14 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 }
 
 // checkIncludePlacement reports :INCLUDE directives that appear after other
-// significant statements. The style guide prefers includes at the top of the file.
+// significant statements or inside procedure bodies.
+// Source of truth: ssl_agent_instructions.md — :INCLUDE must be at file start, not inside procedures.
 func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	startOfStatement := true
 	seenNonIncludeStatement := false
+	procedureDepth := 0
 
 	for _, token := range tokens {
 		if token.Type == lexer.TokenWhitespace {
@@ -1622,6 +1773,16 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 		if token.Type == lexer.TokenComment {
 			startOfStatement = true
 			continue
+		}
+
+		// Track procedure nesting
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "PROCEDURE" {
+				procedureDepth++
+			} else if normalized == "ENDPROC" && procedureDepth > 0 {
+				procedureDepth--
+			}
 		}
 
 		if !startOfStatement {
@@ -1634,7 +1795,14 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 		startOfStatement = false
 
 		if token.Type == lexer.TokenKeyword && strings.ToUpper(strings.TrimPrefix(token.Text, ":")) == "INCLUDE" {
-			if seenNonIncludeStatement {
+			if procedureDepth > 0 {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(token),
+					Message:  "':INCLUDE' inside a procedure body is not supported. Place it at the top of the file",
+					Source:   "ssl-lsp",
+				})
+			} else if seenNonIncludeStatement {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityInfo,
 					Range:    tokenToRange(token),
@@ -1651,7 +1819,7 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 }
 
 // checkDefaultOnDeclareLine checks for :DEFAULT appearing on the same line as :DECLARE.
-// Per ssl_agent_instructions.md (Gotcha #1), these must be separate statements.
+// Per ssl_agent_instructions.md (Gotcha #3), these must be separate statements.
 func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -1670,7 +1838,7 @@ func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 		} else if normalized == "DEFAULT" {
 			if declareToken, found := declareLines[token.Line]; found {
 				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
+					Severity: SeverityError,
 					Range:    tokenToRange(declareToken),
 					Message:  "':DEFAULT' cannot be used with ':DECLARE' - use ':PARAMETERS' with ':DEFAULT' instead",
 					Source:   "ssl-lsp",
@@ -1700,11 +1868,8 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			if startOfStatement {
-				if procedureDepth > 0 && waitingForProcedureParameters {
-					seenProcedureBodyStatement = true
-				}
-			}
+			// Comments are structurally transparent — they should NOT prevent
+			// :PARAMETERS from being accepted after :PROCEDURE.
 			startOfStatement = true
 			continue
 		}
@@ -1795,9 +1960,8 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			if startOfStatement {
-				defaultsAllowed = false
-			}
+			// Comments are structurally transparent — they should NOT break
+			// the :PARAMETERS -> :DEFAULT sequence.
 			startOfStatement = true
 			continue
 		}
@@ -2434,6 +2598,64 @@ func checkNotPreferredOperators(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// checkScientificNotation detects numbers immediately followed by an identifier
+// starting with 'e' or 'E', which suggests the user intended scientific notation
+// but omitted the required decimal point (e.g., 7e2 should be 7.0e2).
+func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens)-1; i++ {
+		if tokens[i].Type != lexer.TokenNumber {
+			continue
+		}
+		num := tokens[i].Text
+
+		next := tokens[i+1]
+		if next.Type != lexer.TokenIdentifier {
+			continue
+		}
+		upper := strings.ToUpper(next.Text)
+
+		// Case 1: number WITHOUT decimal followed by eN, e-N, e+N identifier
+		// e.g., 7e2 -> tokens: "7" + "e2"; 1e-3 -> tokens: "1" + "e" + "-" + "3"
+		if !strings.Contains(num, ".") {
+			if len(upper) >= 2 && upper[0] == 'E' && (upper[1] >= '0' && upper[1] <= '9' || upper[1] == '+' || upper[1] == '-') {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(tokens[i]),
+					Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s' instead of '%s%s'", num, next.Text, num, next.Text),
+					Source:   "ssl-lsp",
+				})
+			}
+			// Case 1b: 9E+1 -> tokens: "9" + "E" (single char) + "+" + "1"
+			if upper == "E" && i+2 < len(tokens) {
+				afterE := tokens[i+2]
+				if afterE.Type == lexer.TokenOperator && (afterE.Text == "+" || afterE.Text == "-") {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(tokens[i]),
+						Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s%s...' instead of '%s%s%s...'", num, next.Text, afterE.Text, num, next.Text, afterE.Text),
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+		}
+
+		// Case 2: number WITH decimal but no digit before decimal (e.g., .5e1)
+		// The lexer produces ".5" as a number token followed by "e1" identifier
+		if strings.HasPrefix(num, ".") && upper[0] == 'E' {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(tokens[i]),
+				Message:  fmt.Sprintf("SSL scientific notation requires a digit before the decimal point: use '0%s%s' instead of '%s%s'", num, next.Text, num, next.Text),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
 // checkLiteralTypeSafety reports type-safety gotchas from the style guide using
 // conservative local type inference.
 func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []Diagnostic {
@@ -3004,19 +3226,225 @@ func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnost
 	var diagnostics []Diagnostic
 
 	for _, proc := range procedures {
-		if len(proc.Parameters) <= 20 {
+		count := len(proc.Parameters)
+		if count > 20 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range: Range{
+					Start: Position{Line: proc.StartLine - 1, Character: 0},
+					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
+				},
+				Message: fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, count),
+				Source:  "ssl-lsp",
+			})
+		} else if count > 8 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityHint,
+				Range: Range{
+					Start: Position{Line: proc.StartLine - 1, Character: 0},
+					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
+				},
+				Message: fmt.Sprintf("Procedure '%s' has %d parameters; style guide recommends at most 8 per procedure", proc.Name, count),
+				Source:  "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNameLengths warns when variable or procedure names exceed style guide limits.
+// Style guide: variable names max 20 characters (excluding Hungarian prefix),
+// procedure names max 30 characters.
+func checkNameLengths(variables []parser.VariableInfo, procedures []parser.ProcedureInfo, prefixes []string) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, v := range variables {
+		// Strip Hungarian prefix to get the effective name length
+		effectiveName := v.Name
+		trimmed := strings.TrimLeft(v.Name, "_")
+		if trimmed != "" {
+			lower := strings.ToLower(trimmed)
+			for _, prefix := range prefixes {
+				if strings.HasPrefix(lower, prefix) {
+					rest := trimmed[len(prefix):]
+					if len(rest) > 0 && unicode.IsUpper([]rune(rest)[0]) {
+						effectiveName = rest
+						break
+					}
+				}
+			}
+		}
+
+		if len(effectiveName) > 20 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range: Range{
+					Start: Position{Line: v.Line - 1, Character: v.Column - 1},
+					End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
+				},
+				Message: fmt.Sprintf("Variable name '%s' exceeds 20-character limit (effective length %d excluding prefix)", v.Name, len(effectiveName)),
+				Source:  "ssl-lsp",
+			})
+		}
+	}
+
+	for _, proc := range procedures {
+		if len(proc.Name) > 30 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range: Range{
+					Start: Position{Line: proc.StartLine - 1, Character: 0},
+					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
+				},
+				Message: fmt.Sprintf("Procedure name '%s' exceeds 30-character limit (length %d)", proc.Name, len(proc.Name)),
+				Source:  "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkVisibilityAnnotations validates /*@private; and /*@protected; annotations.
+// These annotations must appear on their own line before :PROCEDURE.
+// Per the style guide, they have NO effect on class methods (only script procedures).
+func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	inClass := false
+
+	for i, token := range tokens {
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "CLASS" {
+				inClass = true
+			}
+		}
+
+		if token.Type != lexer.TokenComment {
 			continue
 		}
 
-		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityWarning,
-			Range: Range{
-				Start: Position{Line: proc.StartLine - 1, Character: 0},
-				End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
-			},
-			Message: fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, len(proc.Parameters)),
-			Source:  "ssl-lsp",
-		})
+		text := strings.TrimSpace(token.Text)
+		// Check for visibility annotation pattern
+		if !strings.HasPrefix(text, "/*@") {
+			continue
+		}
+
+		// Extract the annotation
+		content := strings.TrimSpace(strings.TrimSuffix(text[3:], ";"))
+		lower := strings.ToLower(content)
+
+		if lower != "private" && lower != "protected" {
+			continue
+		}
+
+		// Valid annotation found - check context
+		if inClass {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' has no effect on class methods — class methods are always public/virtual", content),
+				Source:   "ssl-lsp",
+			})
+			continue
+		}
+
+		// Check that it's followed by :PROCEDURE
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+		if nextIdx >= 0 {
+			nextToken := tokens[nextIdx]
+			if nextToken.Type == lexer.TokenKeyword {
+				normalized := strings.ToUpper(strings.TrimPrefix(nextToken.Text, ":"))
+				if normalized != "PROCEDURE" {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Visibility annotation '/*@%s;' should appear on its own line immediately before ':PROCEDURE'", content),
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNilMethodCalls detects patterns where methods are called on NIL values.
+// Style guide: "Do NOT call instance methods on NIL (raises error)".
+// This uses conservative analysis — only flags cases where a variable is
+// compared to NIL or known to be NIL from assignment context.
+func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Track variables assigned NIL
+	nilVars := make(map[string]bool)
+
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+
+		// Track NIL assignments: x := NIL;
+		if token.Type == lexer.TokenOperator && token.Text == ":=" {
+			prevIdx := previousSignificantTokenIndex(tokens, i-1)
+			nextIdx := nextSignificantTokenIndex(tokens, i+1)
+			if prevIdx >= 0 && nextIdx >= 0 {
+				nextTok := tokens[nextIdx]
+				isNilAssign := strings.EqualFold(nextTok.Text, "NIL") &&
+					(nextTok.Type == lexer.TokenIdentifier || nextTok.Type == lexer.TokenKeyword)
+				if tokens[prevIdx].Type == lexer.TokenIdentifier && isNilAssign {
+					nilVars[strings.ToUpper(tokens[prevIdx].Text)] = true
+				} else if tokens[prevIdx].Type == lexer.TokenIdentifier {
+					// Any non-NIL assignment clears the flag
+					delete(nilVars, strings.ToUpper(tokens[prevIdx].Text))
+				}
+			}
+		}
+
+		// Check for method calls on NIL literal: NIL:Method()
+		isNilToken := strings.EqualFold(token.Text, "NIL") &&
+			(token.Type == lexer.TokenIdentifier || token.Type == lexer.TokenKeyword)
+		if isNilToken {
+			nextIdx := nextSignificantTokenIndex(tokens, i+1)
+			if nextIdx >= 0 {
+				nextTok := tokens[nextIdx]
+				// Pattern 1: NIL : Method (colon as punctuation)
+				isMemberAccess := nextTok.Type == lexer.TokenPunctuation && nextTok.Text == ":"
+				// Pattern 2: NIL:Method (colon consumed into keyword token like :ToString)
+				if !isMemberAccess && nextTok.Type == lexer.TokenKeyword && strings.HasPrefix(nextTok.Text, ":") {
+					normalized := strings.ToUpper(strings.TrimPrefix(nextTok.Text, ":"))
+					if !constants.IsKeyword(normalized) {
+						isMemberAccess = true
+					}
+				}
+				if isMemberAccess {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  "Calling a method on NIL raises an error. Check for NIL before accessing members.",
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+		}
+
+		// Check for method calls on variables known to be NIL
+		if token.Type == lexer.TokenIdentifier && nilVars[strings.ToUpper(token.Text)] {
+			nextIdx := nextSignificantTokenIndex(tokens, i+1)
+			if nextIdx >= 0 && tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == ":" {
+				// Check it's a member access, not assignment
+				memberIdx := nextSignificantTokenIndex(tokens, nextIdx+1)
+				if memberIdx >= 0 && tokens[memberIdx].Type == lexer.TokenIdentifier {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Variable '%s' may be NIL at this point. Calling methods on NIL raises an error.", token.Text),
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+		}
 	}
 
 	return diagnostics
@@ -3124,11 +3552,16 @@ func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
 
 // checkGlobalAssignment checks for assignment to global variables.
 // Global variables are pre-declared and should not be assigned to.
+// Always checks SSLPredefinedGlobals (e.g. MYUSERNAME); also checks user-configured globals.
 func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	// Build a case-insensitive set of global variable names
+	// Build a case-insensitive set of global variable names.
+	// Always include built-in predefined globals (MYUSERNAME, etc.).
 	globalSet := make(map[string]bool)
+	for _, g := range constants.SSLPredefinedGlobals {
+		globalSet[strings.ToUpper(g)] = true
+	}
 	for _, g := range globals {
 		globalSet[strings.ToUpper(g)] = true
 	}
@@ -3319,6 +3752,11 @@ func buildBuiltinSet() map[string]bool {
 		builtins[strings.ToUpper(op)] = true
 	}
 
+	// Add predefined read-only globals (always recognized, never flagged as undeclared)
+	for _, g := range constants.SSLPredefinedGlobals {
+		builtins[strings.ToUpper(g)] = true
+	}
+
 	// Add special identifiers
 	builtins["ME"] = true          // Class self-reference
 	builtins["BASE"] = true        // Parent-class reference
@@ -3463,6 +3901,11 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 		declaredVars[strings.ToUpper(v.Name)] = true
 	}
 
+	// Add built-in predefined globals (MYUSERNAME, etc.)
+	for _, g := range constants.SSLPredefinedGlobals {
+		declaredVars[strings.ToUpper(g)] = true
+	}
+
 	// Add configured globals
 	for _, g := range globals {
 		declaredVars[strings.ToUpper(g)] = true
@@ -3496,12 +3939,20 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 		placeholders := ParseSQLPlaceholders(content)
 
 		for _, ph := range placeholders {
-			// Only validate named parameters
+			// Only validate named parameters (skip complex expressions with operators)
 			if !ph.IsNamed || !isSimpleNamedPlaceholder(ph.Name) {
 				continue
 			}
 
-			paramUpper := strings.ToUpper(ph.Name)
+			// Extract base variable name from property/array/function access
+			// e.g., oUser:ID -> oUser, aArr[1] -> aArr, Today() -> Today
+			baseName := extractBaseVarName(ph.Name)
+			paramUpper := strings.ToUpper(baseName)
+
+			// Skip function calls (Today(), etc.) — they're not variables
+			if strings.Contains(ph.Name, "(") {
+				continue
+			}
 
 			// Initialize reported map for this parameter if needed
 			if reported[paramUpper] == nil {
@@ -3531,6 +3982,413 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 					Message: fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
 					Source:  "ssl-lsp",
 				})
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// extractBaseVarName extracts the root variable name from a SQL placeholder.
+// For example: "oUser:ID" -> "oUser", "aArr[1]" -> "aArr", "Today()" -> "Today".
+func extractBaseVarName(name string) string {
+	for i, ch := range name {
+		if ch == ':' || ch == '[' || ch == '(' {
+			return name[:i]
+		}
+	}
+	return name
+}
+
+// checkRedeclaredVariables warns when the same variable is declared more than once
+// in the same scope. Per the schema, re-declaring is silently ignored by the runtime
+// but is almost always a mistake.
+func checkRedeclaredVariables(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Track declared variables per scope (procedure or global)
+	type scopeInfo struct {
+		declared map[string]lexer.Token // variable name -> first declaration token
+	}
+
+	currentScope := &scopeInfo{declared: make(map[string]lexer.Token)}
+	scopeStack := []*scopeInfo{currentScope}
+
+	for i, token := range tokens {
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "PROCEDURE" {
+				// New scope
+				currentScope = &scopeInfo{declared: make(map[string]lexer.Token)}
+				scopeStack = append(scopeStack, currentScope)
+			} else if normalized == "ENDPROC" {
+				// Pop scope
+				if len(scopeStack) > 1 {
+					scopeStack = scopeStack[:len(scopeStack)-1]
+					currentScope = scopeStack[len(scopeStack)-1]
+				}
+			} else if normalized == "DECLARE" || normalized == "PARAMETERS" {
+				// Collect the identifiers on this line until semicolon
+				for j := i + 1; j < len(tokens); j++ {
+					t := tokens[j]
+					if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+						break
+					}
+					if t.Type == lexer.TokenIdentifier {
+						upper := strings.ToUpper(t.Text)
+						if firstDecl, exists := currentScope.declared[upper]; exists {
+							diagnostics = append(diagnostics, Diagnostic{
+								Severity: SeverityHint,
+								Range:    tokenToRange(t),
+								Message:  fmt.Sprintf("Variable '%s' is already declared (first declared at line %d). Re-declaration is silently ignored at runtime.", t.Text, firstDecl.Line),
+								Source:   "ssl-lsp",
+							})
+						} else {
+							currentScope.declared[upper] = t
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNestedIIF detects nested IIF() calls which reduce readability.
+// Schema: no_nested_ternaries: true
+func checkNestedIIF(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+		if !strings.EqualFold(token.Text, "IIF") {
+			continue
+		}
+		// Check this is a function call (followed by `(`)
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+		if nextIdx < 0 || tokens[nextIdx].Text != "(" {
+			continue
+		}
+
+		// Scan inside the IIF(...) for nested IIF calls
+		parenDepth := 0
+		for j := nextIdx; j < len(tokens); j++ {
+			if tokens[j].Text == "(" {
+				parenDepth++
+			} else if tokens[j].Text == ")" {
+				parenDepth--
+				if parenDepth == 0 {
+					break
+				}
+			}
+			if parenDepth > 0 && tokens[j].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[j].Text, "IIF") {
+				// Check it's a call
+				nIdx := nextSignificantTokenIndex(tokens, j+1)
+				if nIdx >= 0 && tokens[nIdx].Text == "(" {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityInfo,
+						Range:    tokenToRange(tokens[j]),
+						Message:  "Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.",
+						Source:   "ssl-lsp",
+					})
+				}
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNegativeLogic flags :IF blocks with negated conditions that have :ELSE blocks,
+// suggesting the logic be inverted for readability.
+// Schema: prefer_positive_logic: true
+func checkNegativeLogic(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		if normalized != "IF" {
+			continue
+		}
+
+		// Check if the condition starts with a negation
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+		if nextIdx < 0 {
+			continue
+		}
+
+		isNegated := false
+		negToken := tokens[nextIdx]
+		if negToken.Type == lexer.TokenOperator {
+			upper := strings.ToUpper(negToken.Text)
+			if upper == ".NOT." || upper == "!" {
+				isNegated = true
+			}
+		}
+
+		if !isNegated {
+			continue
+		}
+
+		// Look for matching :ELSE — scan forward tracking IF/ENDIF depth
+		depth := 1
+		hasElse := false
+		for j := nextIdx + 1; j < len(tokens); j++ {
+			if tokens[j].Type != lexer.TokenKeyword {
+				continue
+			}
+			kw := strings.ToUpper(strings.TrimPrefix(tokens[j].Text, ":"))
+			if kw == "IF" {
+				depth++
+			} else if kw == "ENDIF" {
+				depth--
+				if depth == 0 {
+					break
+				}
+			} else if kw == "ELSE" && depth == 1 {
+				hasElse = true
+				break
+			}
+		}
+
+		if hasElse {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityHint,
+				Range:    tokenToRange(negToken),
+				Message:  "Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.",
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkStepSpacing warns when :STEP has no space before it in FOR loops.
+// Source of truth: ssl_agent_instructions.md gotcha #16.
+func checkStepSpacing(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		if normalized != "STEP" {
+			continue
+		}
+		// Check the preceding token — it should be whitespace
+		if i > 0 && tokens[i-1].Type != lexer.TokenWhitespace {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  "':STEP' should have a space before it: ':FOR i := 1 :TO 10 :STEP 2;'",
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkRegionLegacyWarning warns when :REGION/:ENDREGION is used (legacy functional construct).
+// Source of truth: ssl_agent_instructions.md gotcha #22.
+func checkRegionLegacyWarning(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		if normalized == "REGION" || normalized == "ENDREGION" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("':%s' is a legacy functional construct that captures body text for GetRegion(). For IDE code folding and grouping, prefer '/* region' / '/* endregion' comments instead.", normalized),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkCodeBlockStructure validates code block literals {|params| expr}.
+// Source of truth: ssl_agent_instructions.md — code blocks require at least one bound variable.
+func checkCodeBlockStructure(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenCodeBlock {
+			continue
+		}
+		text := token.Text
+		// Check for empty parameter list: {|| expr} or {| | expr} (with whitespace)
+		// Source of truth: ssl-ebnf-grammar.md — at least one parameter required between pipes.
+		if len(text) >= 3 && text[0] == '{' && text[1] == '|' {
+			// Find closing pipe and check if anything non-whitespace exists between pipes
+			hasParam := false
+			for ci := 2; ci < len(text); ci++ {
+				if text[ci] == '|' {
+					break
+				}
+				if text[ci] != ' ' && text[ci] != '\t' {
+					hasParam = true
+					break
+				}
+			}
+			if !hasParam {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(token),
+					Message:  "Code blocks require at least one bound variable between the pipes: {|x| expr}",
+					Source:   "ssl-lsp",
+				})
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkSkippedParamSpacing flags spaces between adjacent commas in skipped parameters.
+// Source of truth: ssl-style-guide.schema.yaml parameter_skipping_style — {p1,,p3} valid, {p1, , p3} invalid.
+func checkSkippedParamSpacing(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i].Text != "," {
+			continue
+		}
+		// Look for pattern: comma, whitespace with spaces (no newline), comma
+		if i+2 < len(tokens) &&
+			tokens[i+1].Type == lexer.TokenWhitespace &&
+			!strings.Contains(tokens[i+1].Text, "\n") &&
+			tokens[i+2].Text == "," {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range:    tokenToRange(tokens[i+1]),
+				Message:  "Skipped parameters should use adjacent commas with no space: {a,,b} not {a, , b}",
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkNotEqualsAsymmetry warns when != is used with string literals, since != negates == (exact),
+// not = (prefix). This means = and != are NOT logical opposites for strings.
+// Source of truth: ssl_agent_instructions.md gotcha #18.
+func checkNotEqualsAsymmetry(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if token.Type != lexer.TokenOperator || token.Text != "!=" {
+			continue
+		}
+
+		prevIdx := previousSignificantTokenIndex(tokens, i-1)
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+		if prevIdx < 0 || nextIdx < 0 {
+			continue
+		}
+
+		left := tokens[prevIdx]
+		right := tokens[nextIdx]
+
+		if left.Type == lexer.TokenString || right.Type == lexer.TokenString {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range:    tokenToRange(token),
+				Message:  "'!=' negates '==' (exact match), not '=' (prefix match). For strings, '=' and '!=' are NOT logical opposites",
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkSQLConcatenationInjection detects string concatenation in SQL function arguments,
+// which may indicate SQL injection vulnerability.
+// Source of truth: ssl-style-guide.schema.yaml lints.security.prevent_sql_injection.
+func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		upper := strings.ToUpper(token.Text)
+		if !constants.IsSQLFunction(upper) {
+			continue
+		}
+
+		// Walk into the function call to find the first string argument
+		parenDepth := 0
+		inCall := false
+		for j := i + 1; j < len(tokens); j++ {
+			t := tokens[j]
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+
+			if t.Text == "(" {
+				if !inCall {
+					inCall = true
+				}
+				parenDepth++
+				continue
+			}
+
+			if t.Text == ")" {
+				parenDepth--
+				if parenDepth <= 0 {
+					break
+				}
+				continue
+			}
+
+			// Check if first arg has concatenation with + operator
+			if inCall && parenDepth == 1 {
+				if t.Type == lexer.TokenString {
+					nextIdx := nextSignificantTokenIndex(tokens, j+1)
+					if nextIdx >= 0 && tokens[nextIdx].Text == "+" {
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityWarning,
+							Range:    tokenToRange(tokens[nextIdx]),
+							Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
+							Source:   "ssl-lsp",
+						})
+					}
+					break
+				}
+				if t.Type == lexer.TokenIdentifier {
+					nextIdx := nextSignificantTokenIndex(tokens, j+1)
+					if nextIdx >= 0 && tokens[nextIdx].Text == "+" {
+						afterPlusIdx := nextSignificantTokenIndex(tokens, nextIdx+1)
+						if afterPlusIdx >= 0 && tokens[afterPlusIdx].Type == lexer.TokenString {
+							diagnostics = append(diagnostics, Diagnostic{
+								Severity: SeverityWarning,
+								Range:    tokenToRange(tokens[nextIdx]),
+								Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
+								Source:   "ssl-lsp",
+							})
+						}
+					}
+					break
+				}
+				break
 			}
 		}
 	}

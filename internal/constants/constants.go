@@ -46,7 +46,10 @@ var CaseKeywords = []string{"CASE", "OTHERWISE"}
 // ProcedureLevelKeywords are keywords valid at procedure level.
 var ProcedureLevelKeywords = []string{"PARAMETERS", "DEFAULT", "PUBLIC", "DECLARE"}
 
-// SSLOperators contains all SSL operators (32 total).
+// SSLOperators contains all SSL operators (32 total in this list).
+// Note: the source of truth counts 36 total operators including `:` (member access),
+// `/*` (comment delimiter), and bitwise function calls (_AND, _OR, _XOR, _NOT).
+// Those additional four are handled as punctuation/comments/functions, not operators.
 var SSLOperators = []string{
 	// Logical operators
 	".AND.", ".OR.", ".NOT.", "!",
@@ -65,8 +68,9 @@ var SSLOperators = []string{
 // SSLLogicalOperators are the logical operators.
 var SSLLogicalOperators = []string{".AND.", ".OR.", ".NOT."}
 
-// SSLCompoundOperators are compound assignment operators.
-var SSLCompoundOperators = []string{":=", "+=", "-=", "*=", "/=", "%=", "^="}
+// SSLCompoundOperators are compound assignment operators (operate-and-assign).
+// Note: := is the simple assignment operator and is NOT included here.
+var SSLCompoundOperators = []string{"+=", "-=", "*=", "/=", "%=", "^="}
 
 // SSLMultiCharOperators are all operators that span multiple characters.
 // Used by the lexer to correctly tokenize multi-character operators as single tokens.
@@ -76,6 +80,35 @@ var SSLMultiCharOperators = []string{
 	// Assignment operators
 	":=", "+=", "-=", "*=", "/=", "%=", "^=",
 	"**", "++", "--", "<<", ">>",
+}
+
+// SSLPredefinedGlobals contains runtime-provided read-only global variables.
+// These are always recognized as pre-declared identifiers and must never be assigned to.
+// Source: ssl_agent_instructions.md — "Predefined Global Variables" section.
+var SSLPredefinedGlobals = []string{
+	"MYUSERNAME", // The currently logged-in user's login name. Read-only.
+}
+
+// SSLClassContextForms are case-insensitive identifiers used in class definitions.
+// Me: self-reference, Base: parent class reference, Constructor: reserved constructor name.
+var SSLClassContextForms = []string{"Me", "Base", "Constructor"}
+
+// SSLClassContextDescriptions maps class-context forms to their descriptions.
+var SSLClassContextDescriptions = map[string]string{
+	"Me":          "Self-reference to the current class instance; use Me:PropertyName or Me:MethodName(args). Only valid inside :CLASS definitions.",
+	"Base":        "Parent class reference used in colon-chained access; use Base:MethodName(args) to call overridden parent methods. Only valid inside :CLASS with :INHERIT.",
+	"Constructor": "Reserved constructor declaration name inside :CLASS. Define with :PROCEDURE Constructor;. Cannot return a value.",
+}
+
+// IsSSLClassContextForm checks if a string is a class-context form (case-insensitive).
+func IsSSLClassContextForm(s string) bool {
+	lower := strings.ToLower(s)
+	for _, form := range SSLClassContextForms {
+		if strings.ToLower(form) == lower {
+			return true
+		}
+	}
+	return false
 }
 
 // SSLLiterals contains boolean and null literal values (3 total).
@@ -89,7 +122,7 @@ var SSLLiteralAliases = map[string]string{
 }
 
 // legacySSLFunctionNames contains the historical built-in function inventory.
-// The public SSLFunctionNames slice is source-aligned in source_alignment.go.
+// The public SSLFunctionNames slice is the canonical inventory in canonical.go.
 var legacySSLFunctionNames = []string{
 	"aadd", "Abs", "AddColDelimiters", "AddNameDelimiters", "AddProperty", "AddToApplication", "AddToSession",
 	"aeval", "aevala", "afill", "alen", "AllTrim", "arraycalc", "arraynew", "ArrayToTVP", "Asc", "ascan", "ascanexact", "At",
@@ -157,7 +190,7 @@ var legacySSLFunctionNames = []string{
 }
 
 // legacySSLClassNames contains the historical built-in class inventory.
-// The public SSLClassNames slice is source-aligned in source_alignment.go.
+// The public SSLClassNames slice is the canonical inventory in canonical.go.
 var legacySSLClassNames = []string{
 	"AzureStorage",
 	"BatchSupport",
@@ -198,6 +231,21 @@ var ParameterizedSQLFunctions = []string{
 	"XmlExportSql",
 }
 
+// IsSQLFunction checks if a function name (uppercase) is any SQL-related function.
+func IsSQLFunction(upper string) bool {
+	for _, f := range InlineSQLFunctions {
+		if strings.EqualFold(upper, f) {
+			return true
+		}
+	}
+	for _, f := range ParameterizedSQLFunctions {
+		if strings.EqualFold(upper, f) {
+			return true
+		}
+	}
+	return false
+}
+
 // SSLKeywordDescriptions maps keywords to their descriptions.
 var SSLKeywordDescriptions = map[string]string{
 	"IF":              "Conditional statement - executes code block if condition is true",
@@ -211,11 +259,11 @@ var SSLKeywordDescriptions = map[string]string{
 	"NEXT":            "Marks the end of a FOR loop",
 	"BEGINCASE":       "Starts a CASE block where each :CASE evaluates an independent boolean expression",
 	"CASE":            "Evaluates a CASE condition within a BEGINCASE block",
-	"OTHERWISE":       "Runs when no CASE conditions matched",
+	"OTHERWISE":       "Runs when no earlier CASE body has executed",
 	"ENDCASE":         "Marks the end of a CASE statement",
 	"TRY":             "Begins a structured error handling block; requires at least one CATCH or FINALLY",
 	"CATCH":           "Handles an error raised inside a TRY block; use GetLastSSLError() for details",
-	"FINALLY":         "Runs cleanup code after TRY/CATCH; RETURN and loop exits are not allowed here",
+	"FINALLY":         "Runs cleanup code after TRY/CATCH; :RETURN, :EXITFOR, :EXITWHILE, and :LOOP are compile-time errors inside :FINALLY",
 	"ENDTRY":          "Marks the end of a TRY/CATCH/FINALLY block",
 	"PROCEDURE":       "Defines a reusable code procedure/function",
 	"ENDPROC":         "Marks the end of a PROCEDURE",
@@ -231,7 +279,7 @@ var SSLKeywordDescriptions = map[string]string{
 	"INHERIT":         "Specifies base class for inheritance",
 	"EXITFOR":         "Exits a FOR loop immediately",
 	"EXITWHILE":       "Exits a WHILE loop immediately",
-	"EXITCASE":        "Stops evaluating further CASE blocks in the current BEGINCASE",
+	"EXITCASE":        "Stops evaluating further CASE blocks in the current BEGINCASE; without it, later :CASE expressions are still evaluated and additional matching bodies may execute",
 	"LOOP":            "Jump back to start of loop",
 	"BEGININLINECODE": "Begins a legacy named inline-code storage block",
 	"ENDINLINECODE":   "Ends a legacy named inline-code storage block",
@@ -252,10 +300,10 @@ var SSLOperatorDescriptions = map[string]string{
 	"/=":    "Divide and assign operator",
 	"%=":    "Modulo and assign operator",
 	"^=":    "Power and assign operator",
-	"=":     "Equality comparison operator; for strings this is loose prefix-style matching",
-	"==":    "Strict equality comparison operator; use this for exact string equality",
-	"!=":    "Not equal comparison operator",
-	"<>":    "Not equal comparison operator (legacy)",
+	"=":     "Equality comparison operator; for strings this is loose (prefix) matching — .T. if right is empty or left starts with right",
+	"==":    "Strict equality comparison operator; use for exact string equality",
+	"!=":    "Not equal operator (negates ==, not =); for strings, = and != are NOT logical opposites",
+	"<>":    "Not equal operator (equivalent to !=, but != is preferred)",
 	">":     "Greater than comparison operator",
 	"<":     "Less than comparison operator",
 	">=":    "Greater than or equal comparison operator",
@@ -271,8 +319,8 @@ var SSLOperatorDescriptions = map[string]string{
 	"--":    "Decrement operator",
 	"<<":    "Bitwise left shift operator",
 	">>":    "Bitwise right shift operator",
-	"$":     "String containment operator",
-	"#":     "Not equal operator (alternative to <>)",
+	"$":     "String containment operator; left $ right is .T. if left is found inside right",
+	"#":     "Not equal operator (equivalent to !=, but != is preferred)",
 	"!":     "Logical NOT operator (alternative to .NOT.)",
 }
 
@@ -351,12 +399,12 @@ func IsSSLLiteral(s string) bool {
 
 // IsSSLFunction checks if a string is an SSL function name.
 func IsSSLFunction(s string) bool {
-	_, ok := sslFunctionNameSet[strings.ToLower(s)]
+	_, ok := sslFunctionLookup[strings.ToLower(s)]
 	return ok
 }
 
 // IsSSLClass checks if a string is an SSL class name.
 func IsSSLClass(s string) bool {
-	_, ok := sslClassNameSet[strings.ToLower(s)]
+	_, ok := sslClassLookup[strings.ToLower(s)]
 	return ok
 }

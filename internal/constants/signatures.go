@@ -20,7 +20,7 @@ type FunctionSignature struct {
 }
 
 // legacySSLFunctionSignatures maps historical function names (lowercase) to signatures.
-// The public SSLFunctionSignatures map is source-aligned in source_alignment.go.
+// The public SSLFunctionSignatures map is the canonical inventory in canonical.go.
 var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"aadd": {
 		Name: "aadd", Description: "Appends an element to an array and returns the appended element.", ReturnType: "variant",
@@ -46,8 +46,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"addnamedelimiters": {
 		Name: "AddNameDelimiters", Description: "Wraps a database object name with RDBMS-specific delimiters for use in SQL queries.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "dsn", Type: "string", Required: true, Description: "Data source name used to determine the appropriate RDBMS-specific delimiter style. Can be null or empty for default behavior."},
-			{Name: "name", Type: "string", Required: true, Description: "The database object name to wrap with delimiters. Can be null (defaults to empty string)."},
+			{Name: "sDSN", Type: "string", Required: false, Description: "Data source name used to determine the appropriate RDBMS-specific delimiter style. Can be null or empty for default behavior."},
+			{Name: "sName", Type: "string", Required: false, Description: "The database object name to wrap with delimiters. Can be null (defaults to empty string)."},
 		},
 	},
 	"addproperty": {
@@ -114,7 +114,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "arraycalc", Description: "Computes and returns various statistical values or modified arrays based on specified operations.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "target", Type: "array", Required: true, Description: "Array on which operations will be performed."},
-			{Name: "operation", Type: "string", Required: true, Description: "Specifies the mathematical or logical operation to perform on an array, such as \"SUM\", \"AVG\", or \"MERGE\"."},
+			{Name: "operation", Type: "string", Required: false, Description: "Specifies the mathematical or logical operation to perform on an array, such as \"SUM\", \"AVG\", or \"MERGE\"."},
 			{Name: "value", Type: "variant", Required: false, Description: "Data or value to be used in operations like MERGE, SORT, ADD, FILL, INS. Not needed for statistical operations."},
 			{Name: "start", Type: "double", Required: false, Description: "1-based index at which to begin processing. Defaults to 1. Used by COPY, DEL, FILL, INS operations."},
 			{Name: "count", Type: "double", Required: false, Description: "Number of elements to process. Defaults to array length. Used by COPY, DEL, FILL operations."},
@@ -133,7 +133,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "values", Type: "variant", Required: true, Description: "Array of data to be converted into a Table Value Parameter (TVP)."},
 			{Name: "dataType", Type: "variant", Required: true, Description: "Specifies the data type for TVP elements. Valid values are \"INT\", \"DOUBLE\", \"DATE\", or any other value defaults to string."},
-			{Name: "connectionName", Type: "variant", Required: false, Description: "Optional database connection name used to determine the database platform. If null, uses the default connection."},
+			{Name: "connectionName", Type: "variant", Required: true, Description: "Optional database connection name used to determine the database platform. If null, uses the default connection."},
 		},
 	},
 	"asc": {
@@ -145,8 +145,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"ascan": {
 		Name: "ascan", Description: "Returns the 1-based index of the first occurrence of a specified value in an array, or 0 if not found.", ReturnType: "double",
 		Parameters: []FunctionParameter{
-			{Name: "target", Type: "array", Required: false, Description: "Array in which to search for elements that match a specified value or function."},
-			{Name: "value", Type: "variant", Required: false, Description: "Value to search for within the array."},
+			{Name: "target", Type: "array", Required: true, Description: "Array in which to search for elements that match a specified value or function."},
+			{Name: "value", Type: "variant", Required: true, Description: "Value to search for within the array."},
 			{Name: "start", Type: "double", Required: false, Description: "Specifies the index at which to begin searching within the array for the specified value or condition."},
 			{Name: "count", Type: "double", Required: false, Description: "Specifies the number of items to process in the array starting from the specified index."},
 		},
@@ -154,8 +154,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"ascanexact": {
 		Name: "ascanexact", Description: "Returns the 1-based index of an exact value match in an array, or 0 if not found.", ReturnType: "double",
 		Parameters: []FunctionParameter{
-			{Name: "target", Type: "array", Required: false, Description: "Array in which to search for the specified value(s)."},
-			{Name: "value", Type: "variant", Required: false, Description: "Item to search for within the array."},
+			{Name: "target", Type: "array", Required: true, Description: "Array in which to search for the specified value(s)."},
+			{Name: "value", Type: "variant", Required: true, Description: "Item to search for within the array."},
 			{Name: "start", Type: "double", Required: false, Description: "Specifies the index at which to begin searching for the specified value within the target array."},
 			{Name: "count", Type: "double", Required: false, Description: "Number of items to process from the start index in the array."},
 		},
@@ -170,8 +170,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"beginlimstransaction": {
 		Name: "BeginLimsTransaction", Description: "Starts a database transaction and returns a boolean indicating success.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "variant", Required: false, Description: "Name given to the transaction for easy identification."},
-			{Name: "isoLevel", Type: "variant", Required: false, Description: "Specifies the isolation level for the database transaction. If null or empty, uses the default isolation level from GlobalSettings.SqlDefaultIsolationLevel."},
+			{Name: "friendlyName", Type: "variant", Required: true, Description: "Name given to the transaction for easy identification."},
+			{Name: "isoLevel", Type: "variant", Required: true, Description: "Specifies the isolation level for the database transaction. If null or empty, uses the default isolation level from GlobalSettings.SqlDefaultIsolationLevel."},
 		},
 	},
 	"break": {
@@ -181,7 +181,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"buildarray": {
 		Name: "buildarray", Description: "Converts a string into an array based on specified delimiters and options, returning the resulting array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
-			{Name: "text", Type: "string", Required: false, Description: "String that will be split into an array based on specified delimiters and other options."},
+			{Name: "text", Type: "string", Required: true, Description: "String that will be split into an array based on specified delimiters and other options."},
 			{Name: "crlfOk", Type: "boolean", Required: false, Description: "Determines whether carriage return and line feed characters are allowed in the input text."},
 			{Name: "delimiter", Type: "string", Required: false, Description: "Specifies the character or string used to separate values in the input text when building an array."},
 			{Name: "unique", Type: "boolean", Required: false, Description: "Parameter is accepted but NOT IMPLEMENTED - does not actually filter duplicates. Defaults to false."},
@@ -191,7 +191,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"buildarray2": {
 		Name: "buildarray2", Description: "Converts a string into a 2D array using specified delimiters and options. Returns an array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
-			{Name: "text", Type: "string", Required: false, Description: "String that will be parsed into an array based on specified delimiters and options for handling carriage returns, line feeds, and trimming spaces."},
+			{Name: "text", Type: "string", Required: true, Description: "String that will be parsed into an array based on specified delimiters and options for handling carriage returns, line feeds, and trimming spaces."},
 			{Name: "lineDelimiter", Type: "string", Required: false, Description: "Specifies the string used to delimit lines in the input text when building an array."},
 			{Name: "colDelimiter", Type: "string", Required: false, Description: "Specifies the character used to separate columns in the input text."},
 			{Name: "crlfOk", Type: "boolean", Required: false, Description: "Indicates whether carriage return and line feed characters are allowed in the input text."},
@@ -218,7 +218,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"buildstringforin": {
 		Name: "BuildStringForIn", Description: "Converts an array to a string suitable for SQL IN clause, returning a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "target", Type: "array", Required: false, Description: "An array containing the elements that will be converted into a string format suitable for use in an SQL IN clause."},
+			{Name: "target", Type: "array", Required: true, Description: "An array containing the elements that will be converted into a string format suitable for use in an SQL IN clause."},
 		},
 	},
 	"callbuiltinfunction": {
@@ -235,30 +235,30 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "remoteFileName", Type: "string", Required: true, Description: "Name of the file to check on the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication with the FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for authenticating with an FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Port number on which the FTP server is listening."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for FTP operations. Can be null if no proxy is needed."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether to use SFTP (true) or FTP (false)."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
+			{Name: "port", Type: "double", Required: true, Description: "Port number on which the FTP server is listening."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for FTP operations. Can be null if no proxy is needed."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether to use SFTP (true) or FTP (false)."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
 		},
 	},
 	"chknewpassword": {
 		Name: "ChkNewPassword", Description: "Validates a new password against previous passwords; returns true if valid.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "password", Type: "string", Required: false, Description: "Represents a new password entered by the user for validation."},
-			{Name: "prevPasswords", Type: "variant", Required: false, Description: "An array containing previous passwords used by the user."},
+			{Name: "password", Type: "string", Required: true, Description: "Represents a new password entered by the user for validation."},
+			{Name: "prevPasswords", Type: "variant", Required: true, Description: "An array containing previous passwords used by the user."},
 		},
 	},
 	"chkpassword": {
 		Name: "ChkPassword", Description: "Validates user credentials and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "userName", Type: "string", Required: false, Description: "Username of the user whose password is being checked."},
-			{Name: "password", Type: "string", Required: false, Description: "Represents the user's password for authentication."},
+			{Name: "userName", Type: "string", Required: true, Description: "Username of the user whose password is being checked."},
+			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for authentication."},
 		},
 	},
 	"chr": {
 		Name: "Chr", Description: "Converts an ASCII code to its corresponding character. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "asciiCode", Type: "double", Required: false, Description: "ASCII code for which the corresponding character is to be returned."},
+			{Name: "asciiCode", Type: "double", Required: true, Description: "ASCII code for which the corresponding character is to be returned."},
 		},
 	},
 	"clearlastsslerror": {
@@ -305,7 +305,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "Compress", Description: "Compresses a string and returns the compressed data as a string or writes it to a file based on the provided parameters.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "source", Type: "variant", Required: true, Description: "String to compress."},
-			{Name: "toFile", Type: "variant", Required: false, Description: "Indicates whether the compressed data should be written to a file. Defaults to false if null."},
+			{Name: "toFile", Type: "variant", Required: true, Description: "Indicates whether the compressed data should be written to a file. Defaults to false if null."},
 		},
 	},
 	"convertreport": {
@@ -319,14 +319,14 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "serverNameOrIP", Type: "string", Required: true, Description: "Specifies the name or IP address of the FTP server where files will be copied."},
 			{Name: "remoteDirectory", Type: "string", Required: true, Description: "Directory on the FTP server where files will be copied."},
-			{Name: "remoteFileNames", Type: "array", Required: false, Description: "An array of strings representing the names of files to copy to the remote FTP server."},
+			{Name: "remoteFileNames", Type: "array", Required: true, Description: "An array of strings representing the names of files to copy to the remote FTP server."},
 			{Name: "fileContents", Type: "string", Required: true, Description: "Content of the file to be uploaded to the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used to authenticate with the FTP server or SFTP service for file transfer operations."},
 			{Name: "password", Type: "string", Required: true, Description: "Password for authenticating with the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number for the FTP server to which files will be copied."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for the FTP connection. Can be null if no proxy is needed."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether to use SFTP instead of FTP for the file transfer."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number for the FTP server to which files will be copied."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for the FTP connection. Can be null if no proxy is needed."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether to use SFTP instead of FTP for the file transfer."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
 		},
 	},
 	"createguid": {
@@ -337,7 +337,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "CreateLocal", Description: "Creates a local variable and assigns it a value, returning the assigned value as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "varName", Type: "variant", Required: true, Description: "Name of the local variable to be created."},
-			{Name: "varValue", Type: "variant", Required: false, Description: "Value to assign to the local variable specified by varName."},
+			{Name: "varValue", Type: "variant", Required: true, Description: "Value to assign to the local variable specified by varName."},
 		},
 	},
 	"createormsession": {
@@ -348,7 +348,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "CreatePublic", Description: "Creates a public variable with the specified name and assigns it a value, returning the value.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "varName", Type: "variant", Required: true, Description: "Name of the public variable to create."},
-			{Name: "varValue", Type: "variant", Required: false, Description: "Value to assign to the public variable being created."},
+			{Name: "varValue", Type: "variant", Required: true, Description: "Value to assign to the public variable being created."},
 		},
 	},
 	"createudobject": {
@@ -363,9 +363,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "zipFileName", Type: "string", Required: true, Description: "Name of the zip file to be created."},
 			{Name: "sourceDirectory", Type: "string", Required: true, Description: "Directory containing the files to be zipped."},
-			{Name: "recurse", Type: "boolean", Required: false, Description: "Indicates whether the zip creation should include subdirectories and their contents."},
-			{Name: "fileFilter", Type: "string", Required: false, Description: "FileFilter specifies the pattern used to filter files included in the zip archive."},
-			{Name: "password", Type: "string", Required: false, Description: "Specifies the encryption password for the created zip file."},
+			{Name: "recurse", Type: "boolean", Required: true, Description: "Indicates whether the zip creation should include subdirectories and their contents."},
+			{Name: "fileFilter", Type: "string", Required: true, Description: "FileFilter specifies the pattern used to filter files included in the zip archive."},
+			{Name: "password", Type: "string", Required: true, Description: "Specifies the encryption password for the created zip file."},
 		},
 	},
 	"ctod": {
@@ -379,7 +379,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "date", Type: "variant", Required: true, Description: "Initial date or datetime value to which the specified number of units will be added."},
 			{Name: "number", Type: "variant", Required: true, Description: "Specifies the amount by which to add or subtract from the date, based on the unit of time specified in the datepart parameter."},
-			{Name: "datepart", Type: "variant", Required: false, Description: "Datepart specifies the unit of time (year, month, day, etc.) by which the date should be incremented or decremented."},
+			{Name: "datepart", Type: "variant", Required: true, Description: "Datepart specifies the unit of time (year, month, day, etc.) by which the date should be incremented or decremented."},
 		},
 	},
 	"datediff": {
@@ -387,7 +387,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "startDate", Type: "variant", Required: true, Description: "Beginning date for calculating the difference between two dates using the DateDiff function."},
 			{Name: "endDate", Type: "variant", Required: true, Description: "End date for calculating the difference from the start date in the DateDiff function."},
-			{Name: "datepart", Type: "variant", Required: false, Description: "Specifies the unit of time (e.g., day, hour) for which the difference between two dates should be calculated."},
+			{Name: "datepart", Type: "variant", Required: true, Description: "Specifies the unit of time (e.g., day, hour) for which the difference between two dates should be calculated."},
 		},
 	},
 	"datediffex": {
@@ -429,7 +429,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DateToString", Description: "Converts a date to a string using a specified format or default format. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "date", Type: "variant", Required: true, Description: "Date and time value that will be converted to a string using the specified format."},
-			{Name: "format", Type: "variant", Required: false, Description: "Specifies the string pattern used to convert a date into a readable string."},
+			{Name: "format", Type: "variant", Required: true, Description: "Specifies the string pattern used to convert a date into a readable string."},
 		},
 	},
 	"day": {
@@ -442,14 +442,14 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "Decompress", Description: "Returns a decompressed string from the provided source or file path.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "source", Type: "variant", Required: true, Description: "Is a string containing compressed data that needs to be decompressed."},
-			{Name: "fromFile", Type: "variant", Required: false, Description: "A boolean indicating whether the input string is compressed in a file. Defaults to false if null."},
+			{Name: "fromFile", Type: "variant", Required: true, Description: "A boolean indicating whether the input string is compressed in a file. Defaults to false if null."},
 		},
 	},
 	"decryptdata": {
 		Name: "DecryptData", Description: "Decrypts data using a password and returns the decrypted string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "inputData", Type: "string", Required: false, Description: "Encrypted data string to be decrypted."},
-			{Name: "password", Type: "string", Required: false, Description: "Is used to decrypt the inputData string."},
+			{Name: "inputData", Type: "string", Required: true, Description: "Encrypted data string to be decrypted."},
+			{Name: "password", Type: "string", Required: true, Description: "Is used to decrypt the inputData string."},
 		},
 	},
 	"delarray": {
@@ -466,10 +466,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "remoteDirectory", Type: "string", Required: true, Description: "Specifies the directory on the FTP server that needs to be deleted."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when connecting to the FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for authenticating with the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number on which the FTP server is listening."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Proxy server to route FTP requests through. Can be null if no proxy is needed."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "IsSFTP determines whether the operation should use SFTP (true) or FTP (false)."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number on which the FTP server is listening."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Proxy server to route FTP requests through. Can be null if no proxy is needed."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "IsSFTP determines whether the operation should use SFTP (true) or FTP (false)."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
 		},
 	},
 	"deletefromftp": {
@@ -480,10 +480,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "remoteFileName", Type: "string", Required: true, Description: "Name of the file to delete from the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when deleting a file from an FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Password for the FTP user."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the FTP server's port number for the connection."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Proxy server address used for the FTP connection. Can be null if no proxy is needed."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether the FTP operation should use SFTP instead of standard FTP."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the FTP server's port number for the connection."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Proxy server address used for the FTP connection. Can be null if no proxy is needed."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether the FTP operation should use SFTP instead of standard FTP."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication. Only used when isSFTP is true."},
 		},
 	},
 	"deleteinlinecode": {
@@ -496,14 +496,14 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DetectSqlInjections", Description: "Enables or disables SQL injection detection for a database connection and returns the current state.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "onOff", Type: "variant", Required: true, Description: "Determines whether SQL injection detection is enabled or disabled for the specified database connection."},
-			{Name: "connectionName", Type: "variant", Required: false, Description: "Name of the database connection to configure. If not provided or not a string, uses the default connection."},
+			{Name: "connectionName", Type: "variant", Required: true, Description: "Name of the database connection to configure. If not provided or not a string, uses the default connection."},
 		},
 	},
 	"directory": {
 		Name: "Directory", Description: "Returns a list of files and directories matching the specified pattern.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "filePattern", Type: "string", Required: true, Description: "Specifies the pattern used to filter files in a directory."},
-			{Name: "attributes", Type: "string", Required: false, Description: "Optional string specifying attributes to filter directory entries."},
+			{Name: "attributes", Type: "string", Required: true, Description: "Optional string specifying attributes to filter directory entries."},
 		},
 	},
 	"docacquireworkitem": {
@@ -530,9 +530,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "filePath", Type: "string", Required: true, Description: "Path to the document file being checked in."},
 			{Name: "documentId", Type: "string", Required: true, Description: "Unique identifier for the document being checked in."},
-			{Name: "version", Type: "string", Required: false, Description: "Represents the version number of the document being checked in."},
-			{Name: "replaceContent", Type: "boolean", Required: false, Description: "Indicates whether to replace the existing content of the document with the new content being checked in."},
-			{Name: "majorVersion", Type: "boolean", Required: false, Description: "Indicates whether the document should be checked in with a major version increment."},
+			{Name: "version", Type: "string", Required: true, Description: "Represents the version number of the document being checked in."},
+			{Name: "replaceContent", Type: "boolean", Required: true, Description: "Indicates whether to replace the existing content of the document with the new content being checked in."},
+			{Name: "majorVersion", Type: "boolean", Required: true, Description: "Indicates whether the document should be checked in with a major version increment."},
 		},
 	},
 	"doccheckoutdocument": {
@@ -549,25 +549,25 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocCompleteWorkitem", Description: "Completes a workitem in Documentum and returns true if successful.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "workitemId", Type: "string", Required: true, Description: "Unique identifier for the work item to be completed."},
-			{Name: "signOffUser", Type: "string", Required: false, Description: "Username of the user signing off on the workitem."},
-			{Name: "signOffPass", Type: "string", Required: false, Description: "Password used for signing off on a workitem."},
-			{Name: "signOffReason", Type: "string", Required: false, Description: "Reason for completing the work item."},
+			{Name: "signOffUser", Type: "string", Required: true, Description: "Username of the user signing off on the workitem."},
+			{Name: "signOffPass", Type: "string", Required: true, Description: "Password used for signing off on a workitem."},
+			{Name: "signOffReason", Type: "string", Required: true, Description: "Reason for completing the work item."},
 		},
 	},
 	"doccreateacl": {
 		Name: "DocCreateACL", Description: "Creates a new Access Control List (ACL) and returns its name as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "name", Type: "string", Required: true, Description: "Identifier for the access control list (ACL) being created."},
-			{Name: "description", Type: "string", Required: false, Description: "Represents a string that provides additional information or context for the Access Control List (ACL) being created."},
-			{Name: "groups", Type: "array", Required: false, Description: "An array of strings representing the names of groups to which access control is being granted or modified."},
+			{Name: "description", Type: "string", Required: true, Description: "Represents a string that provides additional information or context for the Access Control List (ACL) being created."},
+			{Name: "groups", Type: "array", Required: true, Description: "An array of strings representing the names of groups to which access control is being granted or modified."},
 		},
 	},
 	"doccreatecabinet": {
 		Name: "DocCreateCabinet", Description: "Creates a new document cabinet with the specified name and optional type and ACL, returning the cabinet's ID as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "name", Type: "string", Required: true, Description: "Specifies the name of the cabinet to be created."},
-			{Name: "cabinetType", Type: "string", Required: false, Description: "Specifies the type of cabinet to create when using the DocCreateCabinet function."},
-			{Name: "acl", Type: "string", Required: false, Description: "Specifies the access control list for the document cabinet, defining permissions and roles."},
+			{Name: "cabinetType", Type: "string", Required: true, Description: "Specifies the type of cabinet to create when using the DocCreateCabinet function."},
+			{Name: "acl", Type: "string", Required: true, Description: "Specifies the access control list for the document cabinet, defining permissions and roles."},
 		},
 	},
 	"doccreatefolder": {
@@ -575,14 +575,14 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "path", Type: "string", Required: true, Description: "Specifies the directory path where the new folder will be created."},
 			{Name: "name", Type: "string", Required: true, Description: "Specifies the name of the folder to be created."},
-			{Name: "acl", Type: "string", Required: false, Description: "Specifies the access control list for the new folder, defining permissions for users and groups."},
+			{Name: "acl", Type: "string", Required: true, Description: "Specifies the access control list for the new folder, defining permissions for users and groups."},
 		},
 	},
 	"doccreategroup": {
 		Name: "DocCreateGroup", Description: "Creates a new document group and returns its name as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "name", Type: "string", Required: true, Description: "Name of the group to be created."},
-			{Name: "description", Type: "string", Required: false, Description: "Is a string that provides additional information or details about the group being created."},
+			{Name: "description", Type: "string", Required: true, Description: "Is a string that provides additional information or details about the group being created."},
 		},
 	},
 	"doccreateuser": {
@@ -590,12 +590,12 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "loginName", Type: "string", Required: true, Description: "Username used for logging into the system."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's login password."},
-			{Name: "userName", Type: "string", Required: false, Description: "Username for the new user being created."},
-			{Name: "eMail", Type: "string", Required: false, Description: "Email address associated with the user being created."},
-			{Name: "defaultFolder", Type: "string", Required: false, Description: "Default folder where the user's documents will be stored."},
-			{Name: "groupName", Type: "string", Required: false, Description: "Specifies the group to which the user should be added."},
-			{Name: "permissionSet", Type: "string", Required: false, Description: "Specifies the set of permissions to assign to the new user."},
-			{Name: "userPrivileges", Type: "double", Required: false, Description: "Numeric value of user privileges to be assigned to the newly created user."},
+			{Name: "userName", Type: "string", Required: true, Description: "Username for the new user being created."},
+			{Name: "eMail", Type: "string", Required: true, Description: "Email address associated with the user being created."},
+			{Name: "defaultFolder", Type: "string", Required: true, Description: "Default folder where the user's documents will be stored."},
+			{Name: "groupName", Type: "string", Required: true, Description: "Specifies the group to which the user should be added."},
+			{Name: "permissionSet", Type: "string", Required: true, Description: "Specifies the set of permissions to assign to the new user."},
+			{Name: "userPrivileges", Type: "double", Required: true, Description: "Numeric value of user privileges to be assigned to the newly created user."},
 		},
 	},
 	"docdelegateworkitem": {
@@ -609,21 +609,21 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocDelete", Description: "Deletes a document by object ID, optionally all versions. Returns true on success, false otherwise.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "objId", Type: "string", Required: true, Description: "Unique identifier of the document to be deleted."},
-			{Name: "allVersions", Type: "boolean", Required: false, Description: "A boolean indicating whether to delete all versions of the document or just the current version."},
+			{Name: "allVersions", Type: "boolean", Required: true, Description: "A boolean indicating whether to delete all versions of the document or just the current version."},
 		},
 	},
 	"docdeletecabinet": {
 		Name: "DocDeleteCabinet", Description: "Deletes a document cabinet by ID, optionally deleting all contained documents; returns true on success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "cabinetId", Type: "string", Required: true, Description: "Unique identifier for the cabinet to be deleted."},
-			{Name: "deepDelete", Type: "boolean", Required: false, Description: "Determines whether to delete all documents within the cabinet, not just the cabinet itself."},
+			{Name: "deepDelete", Type: "boolean", Required: true, Description: "Determines whether to delete all documents within the cabinet, not just the cabinet itself."},
 		},
 	},
 	"docdeletefolder": {
 		Name: "DocDeleteFolder", Description: "Deletes a folder by ID; returns true on success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "folderId", Type: "string", Required: true, Description: "Is a string representing the unique identifier of the folder to be deleted."},
-			{Name: "deepDelete", Type: "boolean", Required: false, Description: "DeepDelete determines whether to delete subfolders and documents within the specified folder."},
+			{Name: "deepDelete", Type: "boolean", Required: true, Description: "DeepDelete determines whether to delete subfolders and documents within the specified folder."},
 		},
 	},
 	"docdeleteuser": {
@@ -653,7 +653,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocExportDocument", Description: "Exports a document to a specified format and returns its content as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "documentId", Type: "string", Required: true, Description: "Represents the unique identifier of the document to be exported."},
-			{Name: "format", Type: "string", Required: false, Description: "Specifies the output format for the document, such as 'PDF' or 'DOCX'."},
+			{Name: "format", Type: "string", Required: true, Description: "Specifies the output format for the document, such as 'PDF' or 'DOCX'."},
 		},
 	},
 	"docgetcabinets": {
@@ -664,7 +664,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocGetDocuments", Description: "Returns an array of documents in a specified folder, optionally filtering by document types.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "folderPath", Type: "string", Required: true, Description: "Path to the folder from which documents will be retrieved."},
-			{Name: "docTypes", Type: "string", Required: false, Description: "DocTypes specifies the types of documents to retrieve from the specified folder."},
+			{Name: "docTypes", Type: "string", Required: true, Description: "DocTypes specifies the types of documents to retrieve from the specified folder."},
 		},
 	},
 	"docgeterrormessage": {
@@ -681,13 +681,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocGetMetadata", Description: "Returns metadata attributes for a document as an array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "objId", Type: "string", Required: true, Description: "Identifier of the document for which metadata is being retrieved."},
-			{Name: "attributes", Type: "string", Required: false, Description: "A string containing a comma-separated list of metadata attribute names to retrieve for the specified document."},
+			{Name: "attributes", Type: "string", Required: true, Description: "A string containing a comma-separated list of metadata attribute names to retrieve for the specified document."},
 		},
 	},
 	"docgettasks": {
 		Name: "DocGetTasks", Description: "Returns an array of tasks for a given workflow ID.", ReturnType: "array",
 		Parameters: []FunctionParameter{
-			{Name: "workflowId", Type: "string", Required: false, Description: "Unique identifier for a workflow in STARLIMS, used to retrieve tasks associated with that workflow."},
+			{Name: "workflowId", Type: "string", Required: true, Description: "Unique identifier for a workflow in STARLIMS, used to retrieve tasks associated with that workflow."},
 		},
 	},
 	"docgettaskscount": {
@@ -723,10 +723,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "docFile", Type: "string", Required: true, Description: "Path to the document file that will be imported into STARLIMS."},
 			{Name: "destinationPath", Type: "string", Required: true, Description: "Directory where the document will be imported."},
-			{Name: "docName", Type: "string", Required: false, Description: "Name of the document to be imported into STARLIMS."},
-			{Name: "docType", Type: "string", Required: false, Description: "DocType specifies the type of document being imported."},
-			{Name: "appCode", Type: "string", Required: false, Description: "Specifies the application code associated with the document being imported, ensuring that the document is processed according to the rules and configurations defined for that specific application."},
-			{Name: "aclName", Type: "string", Required: false, Description: "Specifies the access control list (ACL) to apply to the imported document, controlling who can view and interact with it within the system."},
+			{Name: "docName", Type: "string", Required: true, Description: "Name of the document to be imported into STARLIMS."},
+			{Name: "docType", Type: "string", Required: true, Description: "DocType specifies the type of document being imported."},
+			{Name: "appCode", Type: "string", Required: true, Description: "Specifies the application code associated with the document being imported, ensuring that the document is processed according to the rules and configurations defined for that specific application."},
+			{Name: "aclName", Type: "string", Required: true, Description: "Specifies the access control list (ACL) to apply to the imported document, controlling who can view and interact with it within the system."},
 		},
 	},
 	"docinitdocumentuminterface": {
@@ -765,9 +765,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "workitemId", Type: "string", Required: true, Description: "Unique identifier of the workitem to be repeated in STARLIMS."},
 			{Name: "users", Type: "array", Required: true, Description: "An array of user identifiers representing the individuals who will repeat a workitem."},
-			{Name: "signOffUser", Type: "string", Required: false, Description: "Username of the user who is signing off on the workitem."},
-			{Name: "signOffPass", Type: "string", Required: false, Description: "Password used for authentication when signing off a work item in STARLIMS."},
-			{Name: "signOffReason", Type: "string", Required: false, Description: "Specifies the reason for repeating a workitem."},
+			{Name: "signOffUser", Type: "string", Required: true, Description: "Username of the user who is signing off on the workitem."},
+			{Name: "signOffPass", Type: "string", Required: true, Description: "Password used for authentication when signing off a work item in STARLIMS."},
+			{Name: "signOffReason", Type: "string", Required: true, Description: "Specifies the reason for repeating a workitem."},
 		},
 	},
 	"docresumeworkflow": {
@@ -779,27 +779,27 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"docsearchasdataset": {
 		Name: "DocSearchAsDataset", Description: "Converts a document search query into a dataset string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "contains", Type: "string", Required: false, Description: "Contains a string that filters documents based on their content."},
-			{Name: "startLocation", Type: "string", Required: false, Description: "Specifies the starting point for the document search within the Documentum repository."},
-			{Name: "objectType", Type: "string", Required: false, Description: "Type of document objects to search for."},
-			{Name: "where", Type: "string", Required: false, Description: "Specifies the search criteria for documents in the dataset, allowing for filtering based on specific conditions."},
-			{Name: "allVersions", Type: "boolean", Required: false, Description: "AllVersions determines whether to include all versions of documents in the search results."},
-			{Name: "resultSetSize", Type: "double", Required: false, Description: "Specifies the maximum number of documents to return in the search result dataset."},
+			{Name: "contains", Type: "string", Required: true, Description: "Contains a string that filters documents based on their content."},
+			{Name: "startLocation", Type: "string", Required: true, Description: "Specifies the starting point for the document search within the Documentum repository."},
+			{Name: "objectType", Type: "string", Required: true, Description: "Type of document objects to search for."},
+			{Name: "where", Type: "string", Required: true, Description: "Specifies the search criteria for documents in the dataset, allowing for filtering based on specific conditions."},
+			{Name: "allVersions", Type: "boolean", Required: true, Description: "AllVersions determines whether to include all versions of documents in the search results."},
+			{Name: "resultSetSize", Type: "double", Required: true, Description: "Specifies the maximum number of documents to return in the search result dataset."},
 		},
 	},
 	"docsearchfulltext": {
 		Name: "DocSearchFullText", Description: "Returns an array of documents matching a full-text search query.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "textToSearch", Type: "string", Required: true, Description: "Text to search for within documents."},
-			{Name: "startLocation", Type: "string", Required: false, Description: "StartLocation specifies the starting point for the document search within the documentum system."},
-			{Name: "resultSetSize", Type: "double", Required: false, Description: "Specifies the maximum number of search results to return."},
+			{Name: "startLocation", Type: "string", Required: true, Description: "StartLocation specifies the starting point for the document search within the documentum system."},
+			{Name: "resultSetSize", Type: "double", Required: true, Description: "Specifies the maximum number of search results to return."},
 		},
 	},
 	"docsearchusingdql": {
 		Name: "DocSearchUsingDql", Description: "Returns an array of documents based on a DQL query.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "dql", Type: "string", Required: true, Description: "Documentum Query Language (DQL) query used to search for documents in the system."},
-			{Name: "resultSetSize", Type: "double", Required: false, Description: "Specifies the maximum number of documents to return in the search results when using the DocSearchUsingDql function."},
+			{Name: "resultSetSize", Type: "double", Required: true, Description: "Specifies the maximum number of documents to return in the search results when using the DocSearchUsingDql function."},
 		},
 	},
 	"docsetmetadata": {
@@ -813,8 +813,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "DocStartWorkflow", Description: "Starts a workflow for specified documents and returns workflow ID and performers as an array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "workflowId", Type: "string", Required: true, Description: "WorkflowId identifies the specific workflow to start."},
-			{Name: "documentIds", Type: "array", Required: false, Description: "An array of document IDs representing the documents to start the workflow on."},
-			{Name: "packageName", Type: "string", Required: false, Description: "Name of the package associated with the workflow."},
+			{Name: "documentIds", Type: "array", Required: true, Description: "An array of document IDs representing the documents to start the workflow on."},
+			{Name: "packageName", Type: "string", Required: true, Description: "Name of the package associated with the workflow."},
 		},
 	},
 	"docstopworkflow": {
@@ -828,27 +828,27 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "loginName", Type: "string", Required: true, Description: "Username used for authentication in the system."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's new password for authentication."},
-			{Name: "userName", Type: "string", Required: false, Description: "Username of the user whose details are being updated."},
-			{Name: "eMail", Type: "string", Required: false, Description: "Represents the email address associated with the user being updated."},
-			{Name: "defaultFolder", Type: "string", Required: false, Description: "Default folder where the user's documents will be stored."},
-			{Name: "groupName", Type: "string", Required: false, Description: "Name of the group to which the user should be added."},
-			{Name: "permissionSet", Type: "string", Required: false, Description: "PermissionSet specifies the set of permissions to assign to the user."},
-			{Name: "userPrivileges", Type: "double", Required: false, Description: "Represents the set of permissions assigned to a user."},
+			{Name: "userName", Type: "string", Required: true, Description: "Username of the user whose details are being updated."},
+			{Name: "eMail", Type: "string", Required: true, Description: "Represents the email address associated with the user being updated."},
+			{Name: "defaultFolder", Type: "string", Required: true, Description: "Default folder where the user's documents will be stored."},
+			{Name: "groupName", Type: "string", Required: true, Description: "Name of the group to which the user should be added."},
+			{Name: "permissionSet", Type: "string", Required: true, Description: "PermissionSet specifies the set of permissions to assign to the user."},
+			{Name: "userPrivileges", Type: "double", Required: true, Description: "Represents the set of permissions assigned to a user."},
 		},
 	},
 	"doproc": {
 		Name: "DoProc", Description: "Calls a procedure by name, usually in the current file or context, and returns whatever that procedure returns.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "name", Type: "string", Required: true, Description: "Procedure name to execute. In class methods, prefer Me:MethodName() or Base:MethodName() for sibling and inherited methods."},
-			{Name: "args", Type: "array", Required: false, Description: "Optional argument array for the called procedure. Omit the second argument entirely when there are no parameters."},
+			{Name: "args", Type: "array", Required: true, Description: "Optional argument array for the called procedure. Omit the second argument entirely when there are no parameters."},
 		},
 	},
 	"dossupport": {
 		Name: "DosSupport", Description: "Returns a variant containing the result of executing a DOS command or retrieving directory information.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "cmd", Type: "string", Required: true, Description: "Command to execute."},
-			{Name: "prm", Type: "string", Required: false, Description: "Additional parameters for the command. Required for all commands except WORK, WORKDIR, and CURRENTDRIVE."},
-			{Name: "dbg", Type: "variant", Required: false, Description: "A boolean indicating whether debugging information should be displayed."},
+			{Name: "prm", Type: "string", Required: true, Description: "Additional parameters for the command. Required for all commands except WORK, WORKDIR, and CURRENTDRIVE."},
+			{Name: "dbg", Type: "variant", Required: true, Description: "A boolean indicating whether debugging information should be displayed."},
 		},
 	},
 	"dow": {
@@ -878,17 +878,17 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"empty": {
 		Name: "Empty", Description: "Returns true if the provided value is empty or null; otherwise, false.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "value", Type: "variant", Required: false, Description: "Value to check if it is empty."},
+			{Name: "value", Type: "variant", Required: true, Description: "Value to check if it is empty."},
 		},
 	},
 	"encryptdata": {
 		Name: "EncryptData", Description: "Encrypts data using a specified algorithm and returns the encrypted string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "inputData", Type: "string", Required: false, Description: "Data to be encrypted."},
-			{Name: "password", Type: "string", Required: false, Description: "Is used to encrypt the input data."},
-			{Name: "algorithm", Type: "string", Required: false, Description: "Specifies the encryption algorithm to use for encrypting the data."},
-			{Name: "key", Type: "string", Required: false, Description: "Encryption key used to encrypt the data."},
-			{Name: "retType", Type: "string", Required: false, Description: "RetType specifies the format of the returned encryption data, such as 'base64' or 'hexadecimal'."},
+			{Name: "inputData", Type: "string", Required: true, Description: "Data to be encrypted."},
+			{Name: "password", Type: "string", Required: true, Description: "Is used to encrypt the input data."},
+			{Name: "algorithm", Type: "string", Required: true, Description: "Specifies the encryption algorithm to use for encrypting the data."},
+			{Name: "key", Type: "string", Required: true, Description: "Encryption key used to encrypt the data."},
+			{Name: "retType", Type: "string", Required: true, Description: "RetType specifies the format of the returned encryption data, such as 'base64' or 'hexadecimal'."},
 		},
 	},
 	"endlimsoleconnect": {
@@ -900,8 +900,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"endlimstransaction": {
 		Name: "EndLimsTransaction", Description: "Ends a LIMS transaction and commits changes if specified; returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "A descriptive name for the transaction, used for logging and auditing purposes."},
-			{Name: "commit", Type: "boolean", Required: false, Description: "A boolean indicating whether to commit the transaction."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "A descriptive name for the transaction, used for logging and auditing purposes."},
+			{Name: "commit", Type: "boolean", Required: true, Description: "A boolean indicating whether to commit the transaction."},
 		},
 	},
 	"errormes": {
@@ -923,35 +923,35 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "o", Type: "variant", Required: true, Description: "Object on which the method will be invoked."},
 			{Name: "methodName", Type: "string", Required: true, Description: "Name of the method to invoke."},
-			{Name: "arg01", Type: "variant", Required: false, Description: "First argument to pass to the method."},
-			{Name: "arg02", Type: "variant", Required: false, Description: "Second argument to pass to the method."},
-			{Name: "Arg03", Type: "variant", Required: false, Description: "Third argument to pass to the method."},
-			{Name: "arg04", Type: "variant", Required: false, Description: "Fourth argument to pass to the method."},
-			{Name: "arg05", Type: "variant", Required: false, Description: "Fifth argument to pass to the method."},
-			{Name: "arg06", Type: "variant", Required: false, Description: "Sixth argument to pass to the method."},
-			{Name: "arg07", Type: "variant", Required: false, Description: "Seventh argument to pass to the method."},
-			{Name: "arg08", Type: "variant", Required: false, Description: "Eighth argument to pass to the method."},
-			{Name: "arg09", Type: "variant", Required: false, Description: "Ninth argument to pass to the method."},
-			{Name: "arg10", Type: "variant", Required: false, Description: "Tenth argument to pass to the method."},
-			{Name: "arg11", Type: "variant", Required: false, Description: "Eleventh argument to pass to the method."},
-			{Name: "arg12", Type: "variant", Required: false, Description: "Twelfth argument to pass to the method."},
-			{Name: "arg13", Type: "variant", Required: false, Description: "Thirteenth argument to pass to the method."},
-			{Name: "arg14", Type: "variant", Required: false, Description: "Fourteenth argument to pass to the method."},
-			{Name: "arg15", Type: "variant", Required: false, Description: "Fifteenth argument to pass to the method."},
-			{Name: "arg16", Type: "variant", Required: false, Description: "Sixteenth argument to pass to the method."},
-			{Name: "arg17", Type: "variant", Required: false, Description: "Seventeenth argument to pass to the method."},
-			{Name: "arg18", Type: "variant", Required: false, Description: "Eighteenth argument to pass to the method."},
-			{Name: "arg19", Type: "variant", Required: false, Description: "Nineteenth argument to pass to the method."},
-			{Name: "arg20", Type: "variant", Required: false, Description: "Twentieth argument to pass to the method."},
-			{Name: "arg21", Type: "variant", Required: false, Description: "Twenty-first argument to pass to the method."},
+			{Name: "arg01", Type: "variant", Required: true, Description: "First argument to pass to the method."},
+			{Name: "arg02", Type: "variant", Required: true, Description: "Second argument to pass to the method."},
+			{Name: "Arg03", Type: "variant", Required: true, Description: "Third argument to pass to the method."},
+			{Name: "arg04", Type: "variant", Required: true, Description: "Fourth argument to pass to the method."},
+			{Name: "arg05", Type: "variant", Required: true, Description: "Fifth argument to pass to the method."},
+			{Name: "arg06", Type: "variant", Required: true, Description: "Sixth argument to pass to the method."},
+			{Name: "arg07", Type: "variant", Required: true, Description: "Seventh argument to pass to the method."},
+			{Name: "arg08", Type: "variant", Required: true, Description: "Eighth argument to pass to the method."},
+			{Name: "arg09", Type: "variant", Required: true, Description: "Ninth argument to pass to the method."},
+			{Name: "arg10", Type: "variant", Required: true, Description: "Tenth argument to pass to the method."},
+			{Name: "arg11", Type: "variant", Required: true, Description: "Eleventh argument to pass to the method."},
+			{Name: "arg12", Type: "variant", Required: true, Description: "Twelfth argument to pass to the method."},
+			{Name: "arg13", Type: "variant", Required: true, Description: "Thirteenth argument to pass to the method."},
+			{Name: "arg14", Type: "variant", Required: true, Description: "Fourteenth argument to pass to the method."},
+			{Name: "arg15", Type: "variant", Required: true, Description: "Fifteenth argument to pass to the method."},
+			{Name: "arg16", Type: "variant", Required: true, Description: "Sixteenth argument to pass to the method."},
+			{Name: "arg17", Type: "variant", Required: true, Description: "Seventeenth argument to pass to the method."},
+			{Name: "arg18", Type: "variant", Required: true, Description: "Eighteenth argument to pass to the method."},
+			{Name: "arg19", Type: "variant", Required: true, Description: "Nineteenth argument to pass to the method."},
+			{Name: "arg20", Type: "variant", Required: true, Description: "Twentieth argument to pass to the method."},
+			{Name: "arg21", Type: "variant", Required: true, Description: "Twenty-first argument to pass to the method."},
 		},
 	},
 	"execudf": {
 		Name: "ExecUdf", Description: "Executes a user-defined function and returns its result as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "code", Type: "string", Required: false, Description: "Script or code snippet to be executed dynamically."},
+			{Name: "code", Type: "string", Required: true, Description: "Script or code snippet to be executed dynamically."},
 			{Name: "args", Type: "sslvalue[]", Required: false, Description: "Array of arguments passed to the user-defined function."},
-			{Name: "cacheCode", Type: "boolean", Required: true, Description: "CacheCode indicates whether to cache the generated code for performance improvement."},
+			{Name: "cacheCode", Type: "boolean", Required: false, Description: "CacheCode indicates whether to cache the generated code for performance improvement."},
 		},
 	},
 	"executedatasource": {
@@ -973,8 +973,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "zipFileName", Type: "string", Required: true, Description: "Name of the zip file to extract."},
 			{Name: "targetDirectory", Type: "string", Required: true, Description: "Target directory where the files extracted from the zip archive will be saved."},
-			{Name: "fileFilter", Type: "string", Required: false, Description: "FileFilter specifies the pattern used to filter files when extracting a zip archive."},
-			{Name: "password", Type: "string", Required: false, Description: "Is used to provide a secure extraction key for encrypted zip files."},
+			{Name: "fileFilter", Type: "string", Required: true, Description: "FileFilter specifies the pattern used to filter files when extracting a zip archive."},
+			{Name: "password", Type: "string", Required: true, Description: "Is used to provide a secure extraction key for encrypted zip files."},
 		},
 	},
 	"filesupport": {
@@ -982,9 +982,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "fileIdentifier", Type: "variant", Required: true, Description: "Identifier for the file to perform operations on."},
 			{Name: "request", Type: "string", Required: true, Description: "Specifies the operation to perform. Valid values include CHECK, SETATTR, GETATTR, CREATE, OPEN, CLOSE, READ, READBLK, WRITE, BOF, EOF, TELL, SEEK, RESIZE, COPY, DELETE, MOVE, RENAME, PATH, FOLDERNAME, FILENAME, NAME, EXT, SIZE, DATE, TIME, DIR."},
-			{Name: "arg1", Type: "variant", Required: false, Description: "Operation or action to perform on the file, such as read, write, delete, etc."},
-			{Name: "arg2", Type: "variant", Required: false, Description: "Additional parameters or options for the file operation."},
-			{Name: "encoding", Type: "string", Required: false, Description: "Specifies the character encoding used for reading or writing files. Defaults to UTF8."},
+			{Name: "arg1", Type: "variant", Required: true, Description: "Operation or action to perform on the file, such as read, write, delete, etc."},
+			{Name: "arg2", Type: "variant", Required: true, Description: "Additional parameters or options for the file operation."},
+			{Name: "encoding", Type: "string", Required: true, Description: "Specifies the character encoding used for reading or writing files. Defaults to UTF8."},
 		},
 	},
 	"formaterrormessage": {
@@ -1040,7 +1040,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"getconnectionbyname": {
 		Name: "GetConnectionByName", Description: "Returns an SQLConnection object for a database connection identified by its friendly name.", ReturnType: "sqlconnection",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "FriendlyName identifies the connection by a user-friendly name."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "FriendlyName identifies the connection by a user-friendly name."},
 		},
 	},
 	"getconnectionstrings": {
@@ -1075,7 +1075,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "GetDataSetFromArray", Description: "Converts an array of values and fields into a dataset string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "arrayOfValues", Type: "array", Required: true, Description: "Array containing the values to be included in the dataset."},
-			{Name: "arrayFields", Type: "array", Required: false, Description: "Names of the fields to include in the resulting dataset."},
+			{Name: "arrayFields", Type: "array", Required: true, Description: "Names of the fields to include in the resulting dataset."},
 		},
 	},
 	"getdatasetfromarrayex": {
@@ -1092,8 +1092,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "GetDataSetWithSchemaFromSelect", Description: "Computes a dataset with schema from a SELECT command and returns it as a string. Use positional '?' placeholders with the values array.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "string", Required: true, Description: "SQL query used to retrieve data from the database."},
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name used to identify or reference a specific dataset within the system."},
-			{Name: "arrayOfValues", Type: "array", Required: false, Description: "An array containing values to be used in the SQL query."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The name used to identify or reference a specific dataset within the system."},
+			{Name: "arrayOfValues", Type: "array", Required: true, Description: "An array containing values to be used in the SQL query."},
 			{Name: "arrayOfPrimaryKeys", Type: "array", Required: true, Description: "Primary keys of the data to be retrieved in the dataset."},
 			{Name: "arrayOfUniqueConstraints", Type: "array", Required: true, Description: "An array containing unique constraints for the dataset."},
 		},
@@ -1102,10 +1102,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "GetDataSetXMLFromArray", Description: "Converts an array of values into XML format, optionally including headers and schema. Returns a string containing the XML data.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "arrayOfValues", Type: "array", Required: true, Description: "Data to be converted into XML format."},
-			{Name: "arrayFields", Type: "array", Required: false, Description: "An array of field names to include in the resulting XML dataset."},
-			{Name: "tableName", Type: "string", Required: false, Description: "Name of the table for which the dataset XML is being generated."},
-			{Name: "includeHeader", Type: "boolean", Required: false, Description: "Determines whether the XML output should include a header row."},
-			{Name: "includeSchema", Type: "boolean", Required: false, Description: "Indicates whether to include the schema information in the XML output generated from an array of values."},
+			{Name: "arrayFields", Type: "array", Required: true, Description: "An array of field names to include in the resulting XML dataset."},
+			{Name: "tableName", Type: "string", Required: true, Description: "Name of the table for which the dataset XML is being generated."},
+			{Name: "includeHeader", Type: "boolean", Required: true, Description: "Determines whether the XML output should include a header row."},
+			{Name: "includeSchema", Type: "boolean", Required: true, Description: "Indicates whether to include the schema information in the XML output generated from an array of values."},
 		},
 	},
 	"getdatasetxmlfromselect": {
@@ -1124,13 +1124,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"getdbmsname": {
 		Name: "GetDBMSName", Description: "Returns the name of the database management system as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name of the database management system (DBMS) to retrieve."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The name of the database management system (DBMS) to retrieve."},
 		},
 	},
 	"getdbmsprovidername": {
 		Name: "GetDBMSProviderName", Description: "Returns the name of the database management system provider as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "User-friendly name of a database management system provider."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "User-friendly name of a database management system provider."},
 		},
 	},
 	"getdecimalsep": {
@@ -1153,11 +1153,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "filePattern", Type: "string", Required: true, Description: "Specifies the pattern to match files in the remote directory during an FTP operation."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when connecting to an FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Is used to authenticate the user when connecting to the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number for connecting to the FTP server."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for the FTP connection."},
-			{Name: "usePassive", Type: "boolean", Required: false, Description: "Enables or disables passive mode for FTP operations."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Determines whether to use SFTP (true) or FTP (false)."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number for connecting to the FTP server."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for the FTP connection."},
+			{Name: "usePassive", Type: "boolean", Required: true, Description: "Enables or disables passive mode for FTP operations."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Determines whether to use SFTP (true) or FTP (false)."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication."},
 		},
 	},
 	"getdsparameters": {
@@ -1198,7 +1198,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"getfromapplication": {
 		Name: "GetFromApplication", Description: "Retrieves connected users from the application and returns them as a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "key", Type: "string", Required: false, Description: "Identifier used to retrieve data from the application's session, specifically targeting \"STARLIMSUSERS\" to get connected users."},
+			{Name: "key", Type: "string", Required: true, Description: "Identifier used to retrieve data from the application's session, specifically targeting \"STARLIMSUSERS\" to get connected users."},
 		},
 	},
 	"getfromftp": {
@@ -1210,10 +1210,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "localFileName", Type: "string", Required: true, Description: "Local file path where the downloaded file will be saved."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used to authenticate with the FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's authentication credentials for accessing the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number on which the FTP server is listening."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for the FTP connection, allowing the script to route requests through an intermediary server."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Determines whether to use SFTP (True) or FTP (False)."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number on which the FTP server is listening."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for the FTP connection, allowing the script to route requests through an intermediary server."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Determines whether to use SFTP (True) or FTP (False)."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication."},
 		},
 	},
 	"getfromsession": {
@@ -1250,11 +1250,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "o", Type: "variant", Required: true, Description: "Object from which to get the internal value."},
 			{Name: "collectionName", Type: "string", Required: true, Description: "Name of the collection within an object on which the method will be invoked."},
 			{Name: "arg1", Type: "variant", Required: true, Description: "Key or index used to access a specific element within an object or collection."},
-			{Name: "arg2", Type: "variant", Required: false, Description: "Arg2: The second index value used to access nested elements within an object or collection."},
-			{Name: "arg3", Type: "variant", Required: false, Description: "Third index used to access nested elements within the object."},
-			{Name: "arg4", Type: "variant", Required: false, Description: "Fourth index value used to access a nested element within an object structure."},
-			{Name: "arg5", Type: "variant", Required: false, Description: "Fifth index or key used to access nested elements within an object structure."},
-			{Name: "arg6", Type: "variant", Required: false, Description: "Sixth index value used to access a nested property or element within an object structure."},
+			{Name: "arg2", Type: "variant", Required: true, Description: "Arg2: The second index value used to access nested elements within an object or collection."},
+			{Name: "arg3", Type: "variant", Required: true, Description: "Third index used to access nested elements within the object."},
+			{Name: "arg4", Type: "variant", Required: true, Description: "Fourth index value used to access a nested element within an object structure."},
+			{Name: "arg5", Type: "variant", Required: true, Description: "Fifth index or key used to access nested elements within an object structure."},
+			{Name: "arg6", Type: "variant", Required: true, Description: "Sixth index value used to access a nested property or element within an object structure."},
 		},
 	},
 	"getlastsqlerror": {
@@ -1311,7 +1311,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"getrdbmsdelimiter": {
 		Name: "GetRdbmsDelimiter", Description: "Returns the delimiter string for a specified RDBMS connection.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "dsn", Type: "string", Required: false, Description: "Data source name (DSN) identifying the database."},
+			{Name: "dsn", Type: "string", Required: true, Description: "Data source name (DSN) identifying the database."},
 			{Name: "open", Type: "boolean", Required: true, Description: "Indicates whether the database connection should be opened before retrieving the delimiter."},
 		},
 	},
@@ -1359,13 +1359,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"gettables": {
 		Name: "GetTables", Description: "Returns an array of table names from the database based on a provided SQL query or all tables if no query is given.", ReturnType: "array",
 		Parameters: []FunctionParameter{
-			{Name: "sql", Type: "string", Required: false, Description: "SQL query used to filter the tables to retrieve."},
+			{Name: "sql", Type: "string", Required: true, Description: "SQL query used to filter the tables to retrieve."},
 		},
 	},
 	"gettransactionscount": {
 		Name: "GetTransactionsCount", Description: "Counts transactions and returns a double.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "connection", Type: "variant", Required: false, Description: "Is a string representing the database connection details."},
+			{Name: "connection", Type: "variant", Required: true, Description: "Is a string representing the database connection details."},
 		},
 	},
 	"getuserdata": {
@@ -1379,8 +1379,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"hashdata": {
 		Name: "HashData", Description: "Computes a hash of input data using a specified algorithm and returns it as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "inputData", Type: "string", Required: false, Description: "Data string to be hashed."},
-			{Name: "algorithm", Type: "string", Required: false, Description: "Specifies the hashing algorithm to use for the input data."},
+			{Name: "inputData", Type: "string", Required: true, Description: "Data string to be hashed."},
+			{Name: "algorithm", Type: "string", Required: true, Description: "Specifies the hashing algorithm to use for the input data."},
 		},
 	},
 	"hasproperty": {
@@ -1399,13 +1399,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"htmldecode": {
 		Name: "HtmlDecode", Description: "Converts HTML-encoded text back to plain text. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "data", Type: "string", Required: false, Description: "Is a string containing HTML-encoded text that needs to be decoded."},
+			{Name: "data", Type: "string", Required: true, Description: "Is a string containing HTML-encoded text that needs to be decoded."},
 		},
 	},
 	"htmlencode": {
 		Name: "HtmlEncode", Description: "Converts a string to its HTML-encoded equivalent and returns it as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "data", Type: "string", Required: false, Description: "String that will be encoded for HTML output."},
+			{Name: "data", Type: "string", Required: true, Description: "String that will be encoded for HTML output."},
 		},
 	},
 	"ignoresqlerrors": {
@@ -1418,8 +1418,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "IIf", Description: "Returns a value based on whether a condition is true or false.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "condition", Type: "boolean", Required: true, Description: "A boolean value that determines whether to return the trueValue or falseValue."},
-			{Name: "trueValue", Type: "variant", Required: false, Description: "To return if the condition is true."},
-			{Name: "falseValue", Type: "variant", Required: false, Description: "To return when the condition is false."},
+			{Name: "trueValue", Type: "variant", Required: true, Description: "To return if the condition is true."},
+			{Name: "falseValue", Type: "variant", Required: true, Description: "To return when the condition is false."},
 		},
 	},
 	"in64bitmode": {
@@ -1446,7 +1446,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"isdbconnected": {
 		Name: "IsDBConnected", Description: "Checks if a database connection is established and returns a boolean indicating the connection status.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "variant", Required: false, Description: "\"friendlyName\": The name of the database connection to check for connectivity."},
+			{Name: "friendlyName", Type: "variant", Required: true, Description: "\"friendlyName\": The name of the database connection to check for connectivity."},
 		},
 	},
 	"isdefined": {
@@ -1472,7 +1472,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"isguid": {
 		Name: "IsGuid", Description: "Validates whether a string is a valid GUID and returns a boolean result.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "guid", Type: "string", Required: false, Description: "String representation of a globally unique identifier (GUID) to validate."},
+			{Name: "guid", Type: "string", Required: true, Description: "String representation of a globally unique identifier (GUID) to validate."},
 		},
 	},
 	"ishex": {
@@ -1497,7 +1497,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "IsNumeric", Description: "Determines if a value is numeric, optionally allowing hexadecimal format; returns boolean.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "sNumber", Type: "string", Required: true, Description: "String to be checked for numeric validity."},
-			{Name: "allowHex", Type: "boolean", Required: false, Description: "When true, hexadecimal values are considered numeric. Defaults to false."},
+			{Name: "allowHex", Type: "boolean", Required: true, Description: "When true, hexadecimal values are considered numeric. Defaults to false."},
 		},
 	},
 	"isproductionmodeon": {
@@ -1507,41 +1507,41 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"istable": {
 		Name: "IsTable", Description: "Determines if a table exists in the database and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name used to identify or reference a table in the database."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The name used to identify or reference a table in the database."},
 			{Name: "tableName", Type: "string", Required: true, Description: "Name of the table to check for existence."},
 		},
 	},
 	"istablefld": {
 		Name: "IsTableFld", Description: "Determines if a field exists in a table and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The human-readable name of the field within a table."},
-			{Name: "tableName", Type: "string", Required: false, Description: "Table_name\": \"The name of the table in which to check for the field."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The human-readable name of the field within a table."},
+			{Name: "tableName", Type: "string", Required: true, Description: "Table_name\": \"The name of the table in which to check for the field."},
 			{Name: "fieldName", Type: "string", Required: true, Description: "Name of the field within a table that needs to be checked for existence."},
 		},
 	},
 	"jday": {
 		Name: "JDay", Description: "Computes and returns the Julian day number for a given date as a double.", ReturnType: "double",
 		Parameters: []FunctionParameter{
-			{Name: "date", Type: "variant", Required: false, Description: "A date value used to calculate the Julian day, which is the continuous count of days since January 1, 4713 BC."},
+			{Name: "date", Type: "variant", Required: true, Description: "A date value used to calculate the Julian day, which is the continuous count of days since January 1, 4713 BC."},
 		},
 	},
 	"lcase": {
-		Name: "LCase", Description: "Evaluates and executes SSL expressions conditionally based on a boolean condition.", ReturnType: "variant",
+		Name: "LCase", Description: "Returns sTrueValue if bCondition is true, otherwise returns sFalseValue (or empty string if omitted). A conditional string selector.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "condition", Type: "boolean", Required: true, Description: "Indicates whether to return the value of trueValue or falseValue."},
-			{Name: "trueValue", Type: "string", Required: true, Description: "SSL expression string to execute if the condition is true."},
-			{Name: "falseValue", Type: "string", Required: false, Description: "SSL expression string to execute if the condition is false. Returns empty string if null or empty."},
+			{Name: "bCondition", Type: "boolean", Required: true, Description: "Boolean condition that determines which value to return."},
+			{Name: "sTrueValue", Type: "string", Required: true, Description: "Value returned when bCondition is true."},
+			{Name: "sFalseValue", Type: "string", Required: true, Description: "Value returned when bCondition is false. Returns empty string if omitted."},
 		},
 	},
 	"ldapauth": {
 		Name: "LDAPAuth", Description: "Authenticates a user against an LDAP server and returns the authentication result as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "ldapHost", Type: "string", Required: true, Description: "Specifies the hostname of the LDAP server to authenticate against."},
-			{Name: "ldapPort", Type: "double", Required: false, Description: "Specifies the port number on which the LDAP server is listening for connections. Defaults to 389 if not provided."},
+			{Name: "ldapPort", Type: "double", Required: true, Description: "Specifies the port number on which the LDAP server is listening for connections. Defaults to 389 if not provided."},
 			{Name: "ldapUserName", Type: "string", Required: true, Description: "Username used for authentication in an LDAP (Lightweight Directory Access Protocol) directory service."},
-			{Name: "ldapPassword", Type: "string", Required: false, Description: "Password used to authenticate with an LDAP server during authentication."},
-			{Name: "ldapDistinctiveName", Type: "string", Required: false, Description: "Unique identifier for a user in an LDAP directory, used to authenticate the user during the LDAP authentication process."},
-			{Name: "secure", Type: "boolean", Required: false, Description: "Indicates whether the LDAP connection should use SSL/TLS encryption."},
+			{Name: "ldapPassword", Type: "string", Required: true, Description: "Password used to authenticate with an LDAP server during authentication."},
+			{Name: "ldapDistinctiveName", Type: "string", Required: true, Description: "Unique identifier for a user in an LDAP directory, used to authenticate the user during the LDAP authentication process."},
+			{Name: "secure", Type: "boolean", Required: true, Description: "Indicates whether the LDAP connection should use SSL/TLS encryption."},
 		},
 	},
 	"ldapauthex": {
@@ -1550,13 +1550,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "ldapHost", Type: "string", Required: true, Description: "Specifies the hostname or IP address of the LDAP server to authenticate against."},
 			{Name: "ldapPort", Type: "double", Required: true, Description: "Specifies the port number on which to connect to the LDAP server for authentication."},
 			{Name: "bindUserName", Type: "string", Required: true, Description: "Specifies the username used to bind to the LDAP server for authentication purposes."},
-			{Name: "bindUserPassword", Type: "string", Required: false, Description: "Password used to authenticate the user specified by bindUserName when connecting to an LDAP server."},
-			{Name: "searchUserName", Type: "string", Required: false, Description: "Specifies the username to search for in the LDAP directory."},
-			{Name: "searchUserPassword", Type: "string", Required: false, Description: "Password for the user being searched in LDAP authentication."},
-			{Name: "ldapDistinguishedName", Type: "string", Required: false, Description: "Distinguished name of the LDAP user to authenticate."},
-			{Name: "ldapDistinguishedNameStartSearch", Type: "string", Required: false, Description: "LdapDistinguishedNameStartSearch specifies the starting point in the LDAP directory for searching user entries."},
-			{Name: "searchFilter", Type: "string", Required: false, Description: "Specifies the LDAP query filter used to search for user accounts during authentication."},
-			{Name: "authAttribName", Type: "string", Required: false, Description: "AuthAttribName specifies the attribute used for authentication in LDAP queries."},
+			{Name: "bindUserPassword", Type: "string", Required: true, Description: "Password used to authenticate the user specified by bindUserName when connecting to an LDAP server."},
+			{Name: "searchUserName", Type: "string", Required: true, Description: "Specifies the username to search for in the LDAP directory."},
+			{Name: "searchUserPassword", Type: "string", Required: true, Description: "Password for the user being searched in LDAP authentication."},
+			{Name: "ldapDistinguishedName", Type: "string", Required: true, Description: "Distinguished name of the LDAP user to authenticate."},
+			{Name: "ldapDistinguishedNameStartSearch", Type: "string", Required: true, Description: "LdapDistinguishedNameStartSearch specifies the starting point in the LDAP directory for searching user entries."},
+			{Name: "searchFilter", Type: "string", Required: true, Description: "Specifies the LDAP query filter used to search for user accounts during authentication."},
+			{Name: "authAttribName", Type: "string", Required: true, Description: "AuthAttribName specifies the attribute used for authentication in LDAP queries."},
 			{Name: "secure", Type: "boolean", Required: true, Description: "Indicates whether the LDAP connection should be established using a secure protocol, such as LDAPS (LDAP over SSL)."},
 		},
 	},
@@ -1564,7 +1564,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "lDir", Description: "Returns an array of file names matching a specified pattern and attributes.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "filePattern", Type: "string", Required: true, Description: "Specifies the pattern used to filter files in a directory."},
-			{Name: "attributes", Type: "string", Required: false, Description: "Optional string specifying attributes to filter the files returned."},
+			{Name: "attributes", Type: "string", Required: true, Description: "Optional string specifying attributes to filter the files returned."},
 		},
 	},
 	"left": {
@@ -1597,7 +1597,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "subString", Type: "string", Required: true, Description: "Substring to search for within the source string."},
 			{Name: "source", Type: "string", Required: true, Description: "String in which to search for a substring."},
-			{Name: "offset", Type: "double", Required: false, Description: "Specifies the starting position within the source string from which to begin searching for the substring."},
+			{Name: "offset", Type: "double", Required: true, Description: "Specifies the starting position within the source string from which to begin searching for the substring."},
 		},
 	},
 	"limscleanup": {
@@ -1608,15 +1608,15 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "LIMSDate", Description: "Converts a date to a formatted string. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "date", Type: "variant", Required: true, Description: "Date value to be formatted, which can be a string or a date object."},
-			{Name: "format", Type: "string", Required: false, Description: "Specifies the string pattern used to represent the date."},
+			{Name: "format", Type: "string", Required: true, Description: "Specifies the string pattern used to represent the date."},
 		},
 	},
 	"limsexec": {
 		Name: "LimsExec", Description: "Executes a specified application and returns whether it was successful as a boolean.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "application", Type: "string", Required: false, Description: "Represents the name of the executable or script to run."},
-			{Name: "show", Type: "boolean", Required: false, Description: "Whether to display a window for the application being executed."},
-			{Name: "arguments", Type: "string", Required: false, Description: "Represents a string containing command-line arguments for the application being executed by LimsExec."},
+			{Name: "application", Type: "string", Required: true, Description: "Represents the name of the executable or script to run."},
+			{Name: "show", Type: "boolean", Required: true, Description: "Whether to display a window for the application being executed."},
+			{Name: "arguments", Type: "string", Required: true, Description: "Represents a string containing command-line arguments for the application being executed by LimsExec."},
 		},
 	},
 	"limsgetdateformat": {
@@ -1626,17 +1626,17 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"limsnetcast": {
 		Name: "LimsNETCast", Description: "Converts a value to a specified data type and returns the new value.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "val", Type: "variant", Required: false, Description: "To be cast or converted to a new data type specified by the newType parameter."},
+			{Name: "val", Type: "variant", Required: true, Description: "To be cast or converted to a new data type specified by the newType parameter."},
 			{Name: "newType", Type: "string", Required: true, Description: "Target data type for casting. Valid values include .NET type names, \"byref\", or \"enum:TypeName\" for enumerations."},
 		},
 	},
 	"limsnetconnect": {
 		Name: "LimsNETConnect", Description: "Connects to a .NET assembly and creates an instance of a specified type, returning the created object or null.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "assembly", Type: "string", Required: false, Description: "Name or path of the assembly containing the type to instantiate."},
-			{Name: "typeName", Type: "string", Required: false, Description: "Fully qualified name of the type within the specified assembly that will be instantiated or invoked."},
-			{Name: "args", Type: "array", Required: false, Description: "Array containing arguments to pass to the method being invoked."},
-			{Name: "asStatic", Type: "variant", Required: false, Description: "AsStatic determines whether the method should be called as a static method."},
+			{Name: "assembly", Type: "string", Required: true, Description: "Name or path of the assembly containing the type to instantiate."},
+			{Name: "typeName", Type: "string", Required: true, Description: "Fully qualified name of the type within the specified assembly that will be instantiated or invoked."},
+			{Name: "args", Type: "array", Required: true, Description: "Array containing arguments to pass to the method being invoked."},
+			{Name: "asStatic", Type: "variant", Required: true, Description: "AsStatic determines whether the method should be called as a static method."},
 		},
 	},
 	"limsnettypeof": {
@@ -1658,30 +1658,30 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"limssetcounter": {
 		Name: "LimsSetCounter", Description: "Sets a counter value in the database and returns the new value as a double.", ReturnType: "double",
 		Parameters: []FunctionParameter{
-			{Name: "tableName", Type: "string", Required: false, Description: "\"tableName\": The name of the database table where the counter will be set or incremented."},
-			{Name: "fieldName", Type: "string", Required: false, Description: "Name of the field within the specified table for which the counter value needs to be incremented or set."},
-			{Name: "prefix", Type: "string", Required: false, Description: "\"prefix\": The prefix string that will be added to the counter value when setting it in the database."},
-			{Name: "arrayOfFields", Type: "array", Required: false, Description: "An array of field names to update."},
-			{Name: "arrayOfValues", Type: "array", Required: false, Description: "An array of values to be set for the specified fields in the database table."},
-			{Name: "incrementWith", Type: "variant", Required: false, Description: "By which a counter should be incremented, allowing for custom increments beyond the default of 1."},
+			{Name: "tableName", Type: "string", Required: true, Description: "\"tableName\": The name of the database table where the counter will be set or incremented."},
+			{Name: "fieldName", Type: "string", Required: true, Description: "Name of the field within the specified table for which the counter value needs to be incremented or set."},
+			{Name: "prefix", Type: "string", Required: true, Description: "\"prefix\": The prefix string that will be added to the counter value when setting it in the database."},
+			{Name: "arrayOfFields", Type: "array", Required: true, Description: "An array of field names to update."},
+			{Name: "arrayOfValues", Type: "array", Required: true, Description: "An array of values to be set for the specified fields in the database table."},
+			{Name: "incrementWith", Type: "variant", Required: true, Description: "By which a counter should be incremented, allowing for custom increments beyond the default of 1."},
 		},
 	},
 	"limssqlconnect": {
 		Name: "LimsSqlConnect", Description: "Establishes a connection to a database using a friendly name and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name used to identify or label a database connection in the system."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The name used to identify or label a database connection in the system."},
 		},
 	},
 	"limssqldisconnect": {
 		Name: "LimsSqlDisconnect", Description: "Disconnects from a database using a friendly name and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "FriendlyName identifies the database connection to be disconnected."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "FriendlyName identifies the database connection to be disconnected."},
 		},
 	},
 	"limsstring": {
 		Name: "LimsString", Description: "Converts a value to a string; returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "source", Type: "variant", Required: false, Description: "Or object from which a string representation will be derived."},
+			{Name: "source", Type: "variant", Required: true, Description: "Or object from which a string representation will be derived."},
 		},
 	},
 	"limstime": {
@@ -1697,7 +1697,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"limstypeex": {
 		Name: "LimsTypeEx", Description: "Determines and returns the data type of a given source as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "source", Type: "variant", Required: false, Description: "Whose data type is to be determined and returned as a string."},
+			{Name: "source", Type: "variant", Required: true, Description: "Whose data type is to be determined and returned as a string."},
 		},
 	},
 	"limsxor": {
@@ -1735,7 +1735,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "LSearch", Description: "Computes a search based on a command string and returns the result as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "commandString", Type: "string", Required: true, Description: "Search query or command used to filter data in a database search operation."},
-			{Name: "defaultValue", Type: "variant", Required: false, Description: "Default value to return if no matching item is found in the search array."},
+			{Name: "defaultValue", Type: "variant", Required: true, Description: "Default value to return if no matching item is found in the search array."},
 			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name of the field or column being searched."},
 			{Name: "arrayOfValues", Type: "array", Required: false, Description: "An array of values to be searched against."},
 		},
@@ -1775,20 +1775,20 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"lstr": {
 		Name: "LStr", Description: "Converts a numeric value to a string and trims any leading/trailing whitespace. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "number", Type: "variant", Required: false, Description: "Numeric value that will be converted to a string and trimmed."},
+			{Name: "number", Type: "variant", Required: true, Description: "Numeric value that will be converted to a string and trimmed."},
 		},
 	},
 	"ltohex": {
 		Name: "LToHex", Description: "Converts a string or integer to its hexadecimal representation and returns it as a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "source", Type: "variant", Required: false, Description: "String or integer value that will be converted to a hexadecimal format."},
+			{Name: "source", Type: "variant", Required: true, Description: "String or integer value that will be converted to a hexadecimal format."},
 		},
 	},
 	"ltransform": {
 		Name: "LTransform", Description: "Converts a numeric expression to a formatted string based on a picture format. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "expression", Type: "variant", Required: false, Description: "Represents the value or data that will be transformed by the LTransform function."},
-			{Name: "picture", Type: "string", Required: false, Description: "Format string used to transform a numeric value into a formatted string representation."},
+			{Name: "expression", Type: "variant", Required: true, Description: "Represents the value or data that will be transformed by the LTransform function."},
+			{Name: "picture", Type: "string", Required: true, Description: "Format string used to transform a numeric value into a formatted string representation."},
 		},
 	},
 	"ltrim": {
@@ -1800,21 +1800,21 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"lwait": {
 		Name: "lWait", Description: "Returns a string indicating completion after waiting for a specified number of seconds.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "seconds", Type: "double", Required: false, Description: "Duration in seconds for which the script should pause execution before continuing."},
+			{Name: "seconds", Type: "double", Required: true, Description: "Duration in seconds for which the script should pause execution before continuing."},
 		},
 	},
 	"makedateinvariant": {
 		Name: "MakeDateInvariant", Description: "Converts a date or array of dates to be invariant to time zone changes by removing kind information. Returns the modified date or array.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "dateValue", Type: "variant", Required: true, Description: "Date or array of dates to be converted to an invariant kind, regardless of their original time zone."},
-			{Name: "columnsIndex", Type: "variant", Required: false, Description: "Required when dateValue is an array. Specifies the column indices containing dates to convert. Can be a number or array of numbers."},
+			{Name: "columnsIndex", Type: "variant", Required: true, Description: "Required when dateValue is an array. Specifies the column indices containing dates to convert. Can be a number or array of numbers."},
 		},
 	},
 	"makedatelocal": {
 		Name: "MakeDateLocal", Description: "Converts a date to local time and returns it as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "dateValue", Type: "variant", Required: true, Description: "Date or array of dates to be converted to local time."},
-			{Name: "columnsIndex", Type: "variant", Required: false, Description: "Required when dateValue is an array. Specifies the column indices containing dates to convert. Can be a number or array of numbers."},
+			{Name: "columnsIndex", Type: "variant", Required: true, Description: "Required when dateValue is an array. Specifies the column indices containing dates to convert. Can be a number or array of numbers."},
 		},
 	},
 	"makedironftp": {
@@ -1824,16 +1824,16 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "remoteDirectory", Type: "string", Required: true, Description: "Specifies the directory path where a new directory should be created on the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication on the FTP server to create a directory."},
 			{Name: "password", Type: "string", Required: true, Description: "Is used to authenticate the user when connecting to an FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number for connecting to the FTP server."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the address of the FTP server's proxy server through which connections should be made."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether to use SFTP instead of FTP for directory creation."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP operations."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number for connecting to the FTP server."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the address of the FTP server's proxy server through which connections should be made."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether to use SFTP instead of FTP for directory creation."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
 	"makenetobject": {
 		Name: "MakeNETObject", Description: "Converts a variant to an SSLNetObject or returns null.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "value", Type: "variant", Required: false, Description: "Represents the object or data that will be converted into an SSLNetObject."},
+			{Name: "value", Type: "variant", Required: true, Description: "Represents the object or data that will be converted into an SSLNetObject."},
 		},
 	},
 	"matfunc": {
@@ -1917,10 +1917,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "remoteFileTo", Type: "string", Required: true, Description: "Destination filename for the file being moved."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when moving files via FTP or SFTP."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for authenticating with an FTP server during a file transfer operation."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number for the FTP connection."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the address of the proxy server through which FTP requests should be routed."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether the FTP operation should use SFTP instead of standard FTP."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP operations."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number for the FTP connection."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the address of the proxy server through which FTP requests should be routed."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether the FTP operation should use SFTP instead of standard FTP."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
 	"netframeworkversion": {
@@ -1936,7 +1936,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"nothing": {
 		Name: "Nothing", Description: "Returns `true` if the input is `null`, empty, or \"0\"; otherwise, returns `false`.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "val", Type: "variant", Required: false, Description: "To be evaluated, determining if it is considered \"nothing\" based on its content."},
+			{Name: "val", Type: "variant", Required: true, Description: "To be evaluated, determining if it is considered \"nothing\" based on its content."},
 		},
 	},
 	"now": {
@@ -1947,7 +1947,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "PrepareArrayForIn", Description: "Converts an array to a format suitable for input operations, returning the modified array or null if invalid.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "array", Type: "variant", Required: true, Description: "Array to prepare for input operations."},
-			{Name: "itemType", Type: "variant", Required: false, Description: "Specifies the data type for elements in the array being prepared, such as \"string\", \"numeric\", or \"date\". Defaults to \"string\" if not provided."},
+			{Name: "itemType", Type: "variant", Required: true, Description: "Specifies the data type for elements in the array being prepared, such as \"string\", \"numeric\", or \"date\". Defaults to \"string\" if not provided."},
 		},
 	},
 	"prepareform": {
@@ -2008,13 +2008,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "serverNameOrIP", Type: "string", Required: true, Description: "Specifies the FTP server's hostname or IP address from which to read a file."},
 			{Name: "remoteDirectory", Type: "string", Required: true, Description: "Specifies the directory on the FTP server from which the file will be read."},
 			{Name: "remoteFileName", Type: "string", Required: true, Description: "Name of the file to be read from the FTP server."},
-			{Name: "maxSize", Type: "double", Required: false, Description: "Specifies the maximum size, in bytes, of the file to be read from the FTP server."},
+			{Name: "maxSize", Type: "double", Required: true, Description: "Specifies the maximum size, in bytes, of the file to be read from the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when connecting to an FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Password for the FTP server used to authenticate the user."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the port number on which the FTP server is listening."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for the FTP connection, allowing access through a network firewall or other intermediary."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether to use SFTP (true) or FTP (false)."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP operations."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the port number on which the FTP server is listening."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for the FTP connection, allowing access through a network firewall or other intermediary."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether to use SFTP (true) or FTP (false)."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
 	"readtext": {
@@ -2034,10 +2034,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "fileNameNew", Type: "string", Required: true, Description: "New name for the file to be renamed on the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication on the FTP server when renaming a file."},
 			{Name: "password", Type: "string", Required: true, Description: "Password for authenticating with the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Represents the FTP server's port number for connecting and renaming files."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the address of the FTP proxy server through which the connection should be made."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether the FTP operation should use SFTP protocol instead of regular FTP."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP operations."},
+			{Name: "port", Type: "double", Required: true, Description: "Represents the FTP server's port number for connecting and renaming files."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the address of the FTP proxy server through which the connection should be made."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether the FTP operation should use SFTP protocol instead of regular FTP."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
 	"replace": {
@@ -2066,12 +2066,12 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"retrievelong": {
 		Name: "RetrieveLong", Description: "Retrieves a long integer from the database and saves it to a file. Returns `true` on success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "\"friendlyName\": The name of the item or entity for which data is being retrieved."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "\"friendlyName\": The name of the item or entity for which data is being retrieved."},
 			{Name: "tableName", Type: "string", Required: true, Description: "Name of the database table from which data will be retrieved."},
 			{Name: "columnName", Type: "string", Required: true, Description: "Name of the column from which to retrieve data."},
 			{Name: "whereCondition", Type: "string", Required: true, Description: "Specifies the condition used to filter records in the database table before retrieving the long value."},
 			{Name: "outputFilePath", Type: "string", Required: true, Description: "Represents the path where the retrieved long value will be saved."},
-			{Name: "isCompressed", Type: "boolean", Required: false, Description: "Indicates whether the output should be compressed."},
+			{Name: "isCompressed", Type: "boolean", Required: true, Description: "Indicates whether the output should be compressed."},
 		},
 	},
 	"returnlastsqlerror": {
@@ -2102,8 +2102,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"runapp": {
 		Name: "RunApp", Description: "Runs a specified application with optional arguments and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "application", Type: "string", Required: false, Description: "Represents the name or path of the executable to run."},
-			{Name: "arguments", Type: "string", Required: false, Description: "Arguments to pass to the application when running it."},
+			{Name: "application", Type: "string", Required: true, Description: "Represents the name or path of the executable to run."},
+			{Name: "arguments", Type: "string", Required: true, Description: "Arguments to pass to the application when running it."},
 		},
 	},
 	"runds": {
@@ -2132,13 +2132,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "SearchLDAPUser", Description: "Searches LDAP user details and returns a string containing the search results.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "ldapHost", Type: "string", Required: true, Description: "Hostname or IP address of the LDAP server to search for user information."},
-			{Name: "ldapPort", Type: "double", Required: false, Description: "Port number used to connect to the LDAP server for user search operations. Defaults to 389 if not specified."},
+			{Name: "ldapPort", Type: "double", Required: true, Description: "Port number used to connect to the LDAP server for user search operations. Defaults to 389 if not specified."},
 			{Name: "bindUserName", Type: "string", Required: true, Description: "Username used for binding to the LDAP server."},
-			{Name: "bindUserPassword", Type: "string", Required: false, Description: "Password used to authenticate the user binding to the LDAP server for searching operations."},
-			{Name: "searchUserName", Type: "string", Required: false, Description: "Username to search for in the LDAP directory."},
-			{Name: "ldapDistinguishedNameStartSearch", Type: "string", Required: false, Description: "LdapDistinguishedNameStartSearch specifies the starting point in the LDAP directory for searching user entries."},
-			{Name: "searchFilter", Type: "string", Required: false, Description: "Specifies the LDAP query filter to use when searching for user entries in the directory, allowing customization of the search criteria based on attributes like name or email."},
-			{Name: "secure", Type: "boolean", Required: false, Description: "Indicates whether to use a secure connection when searching for an LDAP user. Defaults to false if not specified."},
+			{Name: "bindUserPassword", Type: "string", Required: true, Description: "Password used to authenticate the user binding to the LDAP server for searching operations."},
+			{Name: "searchUserName", Type: "string", Required: true, Description: "Username to search for in the LDAP directory."},
+			{Name: "ldapDistinguishedNameStartSearch", Type: "string", Required: true, Description: "LdapDistinguishedNameStartSearch specifies the starting point in the LDAP directory for searching user entries."},
+			{Name: "searchFilter", Type: "string", Required: true, Description: "Specifies the LDAP query filter to use when searching for user entries in the directory, allowing customization of the search criteria based on attributes like name or email."},
+			{Name: "secure", Type: "boolean", Required: true, Description: "Indicates whether to use a secure connection when searching for an LDAP user. Defaults to false if not specified."},
 		},
 	},
 	"second": {
@@ -2154,9 +2154,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"sendfromoutbox": {
 		Name: "SendFromOutbox", Description: "Sends emails from the outbox and returns a boolean indicating success.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "ignoreErrors", Type: "boolean", Required: false, Description: "Determines whether to ignore errors during the email sending process."},
-			{Name: "useCDO", Type: "boolean", Required: false, Description: "Indicates whether to use CDO (Component Object Model) for sending emails."},
-			{Name: "timeout", Type: "double", Required: false, Description: "Specifies the maximum time in seconds to wait for a response when sending an email from the outbox."},
+			{Name: "ignoreErrors", Type: "boolean", Required: true, Description: "Determines whether to ignore errors during the email sending process."},
+			{Name: "useCDO", Type: "boolean", Required: true, Description: "Indicates whether to use CDO (Component Object Model) for sending emails."},
+			{Name: "timeout", Type: "double", Required: true, Description: "Specifies the maximum time in seconds to wait for a response when sending an email from the outbox."},
 		},
 	},
 	"sendlimsemail": {
@@ -2165,21 +2165,21 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "SMTP", Type: "string", Required: true, Description: "Represents the server address used to send an email."},
 			{Name: "recipients", Type: "array", Required: true, Description: "Recipients array contains the email addresses of the individuals to whom the email will be sent."},
 			{Name: "fromWho", Type: "string", Required: true, Description: "Specifies the email address of the sender."},
-			{Name: "subject", Type: "string", Required: false, Description: "Represents the email's subject line."},
-			{Name: "messageBody", Type: "string", Required: false, Description: "Body of the email message to be sent."},
-			{Name: "attachList", Type: "array", Required: false, Description: "An array of file paths representing attachments to include in the email."},
-			{Name: "cClist", Type: "array", Required: false, Description: "CClist array represents the carbon copy (CC) email addresses to be included in the email message sent by the SendLimsEmail function."},
-			{Name: "bCClist", Type: "array", Required: false, Description: "An array of email addresses that should receive a blind carbon copy (BCC) of the email."},
-			{Name: "replyTo", Type: "string", Required: false, Description: "Specifies the email address to which recipients can reply when they receive the email sent by this function."},
-			{Name: "nPort", Type: "double", Required: false, Description: "Port number to use for sending emails through an SMTP server."},
-			{Name: "uName", Type: "string", Required: false, Description: "Username used for authentication with the SMTP server."},
-			{Name: "uPass", Type: "string", Required: false, Description: "Password used for authentication when sending an email through the SMTP server."},
-			{Name: "ignoreErrors", Type: "boolean", Required: false, Description: "Determines whether to ignore errors during the email sending process and return a default value instead of throwing an exception."},
-			{Name: "useCDO", Type: "boolean", Required: false, Description: "Indicates whether to use CDO (Component Object Model) for sending emails."},
-			{Name: "timeout", Type: "double", Required: false, Description: "Specifies the maximum time, in seconds, that the function will wait for a response before timing out."},
-			{Name: "useSSL", Type: "boolean", Required: false, Description: "Indicates whether to use SSL for the email connection."},
-			{Name: "isBodyHTML", Type: "boolean", Required: false, Description: "Indicates whether the email message body is in HTML format."},
-			{Name: "encryptedData", Type: "string", Required: false, Description: "Encrypted data to be included in the email message."},
+			{Name: "subject", Type: "string", Required: true, Description: "Represents the email's subject line."},
+			{Name: "messageBody", Type: "string", Required: true, Description: "Body of the email message to be sent."},
+			{Name: "attachList", Type: "array", Required: true, Description: "An array of file paths representing attachments to include in the email."},
+			{Name: "cClist", Type: "array", Required: true, Description: "CClist array represents the carbon copy (CC) email addresses to be included in the email message sent by the SendLimsEmail function."},
+			{Name: "bCClist", Type: "array", Required: true, Description: "An array of email addresses that should receive a blind carbon copy (BCC) of the email."},
+			{Name: "replyTo", Type: "string", Required: true, Description: "Specifies the email address to which recipients can reply when they receive the email sent by this function."},
+			{Name: "nPort", Type: "double", Required: true, Description: "Port number to use for sending emails through an SMTP server."},
+			{Name: "uName", Type: "string", Required: true, Description: "Username used for authentication with the SMTP server."},
+			{Name: "uPass", Type: "string", Required: true, Description: "Password used for authentication when sending an email through the SMTP server."},
+			{Name: "ignoreErrors", Type: "boolean", Required: true, Description: "Determines whether to ignore errors during the email sending process and return a default value instead of throwing an exception."},
+			{Name: "useCDO", Type: "boolean", Required: true, Description: "Indicates whether to use CDO (Component Object Model) for sending emails."},
+			{Name: "timeout", Type: "double", Required: true, Description: "Specifies the maximum time, in seconds, that the function will wait for a response before timing out."},
+			{Name: "useSSL", Type: "boolean", Required: true, Description: "Indicates whether to use SSL for the email connection."},
+			{Name: "isBodyHTML", Type: "boolean", Required: true, Description: "Indicates whether the email message body is in HTML format."},
+			{Name: "encryptedData", Type: "string", Required: true, Description: "Encrypted data to be included in the email message."},
 		},
 	},
 	"sendoutlookreminder": {
@@ -2195,11 +2195,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "organizerEmail", Type: "string", Required: true, Description: "Email address of the organizer for the reminder."},
 			{Name: "attendeeName", Type: "string", Required: true, Description: "Name of the person receiving the reminder."},
 			{Name: "attendeeEmail", Type: "string", Required: true, Description: "Email address of the person who should receive the reminder."},
-			{Name: "nPort", Type: "double", Required: false, Description: "Specifies the port number for sending an Outlook reminder email."},
-			{Name: "uName", Type: "string", Required: false, Description: "Username for authentication when sending an Outlook reminder via email."},
-			{Name: "uPass", Type: "string", Required: false, Description: "Password used for authentication when sending an Outlook reminder email."},
+			{Name: "nPort", Type: "double", Required: true, Description: "Specifies the port number for sending an Outlook reminder email."},
+			{Name: "uName", Type: "string", Required: true, Description: "Username for authentication when sending an Outlook reminder via email."},
+			{Name: "uPass", Type: "string", Required: true, Description: "Password used for authentication when sending an Outlook reminder email."},
 			{Name: "ignoreErrors", Type: "boolean", Required: true, Description: "Determines whether to ignore errors during the execution of the SendOutlookReminder function."},
-			{Name: "useSSL", Type: "boolean", Required: false, Description: "Indicates whether SSL should be used for the email connection."},
+			{Name: "useSSL", Type: "boolean", Required: true, Description: "Indicates whether SSL should be used for the email connection."},
 		},
 	},
 	"sendtoftp": {
@@ -2211,11 +2211,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "localFileName", Type: "string", Required: true, Description: "Local file path to be uploaded to the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication when connecting to the FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for authenticating with the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "FTP server port number to connect to."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for sending files via FTP or SFTP."},
-			{Name: "usePassive", Type: "boolean", Required: false, Description: "Indicates whether to use passive mode for the FTP connection when sending a file."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "Indicates whether to use SFTP instead of FTP for sending files."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP operations."},
+			{Name: "port", Type: "double", Required: true, Description: "FTP server port number to connect to."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for sending files via FTP or SFTP."},
+			{Name: "usePassive", Type: "boolean", Required: true, Description: "Indicates whether to use passive mode for the FTP connection when sending a file."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "Indicates whether to use SFTP instead of FTP for sending files."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
 	"sendtooutbox": {
@@ -2224,19 +2224,19 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "SMTP", Type: "string", Required: true, Description: "SMTP server address used to send an email."},
 			{Name: "recipients", Type: "array", Required: true, Description: "An array containing email addresses of recipients to whom the email will be sent."},
 			{Name: "fromWho", Type: "string", Required: true, Description: "Email address of the sender."},
-			{Name: "subject", Type: "string", Required: false, Description: "Subject line of the email message to be sent."},
-			{Name: "messageBody", Type: "string", Required: false, Description: "Content of the email message to be sent."},
-			{Name: "attachList", Type: "array", Required: false, Description: "An array of file paths representing the attachments to be sent with the email."},
-			{Name: "cClist", Type: "array", Required: false, Description: "An array of email addresses representing the carbon copy recipients."},
-			{Name: "bCClist", Type: "array", Required: false, Description: "An array of email addresses that should receive a blind carbon copy (BCC) of the email being sent."},
-			{Name: "replyTo", Type: "string", Required: false, Description: "Specifies the email address to which replies should be sent."},
-			{Name: "nPort", Type: "double", Required: false, Description: "Port number for the SMTP server connection."},
-			{Name: "uName", Type: "string", Required: false, Description: "Username used for authentication when sending an email through the SMTP server."},
-			{Name: "uPass", Type: "string", Required: false, Description: "Password used for authentication with the SMTP server when sending an email."},
-			{Name: "ignoreErrors", Type: "boolean", Required: false, Description: "Determines whether to ignore errors during the email sending process and continue execution."},
-			{Name: "useSSL", Type: "boolean", Required: false, Description: "Determines whether SSL should be used for secure communication with the SMTP server."},
-			{Name: "isBodyHTML", Type: "boolean", Required: false, Description: "IsBodyHTML indicates whether the message body is in HTML format."},
-			{Name: "encryptedData", Type: "string", Required: false, Description: "Encrypted data to be sent in the email."},
+			{Name: "subject", Type: "string", Required: true, Description: "Subject line of the email message to be sent."},
+			{Name: "messageBody", Type: "string", Required: true, Description: "Content of the email message to be sent."},
+			{Name: "attachList", Type: "array", Required: true, Description: "An array of file paths representing the attachments to be sent with the email."},
+			{Name: "cClist", Type: "array", Required: true, Description: "An array of email addresses representing the carbon copy recipients."},
+			{Name: "bCClist", Type: "array", Required: true, Description: "An array of email addresses that should receive a blind carbon copy (BCC) of the email being sent."},
+			{Name: "replyTo", Type: "string", Required: true, Description: "Specifies the email address to which replies should be sent."},
+			{Name: "nPort", Type: "double", Required: true, Description: "Port number for the SMTP server connection."},
+			{Name: "uName", Type: "string", Required: true, Description: "Username used for authentication when sending an email through the SMTP server."},
+			{Name: "uPass", Type: "string", Required: true, Description: "Password used for authentication with the SMTP server when sending an email."},
+			{Name: "ignoreErrors", Type: "boolean", Required: true, Description: "Determines whether to ignore errors during the email sending process and continue execution."},
+			{Name: "useSSL", Type: "boolean", Required: true, Description: "Determines whether SSL should be used for secure communication with the SMTP server."},
+			{Name: "isBodyHTML", Type: "boolean", Required: true, Description: "IsBodyHTML indicates whether the message body is in HTML format."},
+			{Name: "encryptedData", Type: "string", Required: true, Description: "Encrypted data to be sent in the email."},
 		},
 	},
 	"serverendofday": {
@@ -2301,11 +2301,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "collectionName", Type: "string", Required: true, Description: "Name of the collection within an object where a value will be set or retrieved."},
 			{Name: "val", Type: "variant", Required: true, Description: "Value to set at the specified index or indices within the object."},
 			{Name: "arg1", Type: "variant", Required: true, Description: "Key or index used to access a specific element within an object or collection."},
-			{Name: "arg2", Type: "variant", Required: false, Description: "Second index or key used to access a nested property or element within an object or collection."},
-			{Name: "arg3", Type: "variant", Required: false, Description: "Third index or key in a multi-level collection structure, used to access or set a value within nested collections."},
-			{Name: "arg4", Type: "variant", Required: false, Description: "Fourth index value to set in the specified collection within the object."},
-			{Name: "arg5", Type: "variant", Required: false, Description: "Fifth value to set in the nested structure."},
-			{Name: "arg6", Type: "variant", Required: false, Description: "Value to set at the specified index in the collection."},
+			{Name: "arg2", Type: "variant", Required: true, Description: "Second index or key used to access a nested property or element within an object or collection."},
+			{Name: "arg3", Type: "variant", Required: true, Description: "Third index or key in a multi-level collection structure, used to access or set a value within nested collections."},
+			{Name: "arg4", Type: "variant", Required: true, Description: "Fourth index value to set in the specified collection within the object."},
+			{Name: "arg5", Type: "variant", Required: true, Description: "Fifth value to set in the nested structure."},
+			{Name: "arg6", Type: "variant", Required: true, Description: "Value to set at the specified index in the collection."},
 		},
 	},
 	"setlocationoracle": {
@@ -2333,8 +2333,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"setsqltimeout": {
 		Name: "SetSqlTimeout", Description: "Sets SQL query timeout and returns the result as a double.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "timeout", Type: "variant", Required: false, Description: "Maximum time (in seconds) that a SQL query is allowed to execute before timing out."},
-			{Name: "connection", Type: "variant", Required: false, Description: "String representing the database connection to set the SQL timeout for."},
+			{Name: "timeout", Type: "variant", Required: true, Description: "Maximum time (in seconds) that a SQL query is allowed to execute before timing out."},
+			{Name: "connection", Type: "variant", Required: true, Description: "String representing the database connection to set the SQL timeout for."},
 		},
 	},
 	"setuserdata": {
@@ -2346,8 +2346,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"setuserpassword": {
 		Name: "SetUserPassword", Description: "Sets a user's password and returns the hashed version as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "userName", Type: "string", Required: false, Description: "Username of the user whose password is being set."},
-			{Name: "password", Type: "string", Required: false, Description: "Represents the new password for a user."},
+			{Name: "userName", Type: "string", Required: true, Description: "Username of the user whose password is being set."},
+			{Name: "password", Type: "string", Required: true, Description: "Represents the new password for a user."},
 		},
 	},
 	"showsqlerrors": {
@@ -2368,7 +2368,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "SortArray", Description: "Sorts an array in-place based on numeric or custom criteria and returns the sorted array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
 			{Name: "target", Type: "array", Required: true, Description: "Array that will be sorted."},
-			{Name: "numeric", Type: "variant", Required: false, Description: "Controls sort behavior - 1/true for numeric sort, lambda for custom comparator, null for string sort."},
+			{Name: "numeric", Type: "variant", Required: true, Description: "Controls sort behavior - 1/true for numeric sort, lambda for custom comparator, null for string sort."},
 		},
 	},
 	"sqlexecute": {
@@ -2388,7 +2388,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"sqlremovecomments": {
 		Name: "SQLRemoveComments", Description: "Removes SQL comments from a statement and returns the cleaned string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "statement", Type: "variant", Required: false, Description: "SQL query or statement from which comments will be removed."},
+			{Name: "statement", Type: "variant", Required: true, Description: "SQL query or statement from which comments will be removed."},
 		},
 	},
 	"sqltraceoff": {
@@ -2421,8 +2421,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "Str", Description: "Converts a numeric value to a formatted string with optional width and decimal precision. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "number", Type: "double", Required: true, Description: "Numeric value to be converted to a formatted string."},
-			{Name: "length", Type: "double", Required: false, Description: "Optional total width of the resulting string."},
-			{Name: "decimals", Type: "double", Required: false, Description: "Optional number of decimal places to include in the formatted result."},
+			{Name: "length", Type: "double", Required: true, Description: "Optional total width of the resulting string."},
+			{Name: "decimals", Type: "double", Required: true, Description: "Optional number of decimal places to include in the formatted result."},
 		},
 	},
 	"stringtodate": {
@@ -2437,8 +2437,8 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "subStr", Type: "string", Required: true, Description: "Substring to search for within a larger string."},
 			{Name: "source", Type: "string", Required: true, Description: "String in which to search for a substring."},
-			{Name: "indexOrOccurence", Type: "double", Required: false, Description: "IndexOrOccurence specifies the position or occurrence of the substring to search for within the source string."},
-			{Name: "flag", Type: "boolean", Required: false, Description: "Controls the meaning of the indexOrOccurrence parameter. When false (default), indexOrOccurrence specifies which occurrence to find (1=first, 2=second, etc.). When true, indexOrOccurrence is treated as a 1-based starting index for the search."},
+			{Name: "indexOrOccurence", Type: "double", Required: true, Description: "IndexOrOccurence specifies the position or occurrence of the substring to search for within the source string."},
+			{Name: "flag", Type: "boolean", Required: true, Description: "Controls the meaning of the indexOrOccurrence parameter. When false (default), indexOrOccurrence specifies which occurrence to find (1=first, 2=second, etc.). When true, indexOrOccurrence is treated as a 1-based starting index for the search."},
 		},
 	},
 	"strtran": {
@@ -2446,39 +2446,39 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "source", Type: "string", Required: true, Description: "String in which search and replace operations will be performed."},
 			{Name: "searchFor", Type: "string", Required: true, Description: "String to search for within the source string during the replacement operation."},
-			{Name: "replaceWith", Type: "string", Required: false, Description: "Specifies the string that will replace occurrences of the searchFor string within the source string."},
+			{Name: "replaceWith", Type: "string", Required: true, Description: "Specifies the string that will replace occurrences of the searchFor string within the source string."},
 		},
 	},
 	"strzero": {
 		Name: "StrZero", Description: "Formats a number as a zero-padded string of specified length and decimal places. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "number", Type: "double", Required: false, Description: "Represents the numeric value that will be formatted with leading zeros."},
-			{Name: "length", Type: "double", Required: false, Description: "Specifies the total length of the resulting string, including any decimal places if specified."},
-			{Name: "decimals", Type: "double", Required: false, Description: "Specifies the number of decimal places to include in the formatted string."},
+			{Name: "number", Type: "double", Required: true, Description: "Represents the numeric value that will be formatted with leading zeros."},
+			{Name: "length", Type: "double", Required: true, Description: "Specifies the total length of the resulting string, including any decimal places if specified."},
+			{Name: "decimals", Type: "double", Required: true, Description: "Specifies the number of decimal places to include in the formatted string."},
 		},
 	},
 	"submittobatch": {
 		Name: "SubmitToBatch", Description: "Submits code to a batch process and returns the result as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "code", Type: "string", Required: false, Description: "Script or command to be executed in the batch process."},
-			{Name: "parameters", Type: "variant", Required: false, Description: "An array or object containing additional data to be submitted with the batch request."},
-			{Name: "mode", Type: "string", Required: false, Description: "Specifies the submission mode for the batch process, such as \"submit\" or \"preview\"."},
-			{Name: "userName", Type: "string", Required: false, Description: "Username of the user submitting the batch job."},
-			{Name: "password", Type: "string", Required: false, Description: "User's password required to submit code to a batch process."},
+			{Name: "code", Type: "string", Required: true, Description: "Script or command to be executed in the batch process."},
+			{Name: "parameters", Type: "variant", Required: true, Description: "An array or object containing additional data to be submitted with the batch request."},
+			{Name: "mode", Type: "string", Required: true, Description: "Specifies the submission mode for the batch process, such as \"submit\" or \"preview\"."},
+			{Name: "userName", Type: "string", Required: true, Description: "Username of the user submitting the batch job."},
+			{Name: "password", Type: "string", Required: true, Description: "User's password required to submit code to a batch process."},
 		},
 	},
 	"submittobatchex": {
 		Name: "SubmitToBatchEx", Description: "Computes and submits a batch of code to STARLIMS, returning a string result.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "code", Type: "string", Required: false, Description: "Batch processing code to be executed."},
+			{Name: "code", Type: "string", Required: true, Description: "Batch processing code to be executed."},
 		},
 	},
 	"substr": {
 		Name: "SubStr", Description: "Extracts a substring from a string based on start position and length. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "source", Type: "string", Required: true, Description: "String from which a substring will be extracted."},
-			{Name: "startPos", Type: "double", Required: false, Description: "StartPos specifies the starting position within the source string from which to extract a substring."},
-			{Name: "length", Type: "double", Required: false, Description: "Specifies the number of characters to extract from the source string, starting at the specified position."},
+			{Name: "startPos", Type: "double", Required: true, Description: "StartPos specifies the starting position within the source string from which to extract a substring."},
+			{Name: "length", Type: "double", Required: true, Description: "Specifies the number of characters to extract from the source string, starting at the specified position."},
 		},
 	},
 	"syncdesignresources": {
@@ -2502,7 +2502,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"tablefldlst": {
 		Name: "TableFldLst", Description: "Returns an array of field names for a specified table in STARLIMS.", ReturnType: "array",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "Name of the field to retrieve from the table."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "Name of the field to retrieve from the table."},
 			{Name: "tableName", Type: "string", Required: true, Description: "Name of the table from which to retrieve field names."},
 		},
 	},
@@ -2517,28 +2517,28 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"tojson": {
 		Name: "ToJson", Description: "Converts a value to its JSON string representation. Returns a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "value", Type: "variant", Required: false, Description: "Data or object that will be converted into a JSON string using the ToJson method."},
+			{Name: "value", Type: "variant", Required: true, Description: "Data or object that will be converted into a JSON string using the ToJson method."},
 		},
 	},
 	"tonumeric": {
 		Name: "ToNumeric", Description: "Converts a string to a numeric value and returns it as a double.", ReturnType: "double",
 		Parameters: []FunctionParameter{
 			{Name: "sNumber", Type: "string", Required: true, Description: "String representation of a numeric value to convert to a double."},
-			{Name: "allowHex", Type: "boolean", Required: false, Description: "When true, allows hexadecimal values to be converted. Defaults to false."},
+			{Name: "allowHex", Type: "boolean", Required: true, Description: "When true, allows hexadecimal values to be converted. Defaults to false."},
 		},
 	},
 	"toscientific": {
 		Name: "ToScientific", Description: "Converts a number to scientific notation with specified decimal places and returns it as a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "number", Type: "variant", Required: true, Description: "Numeric value that will be formatted in scientific notation."},
-			{Name: "decimalPlaces", Type: "variant", Required: false, Description: "Specifies the number of decimal places to include in the scientific notation representation of the number."},
+			{Name: "decimalPlaces", Type: "variant", Required: true, Description: "Specifies the number of decimal places to include in the scientific notation representation of the number."},
 		},
 	},
 	"toxml": {
 		Name: "ToXml", Description: "Converts a value to XML format and returns it as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
-			{Name: "o", Type: "variant", Required: false, Description: "Object that will be converted to XML."},
-			{Name: "typeName", Type: "string", Required: false, Description: "TypeName specifies the type of XML schema to use for serialization."},
+			{Name: "o", Type: "variant", Required: true, Description: "Object that will be converted to XML."},
+			{Name: "typeName", Type: "string", Required: true, Description: "TypeName specifies the type of XML schema to use for serialization."},
 		},
 	},
 	"traceoff": {
@@ -2567,18 +2567,18 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"undeclaredvars": {
 		Name: "UndeclaredVars", Description: "Sets whether undeclared variables are allowed and returns the previous setting as a boolean.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "allowUndeclaredVars", Type: "boolean", Required: false, Description: "AllowUndeclaredVars determines whether undeclared variables are allowed in the script."},
+			{Name: "allowUndeclaredVars", Type: "boolean", Required: true, Description: "AllowUndeclaredVars determines whether undeclared variables are allowed in the script."},
 		},
 	},
 	"updlong": {
 		Name: "UpdLong", Description: "Updates a long integer column in a database table based on a condition and returns whether the operation was successful.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "friendlyName", Type: "string", Required: false, Description: "User-friendly name of the database table or column being updated."},
+			{Name: "friendlyName", Type: "string", Required: true, Description: "User-friendly name of the database table or column being updated."},
 			{Name: "tableName", Type: "string", Required: true, Description: "Name of the database table where the data update operation will be performed."},
 			{Name: "columnName", Type: "string", Required: true, Description: "Name of the column in the database table where the data will be updated."},
 			{Name: "whereCondition", Type: "string", Required: true, Description: "Specifies the condition used to filter records in the database table before updating them."},
 			{Name: "inputFilePath", Type: "string", Required: true, Description: "Represents the path to the file containing the data to update."},
-			{Name: "isCompressed", Type: "boolean", Required: false, Description: "IsCompressed indicates whether the input file is compressed and should be decompressed before processing."},
+			{Name: "isCompressed", Type: "boolean", Required: true, Description: "IsCompressed indicates whether the input file is compressed and should be decompressed before processing."},
 		},
 	},
 	"upper": {
@@ -2590,13 +2590,13 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"urldecode": {
 		Name: "UrlDecode", Description: "Converts URL-encoded data to its original form and returns a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "data", Type: "variant", Required: false, Description: "Represents the string that needs to be URL-decoded."},
+			{Name: "data", Type: "variant", Required: true, Description: "Represents the string that needs to be URL-decoded."},
 		},
 	},
 	"urlencode": {
 		Name: "UrlEncode", Description: "Encodes a string to be URL-safe and returns it as a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
-			{Name: "data", Type: "variant", Required: false, Description: "Represents the string that will be URL-encoded."},
+			{Name: "data", Type: "variant", Required: true, Description: "Represents the string that will be URL-encoded."},
 		},
 	},
 	"usertimezone": {
@@ -2620,7 +2620,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "ValidateDate", Description: "Validates a date string and returns true if valid, false otherwise.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
 			{Name: "stringDate", Type: "string", Required: true, Description: "Date string to validate."},
-			{Name: "useDateFormat", Type: "variant", Required: false, Description: "Indicates whether to validate the date string using a four-digit format."},
+			{Name: "useDateFormat", Type: "variant", Required: true, Description: "Indicates whether to validate the date string using a four-digit format."},
 		},
 	},
 	"validatenumeric": {
@@ -2632,9 +2632,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 	"verifysignature": {
 		Name: "VerifySignature", Description: "Verifies a digital signature against provided data and certificate; returns true if valid.", ReturnType: "boolean",
 		Parameters: []FunctionParameter{
-			{Name: "certificateString", Type: "string", Required: false, Description: "Certificate in string format used to verify a digital signature."},
-			{Name: "data", Type: "string", Required: false, Description: "Content to be verified against a digital signature."},
-			{Name: "signature", Type: "string", Required: false, Description: "Digital signature to be verified."},
+			{Name: "certificateString", Type: "string", Required: true, Description: "Certificate in string format used to verify a digital signature."},
+			{Name: "data", Type: "string", Required: true, Description: "Content to be verified against a digital signature."},
+			{Name: "signature", Type: "string", Required: true, Description: "Digital signature to be verified."},
 		},
 	},
 	"writebytesbase64": {
@@ -2649,7 +2649,7 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "fileName", Type: "string", Required: true, Description: "Path to the file where text will be written."},
 			{Name: "charsToWrite", Type: "string", Required: true, Description: "Text content to write to the specified file."},
-			{Name: "confirmRequired", Type: "string", Required: false, Description: "ConfirmRequired indicates whether confirmation is required before writing text to a file."},
+			{Name: "confirmRequired", Type: "string", Required: true, Description: "ConfirmRequired indicates whether confirmation is required before writing text to a file."},
 			{Name: "append", Type: "string", Required: false, Description: "Indicates whether to append text to an existing file ('Y') or overwrite it ('N'). Defaults to 'N'."},
 			{Name: "encoding", Type: "string", Required: false, Description: "Specifies the character encoding used for writing text to a file. Defaults to UTF8."},
 		},
@@ -2663,17 +2663,17 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "fileContents", Type: "string", Required: true, Description: "Content of the file to be written to the FTP server."},
 			{Name: "userName", Type: "string", Required: true, Description: "Username required for authentication when writing a file to an FTP server."},
 			{Name: "password", Type: "string", Required: true, Description: "Password for authenticating with the FTP server."},
-			{Name: "port", Type: "double", Required: false, Description: "Specifies the FTP server's port number for connecting and transferring files."},
-			{Name: "proxy", Type: "string", Required: false, Description: "Specifies the proxy server to use for the FTP operation, allowing connections through a network gateway."},
-			{Name: "isSFTP", Type: "boolean", Required: false, Description: "IsSFTP determines whether to use SFTP (true) or FTP (false) for file transfer."},
-			{Name: "privateKeyFilePath", Type: "string", Required: false, Description: "Path to the private key file used for SFTP authentication."},
+			{Name: "port", Type: "double", Required: true, Description: "Specifies the FTP server's port number for connecting and transferring files."},
+			{Name: "proxy", Type: "string", Required: true, Description: "Specifies the proxy server to use for the FTP operation, allowing connections through a network gateway."},
+			{Name: "isSFTP", Type: "boolean", Required: true, Description: "IsSFTP determines whether to use SFTP (true) or FTP (false) for file transfer."},
+			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP authentication."},
 		},
 	},
 	"xmldomtoudobject": {
 		Name: "XmlDomToUdObject", Description: "Converts XML string to a dynamic object while preserving whitespace. Returns an SSLExpando object.", ReturnType: "sslexpando",
 		Parameters: []FunctionParameter{
 			{Name: "xml", Type: "variant", Required: true, Description: "XML string that will be converted to a user-defined object."},
-			{Name: "preserveWhitespace", Type: "variant", Required: false, Description: "Whether to preserve whitespace in the XML when converting it to a user-defined object."},
+			{Name: "preserveWhitespace", Type: "variant", Required: true, Description: "Whether to preserve whitespace in the XML when converting it to a user-defined object."},
 		},
 	},
 	"xmlexportsql": {

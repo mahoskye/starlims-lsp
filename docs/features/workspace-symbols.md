@@ -1,14 +1,14 @@
 # Workspace Symbols
 
-**Status:** PARTIAL  
-**LSP Method:** `workspace/symbol`  
-**Source Files:** `internal/providers/symbols.go`, `internal/server/handler.go`
+**Status:** IMPLEMENTED
+**LSP Method:** `workspace/symbol`
+**Source Files:** `internal/server/workspace_index.go`, `internal/server/handler.go`
 
 ---
 
 ## 1. Overview
 
-The workspace symbols provider enables searching for symbols across the workspace. Users can use Go to Symbol in Workspace (Ctrl+T) to find procedures by name.
+The workspace symbols provider enables searching for symbols across the entire workspace. Users can use Go to Symbol in Workspace (Ctrl+T) to find procedures by name in any SSL file, not just open documents.
 
 ---
 
@@ -19,10 +19,24 @@ The workspace symbols provider enables searching for symbols across the workspac
 | Aspect | Behavior |
 |--------|----------|
 | Query matching | Case-insensitive substring match |
-| Symbol types | Procedures only |
-| Scope | Open documents only |
+| Symbol types | Procedures (Function kind for scripts, Method kind for class files) |
+| Scope | All workspace files (`.srvscr`, `.ssl`, `.ssl.txt`, `.ds`, `.ds.txt`) |
+| Priority | Open documents take precedence over indexed versions |
+| Result cap | 500 symbols maximum |
 
-### 2.2 Response Format
+### 2.2 Workspace Indexing
+
+On initialization, the server:
+1. Captures workspace root URIs from the client
+2. Launches a background scan of all SSL files (bounded to 4 concurrent workers)
+3. Registers file watchers for dynamic updates (`workspace/didChangeWatchedFiles`)
+
+The index is maintained incrementally:
+- File created/changed: re-indexed (unless currently open — open documents are always authoritative)
+- File deleted: removed from index
+- Document closed: re-indexed from disk to pick up saved changes
+
+### 2.3 Response Format
 
 ```json
 [
@@ -30,22 +44,20 @@ The workspace symbols provider enables searching for symbols across the workspac
     "name": "CalculateTotal",
     "kind": 12,
     "location": {
-      "uri": "file:///path/to/file.ssl",
-      "range": { "start": { "line": 10, "character": 0 }, "end": { "line": 10, "character": 20 } }
-    },
-    "containerName": "file.ssl"
+      "uri": "file:///path/to/file.srvscr",
+      "range": { "start": { "line": 10, "character": 0 }, "end": { "line": 25, "character": 0 } }
+    }
   }
 ]
 ```
 
-### 2.3 Symbol Properties
+### 2.4 Symbol Properties
 
 | Property | Description |
 |----------|-------------|
 | `name` | Procedure name |
-| `kind` | Function (12) |
+| `kind` | Function (12) for script files, Method (6) for class files |
 | `location` | File URI and range |
-| `containerName` | Filename for context |
 
 ---
 
@@ -55,23 +67,33 @@ The workspace symbols provider enables searching for symbols across the workspac
 |---------|------|---------|-------------|
 | (None currently) | - | - | Workspace symbols has no specific configuration |
 
+File extensions indexed: `.srvscr`, `.ssl`, `.ssl.txt`, `.ds`, `.ds.txt`
+
 ---
 
 ## 4. Edge Cases & Special Handling
 
 ### 4.1 Empty Query
 
-An empty query returns all procedures from open documents.
+An empty query returns all procedures from open documents and indexed files (up to 500 results).
 
-### 4.2 No Open Documents
+### 4.2 No Workspace Root
 
-If no documents are open, returns empty array.
+If the client provides no `rootURI` or `workspaceFolders`, workspace indexing is skipped and only open documents are searched (original behavior).
 
-### 4.3 Case Insensitivity
+### 4.3 Open Document Priority
+
+When a file is both open and indexed, the open document version is used. The index entry is skipped to avoid duplicates.
+
+### 4.4 Case Insensitivity
 
 Query "calc" matches "Calculate", "CALCULATE", "CalculateTotal".
 
-### 4.4 Fuzzy Matching - NOT IMPLEMENTED
+### 4.5 Class File Detection
+
+Files starting with `:CLASS` have their procedures reported as Method (kind 6) rather than Function (kind 12).
+
+### 4.6 Fuzzy Matching - NOT IMPLEMENTED
 
 Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "CalculateTotal") is not implemented.
 
@@ -81,10 +103,10 @@ Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "Calculat
 
 | Limitation | Notes |
 |------------|-------|
-| Open documents only | Does not scan workspace files |
-| No indexing | No background file scanning |
 | Procedures only | Variables, regions not included |
 | No fuzzy matching | Substring match only |
+| No cross-file go-to-definition | Index provides symbols but not namespace path resolution (planned) |
+| No `:INCLUDE` resolution | Included symbols not surfaced (planned) |
 
 ---
 
@@ -93,7 +115,7 @@ Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "Calculat
 ### 6.1 Basic Search
 
 ```ssl
-/* File: helpers.ssl (open);
+/* File: helpers.srvscr (open);
 :PROCEDURE CalculateTotal;
 :ENDPROC;
 
@@ -106,8 +128,8 @@ Currently uses substring matching. Fuzzy matching (e.g., "ct" matching "Calculat
 Query: "Calculate"
 /* Expected:
    [
-     { name: "CalculateTotal", kind: 12, containerName: "helpers.ssl" },
-     { name: "CalculateAverage", kind: 12, containerName: "helpers.ssl" }
+     { name: "CalculateTotal", kind: 12 },
+     { name: "CalculateAverage", kind: 12 }
    ]
 ;
 ```
@@ -133,7 +155,7 @@ Query: "age"
 ```
 /* Test: Empty query returns all;
 Query: ""
-/* Expected: All procedures from all open documents;
+/* Expected: All procedures from open documents + indexed workspace files;
 ```
 
 ### 6.5 No Matches
@@ -144,56 +166,63 @@ Query: "xyz123"
 /* Expected: [] (empty array);
 ```
 
-### 6.6 Multiple Open Documents
+### 6.6 Indexed Files (Not Open)
 
 ```
-/* File: file1.ssl (open);
-:PROCEDURE ProcA;
-:ENDPROC;
-
-/* File: file2.ssl (open);
-:PROCEDURE ProcB;
+/* File: Server Scripts/UTILS/HELPERS.srvscr (on disk, NOT open);
+:PROCEDURE FormatDate;
 :ENDPROC;
 ```
 
 ```
-/* Test: Search across open documents;
-Query: "Proc"
-/* Expected:
-   [
-     { name: "ProcA", containerName: "file1.ssl" },
-     { name: "ProcB", containerName: "file2.ssl" }
-   ]
-;
+/* Test: Search finds procedures in files not currently open;
+Query: "FormatDate"
+/* Expected: [ { name: "FormatDate", kind: 12, location.uri: "file://.../HELPERS.srvscr" } ];
+```
+
+### 6.7 Open Document Takes Priority
+
+```
+/* File: test.srvscr is both open (with edits) and indexed;
+/* Test: Open document version used, no duplicate;
+Query: "TestProc"
+/* Expected: Single result from the open document version;
+```
+
+### 6.8 Class File Methods
+
+```
+/* File: MyClass.srvscr (on disk);
+:CLASS MyClass;
+:PROCEDURE GetValue;
+:ENDPROC;
+```
+
+```
+/* Test: Class methods have Method kind;
+Query: "GetValue"
+/* Expected: [ { name: "GetValue", kind: 6 } ];
 ```
 
 ---
 
-## 7. Related Issues
+## 7. Implementation Notes
 
-| Issue | Description | Status |
-|-------|-------------|--------|
-| (None) | Workspace indexing planned for v2.0 | Future |
+### 7.1 Architecture
 
----
+The workspace index (`WorkspaceIndex`) is a separate data structure from the `DocumentManager`:
+- `DocumentManager` holds open documents with full content, tokens, and AST
+- `WorkspaceIndex` holds lightweight `IndexedProcedure` entries (name, parameters, line range) for all files on disk
 
-## 8. Implementation Notes
+The `handleWorkspaceSymbol` handler merges results from both sources, with open documents first.
 
-### 8.1 Current Implementation
+### 7.2 File Watching
 
-1. Iterate over all open documents
-2. Get document symbols for each
-3. Filter procedures matching query
-4. Return combined results
+File watchers are registered dynamically via `client/registerCapability` during `handleInitialized`. Glob patterns cover all five SSL extensions.
 
-### 8.2 Future: Workspace Indexing
+### 7.3 Performance
 
-For v2.0, workspace symbols should:
-1. Scan all SSL files in workspace on startup
-2. Build symbol index in memory
-3. Watch for file changes and update index
-4. Return results from index (much faster)
-
-### 8.3 Performance
-
-Current implementation is O(n × m) where n = open documents and m = procedures per document. Acceptable for small numbers but won't scale without indexing.
+- Background indexing: 4 concurrent workers, ~5-15 seconds for 10K files
+- Symbol search: Linear scan over indexed procedures, microseconds at typical scale
+- Result cap: 500 symbols maximum to prevent client overload
+- Memory: ~50K procedures across 10K files well under 50MB

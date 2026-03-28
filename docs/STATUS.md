@@ -25,13 +25,13 @@ This document provides a quick overview of all LSP features and their current im
 |---------|--------|------------|
 | [Completion](./features/completion.md) | IMPLEMENTED | Broad symbol/snippet list, excludes strings/comments, class-aware procedure dispatch snippets |
 | [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword and SQL placeholders |
-| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 354 source-aligned built-in functions and dispatch helpers such as `DoProc` / `ExecFunction` |
+| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 354 canonical built-in functions and dispatch helpers such as `DoProc` / `ExecFunction` |
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Rename](./features/rename.md) | IMPLEMENTED | Single-file, scope-aware, validates new name |
 | [Inlay Hints](./features/inlay-hints.md) | IMPLEMENTED | Parameter name hints for function calls |
 | [Document Symbols](./features/document-symbols.md) | IMPLEMENTED | Hierarchical: comment regions contain procedures |
-| [Workspace Symbols](./features/workspace-symbols.md) | PARTIAL | Open documents only, no indexing |
+| [Workspace Symbols](./features/workspace-symbols.md) | IMPLEMENTED | Workspace-wide indexing with file watching |
 | [Folding Ranges](./features/folding-ranges.md) | IMPLEMENTED | Procedures, comment regions, comments, control flow blocks |
 | [Formatting](./features/formatting.md) | IMPLEMENTED | SSL + embedded SQL |
 | [Diagnostics](./features/diagnostics.md) | IMPLEMENTED | Full diagnostic suite with opt-in checks |
@@ -42,8 +42,9 @@ This document provides a quick overview of all LSP features and their current im
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Configuration | IMPLEMENTED | Via `workspace/didChangeConfiguration` |
-| Workspace Folders | NOT PLANNED | Single-file focus |
-| File Watching | NOT PLANNED | No background indexing |
+| Workspace Indexing | IMPLEMENTED | Background scan of `.srvscr`, `.ssl`, `.ssl.txt`, `.ds`, `.ds.txt` files |
+| File Watching | IMPLEMENTED | Dynamic registration via `client/registerCapability` |
+| Workspace Folders | IMPLEMENTED | Supports `rootURI` and `workspaceFolders` |
 
 ### Not Implemented
 
@@ -95,6 +96,17 @@ These diagnostics detect common SSL mistakes documented in [gotchas.md](./ssl-re
 | #13 | Property as undeclared | IMPLEMENTED |
 | #14 | `Str()` vs `LimsString()` | REFERENCE ONLY |
 | #15 | Parentheses for class instantiation | IMPLEMENTED |
+| #16 | `!=` asymmetry with `=` for strings | REFERENCE ONLY |
+| #17 | Function name casing (PascalCase) | REFERENCE ONLY |
+| #18 | SQL parameter names are case-insensitive | IMPLEMENTED |
+| #19 | Default variable value is `""`, not `NIL` | IMPLEMENTED (conservative) |
+| #20 | SQLExecute complex expression in placeholder | IMPLEMENTED |
+| #21 | `:FOR` loop `:STEP` keyword spacing | IMPLEMENTED (formatter + diagnostic) |
+| #22 | `:REGION` is functional, not a folding marker | IMPLEMENTED (info diagnostic) |
+| #23 | `:ENDFOR` is not valid — use `:NEXT` | IMPLEMENTED (diagnostic + parser) |
+| #24 | `:FINALLY` block restrictions | IMPLEMENTED |
+| #25 | Visibility annotations on class methods | IMPLEMENTED |
+| #26 | `:INCLUDE` placement | IMPLEMENTED |
 | Branch label token text | IMPLEMENTED | Literal `Branch("...")` targets must include `LABEL` |
 
 ### Known Diagnostic Gaps
@@ -140,7 +152,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 |----------|-------|--------|
 | Keywords | 38 | IMPLEMENTED |
 | Built-in Functions | 354 | IMPLEMENTED |
-| Built-in Classes | 21 | IMPLEMENTED |
+| Built-in Classes | 22 | IMPLEMENTED |
 | Literals (`.T.`, `.F.`, `NIL`) | 3 | IMPLEMENTED |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | 3 | IMPLEMENTED |
 | Snippets | 25+ | IMPLEMENTED |
@@ -172,12 +184,13 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 | Capability | Status | Notes |
 |------------|--------|-------|
+| Workspace symbol search | IMPLEMENTED | All SSL files indexed, procedures searchable |
 | Go to definition (same file) | IMPLEMENTED | Variables, procedures, DoProc/ExecFunction targets |
-| Go to definition (other files) | NOT IMPLEMENTED | No workspace indexing |
+| Go to definition (other files) | PLANNED | Workspace index provides foundation; namespace path resolution needed |
 | Find references (same file) | IMPLEMENTED | Works |
-| Find references (workspace) | NOT IMPLEMENTED | No workspace indexing |
-| `:INCLUDE` resolution | NOT IMPLEMENTED | Paths not followed |
-| Namespace navigation | NOT IMPLEMENTED | `Namespace.Script.Proc` |
+| Find references (workspace) | PLANNED | Workspace index provides foundation |
+| `:INCLUDE` resolution | PLANNED | Paths not followed |
+| Namespace navigation | PLANNED | `Category.Script.Procedure` path resolution |
 
 ---
 
@@ -199,6 +212,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | `ssl.diagnostics.hungarianNotation` | IMPLEMENTED | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | IMPLEMENTED | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | IMPLEMENTED | `[]` |
+| `ssl.diagnostics.maxBlockDepth` | IMPLEMENTED | `4` |
 
 ---
 
@@ -223,9 +237,10 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 ### v1.5 (In Progress)
 - Conservative local type inference for diagnostics implemented
-- Class member metadata (properties/methods for 21 source-aligned built-in classes)
+- Class member metadata (properties/methods for 22 canonical built-in classes)
 - Member completion after `object:`
 
-### v2.0 (Future)
-- Workspace indexing
-- Cross-file navigation
+### v2.0 (In Progress)
+- Workspace indexing — IMPLEMENTED (background scan, file watching, workspace symbols)
+- Cross-file go-to-definition — PLANNED (namespace path resolution)
+- `:INCLUDE` resolution — PLANNED

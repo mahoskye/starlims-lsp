@@ -20,6 +20,7 @@ const (
 	TokenIdentifier
 	TokenOperator
 	TokenPunctuation
+	TokenCodeBlock
 	TokenUnknown
 	TokenEOF
 )
@@ -43,6 +44,8 @@ func (t TokenType) String() string {
 		return "Operator"
 	case TokenPunctuation:
 		return "Punctuation"
+	case TokenCodeBlock:
+		return "CodeBlock"
 	case TokenUnknown:
 		return "Unknown"
 	case TokenEOF:
@@ -130,6 +133,9 @@ func (l *Lexer) Tokenize() []Token {
 
 		case l.isIdentifierStart(char):
 			tokens = append(tokens, l.readIdentifier())
+
+		case char == '{' && l.peek(1) == '|':
+			tokens = append(tokens, l.readCodeBlock())
 
 		case l.isOperatorChar(char):
 			tokens = append(tokens, l.readOperator())
@@ -261,13 +267,22 @@ func (l *Lexer) readString() Token {
 	if quote == '[' {
 		closeQuote = ']'
 	}
+	bracketDepth := 0
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 		text.WriteRune(char)
 		l.advance()
 
-		if char == closeQuote {
-			break
+		if quote == '[' && char == '[' && bracketDepth == 0 {
+			// SSL supports exactly one level of bracket nesting: [[a]b] yields [a]b.
+			// Only the first nested [ increments depth; further ['s are literal content.
+			bracketDepth = 1
+		} else if char == closeQuote {
+			if quote == '[' && bracketDepth > 0 {
+				bracketDepth--
+			} else {
+				break
+			}
 		}
 	}
 
@@ -294,13 +309,15 @@ func (l *Lexer) readNumber() Token {
 			text.WriteRune(char)
 			seenDecimal = true
 			l.advance()
-		} else if (char == 'e' || char == 'E') && (l.peek(1) == '+' || l.peek(1) == '-' || l.isDigit(l.peek(1))) {
+		} else if (char == 'e' || char == 'E') && (l.peek(1) == '-' || l.isDigit(l.peek(1))) {
+			// SSL grammar: Exponent ::= ("e" | "E") ["-"] Digit {Digit}
+			// Only optional minus sign is allowed; explicit "+" is not valid (e.g. 9E+1 is invalid).
 			if !seenDecimal || digitsBeforeDecimal == 0 {
 				break
 			}
 			text.WriteRune(char)
 			l.advance()
-			if l.pos < len(l.input) && (l.input[l.pos] == '+' || l.input[l.pos] == '-') {
+			if l.pos < len(l.input) && l.input[l.pos] == '-' {
 				text.WriteRune(l.input[l.pos])
 				l.advance()
 			}
@@ -353,6 +370,9 @@ func (l *Lexer) readIdentifier() Token {
 
 	str := text.String()
 	upper := strings.ToUpper(str)
+	// Bare keyword detection: SSL keywords MUST be colon-prefixed (:IF, :FOR, etc.).
+	// Bare identifiers matching keyword names are tagged as TokenKeyword so
+	// the diagnostics layer can warn about the missing colon prefix.
 	if constants.IsKeyword(upper) {
 		return Token{Type: TokenKeyword, Text: str, Line: line, Column: col, Offset: start}
 	}
@@ -442,6 +462,31 @@ func (l *Lexer) readPunctuation() Token {
 	text := string(l.input[l.pos])
 	l.advance()
 	return Token{Type: TokenPunctuation, Text: text, Line: line, Column: col, Offset: start}
+}
+
+func (l *Lexer) readCodeBlock() Token {
+	start := l.pos
+	line := l.line
+	col := l.column
+	var text strings.Builder
+	depth := 0
+
+	for l.pos < len(l.input) {
+		char := l.input[l.pos]
+		text.WriteRune(char)
+		l.advance()
+
+		if char == '{' {
+			depth++
+		} else if char == '}' {
+			depth--
+			if depth == 0 {
+				break
+			}
+		}
+	}
+
+	return Token{Type: TokenCodeBlock, Text: text.String(), Line: line, Column: col, Offset: start}
 }
 
 func (l *Lexer) readUnknown() Token {
@@ -543,7 +588,7 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 
 		if inToken {
 			switch token.Type {
-			case TokenString:
+			case TokenString, TokenCodeBlock:
 				return ContextString
 			case TokenComment:
 				return ContextComment

@@ -28,7 +28,7 @@ Keywords are colon-prefixed and UPPERCASE:
 |---------|---------|
 | `:IF`, `:ELSE`, `:ENDIF` | Conditional branching |
 | `:WHILE`, `:ENDWHILE` | While loop |
-| `:FOR`, `:TO`, `:STEP`, `:NEXT` | For loop |
+| `:FOR`, `:TO`, `:STEP`, `:NEXT` | For loop (`:ENDFOR` exists as a token but causes a parse error — always use `:NEXT`) |
 | `:BEGINCASE`, `:CASE`, `:OTHERWISE`, `:EXITCASE`, `:ENDCASE` | Multi-branch conditional block |
 | `:EXITFOR`, `:EXITWHILE`, `:LOOP` | Loop control |
 
@@ -47,7 +47,7 @@ Keywords are colon-prefixed and UPPERCASE:
 | `:DECLARE` | Declare local variables |
 | `:PARAMETERS` | Declare procedure parameters |
 | `:DEFAULT` | Set parameter default values |
-| `:PUBLIC` | Declare global/public variables (legacy/shared-state pattern; discouraged in new code) |
+| `:PUBLIC` | Declare global/public variables — **warning:** persists across all procedures and risks namespace pollution; prefer `:DECLARE` with parameter passing |
 
 ### Procedure & Class Keywords
 
@@ -64,9 +64,9 @@ Keywords are colon-prefixed and UPPERCASE:
 | Keyword | Purpose |
 |---------|---------|
 | `:INCLUDE` | Include external script; keep includes at the top of the file |
-| `:REGION`, `:ENDREGION` | Legacy functional text-capture regions |
-| `:BEGININLINECODE`, `:ENDINLINECODE` | Legacy named inline-code storage blocks; `:BEGININLINECODE` must include a name |
-| `:LABEL` | Legacy Branch() target label |
+| `:REGION`, `:ENDREGION` | Legacy functional text-capture regions; body text is stored for runtime retrieval via `GetRegion(sValue, vSrc, vDst)` |
+| `:BEGININLINECODE`, `:ENDINLINECODE` | Legacy named inline-code storage blocks; `:BEGININLINECODE` **requires** an identifier (bare or quoted form) |
+| `:LABEL` | Legacy `Branch()` target label; two forms: `:LABEL Name;` (spaced, preferred) and `:LABELName;` (compact) |
 
 ---
 
@@ -115,7 +115,7 @@ Placement rules:
 
 - Script-level `:PARAMETERS` must appear before top-level statements, though leading `:PROCEDURE` blocks may come first
 - Inside a procedure, `:PARAMETERS` must immediately follow `:PROCEDURE`
-- `:DEFAULT` must immediately follow `:PARAMETERS`
+- `:DEFAULT` must immediately follow `:PARAMETERS` (placing any statement between them is a compile error)
 
 ### Assignment
 
@@ -149,15 +149,18 @@ nCount %= 3;                   /* Modulo and assign;
 
 | Operator | Description |
 |----------|-------------|
-| `=` | Equality (loose; prefix-style for strings) |
+| `=` | Equality (loose; prefix-style for strings — see note below) |
 | `==` | Strict equality (use for exact string equality) |
-| `!=` | Not equal |
+| `!=` | Not equal — negates `==`, **not** `=` (see note below) |
 | `<>` | Not equal (not preferred — use `!=`) |
 | `#` | Not equal (not preferred — use `!=`) |
 | `<` | Less than |
 | `>` | Greater than |
 | `<=` | Less than or equal |
 | `>=` | Greater than or equal |
+| `$` | Containment — returns `.T.` if left string is found in right string (see also String Operators) |
+
+**`!=` asymmetry:** `!=` negates `==` (exact match), not `=` (prefix match), so `=` and `!=` are **not logical opposites** for strings. For example, `"Logged" = "Log"` is `.T.` (prefix match) AND `"Logged" != "Log"` is also `.T.` (not an exact match). The `<>` and `#` operators behave identically to `!=`. To negate the loose `=` comparison, use `.NOT. (expr = value)` rather than `expr != value`.
 
 ### Arithmetic Operators
 
@@ -195,6 +198,22 @@ nCount %= 3;                   /* Modulo and assign;
 /* WRONG - periods are required!;
 :IF bCondA AND bCondB;  /* Will not work;
 ```
+
+### Operator Precedence (Low to High)
+
+| Level | Operators | Associativity |
+|-------|-----------|---------------|
+| 1 | `.OR.` | Left |
+| 2 | `.AND.` | Left |
+| 3 | `=`, `==`, `!=`, `<>`, `#`, `$` | Left |
+| 4 | `<`, `>`, `<=`, `>=` | Left |
+| 5 | `<<`, `>>` | Left |
+| 6 | `+`, `-` | Left |
+| 7 | `*`, `/`, `%` | Left |
+| 8 | `^`, `**` | **Right** |
+| 9 | `-` (unary), `!`, `.NOT.` | Unary |
+
+Level 3 groups equality, inequality, and containment together. Level 8 (power) is right-associative: `2^3^2` evaluates as `2^(3^2)` = 512.
 
 ### String Operators
 
@@ -281,10 +300,15 @@ sFirst := aNames[1];  /* "Alice";
 n := aMatrix[2, 1];   /* 3;
 ```
 
-### Date Literals
+### Date Values
+
+SSL has **no date literal syntax**. The brace form `{2024, 12, 25}` is an array literal, not a date. Dates are created via functions:
 
 ```ssl
-dDate := {2024, 12, 25, 14, 30, 0};  /* year, month, day, hour, min, sec;
+dToday := Today();                              /* Current date;
+dNow := Now();                                 /* Current date and time;
+dParsed := CToD("12/25/2024");                 /* Parse from string;
+dFrom := DateFromNumbers(2024, 12, 25, 14, 30, 0);  /* From components;
 ```
 
 ---
@@ -350,7 +374,7 @@ The `:FOR` start value, `:TO` limit, and optional `:STEP` value should be numeri
 
 ### CASE Statement (`:EXITCASE` Recommended)
 
-Without `:EXITCASE;`, later `:CASE` expressions are still evaluated and their bodies run if they also match. This is not C-style fall-through, but it can still execute multiple case blocks.
+Without `:EXITCASE;`, later `:CASE` expressions are still evaluated and their bodies run if they also match. This is not C-style fall-through, but it can still execute multiple case blocks. `:OTHERWISE` is always skipped once any earlier `:CASE` body has run — even if that earlier case omitted `:EXITCASE;`.
 
 ```ssl
 :BEGINCASE;
@@ -408,7 +432,7 @@ result := ExecFunction("Category.Script.Proc");
 result := DoProc("MyProc", {sFirst,,nThird});  /* Skips param2;
 ```
 
-Inside class methods, call sibling and inherited methods with `Me:MethodName()` / `Base:MethodName()` instead of `DoProc(...)`.
+`DoProc(...)` is a **compile-time error** inside class methods. Use `Me:MethodName()` / `Base:MethodName()` for sibling and inherited methods instead.
 
 ---
 
@@ -515,13 +539,14 @@ Branch("SKIP");
 - There is NO `:ENDCLASS` keyword
 - The class scope extends from `:CLASS` to the end of the file
 - All procedures defined after `:CLASS` become methods of that class
-- Preferred member order is `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`
+- Member order is `:INHERIT`, `:DECLARE`, regular methods, then `Constructor` — tooling enforces this order
 - Bare and qualified `:INHERIT` names are both accepted
 - Without `:INHERIT`, a class inherits from `SSLObject` by default
 - `Constructor` is the reserved constructor method name inside a class, and `:RETURN` inside `Constructor` cannot return a value
 - Inside class methods, use `Me:MethodName()` / `Base:MethodName()` for sibling and inherited method calls
 - `Me` is only meaningful inside a `:CLASS` definition
 - `Base` must always be used as `Base:MemberName` and is only meaningful when the class declares `:INHERIT`
+- `Me`, `Base`, and `Constructor` are **case-insensitive** — `me`, `base`, `constructor` are all valid forms, though PascalCase is canonical
 - Underscore-prefixed members such as `_sInternal` follow the SSL private convention and are excluded from reflection
 - `/*@private;` and `/*@protected;` annotations apply to script procedures only; they do not change class-method visibility
 

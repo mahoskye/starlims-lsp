@@ -14,8 +14,8 @@ This section provides reference documentation for the STARLIMS Scripting Languag
 | [Syntax Overview](./syntax.md) | SSL syntax rules | Keywords, operators, control flow |
 | [Formal Grammar](./grammar.md) | EBNF specification | Complete grammar definition |
 | [Style Guide](./style-guide.md) | Coding conventions | Naming, formatting, best practices |
-| [Built-in Functions](./functions.md) | Function reference | 354 source-aligned developer-facing built-in functions |
-| [Built-in Classes](./classes.md) | Class reference | 21 source-aligned developer-facing built-in classes |
+| [Built-in Functions](./functions.md) | Function reference | 354 canonical developer-facing built-in functions |
+| [Built-in Classes](./classes.md) | Class reference | 22 canonical developer-facing built-in classes |
 | [Common Gotchas](./gotchas.md) | SSL pitfalls | Common mistakes and how to avoid them |
 
 ---
@@ -130,7 +130,7 @@ The Language Server Protocol implementation sources:
 
 | Purpose | File |
 |---------|------|
-| Source-aligned public SSL inventories | `internal/constants/source_alignment.go` |
+| Canonical public SSL inventories | `internal/constants/canonical.go` |
 | Legacy function signature corpus | `internal/constants/signatures.go` |
 | Keywords, literals, operators, and legacy inventories | `internal/constants/constants.go` |
 | Parser | `internal/parser/parser.go` |

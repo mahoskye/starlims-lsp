@@ -27,7 +27,7 @@ var excludedLegacySSLFunctionNames = map[string]struct{}{
 	"tryconnect":                {},
 }
 
-var sourceOnlySSLFunctionNames = []string{
+var supplementalSSLFunctionNames = []string{
 	"_AND",
 	"_NOT",
 	"_OR",
@@ -37,20 +37,24 @@ var sourceOnlySSLFunctionNames = []string{
 }
 
 var excludedLegacySSLClassNames = map[string]struct{}{
-	"cdatacolumn":          {},
-	"cdatacolumns":         {},
-	"cdatafield":           {},
-	"cdatarow":             {},
-	"cdatatable":           {},
+	// CDataColumn, CDataColumns, CDataField, CDataRow are return-value-only types obtained
+	// from TablesImport:GetTable(name) — they cannot be directly constructed by developers.
+	// CDataTable is NOT excluded: it is directly instantiable via CDataTable{} syntax.
+	"cdatacolumn":  {},
+	"cdatacolumns": {},
+	"cdatafield":   {},
+	"cdatarow":     {},
+	// EnterpriseImpExBase, SQLConnection, SSLCompilerError, SSLCompilerErrorList are internal
+	// implementation types not intended for direct developer use.
 	"enterpriseimpexbase":  {},
 	"sqlconnection":        {},
 	"sslcompilererror":     {},
 	"sslcompilererrorlist": {},
 }
 
-var sourceOnlySSLClassNames = []string{}
+var supplementalSSLClassNames = []string{}
 
-var sourcePreferredSSLFunctionNames = map[string]string{
+var preferredSSLFunctionCasing = map[string]string{
 	"aadd":              "AAdd",
 	"aeval":             "AEval",
 	"aevala":            "AEvalA",
@@ -78,16 +82,16 @@ var sourcePreferredSSLFunctionNames = map[string]string{
 	"usrmes":            "UsrMes",
 }
 
-// SSLFunctionNames contains the source-aligned developer-facing SSL function inventory.
-var SSLFunctionNames = buildSourceAlignedNames(legacySSLFunctionNames, excludedLegacySSLFunctionNames, sourceOnlySSLFunctionNames, sourcePreferredSSLFunctionNames)
+// SSLFunctionNames contains the canonical developer-facing SSL function inventory.
+var SSLFunctionNames = buildCanonicalNames(legacySSLFunctionNames, excludedLegacySSLFunctionNames, supplementalSSLFunctionNames, preferredSSLFunctionCasing)
 
-// SSLClassNames contains the source-aligned developer-facing SSL class inventory.
-var SSLClassNames = buildSourceAlignedNames(legacySSLClassNames, excludedLegacySSLClassNames, sourceOnlySSLClassNames, nil)
+// SSLClassNames contains the canonical developer-facing SSL class inventory.
+var SSLClassNames = buildCanonicalNames(legacySSLClassNames, excludedLegacySSLClassNames, supplementalSSLClassNames, nil)
 
-var sslFunctionNameSet = buildFoldSet(SSLFunctionNames)
-var sslClassNameSet = buildFoldSet(SSLClassNames)
+var sslFunctionLookup = buildLowercaseSet(SSLFunctionNames)
+var sslClassLookup = buildLowercaseSet(SSLClassNames)
 
-var sourceOnlyFunctionSignatures = map[string]FunctionSignature{
+var supplementalFunctionSignatures = map[string]FunctionSignature{
 	"_and": {
 		Name:        "_AND",
 		Description: "Performs a bitwise AND and returns the numeric result.",
@@ -133,23 +137,23 @@ var sourceOnlyFunctionSignatures = map[string]FunctionSignature{
 	},
 	"eval": {
 		Name:        "Eval",
-		Description: "Executes a code block or callable value with optional arguments and returns its result.",
+		Description: "Executes a code block or callable value with optional arguments and returns its result. Accepts a variadic number of arguments (xArg1, xArg2, ...).",
 		ReturnType:  "variant",
 		Parameters: []FunctionParameter{
 			{Name: "code", Type: "variant", Required: true, Description: "Code block or callable value to execute."},
 			{Name: "arg1", Type: "variant", Required: false, Description: "Optional first argument."},
 			{Name: "arg2", Type: "variant", Required: false, Description: "Optional second argument."},
 			{Name: "arg3", Type: "variant", Required: false, Description: "Optional third argument."},
-			{Name: "arg4", Type: "variant", Required: false, Description: "Optional fourth argument."},
+			{Name: "arg4", Type: "variant", Required: false, Description: "Optional fourth argument. Additional arguments beyond arg4 are also accepted (variadic)."},
 		},
 	},
 }
 
-// SSLFunctionSignatures contains the source-aligned function signature inventory.
-var SSLFunctionSignatures = buildSourceAlignedFunctionSignatures()
+// SSLFunctionSignatures contains the canonical function signature inventory.
+var SSLFunctionSignatures = buildCanonicalFunctionSignatures()
 
-func buildSourceAlignedNames(legacy []string, excluded map[string]struct{}, sourceOnly []string, preferred map[string]string) []string {
-	seen := make(map[string]string, len(legacy)+len(sourceOnly))
+func buildCanonicalNames(legacy []string, excluded map[string]struct{}, supplemental []string, preferred map[string]string) []string {
+	seen := make(map[string]string, len(legacy)+len(supplemental))
 
 	for _, name := range legacy {
 		lower := strings.ToLower(name)
@@ -161,7 +165,7 @@ func buildSourceAlignedNames(legacy []string, excluded map[string]struct{}, sour
 		}
 	}
 
-	for _, name := range sourceOnly {
+	for _, name := range supplemental {
 		lower := strings.ToLower(name)
 		if _, ok := seen[lower]; !ok {
 			seen[lower] = preferredName(name, preferred)
@@ -192,7 +196,7 @@ func preferredName(name string, preferred map[string]string) string {
 	return name
 }
 
-func buildFoldSet(values []string) map[string]struct{} {
+func buildLowercaseSet(values []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(values))
 	for _, value := range values {
 		set[strings.ToLower(value)] = struct{}{}
@@ -200,15 +204,15 @@ func buildFoldSet(values []string) map[string]struct{} {
 	return set
 }
 
-func buildSourceAlignedFunctionSignatures() map[string]FunctionSignature {
+func buildCanonicalFunctionSignatures() map[string]FunctionSignature {
 	signatures := make(map[string]FunctionSignature, len(SSLFunctionNames))
 
 	for _, name := range SSLFunctionNames {
 		lower := strings.ToLower(name)
 
 		switch {
-		case sourceOnlyFunctionSignatures[lower].Name != "":
-			sig := sourceOnlyFunctionSignatures[lower]
+		case supplementalFunctionSignatures[lower].Name != "":
+			sig := supplementalFunctionSignatures[lower]
 			sig.Name = name
 			signatures[lower] = sig
 		case legacySSLFunctionSignatures[lower].Name != "":

@@ -45,8 +45,9 @@ The diagnostics provider analyzes SSL code and reports potential issues as squig
 | Comment termination heuristic | Warning | Flags comments that terminate before the line ends |
 | FOR numeric checks | Warning | Inferred non-numeric loop variables and bounds in `:FOR ... :TO ... :STEP ...` headers |
 | Type-safety advisories | Info/Warning | Conservative inferred-type checks for `NIL`, `$`, string `=`, and code-block comparison gotchas |
-| Class member order | Error | Class members must be `:INHERIT`, `:DECLARE`, methods, then `Constructor` |
+| Class member order | Info | Class members must be `:INHERIT`, `:DECLARE`, methods, then `Constructor` |
 | Class-context `DoProc` misuse | Error | Inside class methods, use `Me:Method()` / `Base:Method()` instead of `DoProc(...)` |
+| Constructor return value | Error | `:RETURN` inside a `Constructor` cannot return a value |
 | `Me` / `Base` misuse | Error | `Me` is class-only; `Base` must be `Base:MemberName` inside a `:CLASS` with `:INHERIT` |
 | Branch target labels | Error | Literal `Branch("...")` targets must include `LABEL` token text such as `"LABEL SKIP"` |
 | Direct procedure calls | Error | Custom procedures must be invoked with `DoProc(...)` / `ExecFunction(...)` |
@@ -57,11 +58,28 @@ The diagnostics provider analyzes SSL code and reports potential issues as squig
 | Assignment in condition | Warning | `:=` inside `:IF` / `:WHILE` / `:CASE` conditions is usually a bug |
 | Empty trailing arg arrays | Info | Prefer `DoProc("Name")` over `DoProc("Name", {})` and similar empty trailing optional args |
 | Loop/finally control misuse | Error | `:EXITFOR`, `:EXITWHILE`, `:LOOP`, and `:RETURN` are restricted by loop context and `:FINALLY` rules |
-| Deprecated keywords | Warning/Info | `:ERROR`, `:RESUME`, `:LABEL`, and discouraged operator forms are flagged |
+| Deprecated keywords | Warning/Info | `:ERROR`, `:RESUME`, `:LABEL` are flagged as legacy constructs |
 | PUBLIC usage | Warning | `:PUBLIC` is discouraged because it creates shared global state |
 | Excessive procedure parameters | Warning | Procedures with more than 20 parameters should be refactored |
-| Global assignment | Error | Assignment to configured global variable |
+| Global assignment | Error | Assignment to `MYUSERNAME` (always) or any configured global variable |
+| BEGINCASE without CASE | Error | `:BEGINCASE` requires at least one `:CASE` block |
+| Class instantiation syntax | Error | Built-in classes use curly braces: `Email{}` not `Email()` |
+| Complex SQL placeholders | Info | Complex expressions in `?...?` SQLExecute placeholders should be pre-computed into variables |
+| Missing quotes in DoProc/ExecFunction | Error | First argument to `DoProc(...)` / `ExecFunction(...)` must be a string literal |
+| Non-preferred operators | Info | `#` and `<>` should use `!=` instead |
 | Hungarian notation | Warning | Optional style check |
+| Scientific notation hint | Info | Number immediately followed by `e`/`E` suggesting missing decimal |
+| Missing OTHERWISE | Info | `:BEGINCASE` without `:OTHERWISE` default handler |
+| Name length exceeded | Info | Variable names > 20 chars or procedure names > 30 chars |
+| Visibility annotations on class methods | Warning | `/*@private;` / `/*@protected;` have no effect on class methods |
+| NIL method calls | Warning | Method call on NIL literal or variable known to be NIL |
+| Redeclared variables | Hint | Same variable declared twice in same scope (re-declaration is a no-op) |
+| Nested IIF | Info | Nested `IIF()` calls reduce readability; use `:BEGINCASE` or `:IF` |
+| Negative logic with ELSE | Hint | Negated `:IF` condition with `:ELSE` — consider inverting |
+| Style-level parameter count | Hint | Procedures with more than 8 parameters (style guide recommendation) |
+| `:STEP` spacing | Warning | `:STEP` keyword without a preceding space in `:FOR` loops |
+| `:REGION` legacy warning | Info | `:REGION`/`:ENDREGION` is a legacy functional construct — prefer `/* region` / `/* endregion` comments |
+| Code block structure | Warning | Code block literal `{|| expr}` has empty parameter list — at least one bound variable required |
 
 ### 2.3 Opt-in Diagnostics
 
@@ -88,7 +106,7 @@ These diagnostics are implemented but disabled by default:
 | `ssl.diagnostics.hungarianNotation` | bool | `false` | Enforce Hungarian prefixes on declared variables |
 | `ssl.diagnostics.hungarianPrefixes` | string[] | `["a","b","d","fn","n","o","s","v"]` | Allowed prefixes |
 | `ssl.diagnostics.globals` | string[] | `[]` | Pre-declared global variables |
-| `ssl.diagnostics.maxBlockDepth` | int | `10` | Maximum block nesting depth |
+| `ssl.diagnostics.maxBlockDepth` | int | `4` | Maximum block nesting depth |
 
 Additional always-on style diagnostics include compact label forms such as `:LABELSKIP;` being accepted, informational warnings when trailing empty argument arrays like `DoProc("MyProc", {})` should be omitted, `:INCLUDE` placement guidance, `:PUBLIC` warnings, `:PARAMETERS` placement enforcement, parameter-count warnings, legacy `:ERROR` / `:RESUME` warnings, `:ERROR` handler-body validation, `:CATCH` clause-form validation, literal `Branch("...")` label-target validation, and class-only rules such as constructor placement plus `Me` / `Base` / `DoProc(...)` usage inside class code.
 
@@ -101,7 +119,7 @@ Additional always-on style diagnostics include compact label forms such as `:LAB
       "hungarianNotation": false,
       "hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
       "globals": ["gCurrentUser", "gAppName", "gLimsDate"],
-      "maxBlockDepth": 10
+      "maxBlockDepth": 4
     }
   }
 }
@@ -222,7 +240,7 @@ The diagnostics provider also enforces newer guide rules that are always on:
 - `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` inside `:FINALLY` are compile-time errors
 - Comments that terminate before the line ends are flagged as likely embedded-semicolon mistakes
 - Non-numeric `:FOR` loop variables, start values, limits, and `:STEP` values are flagged when the type can be inferred from declarations, assignments, constructors, or built-in function returns
-- String `=` comparisons are flagged because `=` does prefix matching for strings
+- String `=` comparisons are flagged because `=` does prefix matching for strings (`!=` negates `==`, not `=`, so `=` and `!=` are not logical opposites for strings)
 - `NIL` vs `""`, `0`, or `.F.` comparisons are flagged because declared variables start as empty string, not `NIL`
 - Non-string operands inferred from literals, declarations, assignments, constructors, or built-in function returns are flagged for `$`
 - `NIL` arithmetic/string operations are flagged
@@ -232,7 +250,8 @@ The diagnostics provider also enforces newer guide rules that are always on:
 - Procedures with more than 20 parameters generate a warning
 - Class files are checked for the preferred member order `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`
 - `Me` is class-only, and `Base` must be used as `Base:MemberName` inside a class that declares `:INHERIT`
-- Inside class methods, `DoProc(...)` is flagged in favor of `Me:MethodName()` / `Base:MethodName()`
+- Inside class methods, `DoProc(...)` is flagged in favor of `Me:MethodName()` / `Base:MethodName()` (because `DoProc` is a compile-time error inside class methods — all forms are rejected)
+- `:RETURN` inside a `Constructor` cannot return a value; bare `:RETURN;` is allowed
 - Literal `Branch("...")` targets are checked for the required `LABEL` token text
 
 ---
