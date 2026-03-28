@@ -35,6 +35,8 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
   - Conservative inferred-type checks for `:FOR`, `NIL`, `$`, string `=`, and code-block comparison mistakes
   - SSL gotcha detection for direct procedure calls, dot-property access, zero-based arrays, assignment in conditions, and comment-semicolon hazards
   - Opt-in Hungarian notation warnings (configurable prefixes)
+- **Rename Symbol** for procedures and variables across the document
+- **Inlay Hints** for parameter names at call sites (configurable minimum parameter count)
 - **Document formatting** for SSL and embedded SQL
 - **Folding Ranges** for procedures, comment regions, control-flow blocks, and comments
 - **Code Snippets** for common SSL patterns
@@ -124,6 +126,9 @@ To use with VS Code, you need a client extension that launches this server. The 
 Add to your `init.lua`:
 
 ```lua
+-- Register the .ssl filetype
+vim.filetype.add({ extension = { ssl = 'ssl' } })
+
 local lspconfig = require('lspconfig')
 local configs = require('lspconfig.configs')
 
@@ -259,18 +264,29 @@ starlims-lsp/
 │   │   └── parser.go         # AST parser
 │   ├── constants/
 │   │   ├── constants.go      # Keywords, literals, operators, legacy inventories
-│   │   ├── canonical.go        # Canonical public function/class inventories
+│   │   ├── canonical.go      # Canonical public function/class inventories
 │   │   └── signatures.go     # Legacy signature corpus
 │   ├── providers/
 │   │   ├── completion.go     # Auto-completion
 │   │   ├── hover.go          # Hover information
 │   │   ├── diagnostics.go    # Error detection
 │   │   ├── definition.go     # Go to definition
-│   │   └── symbols.go        # Document symbols
+│   │   ├── symbols.go        # Document symbols
+│   │   ├── signaturehelp.go  # Signature help
+│   │   ├── inlayhints.go     # Inlay hints
+│   │   ├── rename.go         # Rename symbol
+│   │   ├── formatting.go     # Document formatting
+│   │   ├── sql_formatter.go  # Embedded SQL formatter
+│   │   ├── sql_lexer.go      # SQL tokenizer
+│   │   └── function_docs.go  # Built-in function documentation
 │   └── server/
 │       ├── server.go         # LSP server setup
 │       ├── handler.go        # LSP request handlers
-│       └── cache.go          # Document caching
+│       ├── wrapper_handler.go # Request/response wrappers
+│       ├── cache.go          # Document caching
+│       ├── workspace_index.go # Workspace symbol index
+│       ├── inlayhints_types.go # Inlay hint LSP types
+│       └── conversions.go    # LSP type conversions
 ├── go.mod
 ├── go.sum
 ├── Makefile
