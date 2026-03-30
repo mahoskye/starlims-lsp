@@ -75,7 +75,7 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 			tokens = append(tokens, l.readNumber())
 		case unicode.IsLetter(rune(char)) || char == '_':
 			tokens = append(tokens, l.readIdentifierOrKeyword())
-		case strings.ContainsRune("(),;.", rune(char)):
+		case strings.ContainsRune("(),;.{}", rune(char)):
 			tokens = append(tokens, l.readPunctuation())
 		case strings.ContainsRune("+-*/%=!<>|", rune(char)):
 			tokens = append(tokens, l.readOperator())

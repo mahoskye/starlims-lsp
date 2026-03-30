@@ -469,6 +469,13 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 
 func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Token, index int) bool {
 	if s.opts.OperatorSpacing && isOperator(token) {
+		// Detect unary minus/plus: no space between operator and operand
+		// when preceded by another operator, open paren, comma, assignment, or at line start.
+		if (token.Text == "-" || token.Text == "+") && isUnaryContext(s.lastNonWSToken, s.lineStart) {
+			s.builder.WriteString(token.Text)
+			s.currentLineLen += len(token.Text)
+			return true
+		}
 		if !s.lineStart && s.prevToken.Type != lexer.TokenWhitespace && !isOpenParen(s.prevToken) {
 			s.builder.WriteString(" ")
 			s.currentLineLen++
@@ -556,12 +563,10 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	quoteChar := content[0]
 	innerContent := content[1 : len(content)-1]
 
-	// Check if we should format this string as SQL:
-	// 1. If inside a SQL function call (first argument)
-	// 2. Or if DetectSQLStrings is enabled and the string looks like SQL
-	inSQLFunctionArg := s.inSQLFunction && s.sqlArgCount == 0 && s.parenDepth == s.sqlFunctionParenDepth
-	shouldFormat := inSQLFunctionArg ||
-		(s.opts.SQL.DetectSQLStrings && IsSQLString(innerContent))
+	// Only format as SQL if the string actually looks like a SQL statement.
+	// Being inside a SQL function call (first argument) is not sufficient —
+	// the argument could be an error message or other non-SQL string.
+	shouldFormat := IsSQLString(innerContent)
 
 	if !shouldFormat {
 		return false
@@ -639,8 +644,18 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				out := ":LABEL " + labelName
 				state.builder.WriteString(out)
 				state.currentLineLen += len(out)
+			} else if token.Type == lexer.TokenKeyword && strings.HasPrefix(token.Text, ".") {
+				// Dot-wrapped literals (.T., .F., .AND., .OR., .NOT.) — uppercase but no colon
+				normalized := strings.ToUpper(token.Text)
+				state.builder.WriteString(normalized)
+				state.currentLineLen += len(normalized)
+			} else if token.Type == lexer.TokenKeyword && !strings.HasPrefix(token.Text, ":") {
+				// Bare keyword (e.g. NIL) — uppercase, no colon added
+				normalized := strings.ToUpper(token.Text)
+				state.builder.WriteString(normalized)
+				state.currentLineLen += len(normalized)
 			} else if token.Type == lexer.TokenKeyword {
-				// Normalize keyword casing: :if -> :IF, :endIf -> :ENDIF
+				// Colon-prefixed keyword: :if -> :IF, :endIf -> :ENDIF
 				normalized := ":" + strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
@@ -880,6 +895,28 @@ func estimateRemainingLineLen(tokens []lexer.Token, startIdx int) int {
 		}
 	}
 	return length
+}
+
+// isUnaryContext returns true if the previous token context indicates that
+// a - or + is unary (sign) rather than binary (subtraction/addition).
+func isUnaryContext(lastNonWS lexer.Token, lineStart bool) bool {
+	if lineStart || lastNonWS.Type == 0 {
+		return true
+	}
+	// After operators, assignment, open parens, commas, keywords — it's unary
+	if lastNonWS.Type == lexer.TokenOperator {
+		return true
+	}
+	if isOpenParen(lastNonWS) || lastNonWS.Text == "," {
+		return true
+	}
+	if lastNonWS.Text == ":=" {
+		return true
+	}
+	if lastNonWS.Type == lexer.TokenKeyword {
+		return true
+	}
+	return false
 }
 
 // isBlockEndKeyword checks if a keyword ends a block.

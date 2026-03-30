@@ -494,9 +494,14 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 		return false
 	}
 
-	// No space after ( or before )
-	if prev.Text == "(" || curr.Text == ")" {
+	// No space after ( or { or before ) or }
+	if prev.Text == "(" || prev.Text == "{" || curr.Text == ")" || curr.Text == "}" {
 		return false
+	}
+
+	// Space before { (ODBC escape sequences like {fn IFNULL(...)})
+	if curr.Text == "{" {
+		return true
 	}
 
 	// No space before comma
