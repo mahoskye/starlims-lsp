@@ -206,7 +206,7 @@ func (l *Lexer) isIdentifierPart(char rune) bool {
 }
 
 func (l *Lexer) isOperatorChar(char rune) bool {
-	return strings.ContainsRune("+-*/^%=!<>#$", char)
+	return strings.ContainsRune("+-*/^%=!<>#$&|", char)
 }
 
 func (l *Lexer) isPunctuation(char rune) bool {

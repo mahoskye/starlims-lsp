@@ -91,6 +91,8 @@ var SSLMultiCharOperators = []string{
 	// Assignment operators
 	":=", "+=", "-=", "*=", "/=", "%=", "^=",
 	"**", "++", "--", "<<", ">>",
+	// Invalid but recognized for diagnostics (C-style logical operators)
+	"&&", "||",
 }
 
 // SSLPredefinedGlobals contains runtime-provided read-only global variables.
