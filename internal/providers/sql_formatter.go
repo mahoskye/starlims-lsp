@@ -183,6 +183,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		needsBreak := false
 		extraIndent := ""
 		prev := getPrevNonWS(nonWSTokens, i)
+		var prevPrevToken *SQLToken
+		if i >= 2 {
+			prevPrevToken = &nonWSTokens[i-2]
+		}
 
 		if !isFirstToken && isComplex {
 			prevUpper := ""
@@ -267,7 +271,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			if !needsBreak && prev != nil && f.opts.MaxLineLength > 0 &&
 				(style == "canonicalCompact" || style == "expanded") {
 				spaceLen := 0
-				if f.shouldAddSpace(prev, &t) {
+				if f.shouldAddSpace(prev, &t, prevPrevToken) {
 					spaceLen = 1
 				}
 				projectedLen := currentLineLen + spaceLen + len(tokenText)
@@ -375,7 +379,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(parenIndent)
 			result.WriteString(extraIndent)
 			currentLineLen = len(baseIndent) + len(parenIndent) + len(extraIndent)
-		} else if prev != nil && f.shouldAddSpace(prev, &t) {
+		} else if prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken) {
 			result.WriteString(" ")
 			currentLineLen++
 		}
@@ -474,7 +478,7 @@ func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
 }
 
 // shouldAddSpace checks if a space should be added between tokens.
-func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
+func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev ...*SQLToken) bool {
 	if prev == nil {
 		return false
 	}
@@ -519,7 +523,26 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken) bool {
 		return false
 	}
 
-	// Space around operators
+	// Space around operators — but not between unary minus/plus and its operand.
+	// Unary context: - or + after ( or , (no space before or after the sign).
+	// After = or other operators, keep space before the sign but not after.
+	if (curr.Text == "-" || curr.Text == "+") && curr.Type == SQLTokenOperator {
+		// No space between ( or , and unary sign
+		if prev.Text == "(" || prev.Text == "," {
+			return false
+		}
+	}
+	if (prev.Text == "-" || prev.Text == "+") && prev.Type == SQLTokenOperator {
+		// No space between unary sign and its operand
+		var pp *SQLToken
+		if len(prevPrev) > 0 {
+			pp = prevPrev[0]
+		}
+		if pp != nil && (pp.Text == "(" || pp.Text == "," || pp.Text == "=" ||
+			pp.Type == SQLTokenOperator) {
+			return false
+		}
+	}
 	if prev.Type == SQLTokenOperator || curr.Type == SQLTokenOperator {
 		return true
 	}
