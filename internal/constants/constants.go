@@ -46,6 +46,17 @@ var CaseKeywords = []string{"CASE", "OTHERWISE"}
 // ProcedureLevelKeywords are keywords valid at procedure level.
 var ProcedureLevelKeywords = []string{"PARAMETERS", "DEFAULT", "PUBLIC", "DECLARE"}
 
+// DataSourceBuilderDirectives are colon-prefixed directives used in SQL data source
+// files. These are preprocessed by SqlDataSourceBuilder before SSL compilation and
+// are NOT part of the SSL grammar. They must not be flagged as unknown keywords.
+var DataSourceBuilderDirectives = []string{"DSN", "TABLENAME", "NULLASBLANK", "INVARIANTDATECOLUMNS"}
+
+// IsBuilderDirective checks if a normalized keyword name (without colon prefix)
+// is a SQL data source builder directive.
+func IsBuilderDirective(s string) bool {
+	return slices.Contains(DataSourceBuilderDirectives, s)
+}
+
 // SSLOperators contains all SSL operators (32 total in this list).
 // Note: the source of truth counts 36 total operators including `:` (member access),
 // `/*` (comment delimiter), and bitwise function calls (_AND, _OR, _XOR, _NOT).
@@ -286,6 +297,14 @@ var SSLKeywordDescriptions = map[string]string{
 	"ERROR":           "Legacy error handling marker; prefer TRY/CATCH/FINALLY",
 	"RESUME":          "Legacy resume-mode error handling keyword; prefer TRY/CATCH/FINALLY",
 	"LABEL":           "Defines a legacy Branch() target label",
+}
+
+// DataSourceBuilderDirectiveDescriptions maps builder directives to their descriptions.
+var DataSourceBuilderDirectiveDescriptions = map[string]string{
+	"DSN":                    "Specifies the database connection name for a SQL data source",
+	"TABLENAME":              "Specifies the dataset table name for a SQL data source",
+	"NULLASBLANK":            "When true, null values are converted to blank strings in the dataset",
+	"INVARIANTDATECOLUMNS":   "Specifies which date columns should remain culture-invariant",
 }
 
 // SSLOperatorDescriptions maps operators to their descriptions.

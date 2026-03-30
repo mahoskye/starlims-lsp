@@ -561,3 +561,25 @@ func TestSettingsAffectFormatting(t *testing.T) {
 		}
 	}
 }
+
+func TestIsDataSourceURI(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"file:///project/query.ds", true},
+		{"file:///project/query.ds.txt", true},
+		{"file:///project/query.DS", true},
+		{"file:///project/query.DS.TXT", true},
+		{"file:///project/script.ssl", false},
+		{"file:///project/script.ssl.txt", false},
+		{"file:///project/script.srvscr", false},
+		{"file:///project/code.go", false},
+	}
+
+	for _, tt := range tests {
+		if got := isDataSourceURI(tt.uri); got != tt.want {
+			t.Errorf("isDataSourceURI(%q) = %v, want %v", tt.uri, got, tt.want)
+		}
+	}
+}

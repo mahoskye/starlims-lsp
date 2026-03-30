@@ -256,13 +256,36 @@ func GetVariableCompletions(variables []parser.VariableInfo) []CompletionItem {
 	return items
 }
 
+// GetBuilderDirectiveCompletions returns completions for SQL data source builder directives.
+func GetBuilderDirectiveCompletions() []CompletionItem {
+	var items []CompletionItem
+	for _, directive := range constants.DataSourceBuilderDirectives {
+		desc := constants.DataSourceBuilderDirectiveDescriptions[directive]
+		if desc == "" {
+			desc = fmt.Sprintf("SQL data source builder directive: %s", directive)
+		}
+		items = append(items, CompletionItem{
+			Label:            ":" + directive,
+			Kind:             CompletionKindKeyword,
+			Detail:           "Builder Directive",
+			Documentation:    desc,
+			InsertText:       ":" + directive,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+	return items
+}
+
 // GetAllCompletions returns all completions.
-func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, classMethodContext bool) []CompletionItem {
+func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, classMethodContext bool, isDataSourceFile bool) []CompletionItem {
 	var items []CompletionItem
 	items = append(items, GetKeywordCompletions()...)
 	items = append(items, GetFunctionCompletions()...)
 	items = append(items, GetClassCompletions()...)
 	items = append(items, GetLiteralCompletions()...)
+	if isDataSourceFile {
+		items = append(items, GetBuilderDirectiveCompletions()...)
+	}
 	if classMethodContext {
 		items = append(items,
 			CompletionItem{
@@ -298,7 +321,59 @@ func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.Var
 }
 
 // GetSnippetCompletions returns common SSL code snippets.
-func GetSnippetCompletions() []CompletionItem {
+func GetSnippetCompletions(isDataSourceFile bool) []CompletionItem {
+	if isDataSourceFile {
+		return getDataSourceSnippets()
+	}
+	return getStandardSnippets()
+}
+
+// getDataSourceSnippets returns snippets specific to data source files.
+func getDataSourceSnippets() []CompletionItem {
+	return []CompletionItem{
+		{
+			Label:         "dsparams",
+			Kind:          CompletionKindSnippet,
+			Detail:        "Data Source Parameters",
+			Documentation: "Declare data source parameters with inline defaults",
+			InsertText:    `:PARAMETERS ${1:sParam1} := ${2:''};`,
+			InsertTextFormat: InsertTextFormatSnippet,
+		},
+		{
+			Label:         "sqlds",
+			Kind:          CompletionKindSnippet,
+			Detail:        "SQL Data Source",
+			Documentation: "SQL data source with builder directives and parameters",
+			InsertText: `/*
+ * Data Source: ${1:DataSourceName}
+ * Description: ${2:Brief description}
+;
+:DSN := ${3:DefaultDSN};
+:TABLENAME := ${4:Results};
+:PARAMETERS ${5:sParam1} := ${6:''};
+SELECT ${7:*}
+FROM ${8:TableName}
+WHERE ${9:Column} = ?${5:sParam1}?`,
+			InsertTextFormat: InsertTextFormatSnippet,
+		},
+		{
+			Label:         "sslds",
+			Kind:          CompletionKindSnippet,
+			Detail:        "SSL Data Source",
+			Documentation: "SSL data source with parameters",
+			InsertText: `/*
+ * Data Source: ${1:DataSourceName}
+ * Description: ${2:Brief description}
+;
+:PARAMETERS ${3:sParam1} := ${4:''};
+${0}`,
+			InsertTextFormat: InsertTextFormatSnippet,
+		},
+	}
+}
+
+// getStandardSnippets returns snippets for regular SSL scripts and classes.
+func getStandardSnippets() []CompletionItem {
 	return []CompletionItem{
 		{
 			Label:         "proc",

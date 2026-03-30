@@ -28,8 +28,9 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 
 	// Get all completions
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
-	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext)
-	snippets := providers.GetSnippetCompletions()
+	dsFile := isDataSourceURI(uri)
+	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile)
+	snippets := providers.GetSnippetCompletions(dsFile)
 
 	items := make([]protocol.CompletionItem, 0, len(completions)+len(snippets))
 	items = append(items, toProtocolCompletionItems(completions)...)

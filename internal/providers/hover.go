@@ -73,6 +73,16 @@ func getKeywordHover(word string) *Hover {
 		}
 	}
 
+	if constants.IsBuilderDirective(upper) {
+		description := constants.DataSourceBuilderDirectiveDescriptions[upper]
+		if description == "" {
+			description = fmt.Sprintf("SQL data source builder directive: %s", upper)
+		}
+		return &Hover{
+			Contents: fmt.Sprintf("**:%s** *(builder directive)*\n\n%s\n\nOnly valid in data source files (`.ds`, `.ds.txt`). Preprocessed by `SqlDataSourceBuilder` before SSL compilation.", upper, description),
+		}
+	}
+
 	return nil
 }
 

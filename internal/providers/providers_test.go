@@ -721,7 +721,7 @@ func TestGetFunctionCompletions(t *testing.T) {
 }
 
 func TestGetSnippetCompletions(t *testing.T) {
-	snippets := GetSnippetCompletions()
+	snippets := GetSnippetCompletions(false)
 
 	if len(snippets) == 0 {
 		t.Fatal("expected some snippet completions")
@@ -836,7 +836,7 @@ func TestGetAllCompletions(t *testing.T) {
 		{Name: "myVar", Line: 2, Column: 10, Scope: parser.ScopeLocal},
 	}
 
-	completions := GetAllCompletions(procedures, variables, false)
+	completions := GetAllCompletions(procedures, variables, false, false)
 
 	if len(completions) == 0 {
 		t.Fatal("expected some completions")
@@ -876,7 +876,7 @@ func TestGetAllCompletions(t *testing.T) {
 }
 
 func TestGetAllCompletions_ClassMethodContextIncludesClassForms(t *testing.T) {
-	completions := GetAllCompletions(nil, nil, true)
+	completions := GetAllCompletions(nil, nil, true, false)
 
 	foundMe := false
 	foundBase := false
@@ -6510,5 +6510,267 @@ func TestGetDiagnostics_IncludeBeforeProcedure_NoWarning(t *testing.T) {
 		if strings.Contains(d.Message, "inside a procedure body") {
 			t.Error(":INCLUDE before procedures should not be flagged as inside a procedure")
 		}
+	}
+}
+
+// ==================== Data Source Diagnostics ====================
+
+// ==================== Data Source Completions ====================
+
+func TestGetSnippetCompletions_DataSource(t *testing.T) {
+	snippets := GetSnippetCompletions(true)
+
+	foundDSParams := false
+	foundSQLDS := false
+	foundSSLDS := false
+	for _, s := range snippets {
+		switch s.Label {
+		case "dsparams":
+			foundDSParams = true
+		case "sqlds":
+			foundSQLDS = true
+		case "sslds":
+			foundSSLDS = true
+		}
+	}
+
+	if !foundDSParams {
+		t.Error("expected dsparams snippet for data source files")
+	}
+	if !foundSQLDS {
+		t.Error("expected sqlds snippet for data source files")
+	}
+	if !foundSSLDS {
+		t.Error("expected sslds snippet for data source files")
+	}
+
+	// Should NOT include standard snippets like proc, if, while
+	for _, s := range snippets {
+		if s.Label == "proc" || s.Label == "if" || s.Label == "while" {
+			t.Errorf("data source snippets should not include standard snippet %q", s.Label)
+		}
+	}
+}
+
+func TestGetAllCompletions_DataSourceIncludesBuilderDirectives(t *testing.T) {
+	completions := GetAllCompletions(nil, nil, false, true)
+
+	foundDSN := false
+	foundTableName := false
+	for _, c := range completions {
+		switch c.Label {
+		case ":DSN":
+			foundDSN = true
+		case ":TABLENAME":
+			foundTableName = true
+		}
+	}
+
+	if !foundDSN {
+		t.Error("expected :DSN completion in data source file")
+	}
+	if !foundTableName {
+		t.Error("expected :TABLENAME completion in data source file")
+	}
+}
+
+func TestGetAllCompletions_NonDataSourceExcludesBuilderDirectives(t *testing.T) {
+	completions := GetAllCompletions(nil, nil, false, false)
+
+	for _, c := range completions {
+		if c.Label == ":DSN" || c.Label == ":TABLENAME" || c.Label == ":NULLASBLANK" || c.Label == ":INVARIANTDATECOLUMNS" {
+			t.Errorf("regular script should not offer builder directive completion %q", c.Label)
+		}
+	}
+}
+
+// ==================== Data Source Hover ====================
+
+func TestGetHover_BuilderDirective(t *testing.T) {
+	hover := getKeywordHover(":DSN")
+	if hover == nil {
+		t.Fatal("expected hover info for :DSN builder directive")
+	}
+	if !strings.Contains(hover.Contents, "builder directive") {
+		t.Error("expected hover to mention 'builder directive'")
+	}
+	if !strings.Contains(hover.Contents, "database connection") {
+		t.Error("expected hover to describe DSN purpose")
+	}
+}
+
+func TestGetHover_BuilderDirective_AllDirectives(t *testing.T) {
+	directives := []string{":DSN", ":TABLENAME", ":NULLASBLANK", ":INVARIANTDATECOLUMNS"}
+	for _, d := range directives {
+		hover := getKeywordHover(d)
+		if hover == nil {
+			t.Errorf("expected hover info for %s", d)
+		}
+	}
+}
+
+// ==================== Data Source Diagnostics ====================
+
+func TestGetDiagnostics_DataSource_BuilderDirectivesNotFlaggedAsUnknown(t *testing.T) {
+	// SQL data source with builder directives should not get "Unknown SSL keyword" warnings
+	code := `:DSN := MyConnection;
+:TABLENAME := Results;
+:NULLASBLANK := true;
+:INVARIANTDATECOLUMNS := DateCreated, DateModified;
+:PARAMETERS sName := '';
+SELECT * FROM Table1 WHERE Name = ?sName?`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Unknown SSL keyword") {
+			t.Errorf("builder directive should not be flagged as unknown keyword: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_DefaultStatementFlagged(t *testing.T) {
+	// Data source files should not use separate :DEFAULT statements
+	code := `:PARAMETERS sName;
+:DEFAULT sName, '';`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "inline ':=' defaults") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic flagging :DEFAULT usage in data source file")
+	}
+}
+
+func TestGetDiagnostics_DataSource_MissingInlineDefault(t *testing.T) {
+	// Every parameter must have an inline := default in data source files
+	code := `:PARAMETERS sName, nCount := 10;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "sName") && strings.Contains(d.Message, "inline ':=' default") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic for parameter 'sName' missing inline default")
+	}
+}
+
+func TestGetDiagnostics_DataSource_ValidInlineDefaults(t *testing.T) {
+	// Valid data source :PARAMETERS with inline defaults should not produce errors
+	code := `:PARAMETERS sName := '', nCount := 10;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "inline ':=' default") {
+			t.Errorf("valid inline defaults should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_IdentifierDefaultNotFalsePositive(t *testing.T) {
+	// Default values that are identifiers (constants/variables) should NOT be
+	// flagged as parameters missing defaults
+	code := `:PARAMETERS sName := DEFAULT_VALUE, nCount := SOME_CONST;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "DEFAULT_VALUE") && strings.Contains(d.Message, "inline ':=' default") {
+			t.Error("identifier default value 'DEFAULT_VALUE' should not be flagged as a parameter missing a default")
+		}
+		if strings.Contains(d.Message, "SOME_CONST") && strings.Contains(d.Message, "inline ':=' default") {
+			t.Error("identifier default value 'SOME_CONST' should not be flagged as a parameter missing a default")
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_ExpressionDefaultNotFalsePositive(t *testing.T) {
+	// Default values with complex expressions should not produce false positives
+	code := `:PARAMETERS sName := 'hello' + ' world', nVal := 1 + 2;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "inline ':=' default") {
+			t.Errorf("expression default should not produce false positive: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_NoFalseParameterPlacementErrors(t *testing.T) {
+	// :PARAMETERS after builder directives should not trigger placement errors
+	code := `:DSN := MyConn;
+:TABLENAME := Results;
+:PARAMETERS sName := '';
+SELECT * FROM Table1`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "must appear before top-level statements") {
+			t.Errorf("data source file should not get parameter placement error: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_BuilderDirectiveCaseSensitive(t *testing.T) {
+	// Builder directives must be uppercase
+	code := `:dsn := MyConnection;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "uppercase") && strings.Contains(d.Message, ":DSN") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic for lowercase builder directive")
+	}
+}
+
+func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testing.T) {
+	// In regular script files, builder directives should be flagged as unknown keywords
+	code := `:DSN := MyConnection;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = false
+	diagnostics := GetDiagnostics(code, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Unknown SSL keyword") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected unknown keyword diagnostic for :DSN in regular script file")
 	}
 }

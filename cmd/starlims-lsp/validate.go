@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -163,7 +164,13 @@ func validateFilePath(filePath string) DiagnosticOutput {
 		}
 	}
 
-	return validateContent(fileName, string(content))
+	return validateContent(fileName, string(content), isDataSourcePath(fileName))
+}
+
+// isDataSourcePath checks if a file path refers to a data source file (.ds or .ds.txt).
+func isDataSourcePath(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".ds") || strings.HasSuffix(lower, ".ds.txt")
 }
 
 func validateStdin() DiagnosticOutput {
@@ -184,10 +191,10 @@ func validateStdin() DiagnosticOutput {
 		}
 	}
 
-	return validateContent("stdin", string(content))
+	return validateContent("stdin", string(content), false)
 }
 
-func validateContent(name string, content string) DiagnosticOutput {
+func validateContent(name string, content string, isDataSource bool) DiagnosticOutput {
 	// Tokenize
 	lex := lexer.NewLexer(content)
 	tokens := lex.Tokenize()
@@ -198,6 +205,7 @@ func validateContent(name string, content string) DiagnosticOutput {
 
 	// Get diagnostics with default options
 	opts := providers.DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = isDataSource
 	diagnostics := providers.GetDiagnosticsFromTokens(tokens, ast, opts)
 
 	// Convert to output format

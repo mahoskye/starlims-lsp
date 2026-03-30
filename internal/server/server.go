@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"strings"
 
 	"starlims-lsp/internal/providers"
 
@@ -400,6 +401,12 @@ func applyOptional[T any](target *T, value *T) {
 	}
 }
 
+// isDataSourceURI checks if a document URI refers to a data source file (.ds or .ds.txt).
+func isDataSourceURI(uri string) bool {
+	lower := strings.ToLower(uri)
+	return strings.HasSuffix(lower, ".ds") || strings.HasSuffix(lower, ".ds.txt")
+}
+
 // validateDocument validates a document and sends diagnostics.
 func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	if _, ok := s.documents.GetDocument(uri); !ok {
@@ -408,7 +415,9 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
-	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, s.settings.Diagnostics)
+	opts := s.settings.Diagnostics
+	opts.IsDataSourceFile = isDataSourceURI(uri)
+	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 
 	// Convert to protocol diagnostics
 	protocolDiags := make([]protocol.Diagnostic, 0, len(diagnostics))

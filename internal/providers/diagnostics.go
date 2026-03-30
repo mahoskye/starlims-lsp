@@ -52,6 +52,7 @@ type DiagnosticOptions struct {
 	HungarianPrefixes      []string
 	GlobalVariables        []string
 	MaxBlockDepth          int
+	IsDataSourceFile       bool
 }
 
 // DefaultDiagnosticOptions returns default diagnostic options.
@@ -125,14 +126,20 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	}
 
 	// SSL language rule enforcement (always enabled)
-	diagnostics = append(diagnostics, checkKeywordForms(tokens)...)
+	if opts.IsDataSourceFile {
+		diagnostics = append(diagnostics, checkKeywordFormsDataSource(tokens)...)
+		diagnostics = append(diagnostics, checkDataSourceDefaultUsage(tokens)...)
+		diagnostics = append(diagnostics, checkDataSourceParameterDefaults(tokens)...)
+	} else {
+		diagnostics = append(diagnostics, checkKeywordForms(tokens)...)
+		diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
+		diagnostics = append(diagnostics, checkParameterPlacement(tokens)...)
+		diagnostics = append(diagnostics, checkDefaultPlacement(tokens)...)
+	}
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
 	diagnostics = append(diagnostics, checkMissingOtherwise(tokens)...)
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
-	diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
-	diagnostics = append(diagnostics, checkParameterPlacement(tokens)...)
-	diagnostics = append(diagnostics, checkDefaultPlacement(tokens)...)
 	diagnostics = append(diagnostics, checkInlineCodeNaming(tokens)...)
 	diagnostics = append(diagnostics, checkBeginCaseHasCase(tokens)...)
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
@@ -4312,6 +4319,187 @@ func checkNotEqualsAsymmetry(tokens []lexer.Token) []Diagnostic {
 				Message:  "'!=' negates '==' (exact match), not '=' (prefix match). For strings, '=' and '!=' are NOT logical opposites",
 				Source:   "ssl-lsp",
 			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkKeywordFormsDataSource is the data-source variant of checkKeywordForms.
+// It accepts builder directives (:DSN, :TABLENAME, :NULLASBLANK, :INVARIANTDATECOLUMNS)
+// as valid colon-prefixed forms instead of flagging them as unknown keywords.
+func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+
+		text := token.Text
+		normalized := strings.ToUpper(strings.TrimPrefix(text, ":"))
+
+		if strings.HasPrefix(text, ":") {
+			if isLegacyLabelKeywordForm(text) {
+				if !strings.HasPrefix(text, ":LABEL") {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  "SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'",
+						Source:   "ssl-lsp",
+					})
+				}
+				continue
+			}
+
+			// Builder directives are valid in data source files
+			if constants.IsBuilderDirective(normalized) {
+				canonical := ":" + normalized
+				if text != canonical {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Builder directives must be uppercase: use '%s'", canonical),
+						Source:   "ssl-lsp",
+					})
+				}
+				continue
+			}
+
+			if !constants.IsKeyword(normalized) {
+				if normalized == "ENDFOR" {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  "':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'",
+						Source:   "ssl-lsp",
+					})
+				} else {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Unknown SSL keyword: '%s'", text),
+						Source:   "ssl-lsp",
+					})
+				}
+				continue
+			}
+
+			canonical := ":" + normalized
+			if text != canonical {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(token),
+					Message:  fmt.Sprintf("SSL keywords are case-sensitive and must be uppercase: use '%s'", canonical),
+					Source:   "ssl-lsp",
+				})
+			}
+			continue
+		}
+
+		if constants.IsKeyword(normalized) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("SSL keywords must be colon-prefixed: use ':%s'", normalized),
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkDataSourceDefaultUsage flags :DEFAULT statements in data source files.
+// Data sources use inline := defaults in :PARAMETERS, not separate :DEFAULT statements.
+func checkDataSourceDefaultUsage(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		if normalized == "DEFAULT" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  "Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements",
+				Source:   "ssl-lsp",
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkDataSourceParameterDefaults checks that every parameter in a data source
+// :PARAMETERS declaration has an inline := default value.
+// Expected syntax: :PARAMETERS p1 := val1, p2 := val2;
+//
+// The scanner uses a state machine: after finding a parameter name (identifier),
+// it expects := followed by a default value. The default value is consumed
+// (skipped until , or ;) so that identifiers within default values are not
+// mistaken for parameter names.
+func checkDataSourceParameterDefaults(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		if normalized != "PARAMETERS" {
+			continue
+		}
+
+		// State machine scanning the :PARAMETERS statement.
+		// expectParam: true when we expect the next identifier to be a parameter name.
+		j := i + 1
+		expectParam := true
+		for j < len(tokens) {
+			t := tokens[j]
+			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				j++
+				continue
+			}
+
+			if expectParam && t.Type == lexer.TokenIdentifier {
+				// This is a parameter name. Look ahead for :=
+				k := j + 1
+				for k < len(tokens) && tokens[k].Type == lexer.TokenWhitespace {
+					k++
+				}
+				if k >= len(tokens) || tokens[k].Type != lexer.TokenOperator || tokens[k].Text != ":=" {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(t),
+						Message:  fmt.Sprintf("Data source parameter '%s' must have an inline ':=' default value", t.Text),
+						Source:   "ssl-lsp",
+					})
+					// Skip to next comma or semicolon
+					for j < len(tokens) && !(tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ";")) {
+						j++
+					}
+				} else {
+					// Skip past := and consume the default value until , or ;
+					j = k + 1
+					for j < len(tokens) && !(tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ";")) {
+						j++
+					}
+				}
+				expectParam = false
+				continue
+			}
+
+			if t.Type == lexer.TokenPunctuation && t.Text == "," {
+				expectParam = true
+			}
+			j++
 		}
 	}
 

@@ -29,10 +29,11 @@ type IndexedProcedure struct {
 
 // FileSymbols stores the indexed symbols for a single file.
 type FileSymbols struct {
-	URI        string
-	Procedures []IndexedProcedure
-	IsClass    bool
-	ModTime    time.Time
+	URI          string
+	Procedures   []IndexedProcedure
+	IsClass      bool
+	IsDataSource bool
+	ModTime      time.Time
 }
 
 // WorkspaceSymbolResult is returned by SearchSymbols.
@@ -160,10 +161,11 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 	}
 
 	fs := &FileSymbols{
-		URI:        uri,
-		Procedures: indexed,
-		IsClass:    isClassFileFromTokens(tokens),
-		ModTime:    info.ModTime(),
+		URI:          uri,
+		Procedures:   indexed,
+		IsClass:      isClassFileFromTokens(tokens),
+		IsDataSource: isDataSourceURI(uri),
+		ModTime:      info.ModTime(),
 	}
 
 	wi.mu.Lock()
