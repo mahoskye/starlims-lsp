@@ -1836,15 +1836,41 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 		{"===", "==", "SSL uses '==' for exact equality, not '==='"},
 	}
 
+	// C-style logical operators — & and | aren't in the SSL operator charset,
+	// so the lexer produces them as TokenUnknown. Check for adjacent pairs.
+	invalidUnknownPairs := map[string]string{
+		"&&": ".AND.",
+		"||": ".OR.",
+	}
+
 	for i, token := range tokens {
+		// Check adjacent unknown token pairs for && and ||
+		if token.Type == lexer.TokenUnknown && i+1 < len(tokens) && tokens[i+1].Type == lexer.TokenUnknown {
+			next := tokens[i+1]
+			if token.Offset+len(token.Text) == next.Offset {
+				combined := token.Text + next.Text
+				if suggestion, ok := invalidUnknownPairs[combined]; ok {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range: Range{
+							Start: Position{Line: token.Line - 1, Character: token.Column - 1},
+							End:   Position{Line: next.Line - 1, Character: next.Column - 1 + len(next.Text)},
+						},
+						Message: fmt.Sprintf("SSL uses '%s' instead of '%s'", suggestion, combined),
+						Source:  "ssl-lsp",
+					})
+					continue
+				}
+			}
+		}
+
 		if token.Type != lexer.TokenOperator {
 			continue
 		}
 
-		// Check adjacent operator pairs (no whitespace between them)
+		// Check adjacent operator pairs for !== and ===
 		if i+1 < len(tokens) && tokens[i+1].Type == lexer.TokenOperator {
 			next := tokens[i+1]
-			// Only flag if they're adjacent (no gap)
 			if token.Offset+len(token.Text) == next.Offset {
 				combined := token.Text + next.Text
 				for _, fix := range invalidPairs {
