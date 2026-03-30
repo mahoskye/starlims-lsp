@@ -377,33 +377,24 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		}
 
 		// Multi-line detection: if a /* comment spans multiple lines (contains
-		// newlines in its token text), the semicolon terminated what was likely
-		// a multi-line block comment. A single-line comment ending with ;
-		// followed by code on the next line is normal SSL.
+		// newlines in its token text) and the next token is a bare keyword
+		// (without the required : prefix), the semicolon almost certainly
+		// terminated the comment prematurely — normal code never has bare
+		// keywords like "Parameters", "Default", "For", etc.
 		if !strings.HasPrefix(token.Text, "/*") {
 			continue
 		}
 		if !strings.Contains(token.Text, "\n") {
-			// Single-line comment — the semicolon is the intentional terminator.
 			continue
 		}
-
-		// The comment token spans multiple lines but was cut short by a
-		// semicolon inside the text. Check that the next token isn't a
-		// valid statement start (colon-prefixed keyword or another comment).
-		if nextToken.Type == lexer.TokenComment {
-			continue
+		if nextToken.Type == lexer.TokenKeyword && !strings.HasPrefix(nextToken.Text, ":") {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  "Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons",
+				Source:   "ssl-lsp",
+			})
 		}
-		if nextToken.Type == lexer.TokenKeyword && strings.HasPrefix(nextToken.Text, ":") {
-			continue
-		}
-
-		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityError,
-			Range:    tokenToRange(token),
-			Message:  "Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons",
-			Source:   "ssl-lsp",
-		})
 	}
 
 	return diagnostics
