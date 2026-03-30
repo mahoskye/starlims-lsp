@@ -213,6 +213,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else if upperText == "UPDATE" && prevUpper == "FOR" {
 					// FOR UPDATE is a compound clause — stays on one line
 					needsBreak = false
+				} else if upperText == "CASE" && prev != nil && prev.Type == SQLTokenOperator {
+					// CASE after = in SET clause stays inline: fldsts = CASE WHEN ...
+					needsBreak = false
 				} else {
 					needsBreak = true
 					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
