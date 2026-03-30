@@ -325,9 +325,10 @@ func checkTokenErrors(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkCommentTermination warns when a block comment ends and additional tokens
-// continue on the same line, which usually means a semicolon inside comment text
-// terminated the comment earlier than intended.
+// checkCommentTermination detects block comments where a semicolon inside the
+// text terminates the comment prematurely, causing the remaining text to become
+// executable code. This is one of the most destructive errors in SSL — a single
+// stray semicolon in a header comment can corrupt the entire file's parse.
 func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -346,14 +347,6 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		nextIdx := nextSignificantTokenIndex(tokens, i+1)
-		if nextIdx < 0 {
-			continue
-		}
-		if tokens[nextIdx].Line != token.Line {
-			continue
-		}
-
 		// Skip region marker comments — the semicolon after the region name
 		// is intentional and does not indicate premature termination.
 		trimmed := strings.TrimSpace(strings.TrimPrefix(token.Text, "/*"))
@@ -363,10 +356,51 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+		if nextIdx < 0 {
+			continue
+		}
+
+		nextToken := tokens[nextIdx]
+
+		// Same-line continuation: always flag — the semicolon clearly
+		// terminated the comment before the line ended.
+		if nextToken.Line == token.Line {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  "Comment terminated early by semicolon. Text after the ';' becomes executable code. Rewrite the comment to avoid internal semicolons",
+				Source:   "ssl-lsp",
+			})
+			continue
+		}
+
+		// Multi-line detection: if a /* comment spans multiple lines (contains
+		// newlines in its token text), the semicolon terminated what was likely
+		// a multi-line block comment. A single-line comment ending with ;
+		// followed by code on the next line is normal SSL.
+		if !strings.HasPrefix(token.Text, "/*") {
+			continue
+		}
+		if !strings.Contains(token.Text, "\n") {
+			// Single-line comment — the semicolon is the intentional terminator.
+			continue
+		}
+
+		// The comment token spans multiple lines but was cut short by a
+		// semicolon inside the text. Check that the next token isn't a
+		// valid statement start (colon-prefixed keyword or another comment).
+		if nextToken.Type == lexer.TokenComment {
+			continue
+		}
+		if nextToken.Type == lexer.TokenKeyword && strings.HasPrefix(nextToken.Text, ":") {
+			continue
+		}
+
 		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityWarning,
+			Severity: SeverityError,
 			Range:    tokenToRange(token),
-			Message:  "Comment appears to terminate before the line ends. A semicolon inside comment text makes the remaining text executable code",
+			Message:  "Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons",
 			Source:   "ssl-lsp",
 		})
 	}
