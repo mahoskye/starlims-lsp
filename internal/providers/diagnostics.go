@@ -363,13 +363,14 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 
 		nextToken := tokens[nextIdx]
 
-		// Same-line continuation: always flag — the semicolon clearly
-		// terminated the comment before the line ended.
+		// Same-line continuation: the semicolon terminated the comment
+		// before the line ended. The remaining text becomes executable code,
+		// which may be intentional or may be hiding code accidentally.
 		if nextToken.Line == token.Line {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
+				Severity: SeverityWarning,
 				Range:    tokenToRange(token),
-				Message:  "Comment terminated early by semicolon. Text after the ';' becomes executable code. Rewrite the comment to avoid internal semicolons",
+				Message:  "Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden",
 				Source:   "ssl-lsp",
 			})
 			continue
