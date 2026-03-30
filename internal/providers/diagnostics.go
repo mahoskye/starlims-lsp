@@ -139,6 +139,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
 	diagnostics = append(diagnostics, checkMissingOtherwise(tokens)...)
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
+	diagnostics = append(diagnostics, checkInvalidOperatorSequences(tokens)...)
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
 	diagnostics = append(diagnostics, checkInlineCodeNaming(tokens)...)
 	diagnostics = append(diagnostics, checkBeginCaseHasCase(tokens)...)
@@ -1813,6 +1814,54 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 				Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
 				Source:   "ssl-lsp",
 			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkInvalidOperatorSequences detects adjacent operator tokens that form
+// invalid compound operators common in other languages (e.g. !==, ===, &&, ||).
+func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Map of (op1 + op2) -> suggestion
+	type opFix struct {
+		combined    string
+		suggestion  string
+		description string
+	}
+	invalidPairs := []opFix{
+		{"!==", "!=", "SSL uses '!=' or '<>' for inequality, not '!=='"},
+		{"===", "==", "SSL uses '==' for exact equality, not '==='"},
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenOperator {
+			continue
+		}
+
+		// Check adjacent operator pairs (no whitespace between them)
+		if i+1 < len(tokens) && tokens[i+1].Type == lexer.TokenOperator {
+			next := tokens[i+1]
+			// Only flag if they're adjacent (no gap)
+			if token.Offset+len(token.Text) == next.Offset {
+				combined := token.Text + next.Text
+				for _, fix := range invalidPairs {
+					if combined == fix.combined {
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityError,
+							Range: Range{
+								Start: Position{Line: token.Line - 1, Character: token.Column - 1},
+								End:   Position{Line: next.Line - 1, Character: next.Column - 1 + len(next.Text)},
+							},
+							Message: fmt.Sprintf("%s. Use '%s' instead", fix.description, fix.suggestion),
+							Source:  "ssl-lsp",
+						})
+						break
+					}
+				}
+			}
 		}
 	}
 
