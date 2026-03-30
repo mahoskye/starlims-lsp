@@ -354,6 +354,15 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
+		// Skip region marker comments — the semicolon after the region name
+		// is intentional and does not indicate premature termination.
+		trimmed := strings.TrimSpace(strings.TrimPrefix(token.Text, "/*"))
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "//"))
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "region") || strings.HasPrefix(lower, "endregion") {
+			continue
+		}
+
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
 			Range:    tokenToRange(token),
@@ -449,14 +458,36 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 
 		// Look back to see if preceded by an identifier (skip whitespace)
 		precedingIsIdent := false
+		precedingIdentIdx := -1
 		for j := i - 1; j >= 0; j-- {
 			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
 				continue
 			}
 			if tokens[j].Type == lexer.TokenIdentifier {
 				precedingIsIdent = true
+				precedingIdentIdx = j
 			}
 			break
+		}
+
+		// Skip dots in :INCLUDE namespace paths (e.g. :INCLUDE File_Helpers.FileWork)
+		if precedingIsIdent && precedingIdentIdx >= 0 {
+			isInclude := false
+			for j := precedingIdentIdx - 1; j >= 0; j-- {
+				if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+					continue
+				}
+				if tokens[j].Type == lexer.TokenKeyword {
+					kw := strings.ToUpper(strings.TrimPrefix(tokens[j].Text, ":"))
+					if kw == "INCLUDE" {
+						isInclude = true
+					}
+				}
+				break
+			}
+			if isInclude {
+				continue
+			}
 		}
 
 		if precedingIsIdent {
@@ -4506,6 +4537,27 @@ func checkDataSourceParameterDefaults(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// safeSQLBuilderFunctions lists functions that produce safe SQL fragments
+// (e.g. properly escaped IN-clause value lists). Concatenating their return
+// value into a SQL string is not an injection risk.
+var safeSQLBuilderFunctions = map[string]bool{
+	"BUILDSTRINGFORIN": true,
+}
+
+// isSafeSQLBuilderCall checks if the token at idx is the start of a call to a
+// known-safe SQL builder function (e.g. BuildStringForIn(...)).
+func isSafeSQLBuilderCall(tokens []lexer.Token, idx int) bool {
+	if idx >= len(tokens) || tokens[idx].Type != lexer.TokenIdentifier {
+		return false
+	}
+	if !safeSQLBuilderFunctions[strings.ToUpper(tokens[idx].Text)] {
+		return false
+	}
+	// Verify it's actually a call — next significant token should be "("
+	nextIdx := nextSignificantTokenIndex(tokens, idx+1)
+	return nextIdx >= 0 && tokens[nextIdx].Text == "("
+}
+
 // checkSQLConcatenationInjection detects string concatenation in SQL function arguments,
 // which may indicate SQL injection vulnerability.
 // Source of truth: ssl-style-guide.schema.yaml lints.security.prevent_sql_injection.
@@ -4552,6 +4604,11 @@ func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
 				if t.Type == lexer.TokenString {
 					nextIdx := nextSignificantTokenIndex(tokens, j+1)
 					if nextIdx >= 0 && tokens[nextIdx].Text == "+" {
+						// Skip if concatenating with a known-safe builder function
+						afterPlusIdx := nextSignificantTokenIndex(tokens, nextIdx+1)
+						if afterPlusIdx >= 0 && isSafeSQLBuilderCall(tokens, afterPlusIdx) {
+							break
+						}
 						diagnostics = append(diagnostics, Diagnostic{
 							Severity: SeverityWarning,
 							Range:    tokenToRange(tokens[nextIdx]),
