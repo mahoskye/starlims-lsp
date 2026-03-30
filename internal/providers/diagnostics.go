@@ -1795,12 +1795,14 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 
 // checkIncludePlacement reports :INCLUDE directives that appear after other
 // significant statements or inside procedure bodies.
-// Source of truth: ssl_agent_instructions.md — :INCLUDE must be at file start, not inside procedures.
+// Recommended conventional order: :PARAMETERS, :DEFAULT, :INCLUDE, :PUBLIC, :DECLARE.
+// :PARAMETERS and :DEFAULT are required to precede :INCLUDE, so they don't
+// count as "non-include statements" for the late-placement warning.
 func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	startOfStatement := true
-	seenNonIncludeStatement := false
+	seenNonPreambleStatement := false
 	procedureDepth := 0
 
 	for _, token := range tokens {
@@ -1832,25 +1834,36 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 
 		startOfStatement = false
 
-		if token.Type == lexer.TokenKeyword && strings.ToUpper(strings.TrimPrefix(token.Text, ":")) == "INCLUDE" {
-			if procedureDepth > 0 {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
-					Range:    tokenToRange(token),
-					Message:  "':INCLUDE' inside a procedure body is not supported. Place it at the top of the file",
-					Source:   "ssl-lsp",
-				})
-			} else if seenNonIncludeStatement {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityInfo,
-					Range:    tokenToRange(token),
-					Message:  "':INCLUDE' is an include directive. Place it at the top of the file for clarity",
-					Source:   "ssl-lsp",
-				})
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+
+			if normalized == "INCLUDE" {
+				if procedureDepth > 0 {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  "':INCLUDE' inside a procedure body is not supported",
+						Source:   "ssl-lsp",
+					})
+				} else if seenNonPreambleStatement {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityInfo,
+						Range:    tokenToRange(token),
+						Message:  "':INCLUDE' should appear early in the file. Recommended order: :PARAMETERS, :DEFAULT, :INCLUDE, :PUBLIC, :DECLARE",
+						Source:   "ssl-lsp",
+					})
+				}
+				continue
 			}
-		} else {
-			seenNonIncludeStatement = true
+
+			// :PARAMETERS and :DEFAULT are required to precede :INCLUDE,
+			// so they don't trigger the late-placement warning.
+			if normalized == "PARAMETERS" || normalized == "DEFAULT" {
+				continue
+			}
 		}
+
+		seenNonPreambleStatement = true
 	}
 
 	return diagnostics
