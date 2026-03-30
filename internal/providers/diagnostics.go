@@ -1836,21 +1836,33 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 		{"===", "==", "SSL uses '==' for exact equality, not '==='"},
 	}
 
-	// Invalid single-token operators (C-style logical, etc.)
-	invalidOperators := map[string]string{
+	// C-style logical operators with SSL equivalents
+	invalidLogicalOperators := map[string]string{
 		"&&": ".AND.",
 		"||": ".OR.",
-		"&":  ".AND.",
-		"|":  ".OR.",
+	}
+	// Operators that are simply invalid in SSL (no direct equivalent)
+	invalidOperatorSet := map[string]bool{
+		"&": true,
+		"|": true,
 	}
 
 	for i, token := range tokens {
 		if token.Type == lexer.TokenOperator {
-			if suggestion, ok := invalidOperators[token.Text]; ok {
+			if suggestion, ok := invalidLogicalOperators[token.Text]; ok {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("SSL uses '%s' instead of '%s'", suggestion, token.Text),
+					Source:   "ssl-lsp",
+				})
+				continue
+			}
+			if invalidOperatorSet[token.Text] {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(token),
+					Message:  fmt.Sprintf("'%s' is not a valid SSL operator", token.Text),
 					Source:   "ssl-lsp",
 				})
 				continue
