@@ -369,15 +369,10 @@ func (l *Lexer) readIdentifier() Token {
 	}
 
 	str := text.String()
-	upper := strings.ToUpper(str)
-	// Bare keyword detection: SSL keywords MUST be colon-prefixed (:IF, :FOR, etc.).
-	// Bare identifiers matching keyword names are tagged as TokenKeyword so
-	// the diagnostics layer can warn about the missing colon prefix.
-	if constants.IsKeyword(upper) {
-		return Token{Type: TokenKeyword, Text: str, Line: line, Column: col, Offset: start}
-	}
-	// Check for literals like NIL
-	if constants.IsSSLLiteral(upper) {
+
+	// NIL is a language literal (like null), not a control-flow keyword.
+	// Recognize it so the formatter can normalize casing.
+	if constants.IsSSLLiteral(strings.ToUpper(str)) {
 		return Token{Type: TokenKeyword, Text: str, Line: line, Column: col, Offset: start}
 	}
 

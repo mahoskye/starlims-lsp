@@ -1088,7 +1088,8 @@ func TestGetDiagnostics_DefaultMustFollowParameters(t *testing.T) {
 	t.Fatal("expected ':DEFAULT' placement diagnostic")
 }
 
-func TestGetDiagnostics_KeywordMustBeColonPrefixed(t *testing.T) {
+func TestGetDiagnostics_BareKeywordNameIsIdentifier(t *testing.T) {
+	// IF without a colon is just an identifier, not a keyword — no diagnostic.
 	text := `IF x = 1;
     value := 1;
 ENDIF;`
@@ -1097,11 +1098,9 @@ ENDIF;`
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "must be colon-prefixed") {
-			return
+			t.Error("bare keyword-named identifier should not trigger colon-prefix diagnostic")
 		}
 	}
-
-	t.Fatal("expected colon-prefix keyword diagnostic")
 }
 
 func TestGetDiagnostics_KeywordMustBeUppercase(t *testing.T) {
@@ -1464,7 +1463,7 @@ func TestGetDiagnostics_IncludeAtTop(t *testing.T) {
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Place it at the top of the file") {
+		if strings.Contains(d.Message, "should appear early in the file") {
 			return
 		}
 	}
@@ -1652,7 +1651,7 @@ x := 1;`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Comment appears to terminate before the line ends") {
+		if strings.Contains(d.Message, "Comment terminated early by semicolon") {
 			return
 		}
 	}
@@ -3976,6 +3975,88 @@ func TestGetDiagnostics_ComplexSQLPlaceholder_SimpleNotFlagged(t *testing.T) {
 	}
 }
 
+// --- UDObject array property in IN clause tests ---
+
+func TestGetDiagnostics_UDObjectArrayInClause_Flagged(t *testing.T) {
+	// UDObject property access inside IN(...) should warn
+	code := `SQLExecute("SELECT * FROM T WHERE id IN (?oObj:aItems?)");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "UDObject array property") && strings.Contains(d.Message, "oObj:aItems") {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected Warning severity, got %d", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic for UDObject property in IN clause, got none")
+	}
+}
+
+func TestGetDiagnostics_UDObjectArrayInClause_NotFlaggedOutsideIN(t *testing.T) {
+	// Property access in a WHERE = clause (not IN) should NOT be flagged
+	code := `SQLExecute("SELECT * FROM T WHERE name = ?oObj:sName?");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "UDObject array property") {
+			t.Fatalf("property access outside IN clause should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_UDObjectArrayInClause_LocalVarNotFlagged(t *testing.T) {
+	// Local variable (no ':') in IN clause should NOT be flagged
+	code := `SQLExecute("SELECT * FROM T WHERE id IN (?aLocalIds?)");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "UDObject array property") {
+			t.Fatalf("local variable in IN clause should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_UDObjectArrayInClause_CaseInsensitive(t *testing.T) {
+	// IN keyword should be detected case-insensitively
+	code := `SQLExecute("SELECT * FROM T WHERE id in (?oObj:aList?)");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "UDObject array property") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic for UDObject property in lowercase 'in' clause")
+	}
+}
+
+func TestGetDiagnostics_UDObjectArrayInClause_WithSpaces(t *testing.T) {
+	// Various spacing around IN ( should still be detected
+	code := `SQLExecute("SELECT * FROM T WHERE id IN  (  ?oObj:aIds?  )");`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "UDObject array property") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected diagnostic with extra whitespace around IN clause")
+	}
+}
+
 func TestGetDiagnostics_BeginCaseRequiresCase(t *testing.T) {
 	// Agent instructions: BEGINCASE requires at least one CASE block
 	code := `:BEGINCASE;
@@ -4613,7 +4694,7 @@ x := 1;
 	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "':INCLUDE' is an include directive") {
+		if strings.Contains(d.Message, "should appear early in the file") {
 			return
 		}
 	}
@@ -4629,7 +4710,7 @@ x := 1;`
 	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "':INCLUDE' is an include directive") {
+		if strings.Contains(d.Message, "should appear early in the file") {
 			t.Error(":INCLUDE at top should not be flagged")
 		}
 	}

@@ -166,6 +166,38 @@ func GetLiteralCompletions() []CompletionItem {
 	return items
 }
 
+// GetStatusKeywordCompletions returns completions for predefined status keyword globals.
+func GetStatusKeywordCompletions() []CompletionItem {
+	var items []CompletionItem
+	for _, kw := range constants.SSLStatusKeywords {
+		items = append(items, CompletionItem{
+			Label:            kw,
+			Kind:             CompletionKindConstant,
+			Detail:           "Status Keyword",
+			Documentation:    fmt.Sprintf("Predefined STARLIMS status constant. Value: \"%s\"", kw),
+			InsertText:       kw,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+	return items
+}
+
+// GetPredefinedGlobalCompletions returns completions for predefined global variables.
+func GetPredefinedGlobalCompletions() []CompletionItem {
+	var items []CompletionItem
+	for _, g := range constants.SSLPredefinedGlobals {
+		items = append(items, CompletionItem{
+			Label:            g,
+			Kind:             CompletionKindVariable,
+			Detail:           "Predefined Global",
+			Documentation:    "Runtime-provided read-only global variable.",
+			InsertText:       g,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+	return items
+}
+
 // GetOperatorCompletions returns operator completions.
 func GetOperatorCompletions() []CompletionItem {
 	var items []CompletionItem
@@ -315,6 +347,8 @@ func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.Var
 		)
 	}
 	items = append(items, GetOperatorCompletions()...)
+	items = append(items, GetStatusKeywordCompletions()...)
+	items = append(items, GetPredefinedGlobalCompletions()...)
 	items = append(items, GetProcedureCompletions(procedures, classMethodContext)...)
 	items = append(items, GetVariableCompletions(variables)...)
 	return items

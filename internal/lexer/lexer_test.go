@@ -623,6 +623,33 @@ func TestLexer_ColonAfterIdentifier(t *testing.T) {
 	}
 }
 
+func TestLexer_MemberAccessKeywordName(t *testing.T) {
+	// oEmail:To — "To" matches keyword name TO but is just an identifier.
+	input := "oEmail:To"
+	lex := NewLexer(input)
+	tokens := lex.Tokenize()
+
+	var nonEOF []Token
+	for _, tok := range tokens {
+		if tok.Type != TokenEOF {
+			nonEOF = append(nonEOF, tok)
+		}
+	}
+
+	if len(nonEOF) != 3 {
+		t.Fatalf("expected 3 tokens, got %d: %v", len(nonEOF), nonEOF)
+	}
+	if nonEOF[0].Type != TokenIdentifier || nonEOF[0].Text != "oEmail" {
+		t.Errorf("expected identifier 'oEmail', got %s %q", nonEOF[0].Type, nonEOF[0].Text)
+	}
+	if nonEOF[1].Type != TokenPunctuation || nonEOF[1].Text != ":" {
+		t.Errorf("expected punctuation ':', got %s %q", nonEOF[1].Type, nonEOF[1].Text)
+	}
+	if nonEOF[2].Type != TokenIdentifier || nonEOF[2].Text != "To" {
+		t.Errorf("expected identifier 'To', got %s %q", nonEOF[2].Type, nonEOF[2].Text)
+	}
+}
+
 // ==================== Position Tracking Tests ====================
 
 func TestLexer_Position_LineColumn(t *testing.T) {

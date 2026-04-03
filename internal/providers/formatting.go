@@ -563,6 +563,12 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	quoteChar := content[0]
 	innerContent := content[1 : len(content)-1]
 
+	// When DetectSQLStrings is disabled, only format strings inside SQL
+	// function calls (e.g. SQLExecute). Skip regular string literals.
+	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+
 	// Only format as SQL if the string actually looks like a SQL statement.
 	// Being inside a SQL function call (first argument) is not sufficient —
 	// the argument could be an error message or other non-SQL string.

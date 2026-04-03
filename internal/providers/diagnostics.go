@@ -190,6 +190,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkZeroBasedArrayIndex(tokens)...)
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
+	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
 	diagnostics = append(diagnostics, checkDirectProcedureCalls(tokens, ast, p)...)
 	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
 	diagnostics = append(diagnostics, checkBranchTargetLabels(tokens)...)
@@ -260,16 +261,6 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 					Source:   "ssl-lsp",
 				})
 			}
-			continue
-		}
-
-		if constants.IsKeyword(normalized) {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("SSL keywords must be colon-prefixed: use ':%s'", normalized),
-				Source:   "ssl-lsp",
-			})
 		}
 	}
 
@@ -378,17 +369,16 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		}
 
 		// Multi-line detection: if a /* comment spans multiple lines (contains
-		// newlines in its token text) and the next token is a bare keyword
-		// (without the required : prefix), the semicolon almost certainly
-		// terminated the comment prematurely — normal code never has bare
-		// keywords like "Parameters", "Default", "For", etc.
+		// newlines in its token text) and the next token is an identifier whose
+		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
+		// semicolon almost certainly terminated the comment prematurely.
 		if !strings.HasPrefix(token.Text, "/*") {
 			continue
 		}
 		if !strings.Contains(token.Text, "\n") {
 			continue
 		}
-		if nextToken.Type == lexer.TokenKeyword && !strings.HasPrefix(nextToken.Text, ":") {
+		if nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Range:    tokenToRange(token),
@@ -856,6 +846,77 @@ func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
 				}
 				break // Only check first string argument
 			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkUDObjectArrayInClause detects UDObject property access in SQL IN clause
+// array expansion placeholders. Using ?oObj:ArrayProp? directly in an IN clause
+// causes runtime error "The current array has more than 1 dimmension." —
+// the array must be copied to a local variable first. Scalar properties are fine
+// outside IN clauses, so this only flags property-access placeholders inside IN(...).
+func checkUDObjectArrayInClause(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenString {
+			continue
+		}
+
+		content := token.Text
+		if len(content) < 2 {
+			continue
+		}
+		// Strip surrounding quotes
+		content = content[1 : len(content)-1]
+
+		upper := strings.ToUpper(content)
+		placeholders := ParseSQLPlaceholders(content)
+
+		for _, ph := range placeholders {
+			if !ph.IsNamed {
+				continue
+			}
+			// Only flag property access (contains ':')
+			if !strings.Contains(ph.Name, ":") {
+				continue
+			}
+			// Check if this placeholder sits inside an IN(...) clause
+			// Look backwards from the placeholder start for "IN" keyword
+			prefix := strings.TrimRight(upper[:ph.Start], " \t")
+			if !strings.HasSuffix(prefix, "(") {
+				continue
+			}
+			prefix = strings.TrimRight(prefix[:len(prefix)-1], " \t")
+			if !strings.HasSuffix(prefix, "IN") {
+				continue
+			}
+			// Verify "IN" is not part of a longer word
+			inStart := len(prefix) - 2
+			if inStart > 0 {
+				ch := prefix[inStart-1]
+				if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' {
+					continue
+				}
+			}
+
+			paramColumn := token.Column + 1 + ph.Start
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range: Range{
+					Start: Position{Line: token.Line - 1, Character: paramColumn - 1},
+					End:   Position{Line: token.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2},
+				},
+				Message: fmt.Sprintf(
+					"UDObject array property '?%s?' in IN clause causes runtime error "+
+						"'The current array has more than 1 dimmension.' — "+
+						"copy the array to a local variable first.",
+					ph.Name,
+				),
+				Source: "ssl-lsp",
+			})
 		}
 	}
 
@@ -3714,9 +3775,12 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 	var diagnostics []Diagnostic
 
 	// Build a case-insensitive set of global variable names.
-	// Always include built-in predefined globals (MYUSERNAME, etc.).
+	// Always include built-in predefined globals and status keywords.
 	globalSet := make(map[string]bool)
 	for _, g := range constants.SSLPredefinedGlobals {
+		globalSet[strings.ToUpper(g)] = true
+	}
+	for _, g := range constants.SSLStatusKeywords {
 		globalSet[strings.ToUpper(g)] = true
 	}
 	for _, g := range globals {
@@ -3913,6 +3977,9 @@ func buildBuiltinSet() map[string]bool {
 	for _, g := range constants.SSLPredefinedGlobals {
 		builtins[strings.ToUpper(g)] = true
 	}
+	for _, g := range constants.SSLStatusKeywords {
+		builtins[strings.ToUpper(g)] = true
+	}
 
 	// Add special identifiers
 	builtins["ME"] = true          // Class self-reference
@@ -4058,8 +4125,11 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 		declaredVars[strings.ToUpper(v.Name)] = true
 	}
 
-	// Add built-in predefined globals (MYUSERNAME, etc.)
+	// Add built-in predefined globals (MYUSERNAME, etc.) and status keywords
 	for _, g := range constants.SSLPredefinedGlobals {
+		declaredVars[strings.ToUpper(g)] = true
+	}
+	for _, g := range constants.SSLStatusKeywords {
 		declaredVars[strings.ToUpper(g)] = true
 	}
 
@@ -4544,16 +4614,6 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 					Source:   "ssl-lsp",
 				})
 			}
-			continue
-		}
-
-		if constants.IsKeyword(normalized) {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("SSL keywords must be colon-prefixed: use ':%s'", normalized),
-				Source:   "ssl-lsp",
-			})
 		}
 	}
 

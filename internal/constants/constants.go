@@ -102,6 +102,41 @@ var SSLPredefinedGlobals = []string{
 	"MYUSERNAME", // The currently logged-in user's login name. Read-only.
 }
 
+// SSLStatusKeywords are predefined global constants provided by the STARLIMS runtime.
+// Each keyword is a read-only identifier whose value equals its own name as a string
+// (e.g. Pending == "Pending"). They are used for workflow status comparisons.
+// Source: status_keywords.txt from the vs-code-ssl-formatter project.
+var SSLStatusKeywords = []string{
+	"Accepted", "Active", "Aliquote", "All", "Approved", "Archived", "Assembled",
+	"Cancel", "Canceled", "Cancelled", "Completed", "Created",
+	"DBDE", "DCUTEMP", "Deleted", "Dependent", "Dismissed", "Disposed", "Done",
+	"Draft", "DraftReport",
+	"Edit",
+	"Fail",
+	"Hold",
+	"IS", "InProcess", "Inactive", "Invited",
+	"Locked", "Logged",
+	"NIS", "NeedPrep", "New", "NoEquipment",
+	"OKTOSTART", "OODL", "OOP", "OOS", "OOSPECS", "OOS_A", "OOS_B", "OOS_P",
+	"OktoSubmit", "Open", "OutForCalib", "OutForRepair", "OutInUse",
+	"Pending", "PendingReport", "Planned", "Prelogged", "Prepped", "Pulled",
+	"Quarantine",
+	"RTR", "RTROOS", "Received", "Rejected", "Released", "Reported", "Requested",
+	"Reserved", "Resulted", "Retired", "Reviewed",
+	"Shipped", "Started", "Submitted",
+}
+
+// IsStatusKeyword checks if a string matches a status keyword (case-insensitive).
+func IsStatusKeyword(s string) bool {
+	upper := strings.ToUpper(s)
+	for _, kw := range SSLStatusKeywords {
+		if strings.ToUpper(kw) == upper {
+			return true
+		}
+	}
+	return false
+}
+
 // SSLClassContextForms are case-insensitive identifiers used in class definitions.
 // Me: self-reference, Base: parent class reference, Constructor: reserved constructor name.
 var SSLClassContextForms = []string{"Me", "Base", "Constructor"}
