@@ -5533,6 +5533,71 @@ nResult := NIL + 1;`
 	}
 }
 
+// --- Pass 2: Mixed-type operator warnings ---
+
+func TestGetDiagnostics_MixedTypePlus_StringPlusNumber(t *testing.T) {
+	text := `:DECLARE sName;
+sName := "hello" + 5;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Mixed types in '+' operation") {
+			return
+		}
+	}
+	t.Fatal("expected mixed-type warning for string + number")
+}
+
+func TestGetDiagnostics_MixedTypePlus_HungarianPrefix(t *testing.T) {
+	text := `:DECLARE sName, nCount;
+x := sName + nCount;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Mixed types in '+' operation") {
+			return
+		}
+	}
+	t.Fatal("expected mixed-type warning for string variable + numeric variable")
+}
+
+func TestGetDiagnostics_MixedType_StringInArithmetic(t *testing.T) {
+	text := `:DECLARE sName;
+x := sName - 1;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "String in arithmetic operation") {
+			return
+		}
+	}
+	t.Fatal("expected string-in-arithmetic warning")
+}
+
+func TestGetDiagnostics_MixedType_BooleanInArithmetic(t *testing.T) {
+	text := `x := .T. * 5;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Non-numeric type in arithmetic") {
+			return
+		}
+	}
+	t.Fatal("expected non-numeric-in-arithmetic warning")
+}
+
+func TestGetDiagnostics_NoMixedTypeWarning_SameTypes(t *testing.T) {
+	text := `x := "hello" + " world";
+y := 1 + 2;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if strings.Contains(d.Message, "Mixed types") || strings.Contains(d.Message, "String in arithmetic") {
+			t.Fatalf("unexpected mixed-type warning: %s", d.Message)
+		}
+	}
+}
+
 // --- Pass 2: Multiple :CATCH blocks ---
 
 func TestGetDiagnostics_TryMultipleCatch_Diagnostic(t *testing.T) {

@@ -2958,6 +2958,38 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Message:  "Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first",
 					Source:   "ssl-lsp",
 				})
+				continue
+			}
+
+			leftType := inferSimpleType(tokens, prevIdx, typeInfo)
+			rightType := inferSimpleType(tokens, nextIdx, typeInfo)
+			if leftType != "" && rightType != "" && leftType != rightType {
+				if token.Text == "+" {
+					// + is overloaded: string concatenation or arithmetic
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("Mixed types in '+' operation: %s + %s. The '+' operator requires both operands to be the same type (both strings or both numeric)", leftType, rightType),
+						Source:   "ssl-lsp",
+					})
+				} else {
+					// -, *, / are arithmetic only
+					if leftType == "string" || rightType == "string" {
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityWarning,
+							Range:    tokenToRange(token),
+							Message:  fmt.Sprintf("String in arithmetic operation '%s': %s %s %s. Arithmetic operators require numeric operands", token.Text, leftType, token.Text, rightType),
+							Source:   "ssl-lsp",
+						})
+					} else if leftType != "numeric" || rightType != "numeric" {
+						diagnostics = append(diagnostics, Diagnostic{
+							Severity: SeverityWarning,
+							Range:    tokenToRange(token),
+							Message:  fmt.Sprintf("Non-numeric type in arithmetic operation '%s': %s %s %s", token.Text, leftType, token.Text, rightType),
+							Source:   "ssl-lsp",
+						})
+					}
+				}
 			}
 		}
 	}
