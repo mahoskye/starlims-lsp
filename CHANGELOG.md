@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`Code` field on `providers.Diagnostic`** populated at every emit site and
+  propagated to `protocol.Diagnostic.Code` over the LSP wire. Clients can now
+  identify findings by stable slug instead of message text — enabling reliable
+  quick-fix code actions, suppression comments, and per-rule severity
+  overrides. Where `ssl-style-guide.schema.yaml` defines a `lints` rule slug
+  the code uses that slug verbatim (e.g. `parameters_first`,
+  `prefer_exitcase`, `udobject_array_in_clause`, `exitfor_in_finally`);
+  parser/lexer-level findings get slugs derived from the producing check
+  function. The full list lives in `internal/providers/diagnostic_codes.go`.
+- **Tests** assert that every emitted diagnostic carries a non-empty `Code`
+  and pin a few representative codes via spot-checks, so accidental rename
+  regressions are caught.
+
+### Fixed
+- **`InitializeResult.serverInfo.version`** now reflects the build-time
+  version string instead of a stale hardcoded `"0.2.0"`. The `version`
+  variable in `internal/server/server.go` is now overridden via
+  `server.SetVersion` from `cmd/starlims-lsp/main.go`, which already pulls
+  the version from `-X main.version=...` (set by the Makefile from
+  `git describe --tags`). Previously the LSP reported "0.2.0" to clients
+  on the wire even when the binary was actually 0.3.0.
+
 ## [0.3.0] - 2026-05-01
 
 ### Added
