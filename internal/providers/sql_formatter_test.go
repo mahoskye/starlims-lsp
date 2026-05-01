@@ -2227,6 +2227,32 @@ func TestSQLFormatter_RuleC_ProjectionAliasNotSplit(t *testing.T) {
 	}
 }
 
+// Rule C (whole-projection move): when continuing a long projection on the
+// current SELECT line would overflow the width limit, the whole projection
+// should move to its own line aligned with the SELECT columns. Without this,
+// two long projections sit on one line that runs well past the limit.
+func TestSQLFormatter_RuleC_OverflowingProjectionMovesToNewLine(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT a.short, " +
+		"CAST(FORMAT(a.dt_admission, 'MM/dd/yyyy') AS varchar) AS date_of_admission_string, " +
+		"CAST(FORMAT(a.dt_collected, 'MM/dd/yyyy') AS varchar) AS date_collected_string " +
+		"FROM t1 a"
+	result := f.FormatSQL(input, "")
+	t.Logf("Output:\n%s", result)
+
+	for _, line := range strings.Split(result, "\n") {
+		// Reject lines that contain BOTH "AS date_of_admission_string" and
+		// "AS date_collected_string" on the same line — a tell-tale sign of
+		// two projections crammed together.
+		if strings.Contains(line, "AS date_of_admission_string") &&
+			strings.Contains(line, "AS date_collected_string") {
+			t.Errorf("Rule C: two long projections must not share a line: %q\nfull output:\n%s", line, result)
+		}
+	}
+}
+
 // LongConvoluted: a single big anonymized query that exercises rules A–D at
 // once — multiple JOIN variants (bare + LEFT + JOIN-into-subquery), CASE/WHEN
 // with OR continuation, projections with CAST(FORMAT(...)) AS alias, an IN

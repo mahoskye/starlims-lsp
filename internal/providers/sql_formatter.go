@@ -275,6 +275,26 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				subqueryParenDepths[parenDepth] = true
 			}
 
+			// Rule C (whole-projection move): at the start of a new projection
+			// in SELECT columns, look ahead to the full projection's rendered
+			// length. If continuing on the current line would overflow, move
+			// the whole projection to its own line — better than splitting
+			// the projection later and stranding pieces of it.
+			if !needsBreak && prev != nil && prev.Text == "," &&
+				inSelectColumns && parenDepth == 0 && f.opts.MaxLineLength > 0 &&
+				(style == "canonicalCompact" || style == "expanded") {
+				end := f.projectionEndIndex(nonWSTokens, i)
+				projLen := f.projectionRenderLen(nonWSTokens, i, end)
+				spaceLen := 0
+				if f.shouldAddSpace(prev, &t, prevPrevToken) {
+					spaceLen = 1
+				}
+				if currentLineLen+spaceLen+projLen > f.opts.MaxLineLength {
+					needsBreak = true
+					extraIndent = strings.Repeat(" ", 7) // align with SELECT columns
+				}
+			}
+
 			// Proactive line wrapping (only for canonicalCompact and expanded)
 			if !needsBreak && prev != nil && f.opts.MaxLineLength > 0 &&
 				(style == "canonicalCompact" || style == "expanded") {
@@ -446,6 +466,58 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	}
 
 	return result.String()
+}
+
+// projectionEndIndex returns the index (exclusive) of the end of the
+// projection starting at start. A projection ends at the next top-level
+// (parenDepth == 0 within the lookahead) comma or at FROM/INTO. If neither
+// is found, len(tokens) is returned.
+func (f *SQLFormatter) projectionEndIndex(tokens []SQLToken, start int) int {
+	depth := 0
+	for j := start; j < len(tokens); j++ {
+		switch tokens[j].Text {
+		case "(":
+			depth++
+			continue
+		case ")":
+			if depth > 0 {
+				depth--
+			}
+			continue
+		case ",":
+			if depth == 0 {
+				return j
+			}
+		}
+		if depth == 0 && tokens[j].Type == SQLTokenKeyword {
+			upper := strings.ToUpper(tokens[j].Text)
+			if upper == "FROM" || upper == "INTO" {
+				return j
+			}
+		}
+	}
+	return len(tokens)
+}
+
+// projectionRenderLen estimates the rendered length of tokens[start:end]
+// when laid out on a single line, including the spaces shouldAddSpace would
+// emit between adjacent tokens.
+func (f *SQLFormatter) projectionRenderLen(tokens []SQLToken, start, end int) int {
+	total := 0
+	for j := start; j < end; j++ {
+		text := f.applyKeywordCasing(tokens[j])
+		if j > start {
+			var pp *SQLToken
+			if j >= 2 {
+				pp = &tokens[j-2]
+			}
+			if f.shouldAddSpace(&tokens[j-1], &tokens[j], pp) {
+				total++
+			}
+		}
+		total += len(text)
+	}
+	return total
 }
 
 func (f *SQLFormatter) keywordIndent(style, keyword, currentClause, rootCommand string, parenDepth int) string {
