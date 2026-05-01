@@ -1,6 +1,6 @@
 # SSL Built-in Functions
 
-This document lists all **354 developer-facing built-in functions** exposed by the LSP. Signatures are sourced from `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative).
+This document lists all **330 developer-facing built-in functions** exposed by the LSP. Signatures are sourced from `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative).
 
 **Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/signatures.go`
 
@@ -622,6 +622,6 @@ Str(nValue, 6, 2);   /* Numeric formatting with width/decimals;
 
 ## Complete Reference
 
-For the full list of 354 canonical built-in functions with detailed signatures, see:
+For the full list of 330 canonical built-in functions with detailed signatures, see:
 
 **LSP Sources:** `internal/constants/canonical.go`, `internal/constants/signatures.go`

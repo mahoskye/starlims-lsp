@@ -25,7 +25,7 @@ This document provides a quick overview of all LSP features and their current im
 |---------|--------|------------|
 | [Completion](./features/completion.md) | IMPLEMENTED | Broad symbol/snippet list, excludes strings/comments, class-aware procedure dispatch snippets |
 | [Hover](./features/hover.md) | IMPLEMENTED | Includes `Me` keyword and SQL placeholders |
-| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 354 canonical built-in functions and dispatch helpers such as `DoProc` / `ExecFunction` |
+| [Signature Help](./features/signature-help.md) | IMPLEMENTED | 330 canonical built-in functions and dispatch helpers such as `DoProc` / `ExecFunction` |
 | [Go to Definition](./features/definition.md) | IMPLEMENTED | Single-file, scope precedence, DoProc/ExecFunction string targets |
 | [Find References](./features/references.md) | IMPLEMENTED | Single-file, scope-aware for local vars |
 | [Rename](./features/rename.md) | IMPLEMENTED | Single-file, scope-aware, validates new name |
@@ -151,7 +151,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 | Category | Count | Status |
 |----------|-------|--------|
 | Keywords | 38 | IMPLEMENTED |
-| Built-in Functions | 354 | IMPLEMENTED |
+| Built-in Functions | 330 | IMPLEMENTED |
 | Built-in Classes | 22 | IMPLEMENTED |
 | Literals (`.T.`, `.F.`, `NIL`) | 3 | IMPLEMENTED |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | 3 | IMPLEMENTED |
@@ -237,7 +237,7 @@ The following behaviors are handled when undeclared variable checking is enabled
 
 ### v1.5 (In Progress)
 - Conservative local type inference for diagnostics implemented
-- Class member metadata (properties/methods for 22 canonical built-in classes)
+- Class member metadata (properties/methods for 29 canonical built-in classes)
 - Member completion after `object:`
 
 ### v2.0 (In Progress)

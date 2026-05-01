@@ -29,7 +29,7 @@ result := SubStr("Hello World", 1, 5);
 
 | Type | Hints Shown | Notes |
 |------|-------------|-------|
-| Built-in functions | Yes | 354 canonical functions with parameter names |
+| Built-in functions | Yes | 330 canonical functions with parameter names |
 | DoProc calls | Yes | Shows `sProcName:` and `aParams:` |
 | ExecFunction calls | Yes | Same as DoProc |
 | DoProc with known procedure | Yes | Also shows inner parameter names |
@@ -46,7 +46,7 @@ result := SubStr("Hello World", 1, 5);
 
 ### 2.3 Built-in Function Hints
 
-For the 354 canonical built-in SSL functions, parameter names come from the signature database:
+For the 330 canonical built-in SSL functions, parameter names come from the signature database:
 
 ```ssl
 /* Actual code;

@@ -163,7 +163,7 @@ Static SSL language data:
 │  └── Legacy function/class inventories                  │
 ├─────────────────────────────────────────────────────────┤
 │  canonical.go                                           │
-│  ├── Built-in Functions (354)                           │
+│  ├── Built-in Functions (330)                           │
 │  ├── Built-in Classes (22)                              │
 │  └── Source-only additions / exclusions / canonicalize  │
 ├─────────────────────────────────────────────────────────┤

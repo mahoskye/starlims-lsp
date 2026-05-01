@@ -20,9 +20,11 @@ The hover provider displays contextual information when the user hovers over ide
 |---------|-------------|
 | Keywords | Description |
 | Built-in Functions | Signature, parameters, return type, description |
-| Built-in Classes | Class name with generic built-in class label |
+| Built-in Classes | Summary, base class, constructors with parameter lists, properties table, methods table |
+| Core SSL Types (`array`, `boolean`, `codeblock`, `date`, `netobject`, `number`, `object`, `string`) | Runtime type, supported operators, members |
+| Special Forms (`access-modifiers`, `base`, `code-block`, `code-organization`, `constructor`, `me`) | Summary and canonical syntax block |
 | Literals (`.T.`, `.F.`, `NIL`) | Description of the literal value |
-| Operators (`.AND.`, `.OR.`, `.NOT.`) | Description and usage |
+| Operators (`.AND.`, `.OR.`, `+=`, `==`, `$`, …) | Description, usage, and type-behavior table for binary operators |
 | User Procedures | Signature with parameters from `:PARAMETERS` |
 | Variables | Declaration location and scope |
 
@@ -303,7 +305,7 @@ The current server returns hover contents without an explicit hover range.
 
 ### 8.3 Function Signature Database
 
-All 354 canonical built-in functions are exposed through the canonical inventory in `internal/constants/canonical.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
+All 330 canonical built-in functions are exposed through the canonical inventory in `internal/constants/canonical.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
 - Function name
 - Parameter list (name, type, optional flag)
 - Return type

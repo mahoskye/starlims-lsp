@@ -30,8 +30,8 @@ Completion is triggered automatically on these characters:
 | Type | Count | Example | CompletionItemKind |
 |------|-------|---------|-------------------|
 | Keywords | 38 | `:IF`, `:WHILE`, `:DECLARE` | Keyword (14) |
-| Built-in Functions | 354 | `SQLExecute`, `Len`, `Upper` | Function (3) |
-| Built-in Classes | 22 | `SSLExpando`, `SSLDataset`, `Email` | Class (7) |
+| Built-in Functions | 330 | `SQLExecute`, `Len`, `Upper` | Function (3) |
+| Built-in Classes | 29 | `SSLExpando`, `SSLDataset`, `Email` | Class (7) |
 | Class-context forms | Contextual | `Me`, `Base`, `Constructor` | Keyword/Constructor |
 | Literals | 3 | `.T.`, `.F.`, `NIL` | Constant (21) |
 | Operators | 3 | `.AND.`, `.OR.`, `.NOT.` | Operator (24) |

@@ -14,8 +14,8 @@ This section provides reference documentation for the STARLIMS Scripting Languag
 | [Syntax Overview](./syntax.md) | SSL syntax rules | Keywords, operators, control flow |
 | [Formal Grammar](./grammar.md) | EBNF specification | Complete grammar definition |
 | [Style Guide](./style-guide.md) | Coding conventions | Naming, formatting, best practices |
-| [Built-in Functions](./functions.md) | Function reference | 354 canonical developer-facing built-in functions |
-| [Built-in Classes](./classes.md) | Class reference | 22 canonical developer-facing built-in classes |
+| [Built-in Functions](./functions.md) | Function reference | 330 canonical developer-facing built-in functions |
+| [Built-in Classes](./classes.md) | Class reference | 29 canonical developer-facing built-in classes |
 | [Common Gotchas](./gotchas.md) | SSL pitfalls | Common mistakes and how to avoid them |
 
 ---
