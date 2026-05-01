@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 
+	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
@@ -26,7 +27,14 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 		return []protocol.CompletionItem{}, nil
 	}
 
-	// Get all completions
+	// Context-aware shortcuts: if the cursor is right after `<ClassName>{`
+	// or after a member-access `:`, return the focused completion list
+	// instead of the full inventory. This produces better suggestions in
+	// editors that display unfiltered LSP results.
+	if focused := s.contextAwareCompletions(cache, line, column); focused != nil {
+		return toProtocolCompletionItems(focused), nil
+	}
+
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
 	dsFile := isDataSourceURI(uri)
 	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile)
@@ -37,6 +45,118 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	items = append(items, toProtocolCompletionItems(snippets)...)
 
 	return items, nil
+}
+
+// contextAwareCompletions returns a focused completion list when the cursor
+// is in a context that maps cleanly to one of the new providers helpers:
+//
+//   - `<BuiltInClass>{`           — constructor signatures for that class
+//   - `Me:` / `Base:` (in a class) — method/property suggestions for the
+//     enclosing class declaration
+//   - `<BuiltInClass>:`           — methods/properties of that class
+//
+// Returns nil when no context applies; the caller falls back to the full
+// completion list.
+func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column int) []providers.CompletionItem {
+	// Find the most recently emitted token that ends at or before the
+	// cursor. We then peek at the token immediately before it for context.
+	idx := indexOfTokenBefore(cache.Tokens, line, column)
+	if idx < 0 {
+		return nil
+	}
+
+	prev := cache.Tokens[idx]
+
+	switch prev.Text {
+	case "{":
+		// Constructor context: previous non-trivial token must be a built-in class name.
+		if prior := indexOfPriorSignificantToken(cache.Tokens, idx); prior >= 0 {
+			tok := cache.Tokens[prior]
+			if tok.Type == lexer.TokenIdentifier && constants.IsSSLClass(tok.Text) {
+				return providers.GetClassConstructorCompletions(tok.Text)
+			}
+		}
+	case ":":
+		// Member-access context.
+		if prior := indexOfPriorSignificantToken(cache.Tokens, idx); prior >= 0 {
+			tok := cache.Tokens[prior]
+			if tok.Type != lexer.TokenIdentifier {
+				return nil
+			}
+			switch {
+			case strings.EqualFold(tok.Text, "Me"), strings.EqualFold(tok.Text, "Base"):
+				if className := enclosingClassName(cache.Tokens); className != "" {
+					if items := providers.GetClassMemberCompletions(className); items != nil {
+						return items
+					}
+				}
+			case constants.IsSSLClass(tok.Text):
+				return providers.GetClassMemberCompletions(tok.Text)
+			}
+		}
+	}
+
+	return nil
+}
+
+// indexOfTokenBefore returns the index of the latest token whose end
+// position is at or before (line, column). Whitespace, comment, and EOF
+// tokens are skipped.
+func indexOfTokenBefore(tokens []lexer.Token, line, column int) int {
+	best := -1
+	for i, tok := range tokens {
+		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenComment || tok.Type == lexer.TokenEOF {
+			continue
+		}
+		endCol := tok.Column + len(tok.Text)
+		if tok.Line < line || (tok.Line == line && endCol <= column) {
+			best = i
+			continue
+		}
+		break
+	}
+	return best
+}
+
+// indexOfPriorSignificantToken returns the most recent non-whitespace,
+// non-comment, non-EOF token strictly before idx, or -1 if none exists.
+func indexOfPriorSignificantToken(tokens []lexer.Token, idx int) int {
+	for j := idx - 1; j >= 0; j-- {
+		tok := tokens[j]
+		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenComment || tok.Type == lexer.TokenEOF {
+			continue
+		}
+		return j
+	}
+	return -1
+}
+
+// enclosingClassName returns the name of the class declared at the file's
+// top level, or "" when the file is not a class. SSL allows only one class
+// per file, so we just walk forward until we find `:CLASS <name>`.
+func enclosingClassName(tokens []lexer.Token) string {
+	for i, tok := range tokens {
+		if tok.Type == lexer.TokenKeyword && strings.EqualFold(tok.Text, ":CLASS") {
+			if next := indexOfNextSignificantToken(tokens, i); next >= 0 {
+				if tokens[next].Type == lexer.TokenIdentifier {
+					return tokens[next].Text
+				}
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+func indexOfNextSignificantToken(tokens []lexer.Token, idx int) int {
+	for j := idx + 1; j < len(tokens); j++ {
+		tok := tokens[j]
+		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenComment || tok.Type == lexer.TokenEOF {
+			continue
+		}
+		return j
+	}
+	return -1
 }
 
 func isClassMethodContext(tokens []lexer.Token, procedures []parser.ProcedureInfo, line int) bool {

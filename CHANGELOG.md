@@ -26,9 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Constructor signature help** when the cursor is inside `<ClassName>{...}`
   built-in instantiation. Each constructor form appears as a separate
   signature, with parameter descriptions sourced from the reference.
+- **Context-aware completions** in the LSP completion handler
+  (`internal/server/handler.go`). When the cursor sits in a recognized
+  context the server returns a focused list instead of the full inventory:
+  - `<BuiltInClass>{` — constructor signatures (snippet form) for that class
+  - `Me:` / `Base:` inside a `:CLASS Foo;` file — `Foo`'s methods and properties
+  - `<BuiltInClass>:` — that class's methods and properties
+  - Any other context falls back to the existing full completion list
 - **`GetClassMemberCompletions(className)` / `GetClassConstructorCompletions(className)`**
-  helpers expose method, property, and snippet-form constructor completions
-  for built-in classes — ready for editor wiring.
+  exported helpers in `internal/providers/completion.go` are wired into the
+  server-side completion dispatcher (see context-aware completions above)
+  and are also available to other consumers.
 - **Class-name collision diagnostic** warns when `:CLASS Foo;` declares a
   user class whose name shadows a built-in (Email, SQLConnection, etc.).
 - `--export-signatures` JSON now includes `classes[].constructors`,
