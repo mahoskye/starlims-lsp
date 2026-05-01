@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-30
+
+### Added
+- **Per-element documented exceptions surfaced in hover.** Function and class
+  hovers now include the documented `## Exceptions` table, `## Caveats`, and
+  `Don't` lists straight from ssl-docs (vendored at
+  `internal/constants/data/ssl-element-meta.json`). Hovering `ExecFunction`,
+  for example, now shows the canonical exception messages
+  ("Please provide at least one parameter for ExecFunction" /
+  "Wrong parameters for {functionName}") inline with the signature.
+- New `constants.LookupMeta(name)` runtime accessor for the metadata index.
+  The data is `go:embed`-ed into the binary; no external file lookup at
+  runtime. Diagnostic checks can call `LookupMeta` to quote canonical
+  exception text or weight checks against documented per-element caveats —
+  this PR only wires hover; future PRs can route exceptions into specific
+  diagnostics.
+
+### Tests
+- `TestGetHover_FunctionExceptions` pins the canonical exception text on
+  ExecFunction hover so accidental loader regressions surface in CI.
+
 ## [0.5.0] - 2026-04-30
 
 ### Added

@@ -147,7 +147,7 @@ func getFunctionHover(word string) *Hover {
 			if sig, ok := constants.GetFunctionSignature(fnName); ok {
 				docInfo := buildFunctionDoc(sig)
 				return &Hover{
-					Contents: formatFunctionHover(docInfo),
+					Contents: formatFunctionHoverWithMeta(docInfo, fnName),
 				}
 			}
 			return &Hover{
@@ -178,6 +178,69 @@ func formatFunctionHover(docInfo functionDoc) string {
 	}
 
 	return strings.Join(sections, "\n\n")
+}
+
+// formatFunctionHoverWithMeta is formatFunctionHover plus a layered meta
+// section. Kept separate so the bare formatter is still callable from
+// completion.go's documentation builder, where the meta is folded in
+// elsewhere if at all.
+func formatFunctionHoverWithMeta(docInfo functionDoc, name string) string {
+	body := formatFunctionHover(docInfo)
+	if meta, ok := constants.LookupMeta(name); ok {
+		if extra := formatElementMeta(meta); extra != "" {
+			return body + "\n\n" + extra
+		}
+	}
+	return body
+}
+
+// formatElementMeta renders the documented exceptions, caveats, and Don't
+// list (collapsed inline; the Do list is omitted because it tends to be
+// generic). Returns an empty string when none of the lists carry content.
+//
+// Hover is read at-a-glance, so we keep this terse: bullet lists, no
+// per-section divider lines. The Don't items are particularly valuable
+// because they double as anti-pattern guidance the user gets without
+// leaving the editor.
+func formatElementMeta(meta constants.ElementMeta) string {
+	var builder strings.Builder
+
+	if len(meta.Exceptions) > 0 {
+		builder.WriteString("**Documented exceptions:**")
+		for _, ex := range meta.Exceptions {
+			builder.WriteString("\n- ")
+			builder.WriteString(ex.Trigger)
+			if ex.Message != "" {
+				builder.WriteString(" — `")
+				builder.WriteString(ex.Message)
+				builder.WriteString("`")
+			}
+		}
+	}
+
+	if len(meta.Caveats) > 0 {
+		if builder.Len() > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString("**Caveats:**")
+		for _, c := range meta.Caveats {
+			builder.WriteString("\n- ")
+			builder.WriteString(c)
+		}
+	}
+
+	if len(meta.BestPractices.Dont) > 0 {
+		if builder.Len() > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString("**Don't:**")
+		for _, d := range meta.BestPractices.Dont {
+			builder.WriteString("\n- ")
+			builder.WriteString(d)
+		}
+	}
+
+	return builder.String()
 }
 
 func formatFunctionParameters(params []ParameterInformation) string {
@@ -271,6 +334,14 @@ func getClassHover(word string) *Hover {
 				fmt.Fprintf(&b, " — %s", m.Description)
 			}
 			b.WriteString("\n")
+		}
+	}
+
+	if meta, ok := constants.LookupMeta(canonical); ok {
+		extra := formatElementMeta(meta)
+		if extra != "" {
+			b.WriteString("\n")
+			b.WriteString(extra)
 		}
 	}
 

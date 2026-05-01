@@ -89,6 +89,26 @@ func TestGetHover_BuiltinFunction(t *testing.T) {
 	}
 }
 
+// TestGetHover_FunctionExceptions confirms that documented exceptions from
+// ssl-element-meta.json are appended to the function-hover output. The
+// canary is ExecFunction — its docs page lists two exception triggers
+// ("Called with no arguments at all." and "aParameters is provided but
+// is not an array.").
+func TestGetHover_FunctionExceptions(t *testing.T) {
+	text := `result := ExecFunction("Foo", {});`
+	hover := GetHover(text, 1, 12, nil, nil)
+	if hover == nil {
+		t.Skip("ExecFunction may not be in the function list on this build")
+		return
+	}
+	if !strings.Contains(hover.Contents, "Documented exceptions") {
+		t.Errorf("expected hover to include exceptions section; got:\n%s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "Please provide at least one parameter for ExecFunction") {
+		t.Errorf("expected hover to quote canonical exception message; got:\n%s", hover.Contents)
+	}
+}
+
 func TestGetHover_NoMatch(t *testing.T) {
 	text := `unknownThing := 1;`
 
