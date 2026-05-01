@@ -22,7 +22,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 |----------|---------|--------|
 | Completion | Keywords, functions, classes, snippets | ✅ Complete |
 | Hover | Function signatures, keyword docs, SQL placeholders, `Me` keyword | ✅ Complete |
-| Signature Help | 354 canonical built-in functions and dispatch helpers | ✅ Complete |
+| Signature Help | 330 canonical built-in functions and dispatch helpers | ✅ Complete |
 | Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
 | Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
 | Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
@@ -123,7 +123,7 @@ See [gotchas.md](../ssl-reference/gotchas.md) for full documentation of all SSL 
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Define class member structure | Properties/methods for 22 canonical built-in classes | ⏳ Pending |
+| Define class member structure | Properties/methods for 29 canonical built-in classes | ⏳ Pending |
 | Add SSLDataset members | Most commonly used class | ⏳ Pending |
 | Add Email members | Common utility class | ⏳ Pending |
 | Add SSLExpando members | Dynamic object class | ⏳ Pending |

@@ -23,8 +23,8 @@ The following symbols cannot be renamed:
 | Symbol Type | Reason |
 |-------------|--------|
 | Keywords (`:IF`, `:WHILE`, etc.) | Language constructs |
-| Built-in functions (`Len`, `Trim`, etc.) | 354 canonical built-in functions |
-| Built-in classes (`SSLDataset`, `Email`, etc.) | 22 canonical built-in classes |
+| Built-in functions (`Len`, `Trim`, etc.) | 330 canonical built-in functions |
+| Built-in classes (`SSLDataset`, `Email`, etc.) | 29 canonical built-in classes |
 | Literals (`.T.`, `.F.`, `NIL`) | Language constants |
 | Operators (`.AND.`, `.OR.`, `.NOT.`) | Language operators |
 | `Me` keyword | Self-reference in classes |

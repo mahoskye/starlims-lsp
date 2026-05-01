@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-01
+
 ### Added
 - **SSL element reference integration** — the canonical inventory now lives at
   `internal/constants/data/ssl-element-reference.json` (vendored snapshot from
