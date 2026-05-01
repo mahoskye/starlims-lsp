@@ -1,92 +1,29 @@
 package constants
 
 import (
-	"slices"
 	"strings"
 )
 
-var excludedLegacySSLFunctionNames = map[string]struct{}{
-	"addtoapplication":          {},
-	"break":                     {},
-	"callbuiltinfunction":       {},
-	"executedatasource":         {},
-	"getallclientscripts":       {},
-	"getclientscriptreferences": {},
-	"getformreferences":         {},
-	"limscleanup":               {},
-	"mergeglobalresources":      {},
-	"mergehtmlform":             {},
-	"mergexfd":                  {},
-	"prepareform":               {},
-	"prepareformclientscript":   {},
-	"processxfdformforimport":   {},
-	"resetapplication":          {},
-	"setampm":                   {},
-	"syncdesignresources":       {},
-	"syncprogramaticresources":  {},
-	"tryconnect":                {},
-}
+// Function and class inventory are sourced from the published SSL element
+// reference (see GeneratedFunctionNames and GeneratedClassNames in
+// generated_*.go). The published reference defines 330 user-facing functions
+// and 29 user-facing classes, naturally excluding the legacy and internal
+// helpers the LSP previously had to filter by hand.
+//
+// Curated function signatures with rich parameter descriptions still live in
+// signatures.go and are overlaid by buildCanonicalFunctionSignatures below.
+// Curated descriptions for the 6 supplemental functions (_AND, _NOT, _OR,
+// _XOR, Branch, Eval) live in supplementalFunctionSignatures further down.
 
-var supplementalSSLFunctionNames = []string{
-	"_AND",
-	"_NOT",
-	"_OR",
-	"_XOR",
-	"Branch",
-	"Eval",
-}
+// SSLFunctionNames contains the canonical developer-facing SSL function
+// inventory, sourced from the published ssl-element-reference.json
+// (330 functions). Per-function curated signatures still live in
+// signatures.go and are overlaid below.
+var SSLFunctionNames = GeneratedFunctionNames
 
-var excludedLegacySSLClassNames = map[string]struct{}{
-	// CDataColumn, CDataColumns, CDataField, CDataRow are return-value-only types obtained
-	// from TablesImport:GetTable(name) — they cannot be directly constructed by developers.
-	// CDataTable is NOT excluded: it is directly instantiable via CDataTable{} syntax.
-	"cdatacolumn":  {},
-	"cdatacolumns": {},
-	"cdatafield":   {},
-	"cdatarow":     {},
-	// EnterpriseImpExBase, SQLConnection, SSLCompilerError, SSLCompilerErrorList are internal
-	// implementation types not intended for direct developer use.
-	"enterpriseimpexbase":  {},
-	"sqlconnection":        {},
-	"sslcompilererror":     {},
-	"sslcompilererrorlist": {},
-}
-
-var supplementalSSLClassNames = []string{}
-
-var preferredSSLFunctionCasing = map[string]string{
-	"aadd":              "AAdd",
-	"aeval":             "AEval",
-	"aevala":            "AEvalA",
-	"afill":             "AFill",
-	"alen":              "ALen",
-	"arraycalc":         "ArrayCalc",
-	"arraynew":          "ArrayNew",
-	"ascan":             "AScan",
-	"ascanexact":        "AScanExact",
-	"buildarray":        "BuildArray",
-	"buildarray2":       "BuildArray2",
-	"buildstring":       "BuildString",
-	"buildstring2":      "BuildString2",
-	"comparray":         "CompArray",
-	"delarray":          "DelArray",
-	"deleteinlinecode":  "DeleteInlineCode",
-	"endlimsoleconnect": "EndLimsOleConnect",
-	"extractcol":        "ExtractCol",
-	"getinlinecode":     "GetInlineCode",
-	"getregion":         "GetRegion",
-	"getregionex":       "GetRegionEx",
-	"ldir":              "LDir",
-	"limsoleconnect":    "LimsOleConnect",
-	"lwait":             "LWait",
-	"usrmes":            "UsrMes",
-}
-
-// SSLFunctionNames contains the canonical developer-facing SSL function inventory.
-var SSLFunctionNames = buildCanonicalNames(legacySSLFunctionNames, excludedLegacySSLFunctionNames, supplementalSSLFunctionNames, preferredSSLFunctionCasing)
-
-// SSLClassNames contains the canonical developer-facing SSL class inventory.
-var SSLClassNames = buildCanonicalNames(legacySSLClassNames, excludedLegacySSLClassNames, supplementalSSLClassNames, nil)
+// SSLClassNames contains the canonical developer-facing SSL class inventory,
+// sourced from the published ssl-element-reference.json (29 classes).
+var SSLClassNames = GeneratedClassNames
 
 var sslFunctionLookup = buildLowercaseSet(SSLFunctionNames)
 var sslClassLookup = buildLowercaseSet(SSLClassNames)
@@ -151,50 +88,6 @@ var supplementalFunctionSignatures = map[string]FunctionSignature{
 
 // SSLFunctionSignatures contains the canonical function signature inventory.
 var SSLFunctionSignatures = buildCanonicalFunctionSignatures()
-
-func buildCanonicalNames(legacy []string, excluded map[string]struct{}, supplemental []string, preferred map[string]string) []string {
-	seen := make(map[string]string, len(legacy)+len(supplemental))
-
-	for _, name := range legacy {
-		lower := strings.ToLower(name)
-		if _, skip := excluded[lower]; skip {
-			continue
-		}
-		if _, ok := seen[lower]; !ok {
-			seen[lower] = preferredName(name, preferred)
-		}
-	}
-
-	for _, name := range supplemental {
-		lower := strings.ToLower(name)
-		if _, ok := seen[lower]; !ok {
-			seen[lower] = preferredName(name, preferred)
-		}
-	}
-
-	names := make([]string, 0, len(seen))
-	for _, name := range seen {
-		names = append(names, name)
-	}
-
-	slices.SortStableFunc(names, func(a, b string) int {
-		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
-	})
-
-	return names
-}
-
-func preferredName(name string, preferred map[string]string) string {
-	if preferred == nil {
-		return name
-	}
-
-	if canonical, ok := preferred[strings.ToLower(name)]; ok {
-		return canonical
-	}
-
-	return name
-}
 
 func buildLowercaseSet(values []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(values))

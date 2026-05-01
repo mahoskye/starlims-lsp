@@ -90,25 +90,59 @@ func TestFunctionSignatureMappings(t *testing.T) {
 }
 
 func TestCanonicalInventories(t *testing.T) {
-	if len(SSLFunctionNames) != 354 {
-		t.Fatalf("expected 354 canonical functions, got %d", len(SSLFunctionNames))
+	// Counts match the published ssl-element-reference.json:
+	// 330 functions and 29 classes.
+	if len(SSLFunctionNames) != 330 {
+		t.Fatalf("expected 330 canonical functions, got %d", len(SSLFunctionNames))
 	}
-	if len(SSLClassNames) != 22 {
-		t.Fatalf("expected 22 canonical classes, got %d", len(SSLClassNames))
+	if len(SSLClassNames) != 29 {
+		t.Fatalf("expected 29 canonical classes, got %d", len(SSLClassNames))
 	}
 
 	for _, name := range []string{"Branch", "Eval"} {
-		switch name {
-		default:
-			if !IsSSLFunction(strings.ToLower(name)) {
-				t.Fatalf("expected %s to be recognized case-insensitively as a built-in function", name)
-			}
+		if !IsSSLFunction(strings.ToLower(name)) {
+			t.Fatalf("expected %s to be recognized case-insensitively as a built-in function", name)
 		}
 	}
 
-	for _, removed := range []string{"Break", "TryConnect", "EnterpriseImpExBase", "InList", "SSLError", "SSLSQLError", "CDataColumn", "SQLConnection"} {
-		if IsSSLFunction(removed) || IsSSLClass(removed) {
-			t.Fatalf("expected %s to be excluded from the canonical public inventory", removed)
+	// Functions/classes that must remain excluded — neither in the published
+	// reference nor user-facing.
+	excludedAlways := []string{
+		"Break", "TryConnect", "InList",
+		"EnterpriseImpExBase", "SSLCompilerError", "SSLCompilerErrorList",
+	}
+	for _, name := range excludedAlways {
+		if IsSSLFunction(name) || IsSSLClass(name) {
+			t.Fatalf("expected %s to be excluded from the canonical public inventory", name)
+		}
+	}
+
+	// Functions removed from the published reference must not appear in the
+	// LSP function inventory either.
+	removedFunctions := []string{
+		"GetExecutionTrace", "GetFeaturesAndNumbers", "GetForbiddenAppIDs",
+		"GetForbiddenDesignerAppIDs", "GetInstallationKey", "GetLicenseInfoAsText",
+		"GetNumberOfInstrumentConnections", "GetNumberOfNamedConcurrentUsers",
+		"GetNumberOfNamedUsers", "In64BitMode", "IsDemoLicense",
+		"IsFeatureAuthorized", "IsFeatureBasedLicense", "LPrint",
+		"NetFrameworkVersion", "ResetFeatures", "SetLocationOracle",
+		"SetLocationSQLServer", "SqlTraceOff", "SqlTraceOn", "StationName",
+		"TraceOff", "TraceOn", "UndeclaredVars",
+	}
+	for _, name := range removedFunctions {
+		if IsSSLFunction(name) {
+			t.Errorf("expected removed function %s to be absent from the canonical inventory", name)
+		}
+	}
+
+	// Classes newly exposed to match the published reference — must be present.
+	newlyExposed := []string{
+		"CDataColumn", "CDataColumns", "CDataField", "CDataRow",
+		"SQLConnection", "SSLError", "SSLSQLError",
+	}
+	for _, name := range newlyExposed {
+		if !IsSSLClass(name) {
+			t.Errorf("expected %s to be present in the canonical class inventory", name)
 		}
 	}
 

@@ -1480,7 +1480,7 @@ func TestSQLFormatter_FormatSQLInString(t *testing.T) {
 
 	result := f.FormatSQLInString(
 		"SELECT ordno, testcode FROM ordtask WHERE status = ?sStatus? ORDER BY ordno",
-		'"',   // quoteChar
+		'"',    // quoteChar
 		"    ", // baseIndent (4 spaces for SSL code)
 	)
 

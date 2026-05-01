@@ -134,16 +134,142 @@ func buildFunctionCompletion(fnName string, useSnippet bool) CompletionItem {
 func GetClassCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, className := range constants.SSLClassNames {
+		items = append(items, buildClassCompletion(className))
+	}
+	return items
+}
+
+func buildClassCompletion(className string) CompletionItem {
+	detail := "SSL Class"
+	doc := fmt.Sprintf("Built-in SSL class: %s", className)
+
+	if det, ok := constants.GeneratedClassDetails[strings.ToLower(className)]; ok {
+		var b strings.Builder
+		if det.Summary != "" {
+			b.WriteString(det.Summary)
+		}
+		if len(det.Constructors) > 0 {
+			b.WriteString("\n\n**Constructors:**\n")
+			for _, c := range det.Constructors {
+				fmt.Fprintf(&b, "- `%s`", c.Signature)
+				if c.Description != "" {
+					fmt.Fprintf(&b, " — %s", c.Description)
+				}
+				b.WriteString("\n")
+			}
+		}
+		if rendered := strings.TrimSpace(b.String()); rendered != "" {
+			doc = rendered
+		}
+		if len(det.Methods) > 0 {
+			detail = fmt.Sprintf("SSL Class (%d methods)", len(det.Methods))
+		}
+	}
+
+	return CompletionItem{
+		Label:            className,
+		Kind:             CompletionKindClass,
+		Detail:           detail,
+		Documentation:    doc,
+		InsertText:       className,
+		InsertTextFormat: InsertTextFormatPlainText,
+	}
+}
+
+// GetClassMemberCompletions returns completion items for the public members
+// (methods + properties) of a built-in SSL class. Servers can call this after
+// detecting `<ClassRefOrInstance>:` member access.
+func GetClassMemberCompletions(className string) []CompletionItem {
+	det, ok := constants.GeneratedClassDetails[strings.ToLower(className)]
+	if !ok {
+		return nil
+	}
+
+	items := make([]CompletionItem, 0, len(det.Methods)+len(det.Properties))
+	for _, m := range det.Methods {
+		doc := m.Description
+		if m.Returns != "" && m.Returns != "none" {
+			if doc != "" {
+				doc = fmt.Sprintf("Returns `%s`. %s", m.Returns, doc)
+			} else {
+				doc = fmt.Sprintf("Returns `%s`.", m.Returns)
+			}
+		}
 		items = append(items, CompletionItem{
-			Label:            className,
-			Kind:             CompletionKindClass,
-			Detail:           "SSL Class",
-			Documentation:    fmt.Sprintf("Built-in SSL class: %s", className),
-			InsertText:       className,
+			Label:            m.Name,
+			Kind:             CompletionKindMethod,
+			Detail:           fmt.Sprintf("%s method", className),
+			Documentation:    doc,
+			InsertText:       m.Name,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+	for _, p := range det.Properties {
+		doc := p.Description
+		if p.Type != "" {
+			if doc != "" {
+				doc = fmt.Sprintf("Type `%s` (%s). %s", p.Type, orEmpty(p.Access, "read/write"), doc)
+			} else {
+				doc = fmt.Sprintf("Type `%s` (%s).", p.Type, orEmpty(p.Access, "read/write"))
+			}
+		}
+		items = append(items, CompletionItem{
+			Label:            p.Name,
+			Kind:             CompletionKindProperty,
+			Detail:           fmt.Sprintf("%s property", className),
+			Documentation:    doc,
+			InsertText:       p.Name,
 			InsertTextFormat: InsertTextFormatPlainText,
 		})
 	}
 	return items
+}
+
+// GetClassConstructorCompletions returns snippet completions for every
+// declared constructor form of a built-in class. Useful when the user has
+// just typed `<ClassName>{` and the editor wants to surface signatures.
+func GetClassConstructorCompletions(className string) []CompletionItem {
+	det, ok := constants.GeneratedClassDetails[strings.ToLower(className)]
+	if !ok {
+		return nil
+	}
+
+	items := make([]CompletionItem, 0, len(det.Constructors))
+	for _, c := range det.Constructors {
+		items = append(items, CompletionItem{
+			Label:            c.Signature,
+			Kind:             CompletionKindConstructor,
+			Detail:           fmt.Sprintf("%s constructor", className),
+			Documentation:    c.Description,
+			InsertText:       buildConstructorSnippet(className, c),
+			InsertTextFormat: InsertTextFormatSnippet,
+		})
+	}
+	return items
+}
+
+func buildConstructorSnippet(className string, c constants.ConstructorSignature) string {
+	if len(c.Parameters) == 0 {
+		return className + "{}"
+	}
+	var b strings.Builder
+	b.WriteString(className)
+	b.WriteString("{")
+	for i, p := range c.Parameters {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "${%d:%s}", i+1, p.Name)
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+func orEmpty(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
 }
 
 // GetLiteralCompletions returns literal completions.
@@ -366,11 +492,11 @@ func GetSnippetCompletions(isDataSourceFile bool) []CompletionItem {
 func getDataSourceSnippets() []CompletionItem {
 	return []CompletionItem{
 		{
-			Label:         "dsparams",
-			Kind:          CompletionKindSnippet,
-			Detail:        "Data Source Parameters",
-			Documentation: "Declare data source parameters with inline defaults",
-			InsertText:    `:PARAMETERS ${1:sParam1} := ${2:''};`,
+			Label:            "dsparams",
+			Kind:             CompletionKindSnippet,
+			Detail:           "Data Source Parameters",
+			Documentation:    "Declare data source parameters with inline defaults",
+			InsertText:       `:PARAMETERS ${1:sParam1} := ${2:''};`,
 			InsertTextFormat: InsertTextFormatSnippet,
 		},
 		{

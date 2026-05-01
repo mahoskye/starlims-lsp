@@ -195,6 +195,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
 	diagnostics = append(diagnostics, checkBranchTargetLabels(tokens)...)
 	diagnostics = append(diagnostics, checkClassContextRules(tokens, ast, p)...)
+	diagnostics = append(diagnostics, checkClassNameCollision(tokens)...)
 	diagnostics = append(diagnostics, checkClassReferenceForms(tokens)...)
 	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
@@ -4846,6 +4847,49 @@ func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
 				}
 				break
 			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkClassNameCollision warns when a `:CLASS Foo;` declaration uses a
+// name that collides with one of the published built-in SSL classes. Such
+// declarations are confusing because the user-defined class shadows the
+// built-in only in the file's local scope, and `Foo{}` instantiation may
+// resolve to the built-in elsewhere.
+func checkClassNameCollision(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		if strings.ToUpper(strings.TrimPrefix(token.Text, ":")) != "CLASS" {
+			continue
+		}
+
+		// Find the next non-whitespace, non-comment token — the class name.
+		for j := i + 1; j < len(tokens); j++ {
+			next := tokens[j]
+			if next.Type == lexer.TokenWhitespace || next.Type == lexer.TokenComment {
+				continue
+			}
+			if next.Type != lexer.TokenIdentifier {
+				break
+			}
+			if constants.IsSSLClass(next.Text) {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(next),
+					Message: fmt.Sprintf(
+						"':CLASS %s' shadows the built-in SSL class %q. "+
+							"Pick a different name to avoid confusion when readers reach for the built-in.",
+						next.Text, next.Text),
+					Source: "ssl-lsp",
+				})
+			}
+			break
 		}
 	}
 

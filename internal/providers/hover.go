@@ -43,6 +43,12 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getClassHover(word); hover != nil {
 		return hover
 	}
+	if hover := getTypeHover(word); hover != nil {
+		return hover
+	}
+	if hover := getSpecialFormHover(word); hover != nil {
+		return hover
+	}
 	if hover := getLiteralHover(word); hover != nil {
 		return hover
 	}
@@ -192,19 +198,83 @@ func formatFunctionParameters(params []ParameterInformation) string {
 	return builder.String()
 }
 
-// getClassHover returns hover information for a built-in class.
+// getClassHover returns hover information for a built-in class. The hover
+// surfaces the published summary, then enumerates constructors, properties,
+// and methods drawn from the SSL element reference.
 func getClassHover(word string) *Hover {
 	wordLower := strings.ToLower(word)
 
+	var canonical string
 	for _, className := range constants.SSLClassNames {
 		if strings.ToLower(className) == wordLower {
-			return &Hover{
-				Contents: fmt.Sprintf("**%s**\n\nBuilt-in SSL class", className),
+			canonical = className
+			break
+		}
+	}
+	if canonical == "" {
+		return nil
+	}
+
+	det, ok := constants.GeneratedClassDetails[wordLower]
+	if !ok {
+		return &Hover{Contents: fmt.Sprintf("**%s**\n\nBuilt-in SSL class", canonical)}
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**", canonical)
+	if det.BaseClass != "" {
+		fmt.Fprintf(&b, "  *(inherits from `%s`)*", det.BaseClass)
+	}
+	b.WriteString("\n\n")
+	if det.Summary != "" {
+		b.WriteString(det.Summary)
+		b.WriteString("\n")
+	}
+
+	if len(det.Constructors) > 0 {
+		b.WriteString("\n**Constructors:**\n\n")
+		for _, c := range det.Constructors {
+			fmt.Fprintf(&b, "- `%s`", c.Signature)
+			if c.Description != "" {
+				fmt.Fprintf(&b, " — %s", c.Description)
 			}
+			b.WriteString("\n")
 		}
 	}
 
-	return nil
+	if len(det.Properties) > 0 {
+		b.WriteString("\n**Properties:**\n\n")
+		for _, p := range det.Properties {
+			fmt.Fprintf(&b, "- `%s`", p.Name)
+			if p.Type != "" {
+				fmt.Fprintf(&b, " *(%s", p.Type)
+				if p.Access != "" {
+					fmt.Fprintf(&b, ", %s", p.Access)
+				}
+				b.WriteString(")*")
+			}
+			if p.Description != "" {
+				fmt.Fprintf(&b, " — %s", p.Description)
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	if len(det.Methods) > 0 {
+		b.WriteString("\n**Methods:**\n\n")
+		for _, m := range det.Methods {
+			fmt.Fprintf(&b, "- `%s`", m.Name)
+			if m.Returns != "" && m.Returns != "none" {
+				fmt.Fprintf(&b, " → %s", m.Returns)
+			}
+			if m.Description != "" {
+				fmt.Fprintf(&b, " — %s", m.Description)
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 
 // getLiteralHover returns hover information for a literal.
@@ -223,21 +293,133 @@ func getLiteralHover(word string) *Hover {
 	return nil
 }
 
-// getOperatorHover returns hover information for an operator.
+// getOperatorHover returns hover information for an operator. The hover
+// includes the curated short description plus the type-behavior table from
+// the published reference when one is available (e.g. for `+=`, `==`, `$`).
 func getOperatorHover(word string) *Hover {
 	upper := strings.ToUpper(word)
 
-	if constants.IsSSLOperator(upper) {
-		description := constants.SSLOperatorDescriptions[upper]
-		if description == "" {
-			description = fmt.Sprintf("SSL operator: %s", upper)
+	if !constants.IsSSLOperator(upper) {
+		return nil
+	}
+
+	description := constants.SSLOperatorDescriptions[upper]
+	if description == "" {
+		description = fmt.Sprintf("SSL operator: %s", upper)
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n%s", upper, description)
+
+	// The operator description lookup is keyed by symbol; the JSON-derived
+	// detail map is keyed by symbol too via GeneratedOperatorBySymbol.
+	if det, ok := constants.GeneratedOperatorBySymbol[word]; ok && len(det.TypeBehavior) > 0 {
+		b.WriteString("\n\n**Type behavior:**\n\n")
+		b.WriteString("| Left | Right | Result | Behavior |\n")
+		b.WriteString("|------|-------|--------|----------|\n")
+		for _, row := range det.TypeBehavior {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n",
+				orDash(row.Left), orDash(row.Right), orDash(row.Result), row.Behavior)
 		}
-		return &Hover{
-			Contents: fmt.Sprintf("**%s**\n\n%s", upper, description),
+	} else if det, ok := constants.GeneratedOperatorBySymbol[upper]; ok && len(det.TypeBehavior) > 0 {
+		b.WriteString("\n\n**Type behavior:**\n\n")
+		b.WriteString("| Left | Right | Result | Behavior |\n")
+		b.WriteString("|------|-------|--------|----------|\n")
+		for _, row := range det.TypeBehavior {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n",
+				orDash(row.Left), orDash(row.Right), orDash(row.Result), row.Behavior)
 		}
 	}
 
-	return nil
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}
+
+// getTypeHover returns hover information for one of the 8 core SSL value
+// types (array, boolean, codeblock, date, netobject, number, object, string).
+// Shows runtime type, supported operators, and members.
+func getTypeHover(word string) *Hover {
+	det, ok := constants.GeneratedTypeDetails[strings.ToLower(word)]
+	if !ok {
+		return nil
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**", det.Title)
+	if det.RuntimeType != "" {
+		fmt.Fprintf(&b, "  *(runtime type: `%s`)*", det.RuntimeType)
+	}
+	b.WriteString("\n\n")
+	if det.Summary != "" {
+		b.WriteString(det.Summary)
+		b.WriteString("\n")
+	}
+
+	if len(det.Operators) > 0 {
+		b.WriteString("\n**Operators:**\n\n")
+		for _, op := range det.Operators {
+			fmt.Fprintf(&b, "- `%s`", op.Symbol)
+			if op.Operator != "" && op.Operator != op.Symbol {
+				fmt.Fprintf(&b, " (`%s`)", op.Operator)
+			}
+			if op.Returns != "" {
+				fmt.Fprintf(&b, " → %s", op.Returns)
+			}
+			if op.Behavior != "" {
+				fmt.Fprintf(&b, " — %s", op.Behavior)
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	if len(det.Members) > 0 {
+		b.WriteString("\n**Members:**\n\n")
+		for _, m := range det.Members {
+			fmt.Fprintf(&b, "- `%s`", m.Name)
+			if m.Kind != "" {
+				fmt.Fprintf(&b, " *(%s)*", m.Kind)
+			}
+			if m.Returns != "" && m.Returns != "none" {
+				fmt.Fprintf(&b, " → %s", m.Returns)
+			}
+			if m.Description != "" {
+				fmt.Fprintf(&b, " — %s", m.Description)
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
+}
+
+// getSpecialFormHover returns hover information for one of the 6 SSL special
+// forms (access-modifiers, base, code-block, code-organization, constructor,
+// me). Shows summary and canonical syntax block.
+func getSpecialFormHover(word string) *Hover {
+	det, ok := constants.GeneratedSpecialFormDetails[strings.ToLower(word)]
+	if !ok {
+		return nil
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n", det.Title)
+	if det.Summary != "" {
+		b.WriteString(det.Summary)
+		b.WriteString("\n")
+	}
+	if det.Syntax != "" {
+		b.WriteString("\n**Syntax:**\n\n```ssl\n")
+		b.WriteString(det.Syntax)
+		b.WriteString("\n```")
+	}
+
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 
 // getProcedureHover returns hover information for a procedure defined in the document.
