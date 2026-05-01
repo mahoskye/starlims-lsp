@@ -3,6 +3,8 @@ package providers
 
 import (
 	"fmt"
+	"os"
+	"runtime/debug"
 	"strings"
 	"unicode"
 
@@ -109,7 +111,30 @@ func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts Diagn
 	return collectDiagnostics(tokens, ast, p, opts)
 }
 
-func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, opts DiagnosticOptions) []Diagnostic {
+func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, opts DiagnosticOptions) (result []Diagnostic) {
+	// Defense in depth: if a check function panics, surface it as a single
+	// error diagnostic instead of letting the panic propagate and kill the
+	// LSP server (which manifests on the client as
+	// "all goroutines are asleep - deadlock"). Also log to stderr so the
+	// stack trace shows up in the editor's LSP output channel and bug
+	// reports include enough context to localize the panic.
+	defer func() {
+		if r := recover(); r != nil {
+			stack := debug.Stack()
+			fmt.Fprintf(os.Stderr, "ssl-lsp: panic in collectDiagnostics: %v\n%s\n", r, stack)
+			result = append(result, Diagnostic{
+				Severity: SeverityError,
+				Range: Range{
+					Start: Position{Line: 0, Character: 0},
+					End:   Position{Line: 0, Character: 1},
+				},
+				Message: fmt.Sprintf("ssl-lsp internal error: %v. Other diagnostics for this file may be missing. Please file an issue with the file contents — full stack trace is in the LSP output channel.", r),
+				Source:  "ssl-lsp",
+				Code:    "internal_error",
+			})
+		}
+	}()
+
 	var diagnostics []Diagnostic
 
 	// Check for lexer-level issues
@@ -222,7 +247,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = applySuppressionComments(tokens, diagnostics)
 	diagnostics = applyRuleOverrides(diagnostics, opts.RuleOverrides)
 
-	return diagnostics
+	result = diagnostics
+	return
 }
 
 // applyRuleOverrides drops or remaps severities for diagnostics whose Code
