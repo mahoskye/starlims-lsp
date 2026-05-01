@@ -1677,3 +1677,46 @@ y := 2;
 	}
 	t.Logf("Formatted output:\n%s", formatted)
 }
+
+func TestFormat_TrimTrailingWhitespace(t *testing.T) {
+	src := ":PROCEDURE Test;   \nnX := 1;\t\t\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	opts.TrimTrailingWhitespace = true
+	out := applyPostFormatPasses(src, opts)
+	for i, line := range strings.Split(out, "\n") {
+		if line != strings.TrimRight(line, " \t") {
+			t.Errorf("line %d still has trailing whitespace: %q", i, line)
+		}
+	}
+}
+
+func TestFormat_MaxConsecutiveBlankLines(t *testing.T) {
+	src := "a\n\n\n\n\nb\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxConsecutiveBlankLines = 2
+	out := applyPostFormatPasses(src, opts)
+	want := "a\n\n\nb\n" // a + 2 blank lines + b + trailing newline
+	if out != want {
+		t.Errorf("got %q, want %q", out, want)
+	}
+}
+
+func TestFormat_BuiltinFunctionCase_PascalCase(t *testing.T) {
+	// The published inventory uses canonical PascalCase. `len` and `empty`
+	// should be rewritten to their canonical forms `Len` and `Empty`. A
+	// non-builtin identifier `myUserFn` should be left alone. An identifier
+	// not followed by `(` should also be left alone.
+	src := "x := len(s);\ny := myUserFn(z);\nempty := emptyVar;\n"
+	opts := DefaultFormattingOptions()
+	opts.BuiltinFunctionCase = "PascalCase"
+	out := applyPostFormatPasses(src, opts)
+	if !strings.Contains(out, "Len(s)") {
+		t.Errorf("expected canonical Len(s) in output: %q", out)
+	}
+	if !strings.Contains(out, "myUserFn(z)") {
+		t.Errorf("user-defined call should be preserved: %q", out)
+	}
+	if !strings.Contains(out, "emptyVar") {
+		t.Errorf("identifier not followed by '(' should be untouched: %q", out)
+	}
+}

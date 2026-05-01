@@ -25,10 +25,11 @@ type SSLSettings struct {
 
 // DiagnosticsSettings represents diagnostics settings from the client.
 type DiagnosticsSettings struct {
-	HungarianNotation *bool     `json:"hungarianNotation"`
-	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
-	Globals           *[]string `json:"globals"`
-	MaxBlockDepth     *int      `json:"maxBlockDepth"`
+	HungarianNotation *bool              `json:"hungarianNotation"`
+	HungarianPrefixes *[]string          `json:"hungarianPrefixes"`
+	Globals           *[]string          `json:"globals"`
+	MaxBlockDepth     *int               `json:"maxBlockDepth"`
+	Rules             *map[string]string `json:"rules"`
 }
 
 // InlayHintsSettings represents inlay hint settings from the client.
@@ -39,14 +40,17 @@ type InlayHintsSettings struct {
 
 // FormatSettings represents formatting settings from the client.
 type FormatSettings struct {
-	IndentStyle            *string            `json:"indentStyle"`
-	IndentSize             *int               `json:"indentSize"`
-	MaxLineLength          *int               `json:"maxLineLength"`
-	OperatorSpacing        *bool              `json:"operatorSpacing"`
-	CommaSpacing           *bool              `json:"commaSpacing"`
-	SemicolonEnforcement   *bool              `json:"semicolonEnforcement"`
-	BlankLinesBetweenProcs *int               `json:"blankLinesBetweenProcs"`
-	SQL                    *SQLFormatSettings `json:"sql"`
+	IndentStyle              *string            `json:"indentStyle"`
+	IndentSize               *int               `json:"indentSize"`
+	MaxLineLength            *int               `json:"maxLineLength"`
+	OperatorSpacing          *bool              `json:"operatorSpacing"`
+	CommaSpacing             *bool              `json:"commaSpacing"`
+	SemicolonEnforcement     *bool              `json:"semicolonEnforcement"`
+	BlankLinesBetweenProcs   *int               `json:"blankLinesBetweenProcs"`
+	TrimTrailingWhitespace   *bool              `json:"trimTrailingWhitespace"`
+	MaxConsecutiveBlankLines *int               `json:"maxConsecutiveBlankLines"`
+	BuiltinFunctionCase      *string            `json:"builtinFunctionCase"`
+	SQL                      *SQLFormatSettings `json:"sql"`
 }
 
 // SQLFormatSettings represents SQL formatting settings from the client.
@@ -378,6 +382,9 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Formatting.CommaSpacing, fmt.CommaSpacing)
 		applyOptional(&s.settings.Formatting.SemicolonEnforcement, fmt.SemicolonEnforcement)
 		applyOptional(&s.settings.Formatting.BlankLinesBetweenProcs, fmt.BlankLinesBetweenProcs)
+		applyOptional(&s.settings.Formatting.TrimTrailingWhitespace, fmt.TrimTrailingWhitespace)
+		applyOptional(&s.settings.Formatting.MaxConsecutiveBlankLines, fmt.MaxConsecutiveBlankLines)
+		applyOptional(&s.settings.Formatting.BuiltinFunctionCase, fmt.BuiltinFunctionCase)
 
 		// Apply SQL formatting settings
 		if fmt.SQL != nil {
@@ -398,6 +405,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)
+		applyOptional(&s.settings.Diagnostics.RuleOverrides, diagnostics.Rules)
 	}
 
 	// Apply inlay hints settings

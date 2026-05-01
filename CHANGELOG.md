@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-30
+
+### Added
+- **Server-side per-rule severity overrides.** New
+  `DiagnosticOptions.RuleOverrides` (a slug -> severity map) drops or remaps
+  diagnostics by `Code`. Recognized values: `off` (drop), `info`, `warn`,
+  `warning`, `error`. Wired into `ssl.diagnostics.rules` from client
+  initialization options and configuration changes; the override is applied
+  inside `collectDiagnostics` so every consumer (LSP `publishDiagnostics`,
+  `--validate`, future tooling) honors it uniformly.
+- **Suppression comments.** Two forms recognized in source:
+  - `/* @ssl-disable <slug>[, <slug>...]; */` — file-scope: silences every
+    matching diagnostic in the document.
+  - `/* @ssl-disable-next-line <slug>[, <slug>...]; */` — line-scope: silences
+    matching diagnostics on the line directly after the comment.
+  Slug `*` matches any code (full silence). The set of recognized slugs is the
+  one defined in `internal/providers/diagnostic_codes.go`.
+- **Three new formatting options** (close the gap with the VS Code extension's
+  client-only fallbacks):
+  - `TrimTrailingWhitespace` (default `true`) — strips trailing space/tab from
+    every formatted line.
+  - `MaxConsecutiveBlankLines` (default `0` = no cap) — caps runs of blank
+    lines at the configured count.
+  - `BuiltinFunctionCase` (`"preserve"` default, `"PascalCase"` to canonicalize)
+    — rewrites built-in function call sites to the published inventory casing
+    (e.g. `len(x)` -> `Len(x)`). User-defined identifiers and non-call uses
+    are untouched.
+  Wired through from `ssl.format.{trimTrailingWhitespace, maxConsecutiveBlankLines, builtinFunctionCase}`.
+- **`constants.CanonicalFunctionNames()`** helper — lowercase->PascalCase map
+  over the full inventory; used by the casing rewriter and available to other
+  consumers.
+
+### Tests
+- `TestRuleOverrides_DropAndRemap` — pins drop + remap behavior for `off` /
+  `info` and verifies unknown override values pass through unchanged.
+- `TestSuppressionComments_FileScopeAndNextLine` — pins file-scope and
+  next-line suppression and the `*` wildcard.
+- `TestFormat_TrimTrailingWhitespace`, `TestFormat_MaxConsecutiveBlankLines`,
+  `TestFormat_BuiltinFunctionCase_PascalCase` — pin each post-format pass.
+
 ## [0.4.0] - 2026-04-30
 
 ### Added
