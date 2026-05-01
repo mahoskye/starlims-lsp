@@ -34,11 +34,19 @@ type Position struct {
 }
 
 // Diagnostic represents a diagnostic message.
+//
+// Code is a stable, machine-readable identifier for the rule that produced
+// this diagnostic. Clients use it to wire quick-fix code actions, suppression
+// comments, and per-rule severity overrides. Where the schema in
+// ssl-style-guide.schema.yaml defines a `lints` rule slug, Code uses that
+// slug verbatim (snake_case). Otherwise, Code is derived from the producing
+// check function. See diagnostic_codes.go for the canonical list.
 type Diagnostic struct {
 	Range    Range
 	Severity DiagnosticSeverity
 	Message  string
 	Source   string
+	Code     string
 }
 
 // DiagnosticOptions configures diagnostic checking.
@@ -228,6 +236,7 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'",
 						Source:   "ssl-lsp",
+						Code:     CodeLabelKeywordForm,
 					})
 				}
 				continue
@@ -241,6 +250,7 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'",
 						Source:   "ssl-lsp",
+						Code:     CodeEndForInvalid,
 					})
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
@@ -248,6 +258,7 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Unknown SSL keyword: '%s'", text),
 						Source:   "ssl-lsp",
+						Code:     CodeUnknownKeyword,
 					})
 				}
 				continue
@@ -260,6 +271,7 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("SSL keywords are case-sensitive and must be uppercase: use '%s'", canonical),
 					Source:   "ssl-lsp",
+					Code:     CodeKeywordUppercase,
 				})
 			}
 		}
@@ -311,6 +323,7 @@ func checkTokenErrors(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Unknown token: '%s'", token.Text),
 				Source:   "ssl-lsp",
+				Code:     CodeUnknownToken,
 			})
 		}
 	}
@@ -336,6 +349,7 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "SSL comments must end with a semicolon ';'",
 				Source:   "ssl-lsp",
+				Code:     CodeCommentTermination,
 			})
 			continue
 		}
@@ -365,6 +379,7 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden",
 				Source:   "ssl-lsp",
+				Code:     CodeCommentTextAfterTerminator,
 			})
 			continue
 		}
@@ -385,6 +400,7 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons",
 				Source:   "ssl-lsp",
+				Code:     CodeCommentTextAfterTerminator,
 			})
 		}
 	}
@@ -438,6 +454,7 @@ func checkAssignmentInCondition(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(*token),
 				Message:  fmt.Sprintf("Assignment ':=' used in %s condition - did you mean '=' or '=='?", keywordName),
 				Source:   "ssl-lsp",
+				Code:     CodeAssignmentInCondition,
 			})
 		}
 	}
@@ -514,6 +531,7 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("SSL uses colon ':' for property access, not dot '.'. Use 'object:%s' instead of 'object.%s'", propName, propName),
 				Source:   "ssl-lsp",
+				Code:     CodeDotPropertyAccess,
 			})
 		}
 	}
@@ -595,6 +613,7 @@ func checkClassInstantiationSyntax(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("SSL built-in class '%s' uses curly braces for instantiation: '%s{}' not '%s()'", originalName, originalName, originalName),
 					Source:   "ssl-lsp",
+					Code:     CodeClassInstantiationCurly,
 				})
 			}
 			break
@@ -642,6 +661,7 @@ func checkCreateUdObjectBuiltinClassMisuse(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(tokens[argStart]),
 			Message:  fmt.Sprintf("Built-in SSL class '%s' must use curly-brace construction ('%s{}'), not CreateUdObject(\"%s\")", className, className, className),
 			Source:   "ssl-lsp",
+			Code:     CodeCreateUdObjectBuiltinMisuse,
 		})
 	}
 
@@ -695,6 +715,7 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(*zeroToken),
 					Message:  "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.",
 					Source:   "ssl-lsp",
+					Code:     CodeZeroBasedArrayIndex,
 				})
 			}
 			break
@@ -770,6 +791,7 @@ func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
 							Range:    tokenToRange(t),
 							Message:  fmt.Sprintf("Named SQL parameter '?%s?' not supported by '%s'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.", ph.Name, funcName),
 							Source:   "ssl-lsp",
+							Code:     CodeNamedSqlParamUnsupported,
 						})
 						break // One warning per string is enough
 					}
@@ -842,6 +864,7 @@ func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
 							},
 							Message: fmt.Sprintf("Complex expression '?%s?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.", ph.Name),
 							Source:  "ssl-lsp",
+							Code:     CodeComplexSqlPlaceholder,
 						})
 					}
 				}
@@ -917,6 +940,7 @@ func checkUDObjectArrayInClause(tokens []lexer.Token) []Diagnostic {
 					ph.Name,
 				),
 				Source: "ssl-lsp",
+				Code:     CodeUdObjectArrayInClause,
 			})
 		}
 	}
@@ -980,6 +1004,7 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeDirectProcedureCall,
 					})
 				}
 			}
@@ -1042,6 +1067,7 @@ func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
 								},
 								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
 								Source:  "ssl-lsp",
+								Code:     CodeExecFunctionMissingQuotes,
 							})
 						}
 						break
@@ -1079,6 +1105,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 					},
 					Message: "'Constructor' is only meaningful inside a ':CLASS' definition",
 					Source:  "ssl-lsp",
+					Code:     CodeConstructorOutsideClass,
 				})
 			}
 		}
@@ -1092,6 +1119,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 				Range:    tokenToRange(token),
 				Message:  "Only one ':CLASS' definition is allowed per file",
 				Source:   "ssl-lsp",
+				Code:     CodeOneClassPerFile,
 			})
 		}
 	}
@@ -1103,6 +1131,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 			Range:    tokenToRange(classTokens[0]),
 			Message:  "A file is either a ':CLASS' definition or a script; ':CLASS' must be the first significant statement",
 			Source:   "ssl-lsp",
+			Code:     CodeClassOrScript,
 		})
 	}
 
@@ -1120,6 +1149,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 				},
 				Message: "'Constructor' is only meaningful inside a ':CLASS' definition",
 				Source:  "ssl-lsp",
+				Code:     CodeConstructorOutsideClass,
 			})
 		}
 	}
@@ -1150,6 +1180,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 					Range:    tokenToRange(token),
 					Message:  "DoProc is a compile-time error inside class methods — all forms are rejected. Use Me:MethodName() / Base:MethodName() instead.",
 					Source:   "ssl-lsp",
+					Code:     CodeDoProcInClass,
 				})
 			}
 			break
@@ -1193,6 +1224,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 					Range:    tokenToRange(token),
 					Message:  "':RETURN' inside a Constructor cannot return a value",
 					Source:   "ssl-lsp",
+					Code:     CodeConstructorReturnValue,
 				})
 			}
 		}
@@ -1241,6 +1273,7 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "'Me' can only be used inside a ':CLASS' definition",
 				Source:   "ssl-lsp",
+				Code:     CodeMeOutsideClass,
 			})
 
 		case strings.EqualFold(token.Text, "Base"):
@@ -1251,6 +1284,7 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "'Base' must be used as 'Base:MemberName' and cannot stand alone",
 					Source:   "ssl-lsp",
+					Code:     CodeBaseStandalone,
 				})
 				continue
 			}
@@ -1261,6 +1295,7 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "'Base:MemberName' can only be used inside a ':CLASS' definition",
 					Source:   "ssl-lsp",
+					Code:     CodeBaseOutsideClass,
 				})
 				continue
 			}
@@ -1271,6 +1306,7 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "'Base:MemberName' requires ':INHERIT' in the current ':CLASS' definition",
 					Source:   "ssl-lsp",
+					Code:     CodeBaseRequiresInherit,
 				})
 			}
 		}
@@ -1366,6 +1402,7 @@ func checkClassMemberOrder(tokens []lexer.Token, classToken lexer.Token) []Diagn
 				Range:    tokenToRange(token),
 				Message:  orderMessage,
 				Source:   "ssl-lsp",
+				Code:     CodeClassMemberOrder,
 			})
 		}
 		if order > maxOrder {
@@ -1409,6 +1446,7 @@ func checkUnmatchedDelimiters(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Unmatched '%s'", token.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeUnmatchedDelimiter,
 					})
 				} else if stack[len(stack)-1].char != expected {
 					diagnostics = append(diagnostics, Diagnostic{
@@ -1416,6 +1454,7 @@ func checkUnmatchedDelimiters(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Expected '%s' but found '%s'", pairs[stack[len(stack)-1].char], token.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeMismatchedDelimiter,
 					})
 					stack = stack[:len(stack)-1]
 				} else {
@@ -1432,6 +1471,7 @@ func checkUnmatchedDelimiters(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(item.token),
 			Message:  fmt.Sprintf("Unclosed '%s'", item.char),
 			Source:   "ssl-lsp",
+			Code:     CodeUnclosedDelimiter,
 		})
 	}
 
@@ -1479,6 +1519,7 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Unexpected ':%s' without matching block start", normalized),
 						Source:   "ssl-lsp",
+						Code:     CodeUnmatchedBlockEnd,
 					})
 				} else {
 					top := stack[len(stack)-1]
@@ -1498,6 +1539,7 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 										Range:    tokenToRange(unclosed.token),
 										Message:  fmt.Sprintf("Unclosed ':%s' - expected ':%s'", unclosed.keyword, expectedEnd),
 										Source:   "ssl-lsp",
+										Code:     CodeUnclosedBlock,
 									})
 								}
 								stack = stack[:i]
@@ -1512,6 +1554,7 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 								Range:    tokenToRange(token),
 								Message:  fmt.Sprintf("':%s' does not match ':%s'", normalized, top.keyword),
 								Source:   "ssl-lsp",
+								Code:     CodeMismatchedBlockEnd,
 							})
 						}
 					}
@@ -1528,6 +1571,7 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(item.token),
 			Message:  fmt.Sprintf("Unclosed ':%s' - expected ':%s'", item.keyword, expectedEnd),
 			Source:   "ssl-lsp",
+			Code:     CodeUnclosedBlock,
 		})
 	}
 
@@ -1554,6 +1598,7 @@ func checkBlockDepth(ast *parser.Node, maxDepth int) []Diagnostic {
 				},
 				Message: fmt.Sprintf("Block nesting depth (%d) exceeds maximum (%d)", depth, maxDepth),
 				Source:  "ssl-lsp",
+				Code:     CodeMaxBlockDepth,
 			})
 		}
 
@@ -1595,6 +1640,7 @@ func checkHungarianNotation(variables []parser.VariableInfo, prefixes []string) 
 			},
 			Message: fmt.Sprintf("Variable '%s' should use a Hungarian notation prefix (%s)", variable.Name, validPrefixes),
 			Source:  "ssl-lsp",
+			Code:     CodeHungarianNotation,
 		})
 	}
 
@@ -1754,6 +1800,7 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(*caseToken),
 				Message:  fmt.Sprintf("':%s' block should end with ':EXITCASE;'", strings.ToUpper(strings.TrimPrefix(caseToken.Text, ":"))),
 				Source:   "ssl-lsp",
+				Code:     CodePreferExitCase,
 			})
 		}
 	}
@@ -1837,6 +1884,7 @@ func checkMissingOtherwise(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(*beginCaseToken),
 					Message:  "':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling",
 					Source:   "ssl-lsp",
+					Code:     CodeMissingOtherwise,
 				})
 			}
 			if depth <= 0 {
@@ -1875,6 +1923,7 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
 				Source:   "ssl-lsp",
+				Code:     CodeBareLogicalOperator,
 			})
 		}
 	}
@@ -1917,6 +1966,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("SSL uses '%s' instead of '%s'", suggestion, token.Text),
 					Source:   "ssl-lsp",
+					Code:     CodeInvalidOperatorSequence,
 				})
 				continue
 			}
@@ -1926,6 +1976,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("'%s' is not a valid SSL operator", token.Text),
 					Source:   "ssl-lsp",
+					Code:     CodeInvalidOperatorSequence,
 				})
 				continue
 			}
@@ -1950,6 +2001,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 							},
 							Message: fmt.Sprintf("%s. Use '%s' instead", fix.description, fix.suggestion),
 							Source:  "ssl-lsp",
+							Code:     CodeInvalidOperatorSequence,
 						})
 						break
 					}
@@ -2012,6 +2064,7 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':INCLUDE' inside a procedure body is not supported",
 						Source:   "ssl-lsp",
+						Code:     CodeIncludeEarly,
 					})
 				} else if seenNonPreambleStatement {
 					diagnostics = append(diagnostics, Diagnostic{
@@ -2019,6 +2072,7 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':INCLUDE' should appear early in the file. Recommended order: :PARAMETERS, :DEFAULT, :INCLUDE, :PUBLIC, :DECLARE",
 						Source:   "ssl-lsp",
+						Code:     CodeIncludeEarly,
 					})
 				}
 				continue
@@ -2061,6 +2115,7 @@ func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(declareToken),
 					Message:  "':DEFAULT' cannot be used with ':DECLARE' - use ':PARAMETERS' with ':DEFAULT' instead",
 					Source:   "ssl-lsp",
+					Code:     CodeDefaultOnDeclareLine,
 				})
 			}
 		}
@@ -2134,6 +2189,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':PARAMETERS' must appear immediately after ':PROCEDURE'",
 						Source:   "ssl-lsp",
+						Code:     CodeParametersFirst,
 					})
 				}
 				waitingForProcedureParameters = false
@@ -2144,6 +2200,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "Script-level ':PARAMETERS' must appear before top-level statements (leading ':PROCEDURE' blocks are allowed)",
 					Source:   "ssl-lsp",
+					Code:     CodeParametersFirst,
 				})
 			}
 		default:
@@ -2200,6 +2257,7 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 							Range:    tokenToRange(token),
 							Message:  "':DEFAULT' must appear immediately after ':PARAMETERS'",
 							Source:   "ssl-lsp",
+							Code:     CodeDefaultAfterParameters,
 						})
 					}
 				default:
@@ -2239,6 +2297,7 @@ func checkInlineCodeNaming(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "':BEGININLINECODE' requires a name (identifier or quoted string)",
 				Source:   "ssl-lsp",
+				Code:     CodeInlineCodeNaming,
 			})
 			continue
 		}
@@ -2250,6 +2309,7 @@ func checkInlineCodeNaming(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "':BEGININLINECODE' requires a name (identifier or quoted string)",
 				Source:   "ssl-lsp",
+				Code:     CodeInlineCodeNaming,
 			})
 			continue
 		}
@@ -2260,6 +2320,7 @@ func checkInlineCodeNaming(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(next),
 				Message:  "':BEGININLINECODE' name must be an identifier or quoted string",
 				Source:   "ssl-lsp",
+				Code:     CodeInlineCodeNaming,
 			})
 		}
 	}
@@ -2302,6 +2363,7 @@ func checkBeginCaseHasCase(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(state.token),
 					Message:  "':BEGINCASE' requires at least one ':CASE' block",
 					Source:   "ssl-lsp",
+					Code:     CodeBeginCaseRequiresCase,
 				})
 			}
 		}
@@ -2365,6 +2427,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(stack[len(stack)-1].token),
 					Message:  "':TRY' requires at least one statement before ':CATCH' or ':FINALLY'",
 					Source:   "ssl-lsp",
+					Code:     CodeTryStructure,
 				})
 			}
 			if stack[len(stack)-1].hasFinally {
@@ -2373,6 +2436,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':CATCH' must appear before ':FINALLY' in a ':TRY' block",
 					Source:   "ssl-lsp",
+					Code:     CodeCatchOrderBeforeFinally,
 				})
 				continue
 			}
@@ -2382,6 +2446,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "Only one ':CATCH' block is allowed per ':TRY'",
 					Source:   "ssl-lsp",
+					Code:     CodeSingleCatch,
 				})
 				continue
 			}
@@ -2397,6 +2462,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(stack[len(stack)-1].token),
 					Message:  "':TRY' requires at least one statement before ':CATCH' or ':FINALLY'",
 					Source:   "ssl-lsp",
+					Code:     CodeTryStructure,
 				})
 			}
 			if stack[len(stack)-1].hasFinally {
@@ -2405,6 +2471,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "Only one ':FINALLY' block is allowed per ':TRY'",
 					Source:   "ssl-lsp",
+					Code:     CodeSingleFinally,
 				})
 				continue
 			}
@@ -2423,6 +2490,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(state.token),
 					Message:  "':TRY' requires at least one ':CATCH' or ':FINALLY' block",
 					Source:   "ssl-lsp",
+					Code:     CodeTryRequiresHandler,
 				})
 			}
 			if !state.bodyHasStatements && (state.hasCatch || state.hasFinally) {
@@ -2431,6 +2499,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(state.token),
 					Message:  "':TRY' requires at least one statement before ':CATCH' or ':FINALLY'",
 					Source:   "ssl-lsp",
+					Code:     CodeTryStructure,
 				})
 			}
 			if state.hasFinally && !state.finallyHasBody {
@@ -2439,6 +2508,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(state.finallyToken),
 					Message:  "':FINALLY' must contain at least one statement",
 					Source:   "ssl-lsp",
+					Code:     CodeFinallyEmpty,
 				})
 			}
 		default:
@@ -2478,6 +2548,7 @@ func checkErrorHandlerStructure(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope",
 				Source:   "ssl-lsp",
+				Code:     CodeErrorHandlerStructure,
 			})
 			continue
 		}
@@ -2494,6 +2565,7 @@ func checkErrorHandlerStructure(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope",
 				Source:   "ssl-lsp",
+				Code:     CodeErrorHandlerStructure,
 			})
 		}
 	}
@@ -2527,6 +2599,7 @@ func checkCatchClauseForm(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(next),
 			Message:  "':CATCH' does not take an exception variable; call 'GetLastSSLError()' inside the block instead",
 			Source:   "ssl-lsp",
+			Code:     CodeCatchClauseForm,
 		})
 	}
 
@@ -2588,6 +2661,7 @@ func checkForLoopNumericLiterals(tokens []lexer.Token, typeInfo map[string]strin
 					Range:    tokenToRange(tokens[loopVarIdx]),
 					Message:  "':FOR' loop variable should be numeric",
 					Source:   "ssl-lsp",
+					Code:     CodeForNumericValues,
 				})
 			}
 		}
@@ -2611,6 +2685,7 @@ func checkForLoopNumericLiterals(tokens []lexer.Token, typeInfo map[string]strin
 				Range:    tokenToRange(tokens[valueIdx]),
 				Message:  fmt.Sprintf("':FOR' %s value should be numeric", role),
 				Source:   "ssl-lsp",
+				Code:     CodeForNumericValues,
 			})
 		}
 
@@ -2695,6 +2770,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':EXITFOR' inside a ':FINALLY' block is a compile-time error",
 					Source:   "ssl-lsp",
+					Code:     CodeExitForInFinally,
 				})
 			}
 			if !hasLoop("FOR") {
@@ -2703,6 +2779,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':EXITFOR' must be inside a ':FOR' loop",
 					Source:   "ssl-lsp",
+					Code:     CodeExitForOutsideLoop,
 				})
 			}
 		case "EXITWHILE":
@@ -2712,6 +2789,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':EXITWHILE' inside a ':FINALLY' block is a compile-time error",
 					Source:   "ssl-lsp",
+					Code:     CodeExitWhileInFinally,
 				})
 			}
 			if !hasLoop("WHILE") {
@@ -2720,6 +2798,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':EXITWHILE' must be inside a ':WHILE' loop",
 					Source:   "ssl-lsp",
+					Code:     CodeExitWhileOutsideLoop,
 				})
 			}
 		case "LOOP":
@@ -2729,6 +2808,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':LOOP' inside a ':FINALLY' block is a compile-time error",
 					Source:   "ssl-lsp",
+					Code:     CodeLoopInFinally,
 				})
 			}
 			if !hasLoop("") {
@@ -2737,6 +2817,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':LOOP' must be inside a ':WHILE' or ':FOR' loop",
 					Source:   "ssl-lsp",
+					Code:     CodeLoopOutsideLoop,
 				})
 			}
 		case "RETURN":
@@ -2746,6 +2827,7 @@ func checkLoopAndFinallyControl(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "':RETURN' inside a ':FINALLY' block is a compile-time error",
 					Source:   "ssl-lsp",
+					Code:     CodeReturnInFinally,
 				})
 			}
 		}
@@ -2780,6 +2862,7 @@ func checkDeprecatedKeywords(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  message,
 				Source:   "ssl-lsp",
+				Code:     CodeDeprecatedKeyword,
 			})
 		}
 	}
@@ -2803,6 +2886,7 @@ func checkNotPreferredOperators(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "Use '!=' instead of '#' for inequality",
 				Source:   "ssl-lsp",
+				Code:     CodeNotPreferredOperator,
 			})
 		case "<>":
 			diagnostics = append(diagnostics, Diagnostic{
@@ -2810,6 +2894,7 @@ func checkNotPreferredOperators(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "Use '!=' instead of '<>' for inequality",
 				Source:   "ssl-lsp",
+				Code:     CodeNotPreferredOperator,
 			})
 		}
 	}
@@ -2844,6 +2929,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(tokens[i]),
 					Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s' instead of '%s%s'", num, next.Text, num, next.Text),
 					Source:   "ssl-lsp",
+					Code:     CodeScientificNotation,
 				})
 			}
 			// Case 1b: 9E+1 -> tokens: "9" + "E" (single char) + "+" + "1"
@@ -2855,6 +2941,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(tokens[i]),
 						Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s%s...' instead of '%s%s%s...'", num, next.Text, afterE.Text, num, next.Text, afterE.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeScientificNotation,
 					})
 				}
 			}
@@ -2868,6 +2955,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(tokens[i]),
 				Message:  fmt.Sprintf("SSL scientific notation requires a digit before the decimal point: use '0%s%s' instead of '%s%s'", num, next.Text, num, next.Text),
 				Source:   "ssl-lsp",
+				Code:     CodeScientificNotation,
 			})
 		}
 	}
@@ -2903,6 +2991,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL",
 					Source:   "ssl-lsp",
+					Code:     CodeNilNotEmptyString,
 				})
 				continue
 			}
@@ -2912,6 +3001,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "Code blocks (lambdas) cannot be compared with '=' or '=='. This causes an error",
 					Source:   "ssl-lsp",
+					Code:     CodeCodeBlockComparison,
 				})
 				continue
 			}
@@ -2921,6 +3011,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "For strings, '=' does prefix matching. Use '==' for exact string comparisons",
 					Source:   "ssl-lsp",
+					Code:     CodeEqualsVsStrictEquals,
 				})
 			}
 		case "==":
@@ -2930,6 +3021,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL",
 					Source:   "ssl-lsp",
+					Code:     CodeNilNotEmptyString,
 				})
 			}
 			if inferSimpleType(tokens, prevIdx, typeInfo) == "codeblock" || inferSimpleType(tokens, nextIdx, typeInfo) == "codeblock" {
@@ -2938,6 +3030,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "Code blocks (lambdas) cannot be compared with '=' or '=='. This causes an error",
 					Source:   "ssl-lsp",
+					Code:     CodeCodeBlockComparison,
 				})
 			}
 		case "$":
@@ -2949,6 +3042,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "The '$' containment operator only works on strings. Non-string operands cause error",
 					Source:   "ssl-lsp",
+					Code:     CodeDollarStringOnly,
 				})
 			}
 		case "+", "-", "*", "/":
@@ -2958,6 +3052,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 					Range:    tokenToRange(token),
 					Message:  "Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first",
 					Source:   "ssl-lsp",
+					Code:     CodeNilInOperations,
 				})
 				continue
 			}
@@ -2972,6 +3067,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Mixed types in '+' operation: %s + %s. The '+' operator requires both operands to be the same type (both strings or both numeric)", leftType, rightType),
 						Source:   "ssl-lsp",
+						Code:     CodeMixedTypeOperator,
 					})
 				} else {
 					// -, *, / are arithmetic only
@@ -2981,6 +3077,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 							Range:    tokenToRange(token),
 							Message:  fmt.Sprintf("String in arithmetic operation '%s': %s %s %s. Arithmetic operators require numeric operands", token.Text, leftType, token.Text, rightType),
 							Source:   "ssl-lsp",
+							Code:     CodeArithmeticTypeMismatch,
 						})
 					} else if leftType != "numeric" || rightType != "numeric" {
 						diagnostics = append(diagnostics, Diagnostic{
@@ -2988,6 +3085,7 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 							Range:    tokenToRange(token),
 							Message:  fmt.Sprintf("Non-numeric type in arithmetic operation '%s': %s %s %s", token.Text, leftType, token.Text, rightType),
 							Source:   "ssl-lsp",
+							Code:     CodeArithmeticTypeMismatch,
 						})
 					}
 				}
@@ -3383,6 +3481,7 @@ func checkEmptyOptionalParamArrays(tokens []lexer.Token) []Diagnostic {
 			},
 			Message: fmt.Sprintf("Omit the trailing empty array for '%s' instead of passing '{}'", token.Text),
 			Source:  "ssl-lsp",
+			Code:     CodeEmptyOptionalParamArray,
 		})
 	}
 
@@ -3427,6 +3526,7 @@ func checkBranchTargetLabels(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(tokens[argStart]),
 			Message:  "Branch target string must include the label token text, such as \"LABEL SKIP\" or \"LABELSKIP\"",
 			Source:   "ssl-lsp",
+			Code:     CodeBranchTargetLabel,
 		})
 	}
 
@@ -3465,6 +3565,7 @@ func checkPublicVariables(tokens []lexer.Token) []Diagnostic {
 			Range:    tokenToRange(token),
 			Message:  "':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing",
 			Source:   "ssl-lsp",
+			Code:     CodeLimitPublicVars,
 		})
 	}
 
@@ -3487,6 +3588,7 @@ func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnost
 				},
 				Message: fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, count),
 				Source:  "ssl-lsp",
+				Code:     CodeMaxParamsWarning,
 			})
 		} else if count > 8 {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -3497,6 +3599,7 @@ func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnost
 				},
 				Message: fmt.Sprintf("Procedure '%s' has %d parameters; style guide recommends at most 8 per procedure", proc.Name, count),
 				Source:  "ssl-lsp",
+				Code:     CodeMaxParamsWarning,
 			})
 		}
 	}
@@ -3536,6 +3639,7 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 				},
 				Message: fmt.Sprintf("Variable name '%s' exceeds 20-character limit (effective length %d excluding prefix)", v.Name, len(effectiveName)),
 				Source:  "ssl-lsp",
+				Code:     CodeIdentifierTooLong,
 			})
 		}
 	}
@@ -3550,6 +3654,7 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 				},
 				Message: fmt.Sprintf("Procedure name '%s' exceeds 30-character limit (length %d)", proc.Name, len(proc.Name)),
 				Source:  "ssl-lsp",
+				Code:     CodeIdentifierTooLong,
 			})
 		}
 	}
@@ -3598,6 +3703,7 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' has no effect on class methods — class methods are always public/virtual", content),
 				Source:   "ssl-lsp",
+				Code:     CodeVisibilityAnnotation,
 			})
 			continue
 		}
@@ -3614,6 +3720,7 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Visibility annotation '/*@%s;' should appear on its own line immediately before ':PROCEDURE'", content),
 						Source:   "ssl-lsp",
+						Code:     CodeVisibilityAnnotation,
 					})
 				}
 			}
@@ -3675,6 +3782,7 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "Calling a method on NIL raises an error. Check for NIL before accessing members.",
 						Source:   "ssl-lsp",
+						Code:     CodeNilMethodCall,
 					})
 				}
 			}
@@ -3692,6 +3800,7 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Variable '%s' may be NIL at this point. Calling methods on NIL raises an error.", token.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeNilMethodCall,
 					})
 				}
 			}
@@ -3846,6 +3955,7 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Cannot assign to global variable '%s'", token.Text),
 				Source:   "ssl-lsp",
+				Code:     CodeGlobalAssignment,
 			})
 		}
 	}
@@ -3975,6 +4085,7 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Variable '%s' is not declared", token.Text),
 				Source:   "ssl-lsp",
+				Code:     CodeUndeclaredVariable,
 			})
 		}
 	}
@@ -4083,6 +4194,7 @@ func checkUnusedVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 				},
 				Message: fmt.Sprintf("Variable '%s' is declared but never used", v.Name),
 				Source:  "ssl-lsp",
+				Code:     CodeUnusedVariable,
 			})
 		}
 	}
@@ -4241,6 +4353,7 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 					},
 					Message: fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
 					Source:  "ssl-lsp",
+					Code:     CodeInvalidSqlParam,
 				})
 			}
 		}
@@ -4302,6 +4415,7 @@ func checkRedeclaredVariables(tokens []lexer.Token) []Diagnostic {
 								Range:    tokenToRange(t),
 								Message:  fmt.Sprintf("Variable '%s' is already declared (first declared at line %d). Re-declaration is silently ignored at runtime.", t.Text, firstDecl.Line),
 								Source:   "ssl-lsp",
+								Code:     CodeRedeclareIsNoop,
 							})
 						} else {
 							currentScope.declared[upper] = t
@@ -4353,6 +4467,7 @@ func checkNestedIIF(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(tokens[j]),
 						Message:  "Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.",
 						Source:   "ssl-lsp",
+						Code:     CodeNestedIif,
 					})
 				}
 			}
@@ -4423,6 +4538,7 @@ func checkNegativeLogic(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(negToken),
 				Message:  "Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.",
 				Source:   "ssl-lsp",
+				Code:     CodeNegativeLogic,
 			})
 		}
 	}
@@ -4450,6 +4566,7 @@ func checkStepSpacing(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "':STEP' should have a space before it: ':FOR i := 1 :TO 10 :STEP 2;'",
 				Source:   "ssl-lsp",
+				Code:     CodeStepSpacing,
 			})
 		}
 	}
@@ -4473,6 +4590,7 @@ func checkRegionLegacyWarning(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("':%s' is a legacy functional construct that captures body text for GetRegion(). For IDE code folding and grouping, prefer '/* region' / '/* endregion' comments instead.", normalized),
 				Source:   "ssl-lsp",
+				Code:     CodeRegionLegacy,
 			})
 		}
 	}
@@ -4510,6 +4628,7 @@ func checkCodeBlockStructure(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  "Code blocks require at least one bound variable between the pipes: {|x| expr}",
 					Source:   "ssl-lsp",
+					Code:     CodeCodeBlockStructure,
 				})
 			}
 		}
@@ -4537,6 +4656,7 @@ func checkSkippedParamSpacing(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(tokens[i+1]),
 				Message:  "Skipped parameters should use adjacent commas with no space: {a,,b} not {a, , b}",
 				Source:   "ssl-lsp",
+				Code:     CodeSkippedParamSpacing,
 			})
 		}
 	}
@@ -4571,6 +4691,7 @@ func checkNotEqualsAsymmetry(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "'!=' negates '==' (exact match), not '=' (prefix match). For strings, '=' and '!=' are NOT logical opposites",
 				Source:   "ssl-lsp",
+				Code:     CodeEqualsVsStrictEquals,
 			})
 		}
 	}
@@ -4600,6 +4721,7 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'",
 						Source:   "ssl-lsp",
+						Code:     CodeLabelKeywordForm,
 					})
 				}
 				continue
@@ -4614,6 +4736,7 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Builder directives must be uppercase: use '%s'", canonical),
 						Source:   "ssl-lsp",
+						Code:     CodeBuilderDirectiveCase,
 					})
 				}
 				continue
@@ -4626,6 +4749,7 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'",
 						Source:   "ssl-lsp",
+						Code:     CodeEndForInvalid,
 					})
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
@@ -4633,6 +4757,7 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  fmt.Sprintf("Unknown SSL keyword: '%s'", text),
 						Source:   "ssl-lsp",
+						Code:     CodeUnknownKeyword,
 					})
 				}
 				continue
@@ -4645,6 +4770,7 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 					Range:    tokenToRange(token),
 					Message:  fmt.Sprintf("SSL keywords are case-sensitive and must be uppercase: use '%s'", canonical),
 					Source:   "ssl-lsp",
+					Code:     CodeKeywordUppercase,
 				})
 			}
 		}
@@ -4669,6 +4795,7 @@ func checkDataSourceDefaultUsage(tokens []lexer.Token) []Diagnostic {
 				Range:    tokenToRange(token),
 				Message:  "Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements",
 				Source:   "ssl-lsp",
+				Code:     CodeNoDefaultStatementsInDatasource,
 			})
 		}
 	}
@@ -4723,6 +4850,7 @@ func checkDataSourceParameterDefaults(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(t),
 						Message:  fmt.Sprintf("Data source parameter '%s' must have an inline ':=' default value", t.Text),
 						Source:   "ssl-lsp",
+						Code:     CodeDatasourceDefaultRequired,
 					})
 					// Skip to next comma or semicolon
 					for j < len(tokens) && !(tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ";")) {
@@ -4826,6 +4954,7 @@ func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
 							Range:    tokenToRange(tokens[nextIdx]),
 							Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
 							Source:   "ssl-lsp",
+							Code:     CodeSqlInjection,
 						})
 					}
 					break
@@ -4840,6 +4969,7 @@ func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
 								Range:    tokenToRange(tokens[nextIdx]),
 								Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
 								Source:   "ssl-lsp",
+								Code:     CodeSqlInjection,
 							})
 						}
 					}
@@ -4887,6 +5017,7 @@ func checkClassNameCollision(tokens []lexer.Token) []Diagnostic {
 							"Pick a different name to avoid confusion when readers reach for the built-in.",
 						next.Text, next.Text),
 					Source: "ssl-lsp",
+					Code:     CodeClassNameCollision,
 				})
 			}
 			break

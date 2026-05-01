@@ -75,6 +75,7 @@ func main() {
 		os.Exit(0)
 	}
 
+	server.SetVersion(version)
 	srv := server.NewSSLServer()
 	if err := srv.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

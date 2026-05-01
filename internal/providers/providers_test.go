@@ -6920,3 +6920,111 @@ func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testin
 		t.Fatal("expected unknown keyword diagnostic for :DSN in regular script file")
 	}
 }
+
+// TestDiagnosticsAlwaysCarryCode asserts that every emitted diagnostic carries
+// a non-empty Code so clients can wire quick-fixes / suppression / per-rule
+// severity overrides without inspecting message text.
+func TestDiagnosticsAlwaysCarryCode(t *testing.T) {
+	// A grab-bag of patterns that exercises many distinct check functions.
+	code := `:CLASS Email;
+:PROCEDURE Test;
+:PARAMETERS sFoo;
+nBad = 5
+result := obj.prop;
+arr[0];
+:IF x := 1;
+DoProc("X", {});
+:ENDIF;
+:BEGINCASE;
+:CASE x = 1;
+y := 1;
+:ENDCASE;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUnmatchedParens = true
+	opts.CheckUnclosedBlocks = true
+	opts.CheckHungarianNotation = true
+	opts.HungarianPrefixes = []string{"s", "n", "b", "d", "a", "o", "fn", "v"}
+	diagnostics := GetDiagnostics(code, opts)
+
+	if len(diagnostics) == 0 {
+		t.Fatal("expected at least some diagnostics from sample input")
+	}
+	for i, d := range diagnostics {
+		if d.Code == "" {
+			t.Errorf("diagnostic %d has empty Code: severity=%v message=%q",
+				i, d.Severity, d.Message)
+		}
+		if d.Source != "ssl-lsp" {
+			t.Errorf("diagnostic %d has unexpected Source %q (want %q)",
+				i, d.Source, "ssl-lsp")
+		}
+	}
+}
+
+// TestDiagnosticCodes_SpotChecks pins specific check rules to specific codes.
+// Catches accidental rename / typo regressions in the slug list.
+func TestDiagnosticCodes_SpotChecks(t *testing.T) {
+	tests := []struct {
+		name         string
+		code         string
+		opts         func() DiagnosticOptions
+		wantCode     string
+		messageMatch string
+	}{
+		{
+			name: "udobject_array_in_clause",
+			code: `:PROCEDURE Test;
+SqlExecute("SELECT * FROM t WHERE id IN (?o:Items?)");
+:ENDPROC;`,
+			opts:         DefaultDiagnosticOptions,
+			wantCode:     CodeUdObjectArrayInClause,
+			messageMatch: "UDObject array property",
+		},
+		{
+			name: "parameters_first",
+			code: `:PROCEDURE Test;
+nLocal := 1;
+:PARAMETERS sFoo;
+:ENDPROC;`,
+			opts:         DefaultDiagnosticOptions,
+			wantCode:     CodeParametersFirst,
+			messageMatch: "':PARAMETERS' must appear",
+		},
+		{
+			name: "exitfor_in_finally",
+			code: `:PROCEDURE Test;
+:TRY;
+nX := 1;
+:FINALLY;
+:EXITFOR;
+:ENDTRY;
+:ENDPROC;`,
+			opts:         DefaultDiagnosticOptions,
+			wantCode:     CodeExitForInFinally,
+			messageMatch: "EXITFOR' inside a ':FINALLY",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diagnostics := GetDiagnostics(tt.code, tt.opts())
+			var matched *Diagnostic
+			for i := range diagnostics {
+				if strings.Contains(diagnostics[i].Message, tt.messageMatch) {
+					matched = &diagnostics[i]
+					break
+				}
+			}
+			if matched == nil {
+				t.Fatalf("no diagnostic matched message substring %q; got %d diagnostics",
+					tt.messageMatch, len(diagnostics))
+			}
+			if matched.Code != tt.wantCode {
+				t.Errorf("Code = %q, want %q (message: %q)",
+					matched.Code, tt.wantCode, matched.Message)
+			}
+		})
+	}
+}

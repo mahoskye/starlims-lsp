@@ -61,7 +61,20 @@ type SQLFormatSettings struct {
 
 const serverName = "starlims-lsp"
 
-var version = "0.2.0"
+// Version is the server version reported to LSP clients in
+// `InitializeResult.serverInfo.version`. It is overridden at startup by
+// the cmd/starlims-lsp main package via SetVersion so the wire-reported
+// version matches the binary's built-in version (which is in turn supplied
+// at build time by `-X main.version=...`).
+var version = "dev"
+
+// SetVersion overrides the version reported to LSP clients. Call from main
+// before NewSSLServer.
+func SetVersion(v string) {
+	if v != "" {
+		version = v
+	}
+}
 
 // ExtendedServerCapabilities embeds the standard capabilities and adds LSP 3.17 features.
 type ExtendedServerCapabilities struct {
@@ -425,12 +438,16 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 		if i >= s.settings.MaxNumberOfProblems {
 			break
 		}
-		protocolDiags = append(protocolDiags, protocol.Diagnostic{
+		pd := protocol.Diagnostic{
 			Range:    toProtocolRange(d.Range),
 			Severity: ptrTo(protocol.DiagnosticSeverity(d.Severity)),
 			Source:   &d.Source,
 			Message:  d.Message,
-		})
+		}
+		if d.Code != "" {
+			pd.Code = &protocol.IntegerOrString{Value: d.Code}
+		}
+		protocolDiags = append(protocolDiags, pd)
 	}
 
 	context.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
