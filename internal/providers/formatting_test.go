@@ -1720,3 +1720,58 @@ func TestFormat_BuiltinFunctionCase_PascalCase(t *testing.T) {
 		t.Errorf("identifier not followed by '(' should be untouched: %q", out)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Regression tests for embedded-SQL string-quote placement (anonymized).
+// These pin user-specified rules E and F and are expected to FAIL until the
+// formatter is updated.
+// ---------------------------------------------------------------------------
+
+// Rule F: the opening '"' of a multi-line SQL string stays on the same line
+// as its assignment / call argument. Currently it gets pushed to a new line.
+func TestFormatDocument_RuleF_OpenQuoteStaysOnAssignmentLine(t *testing.T) {
+	input := `sMySQL := "SELECT a.col1, a.col2 FROM my_table a JOIN other_table b ON b.id = a.id WHERE a.col3 = 'x'";`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	if len(edits) == 0 {
+		t.Fatalf("expected at least one edit")
+	}
+	out := edits[0].NewText
+
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == `"` {
+			t.Errorf("Rule F: stranded opening '\"' on its own line; should hug `:=` on the previous line.\nfull output:\n%s", out)
+		}
+	}
+	// The assignment line itself should end with the opening quote.
+	first := strings.SplitN(out, "\n", 2)[0]
+	if !strings.HasSuffix(strings.TrimRight(first, " \t"), `"`) {
+		t.Errorf("Rule F: first line should end with opening '\"'. got: %q\nfull output:\n%s", first, out)
+	}
+}
+
+// Rule E: do not insert a newline between the closing '"' of a multi-line SQL
+// string and the trailing comma + remaining call args. The args follow inline.
+func TestFormatDocument_RuleE_CloseQuoteHugsFollowingArgs(t *testing.T) {
+	input := `x := MyFunc(commandString: "SELECT COUNT(*) FROM t1 a JOIN t2 b ON b.x = a.x WHERE a.col = ?", defaultValue: "0", friendlyName: "DB");`
+
+	opts := DefaultFormattingOptions()
+	opts.SQL.Enabled = true
+	opts.SQL.DetectSQLStrings = true
+
+	edits := FormatDocument(input, opts)
+	if len(edits) == 0 {
+		t.Fatalf("expected at least one edit")
+	}
+	out := edits[0].NewText
+
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == `",` {
+			t.Errorf("Rule E: stranded '\",' on its own line; the comma + remaining args should follow inline.\nfull output:\n%s", out)
+		}
+	}
+}
