@@ -205,6 +205,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
+	diagnostics = append(diagnostics, checkProcedureDeclarationSyntax(tokens)...)
 	diagnostics = append(diagnostics, checkDirectProcedureCalls(tokens, ast, p)...)
 	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
 	diagnostics = append(diagnostics, checkBranchTargetLabels(tokens)...)
@@ -215,7 +216,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
 	diagnostics = append(diagnostics, checkRegionLegacyWarning(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
-	diagnostics = append(diagnostics, checkSkippedParamSpacing(tokens)...)
 	diagnostics = append(diagnostics, checkNotEqualsAsymmetry(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
@@ -1004,7 +1004,7 @@ func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
 							},
 							Message: fmt.Sprintf("Complex expression '?%s?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.", ph.Name),
 							Source:  "ssl-lsp",
-							Code:     CodeComplexSqlPlaceholder,
+							Code:    CodeComplexSqlPlaceholder,
 						})
 					}
 				}
@@ -1080,7 +1080,67 @@ func checkUDObjectArrayInClause(tokens []lexer.Token) []Diagnostic {
 					ph.Name,
 				),
 				Source: "ssl-lsp",
-				Code:     CodeUdObjectArrayInClause,
+				Code:   CodeUdObjectArrayInClause,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkProcedureDeclarationSyntax flags two malformed procedure declarations:
+//   - bare "PROCEDURE Name(...)" with no leading colon
+//   - ":PROCEDURE Name(...)" with parentheses after the name
+//
+// Both shapes are common typos from users coming from C-style languages.
+// SSL declares procedures as ":PROCEDURE Name;" and accepts arguments via a
+// separate ":PARAMETERS ..." statement. Running this check ahead of
+// checkDirectProcedureCalls ensures the user sees the syntax error rather
+// than a misleading "custom procedures cannot be called directly" message.
+func checkProcedureDeclarationSyntax(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens); i++ {
+		tok := tokens[i]
+		isKeywordProc := tok.Type == lexer.TokenKeyword &&
+			strings.EqualFold(strings.TrimPrefix(tok.Text, ":"), "PROCEDURE")
+		isBareProc := tok.Type == lexer.TokenIdentifier && strings.EqualFold(tok.Text, "PROCEDURE")
+		if !isKeywordProc && !isBareProc {
+			continue
+		}
+
+		nameIdx := nextSignificantTokenIndex(tokens, i+1)
+		if nameIdx < 0 || tokens[nameIdx].Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// For the bare-PROCEDURE case, only flag if the user is actually
+		// trying to declare a procedure: the name must be followed by `(`.
+		// For the keyword case, the parens are the diagnostic trigger.
+		parenIdx := nextSignificantTokenIndex(tokens, nameIdx+1)
+		if parenIdx < 0 {
+			continue
+		}
+		paren := tokens[parenIdx]
+		if !(paren.Type == lexer.TokenPunctuation && paren.Text == "(") {
+			continue
+		}
+
+		if isBareProc {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(tok),
+				Message:  `Procedure declarations require a leading colon. Use ":PROCEDURE Name;" (no parentheses; declare arguments via ":PARAMETERS").`,
+				Source:   "ssl-lsp",
+				Code:     CodeProcedureDeclarationSyntax,
+			})
+		} else {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(paren),
+				Message:  `Procedure declarations don't take parentheses. Use ":PROCEDURE Name;" and declare arguments via ":PARAMETERS".`,
+				Source:   "ssl-lsp",
+				Code:     CodeProcedureDeclarationSyntax,
 			})
 		}
 	}
@@ -1134,6 +1194,14 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 						if normalized == "PROCEDURE" {
 							isDeclaration = true
 						}
+					}
+					// Defense in depth: malformed "PROCEDURE Name(" (no leading
+					// colon) is reported by checkProcedureDeclarationSyntax;
+					// also recognise it here so the direct-call rule doesn't
+					// double-fire on the same typo.
+					if tokens[k].Type == lexer.TokenIdentifier &&
+						strings.EqualFold(tokens[k].Text, "PROCEDURE") {
+						isDeclaration = true
 					}
 					break
 				}
@@ -1207,7 +1275,7 @@ func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
 								},
 								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
 								Source:  "ssl-lsp",
-								Code:     CodeExecFunctionMissingQuotes,
+								Code:    CodeExecFunctionMissingQuotes,
 							})
 						}
 						break
@@ -1245,7 +1313,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 					},
 					Message: "'Constructor' is only meaningful inside a ':CLASS' definition",
 					Source:  "ssl-lsp",
-					Code:     CodeConstructorOutsideClass,
+					Code:    CodeConstructorOutsideClass,
 				})
 			}
 		}
@@ -1289,7 +1357,7 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 				},
 				Message: "'Constructor' is only meaningful inside a ':CLASS' definition",
 				Source:  "ssl-lsp",
-				Code:     CodeConstructorOutsideClass,
+				Code:    CodeConstructorOutsideClass,
 			})
 		}
 	}
@@ -1458,13 +1526,12 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 func checkClassMemberOrder(tokens []lexer.Token, classToken lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	const orderMessage = "Class members must be ordered as ':INHERIT', ':DECLARE', regular methods, then 'Constructor'"
+	const orderMessage = "Class members must be ordered as ':INHERIT', ':DECLARE', then methods"
 
 	const (
 		classOrderInherit = 1
 		classOrderDeclare = 2
 		classOrderMethod  = 3
-		classOrderCtor    = 4
 	)
 
 	seenClass := false
@@ -1527,10 +1594,6 @@ func checkClassMemberOrder(tokens []lexer.Token, classToken lexer.Token) []Diagn
 			order = classOrderDeclare
 		case "PROCEDURE":
 			order = classOrderMethod
-			nameIdx := nextSignificantTokenIndex(tokens, i+1)
-			if nameIdx >= 0 && tokens[nameIdx].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[nameIdx].Text, "Constructor") {
-				order = classOrderCtor
-			}
 			inMethod = true
 		default:
 			continue
@@ -1738,7 +1801,7 @@ func checkBlockDepth(ast *parser.Node, maxDepth int) []Diagnostic {
 				},
 				Message: fmt.Sprintf("Block nesting depth (%d) exceeds maximum (%d)", depth, maxDepth),
 				Source:  "ssl-lsp",
-				Code:     CodeMaxBlockDepth,
+				Code:    CodeMaxBlockDepth,
 			})
 		}
 
@@ -1780,7 +1843,7 @@ func checkHungarianNotation(variables []parser.VariableInfo, prefixes []string) 
 			},
 			Message: fmt.Sprintf("Variable '%s' should use a Hungarian notation prefix (%s)", variable.Name, validPrefixes),
 			Source:  "ssl-lsp",
-			Code:     CodeHungarianNotation,
+			Code:    CodeHungarianNotation,
 		})
 	}
 
@@ -2141,7 +2204,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 							},
 							Message: fmt.Sprintf("%s. Use '%s' instead", fix.description, fix.suggestion),
 							Source:  "ssl-lsp",
-							Code:     CodeInvalidOperatorSequence,
+							Code:    CodeInvalidOperatorSequence,
 						})
 						break
 					}
@@ -3174,8 +3237,8 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 				})
 			}
 		case "$":
-			leftType := inferSimpleType(tokens, prevIdx, typeInfo)
-			rightType := inferSimpleType(tokens, nextIdx, typeInfo)
+			leftType := inferOperandType(tokens, prevIdx, -1, typeInfo)
+			rightType := inferOperandType(tokens, nextIdx, +1, typeInfo)
 			if (leftType != "" && leftType != "string") || (rightType != "" && rightType != "string") {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityWarning,
@@ -3197,8 +3260,8 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 				continue
 			}
 
-			leftType := inferSimpleType(tokens, prevIdx, typeInfo)
-			rightType := inferSimpleType(tokens, nextIdx, typeInfo)
+			leftType := inferOperandType(tokens, prevIdx, -1, typeInfo)
+			rightType := inferOperandType(tokens, nextIdx, +1, typeInfo)
 			if leftType != "" && rightType != "" && leftType != rightType {
 				if token.Text == "+" {
 					// + is overloaded: string concatenation or arithmetic
@@ -3348,19 +3411,19 @@ func inferTypeFromName(name string) string {
 	switch {
 	case isHungarianExemptName(name):
 		return "numeric"
-	case hasSpecificHungarianPrefix(name, "fn"):
+	case hasStrictHungarianPrefix(name, "fn"):
 		return "codeblock"
-	case hasSpecificHungarianPrefix(name, "s"):
+	case hasStrictHungarianPrefix(name, "s"):
 		return "string"
-	case hasSpecificHungarianPrefix(name, "n"):
+	case hasStrictHungarianPrefix(name, "n"):
 		return "numeric"
-	case hasSpecificHungarianPrefix(name, "b"):
+	case hasStrictHungarianPrefix(name, "b"):
 		return "boolean"
-	case hasSpecificHungarianPrefix(name, "a"):
+	case hasStrictHungarianPrefix(name, "a"):
 		return "array"
-	case hasSpecificHungarianPrefix(name, "o"):
+	case hasStrictHungarianPrefix(name, "o"):
 		return "object"
-	case hasSpecificHungarianPrefix(name, "d"):
+	case hasStrictHungarianPrefix(name, "d"):
 		return "date"
 	default:
 		return ""
@@ -3370,6 +3433,24 @@ func inferTypeFromName(name string) string {
 func hasSpecificHungarianPrefix(name string, prefix string) bool {
 	_, ok := hasHungarianPrefix(name, []string{prefix})
 	return ok
+}
+
+// hasStrictHungarianPrefix is the case-sensitive variant used for type
+// inference. The original name must start with the lowercase prefix and the
+// next non-underscore rune must be uppercase. This avoids classifying names
+// like "DCUparseCat" as date-typed (its leading 'D' is the start of an
+// acronym, not a Hungarian 'd' prefix).
+func hasStrictHungarianPrefix(name, prefix string) bool {
+	trimmed := strings.TrimLeft(name, "_")
+	if !strings.HasPrefix(trimmed, prefix) {
+		return false
+	}
+	remainder := trimmed[len(prefix):]
+	remainder = strings.TrimLeft(remainder, "_")
+	if remainder == "" {
+		return false
+	}
+	return unicode.IsUpper([]rune(remainder)[0])
 }
 
 func inferExpressionType(tokens []lexer.Token, startIdx, endIdx int, typeInfo map[string]string) string {
@@ -3437,6 +3518,14 @@ func inferExpressionType(tokens []lexer.Token, startIdx, endIdx int, typeInfo ma
 			if tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == "{" && constants.IsSSLClass(startToken.Text) {
 				return "object"
 			}
+			// Indexed access (arr[i]) — element type is opaque, don't classify.
+			if tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == "[" {
+				return ""
+			}
+			// Member access (Me:Foo, obj:bar) — member type is opaque.
+			if tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == ":" {
+				return ""
+			}
 		}
 	}
 
@@ -3475,6 +3564,39 @@ func expressionEnd(tokens []lexer.Token, startIdx, upperBound, stmtEnd int) int 
 		limit = upperBound
 	}
 	return previousSignificantTokenIndex(tokens, limit-1)
+}
+
+// inferOperandType classifies the operand on one side of a binary operator.
+// direction = -1 for the left operand (idx is the last token of that operand),
+// direction = +1 for the right operand (idx is the first token).
+// Returns "" when the operand contains indexed access (arr[i]) or member
+// access (obj:foo), since the LSP can't infer the type of an array element
+// or object member from name conventions alone.
+func inferOperandType(tokens []lexer.Token, idx, direction int, typeInfo map[string]string) string {
+	if idx < 0 || idx >= len(tokens) {
+		return ""
+	}
+	tok := tokens[idx]
+	if direction < 0 {
+		if tok.Type == lexer.TokenPunctuation && tok.Text == "]" {
+			return ""
+		}
+		if tok.Type == lexer.TokenIdentifier {
+			prev := previousSignificantTokenIndex(tokens, idx-1)
+			if prev >= 0 && tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+				return ""
+			}
+		}
+	} else {
+		if tok.Type == lexer.TokenIdentifier {
+			next := nextSignificantTokenIndex(tokens, idx+1)
+			if next >= 0 && tokens[next].Type == lexer.TokenPunctuation &&
+				(tokens[next].Text == "[" || tokens[next].Text == ":") {
+				return ""
+			}
+		}
+	}
+	return inferSimpleType(tokens, idx, typeInfo)
 }
 
 func inferSimpleType(tokens []lexer.Token, idx int, typeInfo map[string]string) string {
@@ -3621,7 +3743,7 @@ func checkEmptyOptionalParamArrays(tokens []lexer.Token) []Diagnostic {
 			},
 			Message: fmt.Sprintf("Omit the trailing empty array for '%s' instead of passing '{}'", token.Text),
 			Source:  "ssl-lsp",
-			Code:     CodeEmptyOptionalParamArray,
+			Code:    CodeEmptyOptionalParamArray,
 		})
 	}
 
@@ -3728,7 +3850,7 @@ func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnost
 				},
 				Message: fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, count),
 				Source:  "ssl-lsp",
-				Code:     CodeMaxParamsWarning,
+				Code:    CodeMaxParamsWarning,
 			})
 		} else if count > 8 {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -3739,7 +3861,7 @@ func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnost
 				},
 				Message: fmt.Sprintf("Procedure '%s' has %d parameters; style guide recommends at most 8 per procedure", proc.Name, count),
 				Source:  "ssl-lsp",
-				Code:     CodeMaxParamsWarning,
+				Code:    CodeMaxParamsWarning,
 			})
 		}
 	}
@@ -3779,7 +3901,7 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 				},
 				Message: fmt.Sprintf("Variable name '%s' exceeds 20-character limit (effective length %d excluding prefix)", v.Name, len(effectiveName)),
 				Source:  "ssl-lsp",
-				Code:     CodeIdentifierTooLong,
+				Code:    CodeIdentifierTooLong,
 			})
 		}
 	}
@@ -3794,7 +3916,7 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 				},
 				Message: fmt.Sprintf("Procedure name '%s' exceeds 30-character limit (length %d)", proc.Name, len(proc.Name)),
 				Source:  "ssl-lsp",
-				Code:     CodeIdentifierTooLong,
+				Code:    CodeIdentifierTooLong,
 			})
 		}
 	}
@@ -4334,7 +4456,7 @@ func checkUnusedVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 				},
 				Message: fmt.Sprintf("Variable '%s' is declared but never used", v.Name),
 				Source:  "ssl-lsp",
-				Code:     CodeUnusedVariable,
+				Code:    CodeUnusedVariable,
 			})
 		}
 	}
@@ -4493,7 +4615,7 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 					},
 					Message: fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
 					Source:  "ssl-lsp",
-					Code:     CodeInvalidSqlParam,
+					Code:    CodeInvalidSqlParam,
 				})
 			}
 		}
@@ -4771,33 +4893,6 @@ func checkCodeBlockStructure(tokens []lexer.Token) []Diagnostic {
 					Code:     CodeCodeBlockStructure,
 				})
 			}
-		}
-	}
-
-	return diagnostics
-}
-
-// checkSkippedParamSpacing flags spaces between adjacent commas in skipped parameters.
-// Source of truth: ssl-style-guide.schema.yaml parameter_skipping_style — {p1,,p3} valid, {p1, , p3} invalid.
-func checkSkippedParamSpacing(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-
-	for i := 0; i < len(tokens); i++ {
-		if tokens[i].Text != "," {
-			continue
-		}
-		// Look for pattern: comma, whitespace with spaces (no newline), comma
-		if i+2 < len(tokens) &&
-			tokens[i+1].Type == lexer.TokenWhitespace &&
-			!strings.Contains(tokens[i+1].Text, "\n") &&
-			tokens[i+2].Text == "," {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range:    tokenToRange(tokens[i+1]),
-				Message:  "Skipped parameters should use adjacent commas with no space: {a,,b} not {a, , b}",
-				Source:   "ssl-lsp",
-				Code:     CodeSkippedParamSpacing,
-			})
 		}
 	}
 
@@ -5157,7 +5252,7 @@ func checkClassNameCollision(tokens []lexer.Token) []Diagnostic {
 							"Pick a different name to avoid confusion when readers reach for the built-in.",
 						next.Text, next.Text),
 					Source: "ssl-lsp",
-					Code:     CodeClassNameCollision,
+					Code:   CodeClassNameCollision,
 				})
 			}
 			break

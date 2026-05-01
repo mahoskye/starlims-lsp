@@ -5164,23 +5164,26 @@ func TestGetDiagnostics_ClassMemberOrder_DeclareBeforeInherit(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_ClassMemberOrder_ConstructorNotLast(t *testing.T) {
-	// Wrong order: Constructor before regular method
-	text := `:CLASS MyClass;
+func TestGetDiagnostics_ClassMemberOrder_ConstructorAnywhere(t *testing.T) {
+	// Constructor position is no longer enforced — neither order should warn.
+	for _, text := range []string{
+		`:CLASS MyClass;
 :PROCEDURE Constructor;
 :ENDPROC;
 :PROCEDURE DoWork;
-:ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Constructor") && (strings.Contains(d.Message, "last") || strings.Contains(d.Message, "after") || strings.Contains(d.Message, "order")) {
-			found = true
+:ENDPROC;`,
+		`:CLASS MyClass;
+:PROCEDURE DoWork;
+:ENDPROC;
+:PROCEDURE Constructor;
+:ENDPROC;`,
+	} {
+		diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+		for _, d := range diagnostics {
+			if d.Code == CodeClassMemberOrder {
+				t.Errorf("unexpected class_member_order diagnostic for permitted Constructor placement: %s", d.Message)
+			}
 		}
-	}
-	if !found {
-		t.Error("expected diagnostic about Constructor needing to be last")
 	}
 }
 
@@ -6505,40 +6508,6 @@ func TestGetDiagnostics_ParametersAfterProcedureWithComment(t *testing.T) {
 
 // ==================== New Diagnostic Tests ====================
 
-func TestGetDiagnostics_SkippedParamSpacing_SpacedCommas(t *testing.T) {
-	// {a, , b} is invalid — should be {a,,b}
-	text := `:DECLARE sResult;
-sResult := DoProc("Test", {sName, , sAge});`
-
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "adjacent commas") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected warning about spaced skipped parameters {a, , b}")
-	}
-}
-
-func TestGetDiagnostics_SkippedParamSpacing_ValidNoSpace(t *testing.T) {
-	// {a,,b} is valid — no warning
-	text := `:DECLARE sResult;
-sResult := DoProc("Test", {sName,,sAge});`
-
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "adjacent commas") {
-			t.Errorf("unexpected warning for valid {a,,b} syntax: %s", d.Message)
-		}
-	}
-}
-
 func TestGetDiagnostics_NotEqualsAsymmetry(t *testing.T) {
 	// != with string literal should warn about asymmetry with =
 	text := `:DECLARE sStatus;
@@ -7174,5 +7143,105 @@ nX := 1;
 					matched.Code, tt.wantCode, matched.Message)
 			}
 		})
+	}
+}
+
+// ==================== v0.7.0 Regression Tests ====================
+
+func countCode(diagnostics []Diagnostic, code string) int {
+	n := 0
+	for _, d := range diagnostics {
+		if d.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
+// mixed_type_operator must not flag uppercase-leading identifiers as
+// Hungarian-typed (DCUparseCat starts with capital D — that's an acronym,
+// not a 'd' Hungarian prefix). Strict-case prefix matching guards this.
+func TestGetDiagnostics_MixedTypes_NoFP_HungarianUppercase(t *testing.T) {
+	text := `:DECLARE DCUparseCat, parsingScript;
+DCUparseCat := "category";
+parsingScript := DCUparseCat + "." + "leaf";`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeMixedTypeOperator); n != 0 {
+		t.Errorf("expected 0 mixed_type_operator diagnostics on uppercase-leading names; got %d", n)
+	}
+}
+
+// Indexed access (arr[i]) must be treated as opaque element type, not as
+// the array's type, so concatenating arr[i] with a string is fine.
+func TestGetDiagnostics_MixedTypes_NoFP_IndexedAccess(t *testing.T) {
+	text := `:PROCEDURE BuildCols;
+:PARAMETERS aCols;
+:DECLARE sCols, X;
+sCols := "";
+:FOR X := 1 :TO 5;
+	sCols := sCols + aCols[X] + " end";
+:NEXT;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeMixedTypeOperator); n != 0 {
+		t.Errorf("expected 0 mixed_type_operator diagnostics on indexed access; got %d", n)
+	}
+}
+
+// Member access (Me:Foo, obj:bar) must be treated as opaque — the LSP can't
+// know the underlying member type from the name.
+func TestGetDiagnostics_MixedTypes_NoFP_MemberAccess(t *testing.T) {
+	text := `:CLASS Box;
+:PROCEDURE Build;
+Me:Foo := Me:Bar + " z";
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeMixedTypeOperator); n != 0 {
+		t.Errorf("expected 0 mixed_type_operator diagnostics on member access; got %d", n)
+	}
+}
+
+// Regression-guard: literal "abc" + 5 must still fire the rule, so we
+// haven't silenced the rule entirely.
+func TestGetDiagnostics_MixedTypes_StillFires_LiteralMismatch(t *testing.T) {
+	text := `:DECLARE x;
+x := "abc" + 5;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeMixedTypeOperator); n == 0 {
+		t.Errorf("expected mixed_type_operator to fire on \"abc\" + 5; got 0")
+	}
+}
+
+// Bare-PROCEDURE typo (missing leading colon, parens used) must produce one
+// procedure_declaration_syntax diagnostic and zero direct_procedure_call.
+func TestGetDiagnostics_ProcDeclSyntax_BareProcedure(t *testing.T) {
+	text := `PROCEDURE Main(); :RETURN .T.; ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeProcedureDeclarationSyntax); n != 1 {
+		t.Errorf("expected exactly 1 procedure_declaration_syntax; got %d", n)
+	}
+	if n := countCode(diagnostics, CodeDirectProcedureCall); n != 0 {
+		t.Errorf("expected 0 direct_procedure_call; got %d", n)
+	}
+}
+
+// :PROCEDURE Name() with parens after the name is also invalid — the rule
+// must flag the parens.
+func TestGetDiagnostics_ProcDeclSyntax_ParensWithColon(t *testing.T) {
+	text := `:PROCEDURE Main(); :RETURN .T.; :ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeProcedureDeclarationSyntax); n != 1 {
+		t.Errorf("expected exactly 1 procedure_declaration_syntax; got %d", n)
+	}
+}
+
+// Happy path: :PROCEDURE Name; … :ENDPROC; produces zero diagnostics.
+func TestGetDiagnostics_ProcDecl_HappyPath(t *testing.T) {
+	text := `:PROCEDURE Main;
+:RETURN .T.;
+:ENDPROC;`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if len(diagnostics) != 0 {
+		t.Errorf("expected 0 diagnostics for valid procedure; got %d: %+v", len(diagnostics), diagnostics)
 	}
 }

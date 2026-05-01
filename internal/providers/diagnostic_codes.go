@@ -24,25 +24,25 @@ const (
 	CodeConstructorReturnValue = "constructor_return_value"
 
 	// Schema lints — type_safety.
-	CodeForNumericValues   = "for_numeric_values"
-	CodeDollarStringOnly   = "dollar_string_only"
-	CodeNilInOperations    = "nil_in_operations"
-	CodeCodeBlockComparison = "code_block_comparison"
-	CodeNilNotEmptyString  = "nil_not_empty_string"
+	CodeForNumericValues     = "for_numeric_values"
+	CodeDollarStringOnly     = "dollar_string_only"
+	CodeNilInOperations      = "nil_in_operations"
+	CodeCodeBlockComparison  = "code_block_comparison"
+	CodeNilNotEmptyString    = "nil_not_empty_string"
 	CodeEqualsVsStrictEquals = "equals_vs_strict_equals"
 
 	// Schema lints — variable_behavior.
 	CodeRedeclareIsNoop = "redeclare_is_noop"
 
 	// Schema lints — class_rules / coding_standards.
-	CodeClassMemberOrder       = "class_member_order"
-	CodeInheritQualifiedName   = "inherit_qualified_name"
-	CodeMaxParamsWarning       = "max_params_warning"
-	CodeLimitPublicVars        = "limit_public_vars"
-	CodePreferExitCase         = "prefer_exitcase"
-	CodeParametersFirst        = "parameters_first"
-	CodeDefaultAfterParameters = "default_after_parameters"
-	CodeIncludeEarly           = "include_early"
+	CodeClassMemberOrder        = "class_member_order"
+	CodeInheritQualifiedName    = "inherit_qualified_name"
+	CodeMaxParamsWarning        = "max_params_warning"
+	CodeLimitPublicVars         = "limit_public_vars"
+	CodePreferExitCase          = "prefer_exitcase"
+	CodeParametersFirst         = "parameters_first"
+	CodeDefaultAfterParameters  = "default_after_parameters"
+	CodeIncludeEarly            = "include_early"
 	CodeConstructorOutsideClass = "constructor_outside_class"
 
 	// Schema lints — datasource.
@@ -72,6 +72,7 @@ const (
 	CodeComplexSqlPlaceholder       = "complex_sql_placeholder"
 	CodeUdObjectArrayInClause       = "udobject_array_in_clause"
 	CodeDirectProcedureCall         = "direct_procedure_call"
+	CodeProcedureDeclarationSyntax  = "procedure_declaration_syntax"
 	CodeExecFunctionMissingQuotes   = "execfunction_missing_quotes"
 	CodeMeOutsideClass              = "me_outside_class"
 	CodeBaseStandalone              = "base_standalone"
@@ -116,7 +117,6 @@ const (
 	CodeStepSpacing                 = "step_spacing"
 	CodeRegionLegacy                = "region_legacy"
 	CodeCodeBlockStructure          = "code_block_structure"
-	CodeSkippedParamSpacing         = "skipped_param_spacing"
 	CodeBuilderDirectiveCase        = "builder_directive_case"
 	CodeIdentifierTooLong           = "identifier_too_long"
 	CodeIdentifierTooShort          = "identifier_too_short"
