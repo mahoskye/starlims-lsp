@@ -6963,6 +6963,134 @@ y := 1;
 	}
 }
 
+// TestRuleOverrides_DropAndRemap verifies that DiagnosticOptions.RuleOverrides
+// drops "off" rules and remaps severity for info/warn/error.
+func TestRuleOverrides_DropAndRemap(t *testing.T) {
+	// Source emits at least one parameters_first diagnostic (statement before
+	// :PARAMETERS) and at least one keyword_uppercase diagnostic (lowercase :if).
+	src := `:PROCEDURE Test;
+nLocal := 1;
+:PARAMETERS sFoo;
+:if .T.;
+:ENDIF;
+:ENDPROC;`
+
+	baseOpts := DefaultDiagnosticOptions()
+	base := GetDiagnostics(src, baseOpts)
+
+	countCode := func(diags []Diagnostic, code string) int {
+		n := 0
+		for _, d := range diags {
+			if d.Code == code {
+				n++
+			}
+		}
+		return n
+	}
+
+	if countCode(base, CodeParametersFirst) == 0 {
+		t.Fatalf("baseline did not emit %s; rest of test is meaningless", CodeParametersFirst)
+	}
+
+	// "off" — diagnostic should disappear.
+	off := DefaultDiagnosticOptions()
+	off.RuleOverrides = map[string]string{CodeParametersFirst: "off"}
+	if got := countCode(GetDiagnostics(src, off), CodeParametersFirst); got != 0 {
+		t.Errorf("with override 'off', expected 0 diagnostics for %s, got %d", CodeParametersFirst, got)
+	}
+
+	// "info" — diagnostic remains but severity is information.
+	info := DefaultDiagnosticOptions()
+	info.RuleOverrides = map[string]string{CodeParametersFirst: "info"}
+	infoDiags := GetDiagnostics(src, info)
+	found := false
+	for _, d := range infoDiags {
+		if d.Code == CodeParametersFirst {
+			found = true
+			if d.Severity != SeverityInfo {
+				t.Errorf("expected SeverityInfo, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("override 'info' should retain the diagnostic")
+	}
+
+	// Unknown override value passes through untouched.
+	noop := DefaultDiagnosticOptions()
+	noop.RuleOverrides = map[string]string{CodeParametersFirst: "bogus"}
+	if got := countCode(GetDiagnostics(src, noop), CodeParametersFirst); got == 0 {
+		t.Errorf("unknown override value should not drop diagnostics")
+	}
+}
+
+// TestSuppressionComments_FileScopeAndNextLine verifies that
+// /* @ssl-disable <slug>; */ suppresses every matching diagnostic file-wide,
+// and /* @ssl-disable-next-line <slug>; */ suppresses only the next line.
+func TestSuppressionComments_FileScopeAndNextLine(t *testing.T) {
+	// File-scope: silence every parameters_first finding in the file.
+	fileWide := `/* @ssl-disable parameters_first; */
+:PROCEDURE Test;
+nLocal := 1;
+:PARAMETERS sFoo;
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(fileWide, DefaultDiagnosticOptions()), CodeParametersFirst); got != 0 {
+		t.Errorf("file-scope @ssl-disable should silence all matching diagnostics; got %d", got)
+	}
+
+	// Without the directive, the same source emits the diagnostic.
+	noDirective := `:PROCEDURE Test;
+nLocal := 1;
+:PARAMETERS sFoo;
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(noDirective, DefaultDiagnosticOptions()), CodeParametersFirst); got == 0 {
+		t.Fatal("baseline should emit parameters_first")
+	}
+
+	// next-line: only the line directly after the directive is silenced.
+	// Place a deprecated-keyword diagnostic on the line right after the
+	// directive, then a second deprecated-keyword on a later line; only the
+	// first should be suppressed.
+	nextLine := `:PROCEDURE Test;
+nA := 1;
+/* @ssl-disable-next-line not_preferred_operator; */
+:IF nA <> 1;
+:ENDIF;
+:IF nA <> 2;
+:ENDIF;
+:ENDPROC;`
+	diags := GetDiagnostics(nextLine, DefaultDiagnosticOptions())
+	got := codeCount(diags, CodeNotPreferredOperator)
+	if got != 1 {
+		t.Errorf("next-line directive should silence exactly one not_preferred_operator; got %d", got)
+		for _, d := range diags {
+			if d.Code == CodeNotPreferredOperator {
+				t.Logf("  remaining: line=%d msg=%q", d.Range.Start.Line, d.Message)
+			}
+		}
+	}
+
+	// Wildcard '*' silences everything (file scope).
+	star := `/* @ssl-disable *; */
+:PROCEDURE Test;
+nLocal := 1;
+:PARAMETERS sFoo;
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(star, DefaultDiagnosticOptions()), CodeParametersFirst); got != 0 {
+		t.Errorf("wildcard '*' should silence all diagnostics; got %d for parameters_first", got)
+	}
+}
+
+func codeCount(diags []Diagnostic, code string) int {
+	n := 0
+	for _, d := range diags {
+		if d.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
 // TestDiagnosticCodes_SpotChecks pins specific check rules to specific codes.
 // Catches accidental rename / typo regressions in the slug list.
 func TestDiagnosticCodes_SpotChecks(t *testing.T) {

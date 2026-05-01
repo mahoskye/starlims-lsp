@@ -61,6 +61,12 @@ type DiagnosticOptions struct {
 	GlobalVariables        []string
 	MaxBlockDepth          int
 	IsDataSourceFile       bool
+
+	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
+	// Recognized values: "off" (drop the diagnostic), "info", "warn",
+	// "warning", "error". Diagnostics whose Code is not in the map pass
+	// through unchanged.
+	RuleOverrides map[string]string
 }
 
 // DefaultDiagnosticOptions returns default diagnostic options.
@@ -213,7 +219,141 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNotEqualsAsymmetry(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
+	diagnostics = applySuppressionComments(tokens, diagnostics)
+	diagnostics = applyRuleOverrides(diagnostics, opts.RuleOverrides)
+
 	return diagnostics
+}
+
+// applyRuleOverrides drops or remaps severities for diagnostics whose Code
+// matches an entry in `overrides`. Diagnostics with no Code or no matching
+// entry pass through unchanged. Recognized override values:
+//
+//	"off"                  — drop the diagnostic entirely
+//	"info"                 — remap to SeverityInformation
+//	"warn" / "warning"     — remap to SeverityWarning
+//	"error"                — remap to SeverityError
+//
+// Any other value is treated as no-op rather than silently dropping.
+func applyRuleOverrides(diagnostics []Diagnostic, overrides map[string]string) []Diagnostic {
+	if len(overrides) == 0 {
+		return diagnostics
+	}
+	out := make([]Diagnostic, 0, len(diagnostics))
+	for _, d := range diagnostics {
+		if d.Code == "" {
+			out = append(out, d)
+			continue
+		}
+		raw, ok := overrides[d.Code]
+		if !ok {
+			out = append(out, d)
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "off":
+			continue
+		case "info":
+			d.Severity = SeverityInfo
+		case "warn", "warning":
+			d.Severity = SeverityWarning
+		case "error":
+			d.Severity = SeverityError
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// applySuppressionComments drops diagnostics silenced by user-authored
+// suppression comments embedded in the source. Two forms are recognized:
+//
+//	/* @ssl-disable <rule_slug>[, <rule_slug>...] ; */
+//	    File-scope suppression. Any diagnostic with a matching Code is dropped.
+//	/* @ssl-disable-next-line <rule_slug>[, <rule_slug>...] ; */
+//	    Line-scope: applies to diagnostics on the line immediately following
+//	    the comment.
+//
+// Slug `*` matches any code and silences every coded diagnostic in scope.
+// Diagnostics without a Code (defensive — every emit should set one) bypass
+// suppression so the user sees them.
+func applySuppressionComments(tokens []lexer.Token, diagnostics []Diagnostic) []Diagnostic {
+	fileScope := map[string]bool{}
+	lineScope := map[int]map[string]bool{} // 0-based diagnostic line -> slug set
+
+	addLineRule := func(line int, slug string) {
+		if lineScope[line] == nil {
+			lineScope[line] = map[string]bool{}
+		}
+		lineScope[line][slug] = true
+	}
+
+	for _, t := range tokens {
+		if t.Type != lexer.TokenComment {
+			continue
+		}
+		body := t.Text
+		if idx := strings.Index(body, "@ssl-disable-next-line"); idx >= 0 {
+			tail := body[idx+len("@ssl-disable-next-line"):]
+			// Comments may span lines, so suppress on the line immediately
+			// after the comment ends (not after it starts). Token.Line is
+			// 1-based; Diagnostic.Range.Start.Line is 0-based; the line
+			// directly below a 1-based line N is the 0-based line N. So
+			// adding (start_line + extra_lines_in_text) yields the right
+			// 0-based key for the line below the comment's last line.
+			extraLines := strings.Count(body, "\n")
+			for _, s := range parseRuleList(tail) {
+				addLineRule(t.Line+extraLines, s)
+			}
+			continue
+		}
+		if idx := strings.Index(body, "@ssl-disable"); idx >= 0 {
+			tail := body[idx+len("@ssl-disable"):]
+			for _, s := range parseRuleList(tail) {
+				fileScope[s] = true
+			}
+		}
+	}
+
+	if len(fileScope) == 0 && len(lineScope) == 0 {
+		return diagnostics
+	}
+
+	out := make([]Diagnostic, 0, len(diagnostics))
+	for _, d := range diagnostics {
+		if d.Code == "" {
+			out = append(out, d)
+			continue
+		}
+		if fileScope[d.Code] || fileScope["*"] {
+			continue
+		}
+		if line, ok := lineScope[d.Range.Start.Line]; ok {
+			if line[d.Code] || line["*"] {
+				continue
+			}
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// parseRuleList extracts comma-separated rule slugs from text following an
+// `@ssl-disable[-next-line]` directive. Stops at the comment-terminating
+// `;`. Whitespace is trimmed, empty entries dropped, and slugs lowercased
+// since the canonical form in diagnostic_codes.go is snake_case lowercase.
+func parseRuleList(s string) []string {
+	if i := strings.Index(s, ";"); i >= 0 {
+		s = s[:i]
+	}
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		slug := strings.ToLower(strings.TrimSpace(part))
+		if slug != "" {
+			out = append(out, slug)
+		}
+	}
+	return out
 }
 
 // checkKeywordForms enforces colon-prefixed uppercase keywords and flags unknown colon forms.

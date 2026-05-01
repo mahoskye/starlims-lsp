@@ -123,3 +123,15 @@ func buildCanonicalFunctionSignatures() map[string]FunctionSignature {
 
 	return signatures
 }
+
+// CanonicalFunctionNames returns a lowercase->canonical-PascalCase map for
+// the entire built-in function inventory. Useful for casing rewriters and
+// other tooling that needs to round-trip user-supplied identifiers back to
+// their published form.
+func CanonicalFunctionNames() map[string]string {
+	out := make(map[string]string, len(SSLFunctionNames))
+	for _, name := range SSLFunctionNames {
+		out[strings.ToLower(name)] = name
+	}
+	return out
+}

@@ -17,20 +17,33 @@ type FormattingOptions struct {
 	CommaSpacing           bool   // space after commas
 	SemicolonEnforcement   bool   // ensure statements end with semicolon
 	BlankLinesBetweenProcs int    // blank lines between procedures
-	SQL                    SQLFormattingOptions
+	// TrimTrailingWhitespace removes trailing space/tab characters from
+	// every formatted line. Default true.
+	TrimTrailingWhitespace bool
+	// MaxConsecutiveBlankLines collapses runs of blank lines longer than
+	// this threshold. 0 disables the cap.
+	MaxConsecutiveBlankLines int
+	// BuiltinFunctionCase controls casing of built-in function names.
+	// "preserve" (default) keeps the user's casing; "PascalCase" rewrites
+	// each call site to the canonical inventory casing.
+	BuiltinFunctionCase string
+	SQL                 SQLFormattingOptions
 }
 
 // DefaultFormattingOptions returns default formatting options.
 func DefaultFormattingOptions() FormattingOptions {
 	return FormattingOptions{
-		IndentStyle:            "tab",
-		IndentSize:             4,
-		MaxLineLength:          90,
-		OperatorSpacing:        true,
-		CommaSpacing:           true,
-		SemicolonEnforcement:   true,
-		BlankLinesBetweenProcs: 1,
-		SQL:                    DefaultSQLFormattingOptions(),
+		IndentStyle:              "tab",
+		IndentSize:               4,
+		MaxLineLength:            90,
+		OperatorSpacing:          true,
+		CommaSpacing:             true,
+		SemicolonEnforcement:     true,
+		BlankLinesBetweenProcs:   1,
+		TrimTrailingWhitespace:   true,
+		MaxConsecutiveBlankLines: 0,
+		BuiltinFunctionCase:      "preserve",
+		SQL:                      DefaultSQLFormattingOptions(),
 	}
 }
 
@@ -46,6 +59,7 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 	tokens := lex.Tokenize()
 
 	formatted := formatTokens(tokens, opts)
+	formatted = applyPostFormatPasses(formatted, opts)
 
 	// Return a single edit replacing the entire document
 	lines := strings.Split(text, "\n")
@@ -970,4 +984,112 @@ func isOpenParen(token lexer.Token) bool {
 // isCloseParen checks if token is a closing delimiter.
 func isCloseParen(token lexer.Token) bool {
 	return token.Text == ")" || token.Text == "]" || token.Text == "}"
+}
+
+// applyPostFormatPasses runs whole-document post-processing on the formatter
+// output. These are line-oriented passes that don't need token information,
+// so they're easier to express here than inside the token-stream formatter.
+func applyPostFormatPasses(text string, opts FormattingOptions) string {
+	if opts.BuiltinFunctionCase == "PascalCase" {
+		text = canonicalizeBuiltinCasing(text)
+	}
+	if opts.TrimTrailingWhitespace {
+		text = trimTrailingWhitespacePerLine(text)
+	}
+	if opts.MaxConsecutiveBlankLines > 0 {
+		text = capConsecutiveBlankLines(text, opts.MaxConsecutiveBlankLines)
+	}
+	return text
+}
+
+// trimTrailingWhitespacePerLine removes trailing space/tab characters from
+// every line. Final newline (if any) is preserved.
+func trimTrailingWhitespacePerLine(text string) string {
+	hadTrailingNewline := strings.HasSuffix(text, "\n")
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " \t")
+	}
+	out := strings.Join(lines, "\n")
+	if hadTrailingNewline && !strings.HasSuffix(out, "\n") {
+		out += "\n"
+	}
+	return out
+}
+
+// capConsecutiveBlankLines collapses runs of N+1 or more blank lines (whitespace
+// only) into exactly `max` blank lines. Lines that contain non-whitespace text
+// are unaffected.
+func capConsecutiveBlankLines(text string, max int) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	blankRun := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			blankRun++
+			if blankRun <= max {
+				out = append(out, line)
+			}
+			continue
+		}
+		blankRun = 0
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// canonicalizeBuiltinCasing rewrites built-in function call sites to their
+// canonical PascalCase form. A "call site" is a bare identifier immediately
+// followed by `(`. We only rewrite identifiers whose lowercased form matches
+// a published built-in; user-defined functions and identifiers used as
+// arguments are left alone.
+func canonicalizeBuiltinCasing(text string) string {
+	canonical := constants.CanonicalFunctionNames()
+	if len(canonical) == 0 {
+		return text
+	}
+	var b strings.Builder
+	b.Grow(len(text))
+	i := 0
+	n := len(text)
+	for i < n {
+		// Find next identifier start.
+		c := text[i]
+		if !isIdentStart(c) {
+			b.WriteByte(c)
+			i++
+			continue
+		}
+		j := i + 1
+		for j < n && isIdentCont(text[j]) {
+			j++
+		}
+		ident := text[i:j]
+		// Skip over any whitespace following ident; only rewrite if the
+		// next non-whitespace character is '('.
+		k := j
+		for k < n && (text[k] == ' ' || text[k] == '\t') {
+			k++
+		}
+		if k < n && text[k] == '(' {
+			if pascal, ok := canonical[strings.ToLower(ident)]; ok && pascal != ident {
+				b.WriteString(pascal)
+				b.WriteString(text[j:k])
+				b.WriteByte('(')
+				i = k + 1
+				continue
+			}
+		}
+		b.WriteString(ident)
+		i = j
+	}
+	return b.String()
+}
+
+func isIdentStart(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+func isIdentCont(c byte) bool {
+	return isIdentStart(c) || (c >= '0' && c <= '9')
 }
