@@ -624,7 +624,16 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 
 	formattedSQL := s.sqlFormatter.FormatSQLInString(innerContent, quoteChar, baseIndent)
 	s.builder.WriteString(formattedSQL)
-	s.currentLineLen += len(formattedSQL)
+	// Rule E: after a multi-line SQL string, currentLineLen must reflect only
+	// the *last* physical line of the output (typically just the closing
+	// quote at baseIndent). Otherwise the next token's wrap logic sees a
+	// huge length and forces a newline between the closing '"' and a
+	// trailing ',' / remaining call args.
+	if idx := strings.LastIndex(formattedSQL, "\n"); idx >= 0 {
+		s.currentLineLen = len(formattedSQL) - idx - 1
+	} else {
+		s.currentLineLen += len(formattedSQL)
+	}
 	return true
 }
 
