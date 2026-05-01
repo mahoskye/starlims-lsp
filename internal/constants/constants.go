@@ -169,93 +169,6 @@ var SSLLiteralAliases = map[string]string{
 	"nil": "NIL",
 }
 
-// legacySSLFunctionNames contains the historical built-in function inventory.
-// The public SSLFunctionNames slice is the canonical inventory in canonical.go.
-var legacySSLFunctionNames = []string{
-	"aadd", "Abs", "AddColDelimiters", "AddNameDelimiters", "AddProperty", "AddToApplication", "AddToSession",
-	"aeval", "aevala", "afill", "alen", "AllTrim", "arraycalc", "arraynew", "ArrayToTVP", "Asc", "ascan", "ascanexact", "At",
-	"BeginLimsTransaction", "Break", "buildarray", "buildarray2", "buildstring", "buildstring2", "BuildStringForIn",
-	"CallBuiltInFunction", "CheckOnFtp", "ChkNewPassword", "ChkPassword", "Chr", "ClearLastSSLError", "ClearSession",
-	"ClientEndOfDay", "ClientStartOfDay", "CMonth", "CombineFiles", "comparray", "Compress", "ConvertReport", "CopyToFtp",
-	"CreateGUID", "CreateLocal", "CreateORMSession", "CreatePublic", "CreateUdObject", "CreateZip", "CToD",
-	"DateAdd", "DateDiff", "DateDiffEx", "DateFormat", "DateFromNumbers", "DateFromString", "DateToString", "Day",
-	"Decompress", "DecryptData", "delarray", "DeleteDirOnFtp", "DeleteFromFtp", "deleteinlinecode", "DetectSqlInjections", "Directory",
-	"DocAcquireWorkitem", "DocAddUsersToGroup", "DocCancelCheckout", "DocCheckinDocument", "DocCheckoutDocument",
-	"DocCommandFailed", "DocCompleteWorkitem", "DocCreateACL", "DocCreateCabinet", "DocCreateFolder", "DocCreateGroup",
-	"DocCreateUser", "DocDelegateWorkitem", "DocDelete", "DocDeleteCabinet", "DocDeleteFolder", "DocDeleteUser",
-	"DocEndDocumentumInterface", "DocExists", "DocExistsUser", "DocExportDocument", "DocGetCabinets", "DocGetDocuments",
-	"DocGetErrorMessage", "DocGetFolders", "DocGetMetadata", "DocGetTasks", "DocGetTasksCount", "DocGetTypeAttributes",
-	"DocGetTypeAttributesAsDataset", "DocGetWorkflowStatus", "DocGetWorkitemProperties", "DocImportDocument",
-	"DocInitDocumentumInterface", "DocLoginToDocumentum", "DocPauseWorkflow", "DocRemoveAllUsersFromGroup",
-	"DocRemoveUsersFromGroup", "DocRepeatWorkitem", "DocResumeWorkflow", "DocSearchAsDataset", "DocSearchFullText",
-	"DocSearchUsingDql", "DocSetMetadata", "DocStartWorkflow", "DocStopWorkflow", "DocUpdateUser",
-	"DoProc", "DosSupport", "DOW", "DOY", "DToC", "DToS",
-	"Empty", "EncryptData", "endlimsoleconnect", "EndLimsTransaction", "ErrorMes", "ExecFunction", "ExecInternal",
-	"ExecUdf", "ExecuteDataSource", "extractcol", "ExtractZip",
-	"FileSupport", "FormatErrorMessage", "FormatSqlErrorMessage", "FromJson", "FromXml",
-	"GetAllClientScripts", "GetAppBaseFolder", "GetAppWorkPathFolder", "GetByName", "GetClientScriptReferences",
-	"GetConnectionByName", "GetConnectionStrings", "GetDataSet", "GetDataSetEx", "GetDataSetFromArray",
-	"GetDataSetFromArrayEx", "GetDataSetWithSchemaFromSelect", "GetDataSetXMLFromArray", "GetDataSetXMLFromSelect",
-	"GetDBMSName", "GetDBMSProviderName", "GetDecimalSep", "GetDecimalSeparator", "GetDefaultConnection",
-	"GetDirFromFtp", "GetDSParameters", "GetExecutionTrace", "GetFeaturesAndNumbers", "GetFileVersion",
-	"GetForbiddenAppIDs", "GetForbiddenDesignerAppIDs", "GetFormReferences", "GetFromApplication", "GetFromFtp",
-	"GetFromSession", "GetGroupSeparator", "getinlinecode", "GetInstallationKey", "GetInternal", "GetInternalC",
-	"GetLastSQLError", "GetLastSSLError", "GetLicenseInfoAsText", "GetLogsFolder", "GetNETDataSet", "GetNoLock",
-	"GetNumberOfInstrumentConnections", "GetNumberOfNamedConcurrentUsers", "GetNumberOfNamedUsers", "GetPrinters",
-	"GetRdbmsDelimiter", "getregion", "getregionex", "GetSetting", "GetSettings", "GetSSLDataset", "GetTables",
-	"GetTransactionsCount", "GetUserData", "GetWebFolder",
-	"HashData", "HasProperty", "Hour", "HtmlDecode", "HtmlEncode",
-	"IgnoreSqlErrors", "IIf", "In64BitMode", "InBatchProcess", "InfoMes", "Integer", "IsDBConnected", "IsDefined",
-	"IsDemoLicense", "IsFeatureAuthorized", "IsFeatureBasedLicense", "IsGuid", "IsHex", "IsInTransaction",
-	"IsInvariantDate", "IsNumeric", "IsProductionModeOn", "IsTable", "IsTableFld",
-	"JDay",
-	"LCase", "LDAPAuth", "LDAPAuthEX", "lDir", "Left", "Len", "LFromHex", "LHex2Dec", "LimsAt", "LimsCleanup",
-	"LIMSDate", "LimsExec", "LimsGetDateFormat", "LimsNETCast", "LimsNETConnect", "LimsNETTypeOf", "limsoleconnect",
-	"LimsRecordsAffected", "LimsSetCounter", "LimsSqlConnect", "LimsSqlDisconnect", "LimsString", "LimsTime",
-	"LimsType", "LimsTypeEx", "LimsXOr", "LKill", "LLower", "Lower", "LPrint", "LSearch", "LSelect", "LSelect1",
-	"LSelectC", "LStr", "LToHex", "LTransform", "LTrim", "lWait",
-	"MakeDateInvariant", "MakeDateLocal", "MakeDirOnFtp", "MakeNETObject", "MatFunc", "Max", "MergeGlobalResources",
-	"MergeHtmlForm", "MergeXfd", "MimeDecode", "MimeEncode", "Min", "Minute", "Month", "MoveInFtp",
-	"NetFrameworkVersion", "NoOfDays", "Nothing", "Now",
-	"PrepareArrayForIn", "PrepareForm", "PrepareFormClientScript", "PrmCount", "ProcessXfdFormForImport",
-	"RaiseError", "Rand", "Rat", "ReadBytesBase64", "ReadFromFtp", "ReadText", "RenameOnFtp", "Replace", "Replicate",
-	"ResetApplication", "ResetFeatures", "RetrieveLong", "ReturnLastSQLError", "Right", "Round", "RoundPoint5",
-	"RunApp", "RunDS", "RunSQL",
-	"Scient", "SearchLDAPUser", "Second", "Seconds", "SendFromOutbox", "SendLimsEmail", "SendOutlookReminder",
-	"SendToFtp", "SendToOutbox", "ServerEndOfDay", "ServerStartOfDay", "ServerTimeZone", "SetAmPm", "SetByName",
-	"SetDecimalSeparator", "SetDefaultConnection", "SetGroupSeparator", "SetInternal", "SetInternalC",
-	"SetLocationOracle", "SetLocationSQLServer", "SetSqlTimeout", "SetUserData", "SetUserPassword", "ShowSqlErrors",
-	"SigFig", "SortArray", "SQLExecute", "SQLRemoveComments", "SqlTraceOff", "SqlTraceOn", "Sqrt", "StationName",
-	"StdRound", "Str", "StringToDate", "StrSrch", "StrTran", "StrZero", "SubmitToBatch", "SubmitToBatchEx", "SubStr",
-	"SyncDesignResources", "SyncProgramaticResources",
-	"TableFldLst", "Time", "Today", "ToJson", "ToNumeric", "ToScientific", "ToXml", "TraceOff", "TraceOn", "Trim",
-	"TryConnect",
-	"UndeclaredVars", "UpdLong", "Upper", "UrlDecode", "UrlEncode", "UserTimeZone", "usrmes",
-	"Val", "ValidateDate", "ValidateNumeric", "VerifySignature",
-	"WriteBytesBase64", "WriteText", "WriteToFtp",
-	"XmlDomToUdObject", "XmlExportSql",
-	"Year",
-}
-
-// legacySSLClassNames contains the historical built-in class inventory.
-// The public SSLClassNames slice is the canonical inventory in canonical.go.
-var legacySSLClassNames = []string{
-	"AzureStorage",
-	"BatchSupport",
-	"CDataColumn", "CDataColumns", "CDataField", "CDataRow", "CDataTable",
-	"Email",
-	"EnterpriseExporter", "EnterpriseImpExBase",
-	"FtpsClient",
-	"HtmlConverter",
-	"PatcherSupport", "PdfSupport",
-	"RegSetup",
-	"SDMS", "SDMSDocUploader", "Sequence", "SQLConnection",
-	"SSLBaseDictionary", "SSLCodeProvider", "SSLCompilerError", "SSLCompilerErrorList",
-	"SSLDataset", "SSLExpando", "SSLIntDictionary", "SSLRegex", "SSLStringDictionary",
-	"TablesImport",
-	"WebServices",
-}
-
 // InlineSQLFunctions are functions that support named ?param? placeholders.
 // Per the SSL style guide, only SQLExecute supports named substitution.
 var InlineSQLFunctions = []string{
@@ -338,10 +251,10 @@ var SSLKeywordDescriptions = map[string]string{
 
 // DataSourceBuilderDirectiveDescriptions maps builder directives to their descriptions.
 var DataSourceBuilderDirectiveDescriptions = map[string]string{
-	"DSN":                    "Specifies the database connection name for a SQL data source",
-	"TABLENAME":              "Specifies the dataset table name for a SQL data source",
-	"NULLASBLANK":            "When true, null values are converted to blank strings in the dataset",
-	"INVARIANTDATECOLUMNS":   "Specifies which date columns should remain culture-invariant",
+	"DSN":                  "Specifies the database connection name for a SQL data source",
+	"TABLENAME":            "Specifies the dataset table name for a SQL data source",
+	"NULLASBLANK":          "When true, null values are converted to blank strings in the dataset",
+	"INVARIANTDATECOLUMNS": "Specifies which date columns should remain culture-invariant",
 }
 
 // SSLOperatorDescriptions maps operators to their descriptions.

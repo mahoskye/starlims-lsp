@@ -362,3 +362,97 @@ func TestHandleRangeFormatting(t *testing.T) {
 		t.Errorf("expected formatted range to include DECLARE, got %q", edits[0].NewText)
 	}
 }
+
+func TestHandleCompletion_ConstructorContext(t *testing.T) {
+	// Cursor is right after `Email{` on line 1; expect constructor signatures only.
+	s := newTestServerWithDocument(`oEmail := Email{`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 16},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) == 0 {
+		t.Fatal("expected constructor completions for Email{")
+	}
+	for _, item := range items {
+		if !strings.HasPrefix(item.Label, "Email{") {
+			t.Errorf("expected only Email constructor labels, got %q", item.Label)
+		}
+	}
+}
+
+func TestHandleCompletion_BuiltinClassMemberContext(t *testing.T) {
+	// `Email:` directly suggests Email class members.
+	s := newTestServerWithDocument(`Email:`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 6},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) == 0 {
+		t.Fatal("expected member completions for Email:")
+	}
+	for _, item := range items {
+		detail := ""
+		if item.Detail != nil {
+			detail = *item.Detail
+		}
+		if !strings.HasPrefix(detail, "Email ") {
+			t.Errorf("expected detail to start with 'Email ', got %q", detail)
+		}
+	}
+}
+
+func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
+	// Inside :CLASS Email, typing `Me:` should suggest Email members.
+	s := newTestServerWithDocument(`:CLASS Email;
+:PROCEDURE Demo;
+    Me:
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 2, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) == 0 {
+		t.Fatal("expected Me: member completions inside :CLASS Email")
+	}
+	// Email has SendOutgoing or similar — confirm at least one method-kind item.
+	hasMethod := false
+	for _, item := range items {
+		if item.Kind != nil && *item.Kind == protocol.CompletionItemKindMethod {
+			hasMethod = true
+			break
+		}
+	}
+	if !hasMethod {
+		t.Error("expected at least one method-kind completion for Me:")
+	}
+}

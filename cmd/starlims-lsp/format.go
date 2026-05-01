@@ -132,4 +132,3 @@ func formatContent(content string) string {
 	// No edits means content is already formatted (or empty)
 	return content
 }
-
