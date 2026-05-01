@@ -288,6 +288,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					(t.Type == SQLTokenKeyword || t.Type == SQLTokenIdentifier) &&
 						prev.Text != "."
 
+				// Rule C: never split a projection from its AS alias. Block
+				// wrapping immediately before AS, and immediately after AS
+				// (the alias identifier must stay attached).
+				if t.Type == SQLTokenKeyword && upperText == "AS" {
+					canBreak = false
+				}
+				if prev.Type == SQLTokenKeyword && strings.ToUpper(prev.Text) == "AS" {
+					canBreak = false
+				}
+
 				if projectedLen > f.opts.MaxLineLength && canBreak && prev.Text != "(" {
 					needsBreak = true
 					// Rule D: when wrapping inside a non-subquery argument list,
