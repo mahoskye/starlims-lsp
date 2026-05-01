@@ -187,10 +187,11 @@ func TestKeywordAndOperatorDescriptions(t *testing.T) {
 		t.Errorf("= description must mention loose prefix matching; got: %q", desc)
 	}
 
-	// != operator must mention it negates == not =
+	// != operator must convey that it's the opposite of == (exact match),
+	// not = (prefix match on strings).
 	desc = SSLOperatorDescriptions["!="]
-	if !strings.Contains(desc, "negates ==") {
-		t.Errorf("!= description must mention it negates == (not =); got: %q", desc)
+	if !strings.Contains(desc, "==") || !strings.Contains(desc, "prefix") {
+		t.Errorf("!= description must reference == and explain '=' is prefix-match on strings; got: %q", desc)
 	}
 
 	// $ operator must explain containment direction

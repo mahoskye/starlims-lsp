@@ -271,7 +271,7 @@ var SSLOperatorDescriptions = map[string]string{
 	"^=":    "Power and assign operator",
 	"=":     "Equality comparison operator; for strings this is loose (prefix) matching — .T. if right is empty or left starts with right",
 	"==":    "Strict equality comparison operator; use for exact string equality",
-	"!=":    "Not equal operator (negates ==, not =); for strings, = and != are NOT logical opposites",
+	"!=":    "Not equal operator — exact-match negation (opposite of ==, not =, since SSL's = does prefix matching on strings)",
 	"<>":    "Not equal operator (equivalent to !=, but != is preferred)",
 	">":     "Greater than comparison operator",
 	"<":     "Less than comparison operator",

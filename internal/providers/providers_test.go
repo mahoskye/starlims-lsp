@@ -6520,12 +6520,12 @@ func TestGetDiagnostics_NotEqualsAsymmetry(t *testing.T) {
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "NOT logical opposites") {
+		if d.Code == CodeEqualsVsStrictEquals {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected info about != and = not being logical opposites for strings")
+		t.Error("expected equals_vs_strict_equals info for != with string literal")
 	}
 }
 
@@ -6540,7 +6540,7 @@ func TestGetDiagnostics_NotEqualsAsymmetry_NonString(t *testing.T) {
 	diagnostics := GetDiagnostics(text, opts)
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "NOT logical opposites") {
+		if d.Code == CodeEqualsVsStrictEquals {
 			t.Errorf("unexpected != asymmetry warning for non-string comparison: %s", d.Message)
 		}
 	}
