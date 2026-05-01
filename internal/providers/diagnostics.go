@@ -635,7 +635,33 @@ func checkAssignmentInCondition(tokens []lexer.Token) []Diagnostic {
 func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
+	// Issue #56: skip dots inside :INCLUDE module paths. These can be deep
+	// (e.g. :INCLUDE A.B.C.D;) and the lexer breaks them into Unknown
+	// chunks like ".B.", so a single-token lookback is insufficient. Track
+	// :INCLUDE statement scope explicitly.
+	inInclude := false
+
 	for i, token := range tokens {
+		if token.Type == lexer.TokenKeyword {
+			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			if normalized == "INCLUDE" {
+				inInclude = true
+				continue
+			}
+		}
+		if inInclude {
+			if token.Type == lexer.TokenPunctuation && token.Text == ";" {
+				inInclude = false
+				continue
+			}
+			// Also handle the case where the trailing ';' is glued to the
+			// last Unknown token (lexer emits ".D;" as one token).
+			if token.Type == lexer.TokenUnknown && strings.HasSuffix(token.Text, ";") {
+				inInclude = false
+			}
+			continue
+		}
+
 		// Look for TokenUnknown that starts with a dot followed by identifier chars
 		if token.Type != lexer.TokenUnknown {
 			continue
@@ -659,36 +685,14 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 
 		// Look back to see if preceded by an identifier (skip whitespace)
 		precedingIsIdent := false
-		precedingIdentIdx := -1
 		for j := i - 1; j >= 0; j-- {
 			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
 				continue
 			}
 			if tokens[j].Type == lexer.TokenIdentifier {
 				precedingIsIdent = true
-				precedingIdentIdx = j
 			}
 			break
-		}
-
-		// Skip dots in :INCLUDE namespace paths (e.g. :INCLUDE File_Helpers.FileWork)
-		if precedingIsIdent && precedingIdentIdx >= 0 {
-			isInclude := false
-			for j := precedingIdentIdx - 1; j >= 0; j-- {
-				if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
-					continue
-				}
-				if tokens[j].Type == lexer.TokenKeyword {
-					kw := strings.ToUpper(strings.TrimPrefix(tokens[j].Text, ":"))
-					if kw == "INCLUDE" {
-						isInclude = true
-					}
-				}
-				break
-			}
-			if isInclude {
-				continue
-			}
 		}
 
 		if precedingIsIdent {
