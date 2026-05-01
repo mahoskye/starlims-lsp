@@ -317,6 +317,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			extraIndent = strings.Repeat(" ", 11)
 		}
 
+		// Rule B: AND/OR continuing a WHEN's predicate inside CASE-in-SELECT
+		// indents one step past the WHEN keyword (col 11 + indentSize).
+		if needsBreak && caseInSelectColumns && parenDepth == 0 &&
+			(upperText == "AND" || upperText == "OR") && t.Type == SQLTokenKeyword {
+			extraIndent = strings.Repeat(" ", 11) + f.indentString
+		}
+
 		// OVER() internal formatting: PARTITION BY / ORDER BY on their own lines (Gap 8)
 		if inOverClause && parenDepth >= overParenDepth && t.Type == SQLTokenKeyword {
 			if upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE" {
