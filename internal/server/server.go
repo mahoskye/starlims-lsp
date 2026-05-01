@@ -212,14 +212,22 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 }
 
 // handleInitialized handles the initialized notification.
-func (s *SSLServer) handleInitialized(context *glsp.Context, params *protocol.InitializedParams) error {
+func (s *SSLServer) handleInitialized(ctx *glsp.Context, params *protocol.InitializedParams) error {
 	// Start workspace indexing if we have roots
 	if len(s.rootURIs) > 0 {
 		s.workspaceIndex = NewWorkspaceIndex(s.rootURIs)
 		s.workspaceIndex.StartBackgroundIndex()
 
-		// Register file watchers for SSL file types
-		context.Call(string(protocol.ServerClientRegisterCapability),
+		// Register file watchers for SSL file types.
+		//
+		// IMPORTANT: ctx.Call is a synchronous client→server round-trip and
+		// `initialized` is dispatched on the same goroutine that reads
+		// incoming messages. Calling it inline deadlocks: the reader is
+		// blocked waiting for the client's registerCapability response,
+		// which can only arrive via the reader. Run the registration in a
+		// background goroutine so the handler returns and the reader keeps
+		// pumping messages.
+		go ctx.Call(string(protocol.ServerClientRegisterCapability),
 			protocol.RegistrationParams{
 				Registrations: []protocol.Registration{{
 					ID:     "ssl-file-watcher",
