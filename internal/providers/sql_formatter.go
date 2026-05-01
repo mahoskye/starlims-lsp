@@ -84,6 +84,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	addBlankLineBeforeNextBreak := false
 	subqueryParenDepths := make(map[int]bool)
 	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
+	// Rule D: stack of column positions immediately after each open '('.
+	// Used to hang-indent wrapped argument lists / IN lists under their
+	// opening paren. Subquery parens (subqueryParenDepths[d]==true) are
+	// excluded from hang-indent — the subquery has its own formatting.
+	var parenOpenCols []int
 
 	// CASE in SELECT tracking (Gap 6)
 	caseInSelectColumns := false
@@ -285,7 +290,21 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 				if projectedLen > f.opts.MaxLineLength && canBreak && prev.Text != "(" {
 					needsBreak = true
-					if inSelectColumns {
+					// Rule D: when wrapping inside a non-subquery argument list,
+					// hang-indent under the innermost opening '('.
+					hangCol := -1
+					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] {
+						hangCol = parenOpenCols[len(parenOpenCols)-1]
+					}
+					if hangCol >= 0 {
+						baseLen := len(baseIndent)
+						parenIndentLen := len(f.indentString) * parenDepth
+						spaces := hangCol - baseLen - parenIndentLen
+						if spaces < 0 {
+							spaces = 0
+						}
+						extraIndent = strings.Repeat(" ", spaces)
+					} else if inSelectColumns {
 						extraIndent = strings.Repeat(" ", 7) // Align with SELECT columns
 					} else {
 						extraIndent = f.indentString
@@ -397,6 +416,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		result.WriteString(tokenText)
 		currentLineLen += len(tokenText)
 		isFirstToken = false
+
+		// Rule D: maintain stack of opening-paren columns for hang-indent.
+		// Push the column where contents begin (i.e. currentLineLen after
+		// '(' is written) on '(', pop on ')'.
+		if t.Text == "(" {
+			parenOpenCols = append(parenOpenCols, currentLineLen)
+		} else if t.Text == ")" && len(parenOpenCols) > 0 {
+			parenOpenCols = parenOpenCols[:len(parenOpenCols)-1]
+		}
 
 		// Post-token: decrement CASE depth after END has been formatted
 		if upperText == "END" && t.Type == SQLTokenKeyword && caseDepth > 0 {
