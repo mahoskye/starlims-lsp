@@ -475,6 +475,14 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 		return
 	}
 
+	// Rule F: when the next token is a string that will be reflowed as
+	// multi-line SQL, don't wrap before it. The SQL formatter handles its
+	// own line breaks, and the opening '"' should stay on the previous
+	// line (attached to ':=', a named-arg, etc.).
+	if s.willFormatAsMultilineSQL(token) {
+		return
+	}
+
 	s.builder.WriteString("\n")
 	contIndent := s.indent + 1 // Fixed 1-level continuation indent per schema
 	s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
@@ -560,6 +568,23 @@ func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 			s.sqlArgCount++
 		}
 	}
+}
+
+// willFormatAsMultilineSQL returns true if writeTokenWithSQLFormatting will
+// format this token as multi-line SQL. Used by applyLineWrap to suppress a
+// pre-string newline so the opening quote stays on the prior line.
+func (s *formatState) willFormatAsMultilineSQL(token lexer.Token) bool {
+	if token.Type != lexer.TokenString || !s.opts.SQL.Enabled {
+		return false
+	}
+	if len(token.Text) < 2 {
+		return false
+	}
+	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+	inner := token.Text[1 : len(token.Text)-1]
+	return IsSQLString(inner)
 }
 
 func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
