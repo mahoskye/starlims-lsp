@@ -7245,3 +7245,16 @@ func TestGetDiagnostics_ProcDecl_HappyPath(t *testing.T) {
 		t.Errorf("expected 0 diagnostics for valid procedure; got %d: %+v", len(diagnostics), diagnostics)
 	}
 }
+
+// Regression: operators inside function-call arguments must not be picked up
+// as the outer expression's operator. SubStr(s, 1, Len(s) - 1) returns a
+// string; the inner '-' is a SubStr argument, not the outer operator.
+func TestGetDiagnostics_MixedTypes_NoFP_OperatorInsideCall(t *testing.T) {
+	text := `:DECLARE sCols, SqlCommand;
+sCols := SubStr(sCols, 1, Len(sCols) - 1);
+SqlCommand := "TABLE " + sCols + " end";`
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if n := countCode(diagnostics, CodeMixedTypeOperator); n != 0 {
+		t.Errorf("expected 0 mixed_type_operator on SubStr+concat sequence; got %d: %+v", n, diagnostics)
+	}
+}

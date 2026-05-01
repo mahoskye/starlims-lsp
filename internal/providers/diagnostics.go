@@ -3467,9 +3467,29 @@ func inferExpressionType(tokens []lexer.Token, startIdx, endIdx int, typeInfo ma
 		return ""
 	}
 
+	// Top-level operator scans must respect grouping. An operator inside
+	// `(...)`, `[...]`, or `{...}` is part of a sub-expression (function-call
+	// argument, indexed lookup, array literal) — picking it up as the
+	// expression's outer operator misclassifies the whole expression.
+	depth := 0
 	for i := startIdx; i <= endIdx; i++ {
 		token := tokens[i]
 		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+			continue
+		}
+		if token.Type == lexer.TokenPunctuation {
+			switch token.Text {
+			case "(", "[", "{":
+				depth++
+				continue
+			case ")", "]", "}":
+				if depth > 0 {
+					depth--
+				}
+				continue
+			}
+		}
+		if depth > 0 {
 			continue
 		}
 		if token.Type == lexer.TokenOperator {
@@ -3480,8 +3500,24 @@ func inferExpressionType(tokens []lexer.Token, startIdx, endIdx int, typeInfo ma
 		}
 	}
 
+	depth = 0
 	for i := startIdx; i <= endIdx; i++ {
 		token := tokens[i]
+		if token.Type == lexer.TokenPunctuation {
+			switch token.Text {
+			case "(", "[", "{":
+				depth++
+				continue
+			case ")", "]", "}":
+				if depth > 0 {
+					depth--
+				}
+				continue
+			}
+		}
+		if depth > 0 {
+			continue
+		}
 		if token.Type != lexer.TokenOperator {
 			continue
 		}
