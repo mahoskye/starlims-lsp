@@ -617,6 +617,19 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 		return false
 	}
 
+	// Issue #64: don't reformat SQL that's already single-line and would
+	// fit on the current line. Reformatting a short query like
+	// `sX := "SELECT * FROM DUAL";` into a 5-line block breaks the
+	// surrounding SSL syntax and is undesirable when the original already
+	// fits. Only reflow when wrapping is genuinely necessary.
+	if !strings.ContainsRune(innerContent, '\n') {
+		fits := s.opts.MaxLineLength <= 0 ||
+			s.currentLineLen+len(token.Text) <= s.opts.MaxLineLength
+		if fits {
+			return false
+		}
+	}
+
 	baseIndent := strings.Repeat("\t", s.indent)
 	if s.opts.IndentStyle == "space" {
 		baseIndent = strings.Repeat(" ", s.opts.IndentSize*s.indent)

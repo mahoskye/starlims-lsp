@@ -553,7 +553,10 @@ func TestFormattingOptions_BlankLinesBetweenProcs(t *testing.T) {
 }
 
 func TestFormattingOptions_SQLKeywordCaseUpper(t *testing.T) {
-	input := `ds := SQLExecute("select id from users");`
+	// Issue #64: short single-line SQL is now left as-is. Use input long
+	// enough to trigger the reformat path so the keyword-case option
+	// actually has output to act on.
+	input := `ds := SQLExecute("select id, full_name, mailing_address, phone, email from users where status = 'active' and role = 'ADMIN'");`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
@@ -563,14 +566,17 @@ func TestFormattingOptions_SQLKeywordCaseUpper(t *testing.T) {
 	formatted := edits[0].NewText
 
 	if !strings.Contains(formatted, "SELECT") {
-		t.Error("expected SQL SELECT to be uppercase")
+		t.Errorf("expected SQL SELECT to be uppercase, got:\n%s", formatted)
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
 func TestFormattingOptions_SQLKeywordCaseLower(t *testing.T) {
-	input := `ds := SQLExecute("SELECT id FROM users");`
+	// Issue #64: short single-line SQL is now left as-is, so to exercise
+	// the keyword-case option we need a query long enough to trigger the
+	// reformat path.
+	input := `ds := SQLExecute("SELECT id, full_name, mailing_address, phone, email FROM users WHERE status = 'active' AND role = 'ADMIN'");`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
@@ -580,10 +586,10 @@ func TestFormattingOptions_SQLKeywordCaseLower(t *testing.T) {
 	formatted := edits[0].NewText
 
 	if strings.Contains(formatted, "SELECT") || strings.Contains(formatted, "FROM") {
-		t.Error("expected SQL keywords to be lowercase")
+		t.Errorf("expected SQL keywords to be lowercase, got:\n%s", formatted)
 	}
 	if !strings.Contains(formatted, "select") || !strings.Contains(formatted, "from") {
-		t.Error("expected SQL keywords to be lowercase")
+		t.Errorf("expected SQL keywords to be lowercase, got:\n%s", formatted)
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)
@@ -1036,8 +1042,13 @@ func TestFormatDocument_MultiLineArrayPreserved(t *testing.T) {
 // ============================================================================
 
 func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
-	// SQL string assigned to variable should be detected and formatted
-	input := `sSQL := "select * from users where status = 'active'";`
+	// Issue #64: a single-line SQL assignment that already fits within
+	// MaxLineLength must not be reflowed. Reformatting `sSQL := "..."`
+	// across multiple lines breaks the surrounding SSL syntax.
+	// To exercise SQL detection + reformat, we use input that genuinely
+	// overflows the line — then the SQL formatter kicks in, keywords get
+	// uppercased, and the result is multi-line.
+	input := `sSQL := "select id, full_name, mailing_address, phone, email, status, created_dt from users where status = 'active' and role_code = 'ADMIN'";`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
@@ -1046,7 +1057,6 @@ func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// Should be formatted with SQL keywords uppercased
 	if !strings.Contains(formatted, "SELECT") {
 		t.Error("expected detected SQL SELECT to be uppercase")
 	}
@@ -1056,10 +1066,8 @@ func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
 	if !strings.Contains(formatted, "WHERE") {
 		t.Error("expected detected SQL WHERE to be uppercase")
 	}
-
-	// Complex SQL should be multi-line
 	if !strings.Contains(formatted, "\n") {
-		t.Error("expected complex detected SQL to be formatted as multi-line")
+		t.Error("expected overflowing detected SQL to be formatted as multi-line")
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)
@@ -1109,8 +1117,10 @@ func TestFormatDocument_NonSQLStringNotFormatted(t *testing.T) {
 }
 
 func TestFormatDocument_SQLFunctionArgStillFormattedWhenDetectionDisabled(t *testing.T) {
-	// SQL inside SQLExecute should still be formatted even when detection is off
-	input := `ds := SQLExecute("select * from users");`
+	// Issue #64: SQL inside SQLExecute should still be formatted when
+	// detection is off, but only when the line genuinely overflows. Use a
+	// long enough query to trigger reformat.
+	input := `ds := SQLExecute("select id, full_name, mailing_address, phone, email from users where status = 'active' and role = 'ADMIN'");`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
@@ -1119,9 +1129,8 @@ func TestFormatDocument_SQLFunctionArgStillFormattedWhenDetectionDisabled(t *tes
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// SQL function args should STILL be formatted
 	if !strings.Contains(formatted, "SELECT") {
-		t.Error("SQL inside SQLExecute should still be formatted even with DetectSQLStrings=false")
+		t.Error("SQL inside SQLExecute should still be formatted (and uppercased) when overflowing, even with DetectSQLStrings=false")
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)
@@ -1362,7 +1371,9 @@ func TestFormatDocument_LogicalOperatorSpacing(t *testing.T) {
 }
 
 func TestFormatDocument_SQLInsideNestedProcedure(t *testing.T) {
-	// SQL detection should work inside procedures with proper indentation
+	// Issue #64: a short single-line SQL string that already fits should
+	// NOT be reflowed across multiple lines. It should be left as-is so
+	// that `sSQL := "select ...";` stays on one line.
 	input := `:PROCEDURE Test;
 sSQL := "select id, name from users where active = 1";
 :ENDPROC;`
@@ -1374,14 +1385,10 @@ sSQL := "select id, name from users where active = 1";
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// SQL should be detected and formatted
-	if !strings.Contains(formatted, "SELECT") {
-		t.Error("expected SQL to be detected and formatted inside procedure")
-	}
-
-	// SQL should be multi-line due to complexity
-	if !strings.Contains(formatted, "FROM") && strings.Contains(formatted, "\n") {
-		t.Log("SQL is properly formatted with line breaks")
+	// The SQL line should remain a single line, with the original quote and
+	// trailing semicolon all on the same line.
+	if !strings.Contains(formatted, `sSQL := "select id, name from users where active = 1";`) {
+		t.Errorf("expected single-line SQL to be preserved, got:\n%s", formatted)
 	}
 
 	t.Logf("Formatted output:\n%s", formatted)
@@ -1773,5 +1780,39 @@ func TestFormatDocument_RuleE_CloseQuoteHugsFollowingArgs(t *testing.T) {
 		if strings.TrimSpace(line) == `",` {
 			t.Errorf("Rule E: stranded '\",' on its own line; the comma + remaining args should follow inline.\nfull output:\n%s", out)
 		}
+	}
+}
+
+// Issue #64: short, already-fitting single-line SQL strings must NOT be
+// reformatted — neither the assignment shape nor the call-site shape
+// should be exploded across multiple lines.
+func TestFormatDocument_Issue64_ShortSQLStringNotReformatted(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"assignment", `sVariantSQL := "SELECT * FROM DUAL";`},
+		{"sqlexecute", `ds := SQLExecute("SELECT * FROM DUAL");`},
+		{"runsql", `RunSQL("SELECT * FROM DUAL");`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := DefaultFormattingOptions()
+			opts.SQL.Enabled = true
+			opts.SQL.DetectSQLStrings = true
+
+			edits := FormatDocument(c.input, opts)
+			if len(edits) == 0 {
+				t.Fatalf("expected at least one edit")
+			}
+			out := edits[0].NewText
+
+			// Output must be a single physical line (the trailing newline
+			// added by the document formatter is fine, so trim it).
+			trimmed := strings.TrimRight(out, "\n")
+			if strings.Contains(trimmed, "\n") {
+				t.Errorf("Issue #64: short SQL must stay single-line, got:\n%s", out)
+			}
+		})
 	}
 }
