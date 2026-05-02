@@ -199,6 +199,36 @@ func TestApplySettings_Globals(t *testing.T) {
 	}
 }
 
+// Issue #55: settings sent via initializationOptions during the LSP
+// `initialize` request must be applied. Previously they were dropped, which
+// meant `ssl.globals` configured by the user never reached the diagnostic
+// engine until the user happened to change a setting later (and even then,
+// only if the change went through the rebuilt-payload path).
+func TestHandleInitialize_AppliesInitializationOptions(t *testing.T) {
+	s := NewSSLServer()
+
+	initOpts := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"diagnostics": map[string]interface{}{
+				"globals": []string{"gCurrentUser", "gAppName"},
+			},
+		},
+	}
+
+	params := &protocol.InitializeParams{
+		InitializationOptions: initOpts,
+	}
+	if _, err := s.handleInitialize(nil, params); err != nil {
+		t.Fatalf("handleInitialize returned error: %v", err)
+	}
+
+	expected := []string{"gCurrentUser", "gAppName"}
+	if !reflect.DeepEqual(s.settings.Diagnostics.GlobalVariables, expected) {
+		t.Errorf("expected globals from initializationOptions to be applied: want %v, got %v",
+			expected, s.settings.Diagnostics.GlobalVariables)
+	}
+}
+
 func TestApplySettings_MaxBlockDepth(t *testing.T) {
 	s := NewSSLServer()
 

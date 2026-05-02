@@ -176,6 +176,15 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 		s.rootURIs = []string{pathToURI(*params.RootPath)}
 	}
 
+	// Issue #55: apply settings sent via initializationOptions. The VS Code
+	// extension sends its rebuilt settings tree (ssl.diagnostics.globals,
+	// etc.) here at startup. Without this, configured globals — and every
+	// other client setting — were silently dropped until the user happened
+	// to change a setting later.
+	if params.InitializationOptions != nil {
+		s.applySettings(params.InitializationOptions)
+	}
+
 	capabilities := s.handler.CreateServerCapabilities()
 
 	capabilities.TextDocumentSync = protocol.TextDocumentSyncKindIncremental
