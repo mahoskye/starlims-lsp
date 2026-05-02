@@ -85,7 +85,7 @@ var SQLBuiltinFunctions = map[string]bool{
 
 // SQLBreakBeforeKeywords are keywords that trigger line breaks before them.
 var SQLBreakBeforeKeywords = map[string]bool{
-	"FROM": true, "WHERE": true, "INNER": true, "LEFT": true,
+	"FROM": true, "WHERE": true, "JOIN": true, "INNER": true, "LEFT": true,
 	"RIGHT": true, "FULL": true, "CROSS": true, "ORDER": true,
 	"GROUP": true, "HAVING": true, "UNION": true, "VALUES": true,
 	"INTO": true, "USING": true, "ON": true, "CASE": true, "WHEN": true,
@@ -99,7 +99,7 @@ var SQLBreakBeforeKeywords = map[string]bool{
 
 // SQLJoinModifiers are keywords that modify JOIN and shouldn't break before JOIN.
 var SQLJoinModifiers = map[string]bool{
-	"INNER": true, "LEFT": true, "RIGHT": true, "FULL": true, "CROSS": true,
+	"INNER": true, "LEFT": true, "RIGHT": true, "FULL": true, "CROSS": true, "OUTER": true,
 }
 
 // SQLIndentedKeywords get extra indentation.

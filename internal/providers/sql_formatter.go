@@ -84,6 +84,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	addBlankLineBeforeNextBreak := false
 	subqueryParenDepths := make(map[int]bool)
 	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
+	// Rule D: stack of column positions immediately after each open '('.
+	// Used to hang-indent wrapped argument lists / IN lists under their
+	// opening paren. Subquery parens (subqueryParenDepths[d]==true) are
+	// excluded from hang-indent — the subquery has its own formatting.
+	var parenOpenCols []int
 
 	// CASE in SELECT tracking (Gap 6)
 	caseInSelectColumns := false
@@ -270,6 +275,26 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				subqueryParenDepths[parenDepth] = true
 			}
 
+			// Rule C (whole-projection move): at the start of a new projection
+			// in SELECT columns, look ahead to the full projection's rendered
+			// length. If continuing on the current line would overflow, move
+			// the whole projection to its own line — better than splitting
+			// the projection later and stranding pieces of it.
+			if !needsBreak && prev != nil && prev.Text == "," &&
+				inSelectColumns && parenDepth == 0 && f.opts.MaxLineLength > 0 &&
+				(style == "canonicalCompact" || style == "expanded") {
+				end := f.projectionEndIndex(nonWSTokens, i)
+				projLen := f.projectionRenderLen(nonWSTokens, i, end)
+				spaceLen := 0
+				if f.shouldAddSpace(prev, &t, prevPrevToken) {
+					spaceLen = 1
+				}
+				if currentLineLen+spaceLen+projLen > f.opts.MaxLineLength {
+					needsBreak = true
+					extraIndent = strings.Repeat(" ", 7) // align with SELECT columns
+				}
+			}
+
 			// Proactive line wrapping (only for canonicalCompact and expanded)
 			if !needsBreak && prev != nil && f.opts.MaxLineLength > 0 &&
 				(style == "canonicalCompact" || style == "expanded") {
@@ -283,9 +308,33 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					(t.Type == SQLTokenKeyword || t.Type == SQLTokenIdentifier) &&
 						prev.Text != "."
 
+				// Rule C: never split a projection from its AS alias. Block
+				// wrapping immediately before AS, and immediately after AS
+				// (the alias identifier must stay attached).
+				if t.Type == SQLTokenKeyword && upperText == "AS" {
+					canBreak = false
+				}
+				if prev.Type == SQLTokenKeyword && strings.ToUpper(prev.Text) == "AS" {
+					canBreak = false
+				}
+
 				if projectedLen > f.opts.MaxLineLength && canBreak && prev.Text != "(" {
 					needsBreak = true
-					if inSelectColumns {
+					// Rule D: when wrapping inside a non-subquery argument list,
+					// hang-indent under the innermost opening '('.
+					hangCol := -1
+					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] {
+						hangCol = parenOpenCols[len(parenOpenCols)-1]
+					}
+					if hangCol >= 0 {
+						baseLen := len(baseIndent)
+						parenIndentLen := len(f.indentString) * parenDepth
+						spaces := hangCol - baseLen - parenIndentLen
+						if spaces < 0 {
+							spaces = 0
+						}
+						extraIndent = strings.Repeat(" ", spaces)
+					} else if inSelectColumns {
 						extraIndent = strings.Repeat(" ", 7) // Align with SELECT columns
 					} else {
 						extraIndent = f.indentString
@@ -315,6 +364,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		if caseInSelectColumns && (upperText == "WHEN" || upperText == "ELSE") && t.Type == SQLTokenKeyword {
 			needsBreak = true
 			extraIndent = strings.Repeat(" ", 11)
+		}
+
+		// Rule B: AND/OR continuing a WHEN's predicate inside CASE-in-SELECT
+		// indents one step past the WHEN keyword (col 11 + indentSize).
+		if needsBreak && caseInSelectColumns && parenDepth == 0 &&
+			(upperText == "AND" || upperText == "OR") && t.Type == SQLTokenKeyword {
+			extraIndent = strings.Repeat(" ", 11) + f.indentString
 		}
 
 		// OVER() internal formatting: PARTITION BY / ORDER BY on their own lines (Gap 8)
@@ -391,6 +447,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		currentLineLen += len(tokenText)
 		isFirstToken = false
 
+		// Rule D: maintain stack of opening-paren columns for hang-indent.
+		// Push the column where contents begin (i.e. currentLineLen after
+		// '(' is written) on '(', pop on ')'.
+		if t.Text == "(" {
+			parenOpenCols = append(parenOpenCols, currentLineLen)
+		} else if t.Text == ")" && len(parenOpenCols) > 0 {
+			parenOpenCols = parenOpenCols[:len(parenOpenCols)-1]
+		}
+
 		// Post-token: decrement CASE depth after END has been formatted
 		if upperText == "END" && t.Type == SQLTokenKeyword && caseDepth > 0 {
 			caseDepth--
@@ -401,6 +466,58 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	}
 
 	return result.String()
+}
+
+// projectionEndIndex returns the index (exclusive) of the end of the
+// projection starting at start. A projection ends at the next top-level
+// (parenDepth == 0 within the lookahead) comma or at FROM/INTO. If neither
+// is found, len(tokens) is returned.
+func (f *SQLFormatter) projectionEndIndex(tokens []SQLToken, start int) int {
+	depth := 0
+	for j := start; j < len(tokens); j++ {
+		switch tokens[j].Text {
+		case "(":
+			depth++
+			continue
+		case ")":
+			if depth > 0 {
+				depth--
+			}
+			continue
+		case ",":
+			if depth == 0 {
+				return j
+			}
+		}
+		if depth == 0 && tokens[j].Type == SQLTokenKeyword {
+			upper := strings.ToUpper(tokens[j].Text)
+			if upper == "FROM" || upper == "INTO" {
+				return j
+			}
+		}
+	}
+	return len(tokens)
+}
+
+// projectionRenderLen estimates the rendered length of tokens[start:end]
+// when laid out on a single line, including the spaces shouldAddSpace would
+// emit between adjacent tokens.
+func (f *SQLFormatter) projectionRenderLen(tokens []SQLToken, start, end int) int {
+	total := 0
+	for j := start; j < end; j++ {
+		text := f.applyKeywordCasing(tokens[j])
+		if j > start {
+			var pp *SQLToken
+			if j >= 2 {
+				pp = &tokens[j-2]
+			}
+			if f.shouldAddSpace(&tokens[j-1], &tokens[j], pp) {
+				total++
+			}
+		}
+		total += len(text)
+	}
+	return total
 }
 
 func (f *SQLFormatter) keywordIndent(style, keyword, currentClause, rootCommand string, parenDepth int) string {

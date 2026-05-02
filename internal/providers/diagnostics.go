@@ -4986,7 +4986,7 @@ func checkNotEqualsAsymmetry(tokens []lexer.Token) []Diagnostic {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityInfo,
 				Range:    tokenToRange(token),
-				Message:  "'!=' negates '==' (exact match), not '=' (prefix match). For strings, '=' and '!=' are NOT logical opposites",
+				Message:  "'!=' is exact-match negation. SSL's '=' does prefix matching on strings, so '=' and '!=' are not logical opposites — use '==' for exact equality.",
 				Source:   "ssl-lsp",
 				Code:     CodeEqualsVsStrictEquals,
 			})

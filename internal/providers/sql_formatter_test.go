@@ -2153,3 +2153,225 @@ func TestSQLFormatter_MergeOnAndIndent(t *testing.T) {
 	}
 	t.Logf("Formatted SQL:\n%s", result)
 }
+
+// ---------------------------------------------------------------------------
+// Regression tests pinning user-specified formatter rules (anonymized).
+// Rules A–D are SQL-level; rules E/F are SSL-pipeline-level (see formatting_test.go).
+// These are expected to FAIL until the formatter is updated to honor each rule.
+// ---------------------------------------------------------------------------
+
+// Rule A: every JOIN keyword starts a new line, including bare JOIN, at every
+// nesting level. Currently bare JOIN is left inline after FROM/ON.
+func TestSQLFormatter_RuleA_BareJoinStartsNewLine(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT a.x FROM t1 a JOIN t2 b ON b.x = a.x JOIN t3 c ON c.y = b.y"
+	result := f.FormatSQL(input, "")
+
+	for _, line := range strings.Split(result, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.Contains(trimmed, "JOIN") {
+			continue
+		}
+		first := strings.SplitN(trimmed, " ", 2)[0]
+		if first != "JOIN" && !SQLJoinModifiers[first] {
+			t.Errorf("Rule A: JOIN must be the first keyword on its line, got: %q\nfull output:\n%s", line, result)
+		}
+	}
+}
+
+// Rule B: AND/OR continuing a WHEN predicate is indented past the WHEN keyword.
+// Currently the continuation drops back to a small (~2-space) indent.
+func TestSQLFormatter_RuleB_WhenContinuationIndent(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT CASE WHEN a.x IS NULL OR a.x = '' THEN 'empty' ELSE 'set' END AS s FROM t1 a"
+	result := f.FormatSQL(input, "")
+
+	whenIndent := -1
+	for _, line := range strings.Split(result, "\n") {
+		trimmed := strings.TrimLeft(line, " ")
+		if strings.HasPrefix(trimmed, "WHEN ") {
+			whenIndent = len(line) - len(trimmed)
+		}
+		if whenIndent < 0 {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "OR ") || strings.HasPrefix(trimmed, "AND ") {
+			indent := len(line) - len(trimmed)
+			if indent <= whenIndent {
+				t.Errorf("Rule B: OR/AND continuing WHEN must indent past WHEN (col %d), got col %d: %q\nfull output:\n%s",
+					whenIndent, indent, line, result)
+			}
+		}
+	}
+}
+
+// Rule C: a projection (<expr> [AS <alias>]) is indivisible. Never split
+// between the expression and its AS alias.
+func TestSQLFormatter_RuleC_ProjectionAliasNotSplit(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT CONCAT(a.first_name, ' ', a.middle_name, ' ', a.last_name, ' ', a.suffix, ' ', a.title) AS full_display_name FROM t1 a"
+	result := f.FormatSQL(input, "")
+
+	for _, line := range strings.Split(result, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "AS ") {
+			t.Errorf("Rule C: line starts with stranded AS alias — projection was split: %q\nfull output:\n%s",
+				line, result)
+		}
+	}
+}
+
+// Rule C (whole-projection move): when continuing a long projection on the
+// current SELECT line would overflow the width limit, the whole projection
+// should move to its own line aligned with the SELECT columns. Without this,
+// two long projections sit on one line that runs well past the limit.
+func TestSQLFormatter_RuleC_OverflowingProjectionMovesToNewLine(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT a.short, " +
+		"CAST(FORMAT(a.dt_admission, 'MM/dd/yyyy') AS varchar) AS date_of_admission_string, " +
+		"CAST(FORMAT(a.dt_collected, 'MM/dd/yyyy') AS varchar) AS date_collected_string " +
+		"FROM t1 a"
+	result := f.FormatSQL(input, "")
+	t.Logf("Output:\n%s", result)
+
+	for _, line := range strings.Split(result, "\n") {
+		// Reject lines that contain BOTH "AS date_of_admission_string" and
+		// "AS date_collected_string" on the same line — a tell-tale sign of
+		// two projections crammed together.
+		if strings.Contains(line, "AS date_of_admission_string") &&
+			strings.Contains(line, "AS date_collected_string") {
+			t.Errorf("Rule C: two long projections must not share a line: %q\nfull output:\n%s", line, result)
+		}
+	}
+}
+
+// LongConvoluted: a single big anonymized query that exercises rules A–D at
+// once — multiple JOIN variants (bare + LEFT + JOIN-into-subquery), CASE/WHEN
+// with OR continuation, projections with CAST(FORMAT(...)) AS alias, an IN
+// list large enough to wrap, and a NOT EXISTS subquery. This is a "smoke" test
+// — when any rule regresses, this one fails alongside the targeted rule test.
+func TestSQLFormatter_LongConvolutedQuery_AllRules(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT TOP 1 a.id AS accession_number, " +
+		"CASE WHEN a.middle_initial IS NOT NULL THEN CONCAT(a.first_name, ' ', a.middle_initial, ' ', a.last_name) " +
+		"WHEN a.middle_initial IS NULL OR a.middle_initial = '' THEN CONCAT(a.first_name, ' ', a.last_name) " +
+		"ELSE CONCAT(a.first_name, ' ', a.last_name) END AS patient_name, " +
+		"CAST(FORMAT(a.dt_admission, 'MM/dd/yyyy') AS varchar) AS date_of_admission_string, " +
+		"CAST(FORMAT(a.dt_collected, 'MM/dd/yyyy') AS varchar) AS date_collected_string " +
+		"FROM t1 a JOIN t2 b ON b.x = a.x " +
+		"LEFT JOIN t3 c ON c.y = a.y " +
+		"JOIN (SELECT m.x, MAX(m.dt) AS dt FROM t4 m JOIN t5 n ON n.k = m.k GROUP BY m.x) sub ON sub.x = a.x " +
+		"WHERE a.col IN ('aaaaaaaa', 'bbbbbbbb', 'cccccccc', 'dddddddd', 'eeeeeeee', 'ffffffff', 'gggggggg') " +
+		"AND NOT EXISTS (SELECT 1 FROM t6 r WHERE r.k = a.k AND r.s LIKE '3%')"
+
+	result := f.FormatSQL(input, "")
+	t.Logf("Convoluted query formatted output:\n%s", result)
+
+	// Rule A: every JOIN starts a new line.
+	for _, line := range strings.Split(result, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.Contains(trimmed, "JOIN") {
+			continue
+		}
+		first := strings.SplitN(trimmed, " ", 2)[0]
+		if first != "JOIN" && !SQLJoinModifiers[first] {
+			t.Errorf("Rule A (convoluted): JOIN must be first keyword on its line, got: %q", line)
+		}
+	}
+
+	// Rule B: AND/OR continuing a WHEN must indent past the WHEN.
+	whenIndent := -1
+	for _, line := range strings.Split(result, "\n") {
+		trimmed := strings.TrimLeft(line, " ")
+		if strings.HasPrefix(trimmed, "WHEN ") {
+			whenIndent = len(line) - len(trimmed)
+			continue
+		}
+		if whenIndent < 0 {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "OR ") || strings.HasPrefix(trimmed, "AND ") {
+			// Only check the WHEN's predicate continuations, not the WHERE's
+			// AND NOT EXISTS — heuristic: if the trimmed prefix is "OR" we're
+			// in WHEN (the WHERE doesn't use OR here). For AND inside WHEN we
+			// don't have a case in this query, so skip.
+			if strings.HasPrefix(trimmed, "OR ") {
+				if got := len(line) - len(trimmed); got <= whenIndent {
+					t.Errorf("Rule B (convoluted): OR continuing WHEN must indent past WHEN col %d, got col %d: %q",
+						whenIndent, got, line)
+				}
+			}
+		}
+	}
+
+	// Rule C: no line should start with a stranded AS alias.
+	for _, line := range strings.Split(result, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "AS ") {
+			t.Errorf("Rule C (convoluted): stranded AS alias on its own line: %q", line)
+		}
+	}
+
+	// Rule D: the IN-list continuation aligns under '(' (if it wrapped).
+	// Find the IN-line, then check the immediately-following line only.
+	lines := strings.Split(result, "\n")
+	for i, line := range lines {
+		idx := strings.Index(line, "IN (")
+		if idx < 0 || i+1 >= len(lines) {
+			continue
+		}
+		hangCol := idx + len("IN (")
+		next := lines[i+1]
+		trimmed := strings.TrimLeft(next, " ")
+		if !strings.HasPrefix(trimmed, "'") {
+			break // IN list didn't wrap onto a continuation
+		}
+		if got := len(next) - len(trimmed); got != hangCol {
+			t.Errorf("Rule D (convoluted): IN-list continuation should hang at col %d, got col %d: %q",
+				hangCol, got, next)
+		}
+		break
+	}
+}
+
+// Rule D: wrapped IN (...) lists hang-indent under the opening '('.
+// Currently the continuation lands at a fixed indent.
+func TestSQLFormatter_RuleD_InListHangIndent(t *testing.T) {
+	opts := DefaultSQLFormattingOptions()
+	f := NewSQLFormatter(opts)
+
+	input := "SELECT a.x FROM t1 a WHERE a.col IN ('aaaaaaaa', 'bbbbbbbb', 'cccccccc', 'dddddddd', 'eeeeeeee', 'ffffffff', 'gggggggg')"
+	result := f.FormatSQL(input, "")
+
+	lines := strings.Split(result, "\n")
+	hangCol := -1
+	for _, line := range lines {
+		if idx := strings.Index(line, "IN ("); idx >= 0 {
+			hangCol = idx + len("IN (")
+			break
+		}
+	}
+	if hangCol < 0 {
+		t.Fatalf("Rule D: could not locate `IN (` in output:\n%s", result)
+	}
+	for _, line := range lines {
+		trimmed := strings.TrimLeft(line, " ")
+		if strings.HasPrefix(trimmed, "'") && !strings.Contains(line, "IN (") {
+			indent := len(line) - len(trimmed)
+			if indent != hangCol {
+				t.Errorf("Rule D: IN-list continuation should hang-indent at col %d (under '('), got col %d: %q\nfull output:\n%s",
+					hangCol, indent, line, result)
+			}
+			return
+		}
+	}
+}

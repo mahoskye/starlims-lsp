@@ -475,6 +475,14 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 		return
 	}
 
+	// Rule F: when the next token is a string that will be reflowed as
+	// multi-line SQL, don't wrap before it. The SQL formatter handles its
+	// own line breaks, and the opening '"' should stay on the previous
+	// line (attached to ':=', a named-arg, etc.).
+	if s.willFormatAsMultilineSQL(token) {
+		return
+	}
+
 	s.builder.WriteString("\n")
 	contIndent := s.indent + 1 // Fixed 1-level continuation indent per schema
 	s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
@@ -562,6 +570,23 @@ func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 	}
 }
 
+// willFormatAsMultilineSQL returns true if writeTokenWithSQLFormatting will
+// format this token as multi-line SQL. Used by applyLineWrap to suppress a
+// pre-string newline so the opening quote stays on the prior line.
+func (s *formatState) willFormatAsMultilineSQL(token lexer.Token) bool {
+	if token.Type != lexer.TokenString || !s.opts.SQL.Enabled {
+		return false
+	}
+	if len(token.Text) < 2 {
+		return false
+	}
+	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+	inner := token.Text[1 : len(token.Text)-1]
+	return IsSQLString(inner)
+}
+
 func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	if token.Type != lexer.TokenString {
 		return false
@@ -592,6 +617,19 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 		return false
 	}
 
+	// Issue #64: don't reformat SQL that's already single-line and would
+	// fit on the current line. Reformatting a short query like
+	// `sX := "SELECT * FROM DUAL";` into a 5-line block breaks the
+	// surrounding SSL syntax and is undesirable when the original already
+	// fits. Only reflow when wrapping is genuinely necessary.
+	if !strings.ContainsRune(innerContent, '\n') {
+		fits := s.opts.MaxLineLength <= 0 ||
+			s.currentLineLen+len(token.Text) <= s.opts.MaxLineLength
+		if fits {
+			return false
+		}
+	}
+
 	baseIndent := strings.Repeat("\t", s.indent)
 	if s.opts.IndentStyle == "space" {
 		baseIndent = strings.Repeat(" ", s.opts.IndentSize*s.indent)
@@ -599,7 +637,16 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 
 	formattedSQL := s.sqlFormatter.FormatSQLInString(innerContent, quoteChar, baseIndent)
 	s.builder.WriteString(formattedSQL)
-	s.currentLineLen += len(formattedSQL)
+	// Rule E: after a multi-line SQL string, currentLineLen must reflect only
+	// the *last* physical line of the output (typically just the closing
+	// quote at baseIndent). Otherwise the next token's wrap logic sees a
+	// huge length and forces a newline between the closing '"' and a
+	// trailing ',' / remaining call args.
+	if idx := strings.LastIndex(formattedSQL, "\n"); idx >= 0 {
+		s.currentLineLen = len(formattedSQL) - idx - 1
+	} else {
+		s.currentLineLen += len(formattedSQL)
+	}
 	return true
 }
 
