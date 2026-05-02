@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-05-02
+
+### Fixed
+- **Issue #55 — `ssl.globals` setting was being ignored.** Settings sent via
+  `initializationOptions` weren't applied until the first
+  `workspace/didChangeConfiguration`, so workspace-level globals never made
+  it to diagnostics. Initialization now applies the option payload directly.
+- **Issue #56 — `:INCLUDE` deep paths flagged as undeclared.** Identifiers in
+  `:INCLUDE File_Helpers.FileWork;` were being typed as `dot_property_access`
+  and run through the undeclared-variable check. Diagnostics now skip dotted
+  segments that appear as the operand of `:INCLUDE`.
+- **Issue #63 — confusing wording on `equals_vs_strict_equals`.** Reworded to
+  lead with what the user is doing right ("`!=` is exact-match negation")
+  before explaining the asymmetry, instead of reading like `!=` is being
+  flagged as wrong.
+- **Issue #64 — inline SQL formatter mangled single-line SQL.**
+  `FormatSQLInString` now leaves short single-line SQL strings alone, and
+  when wrapping IS required it keeps the opening `"` glued to the preceding
+  `:=` / `(` / `,` and the closing `"` on the line that owns the trailing
+  punctuation.
+
+### Fixed (SQL formatter regressions, rules A–F)
+Six pinned regressions in the SQL formatter and surrounding string
+formatting, surfaced by user-reported fixtures:
+- **Rule A** — every `JOIN` starts a new line.
+- **Rule B** — `AND`/`OR` inside a `CASE`-in-`SELECT` indents past `WHEN`.
+- **Rule C** — projections never split from their `AS` alias; long
+  projections move to their own line on overflow instead.
+- **Rule D** — argument-list wraps hang-indent under the opening `(`.
+- **Rule E** — closing `"` stays attached to trailing args.
+- **Rule F** — opening `"` stays on the assignment line.
+
+### Internal
+- Test fixtures pin all six SQL formatter regression rules so future changes
+  surface deviations in CI.
+
+## [0.7.2] - 2026-05-01
+
+### Fixed
+- **Initialized-handler deadlock on Windows.** The `initialized` notification
+  handler synchronously called `client/registerCapability` to register file
+  watchers, but glsp dispatches notifications on the same goroutine that
+  reads incoming messages — so the server blocked waiting for a response on
+  the goroutine that would have to deliver it. Manifested as
+  `fatal error: all goroutines are asleep - deadlock!` and
+  `Cannot call write after a stream was destroyed` on the client. The
+  registration now runs in a background goroutine. The bug had always been
+  theoretically broken; v0.7.0 evidently shifted Windows timing enough to
+  make it deterministic.
+
+## [0.7.1] - 2026-05-01
+
+### Fixed
+- **Panic recovery in diagnostic collection.** Wrapped `collectDiagnostics`
+  in `recover()` so any panic in a diagnostic check surfaces as a single
+  `internal_error` diagnostic plus a stack trace in the LSP output channel
+  — the editor stays usable and bug reports include actionable detail
+  instead of the server process dying.
+- **Static linking for the host (linux-amd64) build.** The host build was
+  linking against the build runner's glibc; cross-compiled targets were
+  already static. All targets in the Makefile now build with
+  `CGO_ENABLED=0`, so users on systems with older glibc no longer hit
+  silent startup failures.
+
+## [0.7.0] - 2026-05-01
+
+### Added
+- **`procedure_declaration_syntax` rule.** New error-level diagnostic that
+  catches two common procedure-declaration typos:
+  - `PROCEDURE Name(...)` (missing leading colon) — previously misfired
+    `direct_procedure_call` on the procedure name. The new rule explains
+    the actual problem: definitions are `:PROCEDURE Name;` (colon prefix,
+    trailing semicolon, no parens; arguments via `:PARAMETERS`).
+  - `:PROCEDURE Name(...)` — parens after a valid keyword. Same fix, same
+    message.
+
+### Changed
+- **`mixed_type_operator` no longer false-fires** on three common patterns
+  the v0.6.0 inferencer mishandled:
+  - **Uppercase-leading identifiers.** `DCUparseCat` (capital `D` is the
+    start of an acronym) was being read as a `d`-prefixed Hungarian date.
+    Type inference now requires a strict-case lowercase prefix before an
+    uppercase rune; the lenient match still drives the `hungarian_notation`
+    enforcer rule.
+  - **Indexed access (`arr[i]`).** Was typed as the array, not the element.
+    Now treated as opaque element type — no warning.
+  - **Member access (`Me:Foo`, `obj:bar`).** Same opaque treatment.
+  Regression-guard: `"abc" + 5` still emits the warning, so the rule isn't
+  silenced for genuine literal mismatches.
+- **`class_member_order` no longer enforces Constructor position.** Real
+  legacy classes routinely place the constructor first; the rule now only
+  enforces `:INHERIT` < `:DECLARE` < methods.
+- **Paren-aware top-level operator scan in `inferExpressionType`.** Operator
+  splits now respect parenthesis depth so expressions like `(a + b) * c`
+  type correctly.
+
+### Removed
+- **`skipped_param_spacing` rule.** Pure stylistic noise about whether
+  `{a, , b}` should be `{a,,b}`. Removed; the slug is gone from
+  recognized-rule lists.
+
 ## [0.6.0] - 2026-04-30
 
 ### Added
