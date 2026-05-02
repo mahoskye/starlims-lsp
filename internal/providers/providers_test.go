@@ -2138,6 +2138,31 @@ x := 1;
 	}
 }
 
+// Issue #56 (deep paths): a :INCLUDE path with three or more components like
+// `:INCLUDE A.B.C.D;` was firing dot_property_access on the trailing dots
+// because the single-token lookback in checkDotPropertyAccess gets stuck on
+// the lexer's Unknown(".B.") chunks. None of the dots inside an :INCLUDE
+// statement should fire dot_property_access.
+func TestGetDiagnostics_DotPropertyAccess_IncludePathSkipped_DeepPath(t *testing.T) {
+	cases := []string{
+		`:INCLUDE File_Helpers.FileWork;`,
+		`:INCLUDE A.B.C;`,
+		`:INCLUDE A.B.C.D;`,
+		`:INCLUDE Foo.Bar.Baz.Qux.Quux;`,
+	}
+	for _, text := range cases {
+		t.Run(text, func(t *testing.T) {
+			opts := DefaultDiagnosticOptions()
+			diagnostics := GetDiagnostics(text, opts)
+			for _, d := range diagnostics {
+				if d.Code == CodeDotPropertyAccess {
+					t.Errorf("dot_property_access should not fire inside :INCLUDE: %s", d.Message)
+				}
+			}
+		})
+	}
+}
+
 // Issue #2: 'Me' should be recognized as a built-in identifier
 func TestGetDiagnostics_UndeclaredVariable_MeRecognized(t *testing.T) {
 	text := `:CLASS MyClass;
