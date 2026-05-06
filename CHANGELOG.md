@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-05-06
+
+### Added
+- **Issue #7 — UDObject shape inference + `clone()` propagation.** The server
+  now scans `<var> := CreateUDObject({{"key", val}, ...})` assignments and
+  infers a property shape for the LHS variable. `<var>:clone()` calls
+  inherit that shape on the new variable. Property completions fire on
+  `oVar:` member access for any variable with a tracked shape. Coarse value
+  types (`string`, `boolean`, `number`, `array`) are surfaced in the
+  completion detail.
+
+### Changed
+- **Issue #8 — completion auto-trigger trimmed to `:` only.** `,`, `.`, and
+  `(` were removed; they fired completions during normal typing
+  (list/decimal/expression entry, function-call argument lists) and
+  Enter-selected the wrong token. `:` is the sole remaining trigger because
+  it is both the SSL keyword prefix (`:DECLARE`) and the member-access
+  operator (`obj:prop`). On a `:` trigger with no context-aware match
+  (Me/Base, built-in class, or shaped variable), the server returns only
+  keyword completions — no procedures, variables, or snippets. The full
+  inventory is reserved for explicit `Ctrl+Space` invocation.
+- **Issue #9 — signature help auto-trigger is now opt-in.** The popup no
+  longer reappears on every keystroke inside a call by default. Set
+  `ssl.intellisense.signatureHelp.autoTrigger: true` to restore the previous
+  behavior. Hover and explicit invocation (`Ctrl+Shift+Space`) work
+  regardless of the setting.
+
+### Fixed
+- **Issue #6 — false positive on `comment_text_after_terminator` across a
+  paragraph break.** The multi-line "broken-out keyword" heuristic now
+  suppresses when there's a blank line or another standalone comment between
+  the suspect comment and the alleged code text. The original positive case
+  (mid-comment stray `;` immediately followed by a bare keyword) still fires.
+
 ## [0.7.3] - 2026-05-02
 
 ### Fixed

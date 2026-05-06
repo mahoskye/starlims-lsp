@@ -16,16 +16,18 @@ The signature help provider displays function parameter information while the us
 
 ### 2.1 Trigger Characters
 
-| Character | Behavior |
-|-----------|----------|
-| `(` | Opens signature help for function before `(` |
-| `,` | Updates active parameter to next position |
+By default, **no trigger characters are advertised** — the popup obscured
+the line being typed and reappeared on every keystroke inside a call.
+Signature help still works on hover and on explicit invocation
+(`Ctrl+Shift+Space`).
 
-### 2.2 Retrigger Characters
+Auto-trigger is opt-in via configuration:
 
-| Character | Behavior |
-|-----------|----------|
-| `,` | Re-evaluates active parameter position |
+| Setting | Effect when `true` |
+|---------|--------------------|
+| `ssl.intellisense.signatureHelp.autoTrigger` | Advertises `(` and `,` as trigger characters and `,` as a retrigger character. |
+
+See issue #9.
 
 ### 2.3 Signature Information
 
@@ -57,7 +59,7 @@ Each parameter includes:
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| (None currently) | - | - | Signature help has no specific configuration |
+| `ssl.intellisense.signatureHelp.autoTrigger` | boolean | `false` | When `true`, advertises `(` and `,` as auto-trigger characters so the popup opens while typing. When `false` (default), signature help is available only on hover and explicit invocation (`Ctrl+Shift+Space`). |
 
 ---
 

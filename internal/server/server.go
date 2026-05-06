@@ -18,9 +18,24 @@ type ClientSettings struct {
 
 // SSLSettings represents SSL-specific settings from the client.
 type SSLSettings struct {
-	Format      *FormatSettings      `json:"format"`
-	Diagnostics *DiagnosticsSettings `json:"diagnostics"`
-	InlayHints  *InlayHintsSettings  `json:"inlayHints"`
+	Format       *FormatSettings       `json:"format"`
+	Diagnostics  *DiagnosticsSettings  `json:"diagnostics"`
+	InlayHints   *InlayHintsSettings   `json:"inlayHints"`
+	IntelliSense *IntelliSenseSettings `json:"intellisense"`
+}
+
+// IntelliSenseSettings groups completion/signature-help client settings.
+type IntelliSenseSettings struct {
+	SignatureHelp *SignatureHelpSettings `json:"signatureHelp"`
+}
+
+// SignatureHelpSettings configures signature help behavior.
+type SignatureHelpSettings struct {
+	// AutoTrigger controls whether the server advertises trigger characters
+	// for signature help. When false (default), signature help still works
+	// on explicit invocation (Ctrl+Shift+Space) and hover, but does not
+	// auto-pop while typing. See issue #9.
+	AutoTrigger *bool `json:"autoTrigger"`
 }
 
 // DiagnosticsSettings represents diagnostics settings from the client.
@@ -105,19 +120,21 @@ type SSLServer struct {
 
 // Settings contains server settings.
 type Settings struct {
-	MaxNumberOfProblems int
-	Diagnostics         providers.DiagnosticOptions
-	Formatting          providers.FormattingOptions
-	InlayHints          providers.InlayHintOptions
+	MaxNumberOfProblems      int
+	Diagnostics              providers.DiagnosticOptions
+	Formatting               providers.FormattingOptions
+	InlayHints               providers.InlayHintOptions
+	SignatureHelpAutoTrigger bool
 }
 
 // DefaultSettings returns default settings.
 func DefaultSettings() Settings {
 	return Settings{
-		MaxNumberOfProblems: 100,
-		Diagnostics:         providers.DefaultDiagnosticOptions(),
-		Formatting:          providers.DefaultFormattingOptions(),
-		InlayHints:          providers.DefaultInlayHintOptions(),
+		MaxNumberOfProblems:      100,
+		Diagnostics:              providers.DefaultDiagnosticOptions(),
+		Formatting:               providers.DefaultFormattingOptions(),
+		InlayHints:               providers.DefaultInlayHintOptions(),
+		SignatureHelpAutoTrigger: false,
 	}
 }
 
@@ -189,17 +206,33 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 
 	capabilities.TextDocumentSync = protocol.TextDocumentSyncKindIncremental
 	capabilities.CompletionProvider = &protocol.CompletionOptions{
-		TriggerCharacters: []string{":", ".", "(", ","},
+		// Only ':' is advertised. '.' and ',' fire too aggressively during
+		// list/decimal/expression entry. '(' was removed because the popup
+		// it produced after typing an open-paren competed with signature
+		// help and the full inventory it dumped was noisy. ':' is kept
+		// because it is the SSL keyword prefix (`:DECLARE`) and the
+		// member-access operator (`obj:prop`) — both are high-signal
+		// completion moments. When ':' fires and no context-aware match is
+		// found (see contextAwareCompletions), the handler returns only
+		// keyword completions. The full inventory is reserved for explicit
+		// Ctrl+Space invocation. See issue #8.
+		TriggerCharacters: []string{":"},
 	}
 	capabilities.HoverProvider = true
 	capabilities.DefinitionProvider = true
 	capabilities.ReferencesProvider = true
 	capabilities.DocumentSymbolProvider = true
 	capabilities.FoldingRangeProvider = true
-	capabilities.SignatureHelpProvider = &protocol.SignatureHelpOptions{
-		TriggerCharacters:   []string{"(", ","},
-		RetriggerCharacters: []string{","},
+	// Signature help is always supported via explicit invocation
+	// (Ctrl+Shift+Space). Auto-trigger characters are only advertised when
+	// the user opts in via ssl.intellisense.signatureHelp.autoTrigger,
+	// because the popup obscures the line being typed otherwise. See #9.
+	sigHelpOpts := &protocol.SignatureHelpOptions{}
+	if s.settings.SignatureHelpAutoTrigger {
+		sigHelpOpts.TriggerCharacters = []string{"(", ","}
+		sigHelpOpts.RetriggerCharacters = []string{","}
 	}
+	capabilities.SignatureHelpProvider = sigHelpOpts
 	capabilities.DocumentFormattingProvider = true
 	capabilities.DocumentRangeFormattingProvider = true
 	capabilities.WorkspaceSymbolProvider = true
@@ -430,6 +463,11 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		inlayHints := clientSettings.SSL.InlayHints
 		applyOptional(&s.settings.InlayHints.Enabled, inlayHints.Enabled)
 		applyOptional(&s.settings.InlayHints.MinParameterCount, inlayHints.MinParameterCount)
+	}
+
+	// Apply intellisense settings
+	if clientSettings.SSL.IntelliSense != nil && clientSettings.SSL.IntelliSense.SignatureHelp != nil {
+		applyOptional(&s.settings.SignatureHelpAutoTrigger, clientSettings.SSL.IntelliSense.SignatureHelp.AutoTrigger)
 	}
 }
 
