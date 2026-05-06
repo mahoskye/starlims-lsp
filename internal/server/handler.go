@@ -35,6 +35,15 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 		return toProtocolCompletionItems(focused), nil
 	}
 
+	// Auto-triggered ':' with no context-aware match: show only keyword
+	// completions (':' is the SSL keyword prefix). The full inventory is
+	// reserved for explicit Ctrl+Space invocation — auto-popping it on
+	// every member-access ':' produced a noisy popup that fought typing
+	// flow. See issue #8.
+	if params.Context != nil && params.Context.TriggerKind == protocol.CompletionTriggerKindTriggerCharacter {
+		return toProtocolCompletionItems(providers.GetKeywordCompletions()), nil
+	}
+
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
 	dsFile := isDataSourceURI(uri)
 	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile)
@@ -92,6 +101,12 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 				}
 			case constants.IsSSLClass(tok.Text):
 				return providers.GetClassMemberCompletions(tok.Text)
+			default:
+				// Issue #7: variable bound to an inferred UDObject shape.
+				shapes := providers.BuildUDObjectShapes(cache.Tokens)
+				if items := providers.GetUDObjectShapeCompletions(tok.Text, shapes); items != nil {
+					return items
+				}
 			}
 		}
 	}

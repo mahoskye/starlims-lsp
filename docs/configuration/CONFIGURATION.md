@@ -2,8 +2,8 @@
 
 This document specifies all configuration options available in the starlims-lsp language server. It serves as the authoritative reference for client configuration.
 
-**Version:** 1.2  
-**Last Updated:** 2026-03-21  
+**Version:** 1.3  
+**Last Updated:** 2026-05-06  
 **Status:** Current
 
 ---
@@ -16,9 +16,10 @@ This document specifies all configuration options available in the starlims-lsp 
 4. [SQL Formatting Options](#4-sql-formatting-options)
 5. [Diagnostic Options](#5-diagnostic-options)
 6. [Inlay Hint Options](#6-inlay-hint-options)
-7. [Internal Options](#7-internal-options)
-8. [Configuration Examples](#8-configuration-examples)
-9. [VS Code Integration](#9-vs-code-integration)
+7. [IntelliSense Settings](#7-intellisense-settings)
+8. [Internal Options](#8-internal-options)
+9. [Configuration Examples](#9-configuration-examples)
+10. [VS Code Integration](#10-vs-code-integration)
 
 ---
 
@@ -37,7 +38,8 @@ All SSL Language Server options are nested under the `ssl` namespace:
   "ssl": {
     "format": { ... },
     "diagnostics": { ... },
-    "inlayHints": { ... }
+    "inlayHints": { ... },
+    "intellisense": { ... }
   }
 }
 ```
@@ -59,7 +61,20 @@ interface SSLConfiguration {
     format: FormattingOptions;
     diagnostics: DiagnosticOptions;
     inlayHints: InlayHintOptions;
+    intellisense: IntelliSenseOptions;
   }
+}
+
+interface IntelliSenseOptions {
+  signatureHelp: {
+    /**
+     * When true, the server advertises '(' and ',' as signature-help
+     * trigger characters so the popup opens while typing. When false
+     * (default), signature help is available only on hover and explicit
+     * invocation (Ctrl+Shift+Space). See issue #9.
+     */
+    autoTrigger: boolean;
+  };
 }
 
 interface FormattingOptions {
@@ -534,11 +549,45 @@ call site.
 
 ---
 
-## 7. Internal Options
+## 7. IntelliSense Settings
+
+### 7.1 ssl.intellisense.signatureHelp.autoTrigger
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go` (capabilities branch on initialize) |
+
+When `true`, the server advertises `(` and `,` as signature-help trigger
+characters and `,` as a retrigger character — the popup opens
+automatically while typing inside a function call. When `false` (default),
+no trigger characters are advertised; signature help is still available on
+hover and on explicit invocation (`Ctrl+Shift+Space`).
+
+The default was changed from `true` to `false` because the auto-popup
+obscured the line being typed and reappeared on every keystroke after
+being dismissed. See issue #9.
+
+```json
+{
+  "ssl": {
+    "intellisense": {
+      "signatureHelp": {
+        "autoTrigger": false
+      }
+    }
+  }
+}
+```
+
+---
+
+## 8. Internal Options
 
 These options are hardcoded and cannot be changed via client configuration.
 
-### 7.1 CheckUnclosedBlocks
+### 8.1 CheckUnclosedBlocks
 
 | Property | Value |
 |----------|-------|
@@ -548,7 +597,7 @@ These options are hardcoded and cannot be changed via client configuration.
 
 Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 
-### 7.2 CheckUnmatchedParens
+### 8.2 CheckUnmatchedParens
 
 | Property | Value |
 |----------|-------|
@@ -558,7 +607,7 @@ Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 
 Always checks for unmatched parentheses, brackets, and braces.
 
-### 7.3 CheckUndeclaredVars
+### 8.3 CheckUndeclaredVars
 
 | Property | Value |
 |----------|-------|
@@ -569,7 +618,7 @@ Always checks for unmatched parentheses, brackets, and braces.
 
 Checks for usage of undeclared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 7.4 CheckUnusedVars
+### 8.4 CheckUnusedVars
 
 | Property | Value |
 |----------|-------|
@@ -580,7 +629,7 @@ Checks for usage of undeclared variables when enabled directly through `provider
 
 Checks for declared but unused variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 7.5 CheckSQLParams
+### 8.5 CheckSQLParams
 
 | Property | Value |
 |----------|-------|
@@ -591,7 +640,7 @@ Checks for declared but unused variables when enabled directly through `provider
 
 Checks named SQL placeholders against declared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
 
-### 7.6 MaxNumberOfProblems
+### 8.6 MaxNumberOfProblems
 
 | Property | Value |
 |----------|-------|
@@ -603,9 +652,9 @@ Maximum number of diagnostics to report per document.
 
 ---
 
-## 8. Configuration Examples
+## 9. Configuration Examples
 
-### 8.1 Minimal Configuration
+### 9.1 Minimal Configuration
 
 ```json
 {
@@ -615,7 +664,7 @@ Maximum number of diagnostics to report per document.
 
 Uses all defaults.
 
-### 8.2 STARLIMS Style Guide Configuration
+### 9.2 STARLIMS Style Guide Configuration
 
 ```json
 {
@@ -645,7 +694,7 @@ Uses all defaults.
 }
 ```
 
-### 8.3 Production Environment Configuration
+### 9.3 Production Environment Configuration
 
 ```json
 {
@@ -682,7 +731,7 @@ Uses all defaults.
 }
 ```
 
-### 8.4 Compact SQL Configuration
+### 9.4 Compact SQL Configuration
 
 ```json
 {
@@ -698,7 +747,7 @@ Uses all defaults.
 }
 ```
 
-### 8.5 Disable SQL Formatting
+### 9.5 Disable SQL Formatting
 
 ```json
 {
@@ -714,14 +763,14 @@ Uses all defaults.
 
 ---
 
-## 9. VS Code Integration
+## 10. VS Code Integration
 
-### 9.1 settings.json Location
+### 10.1 settings.json Location
 
 - **User:** `~/.config/Code/User/settings.json` (Linux/Mac) or `%APPDATA%\Code\User\settings.json` (Windows)
 - **Workspace:** `.vscode/settings.json`
 
-### 9.2 VS Code Settings Example
+### 10.2 VS Code Settings Example
 
 ```json
 {
@@ -744,7 +793,7 @@ Uses all defaults.
 }
 ```
 
-### 9.3 Configuration via Extension
+### 10.3 Configuration via Extension
 
 The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuration changes to the LSP. Settings changed in VS Code are immediately applied.
 
@@ -770,6 +819,9 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.diagnostics.hungarianNotation` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
+| `ssl.inlayHints.enabled` | `true` |
+| `ssl.inlayHints.minParameterCount` | `2` |
+| `ssl.intellisense.signatureHelp.autoTrigger` | `false` |
 
 ## Appendix B: Option Types
 

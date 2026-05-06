@@ -560,6 +560,14 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		if !strings.Contains(token.Text, "\n") {
 			continue
 		}
+		// Issue #6: suppress when there's a paragraph break (blank line or
+		// another standalone comment) between the comment-end and the alleged
+		// "broken-out" token. That gap indicates the user deliberately ended
+		// the comment — the heuristic is firing on a benign comment-after-
+		// comment chain rather than an actual mid-comment terminator.
+		if commentChainBreaksBeforeNext(tokens, i, nextIdx) {
+			continue
+		}
 		if nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
@@ -572,6 +580,26 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// commentChainBreaksBeforeNext reports whether the run of tokens between
+// commentIdx (a comment that terminates with ;) and nextIdx (the next
+// significant code token) contains a paragraph break — either a blank line
+// (whitespace token spanning more than one newline) or another standalone
+// comment on its own line. Such breaks indicate the original comment ended
+// deliberately and what follows is unrelated; the multi-line "broken-out
+// keyword" heuristic should not fire across them. See issue #6.
+func commentChainBreaksBeforeNext(tokens []lexer.Token, commentIdx, nextIdx int) bool {
+	for j := commentIdx + 1; j < nextIdx && j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenWhitespace && strings.Count(t.Text, "\n") >= 2 {
+			return true
+		}
+		if t.Type == lexer.TokenComment {
+			return true
+		}
+	}
+	return false
 }
 
 // checkAssignmentInCondition detects := assignment operator used in IF/WHILE/CASE conditions.

@@ -613,3 +613,25 @@ func TestIsDataSourceURI(t *testing.T) {
 		}
 	}
 }
+
+// Issue #9: signature-help auto-trigger is opt-in via
+// ssl.intellisense.signatureHelp.autoTrigger. Default is off.
+func TestSignatureHelpAutoTriggerSetting(t *testing.T) {
+	s := NewSSLServer()
+	if s.settings.SignatureHelpAutoTrigger {
+		t.Fatal("expected default SignatureHelpAutoTrigger=false")
+	}
+
+	s.applySettings(map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"intellisense": map[string]interface{}{
+				"signatureHelp": map[string]interface{}{
+					"autoTrigger": true,
+				},
+			},
+		},
+	})
+	if !s.settings.SignatureHelpAutoTrigger {
+		t.Error("expected SignatureHelpAutoTrigger=true after opt-in")
+	}
+}

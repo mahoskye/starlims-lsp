@@ -16,14 +16,21 @@ The completion provider offers SSL symbol and snippet suggestions as the user ty
 
 ### 2.1 Trigger Characters
 
-Completion is triggered automatically on these characters:
+Completion is triggered automatically only on `:` — both the SSL keyword
+prefix (`:DECLARE`, `:IF`) and the member-access operator (`obj:prop`).
+`.`, `,`, and `(` are intentionally **not** advertised as triggers because
+they fire too aggressively during list/decimal/expression entry; the popup
+they produced often Enter-selected the wrong token (e.g. `.AND.` while
+typing a list literal). Use `Ctrl+Space` to invoke completion explicitly
+in those contexts.
 
 | Character | Context |
 |-----------|---------|
-| `:` | Triggers keyword completions (`:IF`, `:WHILE`, etc.) |
-| `.` | Triggers literal (`.T.`, `.F.`) and operator (`.AND.`) completions |
-| `(` | Retriggers completion while editing a call expression |
-| `,` | Retriggers completion while editing an argument list |
+| `:` | After `Me`/`Base`/built-in class/shaped variable: focused member list. Otherwise: keyword completions only. |
+
+When `:` fires with no context-aware match, the server returns **only**
+keyword completions — not procedures, variables, or snippets. The full
+inventory is reserved for explicit `Ctrl+Space` invocation. See issue #8.
 
 ### 2.2 Completion Types
 
@@ -46,8 +53,36 @@ The server currently applies only lightweight filtering:
 | Context | Behavior |
 |---------|----------|
 | Inside strings/comments | No completions returned |
-| Inside `:CLASS` methods | Adds class-context forms and inserts procedure completions as `Me:MethodName(...)` |
-| Other code contexts | Returns built-in plus document-local completions without class-only forms |
+| `:` auto-trigger, no context match | Keyword completions only |
+| `Me:` / `Base:` (in `:CLASS` file) | Methods/properties of the enclosing class |
+| `<BuiltInClass>:` | Methods/properties of that class |
+| `<shapedVar>:` | Inferred UDObject properties (see [UDObject Shape Inference](#26-udobject-shape-inference)) |
+| Inside `:CLASS` methods (explicit invocation) | Adds class-context forms; inserts procedure completions as `Me:MethodName(...)` |
+| Explicit invocation (Ctrl+Space) | Built-in plus document-local completions and snippets |
+
+### 2.6 UDObject Shape Inference
+
+When a variable is initialized with `CreateUDObject({{"key", val}, ...})`,
+the server infers a property shape from the dict literal and binds it to
+the LHS variable. Subsequent `clone()` calls inherit the same shape:
+
+```ssl
+oTemplate := CreateUDObject({
+    {"tableName", ""},
+    {"exists", .F.}
+});
+
+oMetadata := oTemplate:clone();
+oMetadata:tableName    /* completion lists tableName, exists */
+```
+
+Coarse value types (`string`, `boolean`, `number`, `array`) are extracted
+from the initializer values and surfaced in the completion `detail`. The
+analysis is file-global with last-write-wins semantics — there is no
+per-procedure scoping yet. Variables assigned from procedure-call returns,
+parameters, or anywhere outside a recognized `CreateUDObject`/`clone()`
+chain do not get a shape; member access on them shows no focused list. See
+issue #7.
 
 ### 2.4 Completion Item Details
 
