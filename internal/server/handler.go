@@ -41,7 +41,17 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	// every member-access ':' produced a noisy popup that fought typing
 	// flow. See issue #8.
 	if params.Context != nil && params.Context.TriggerKind == protocol.CompletionTriggerKindTriggerCharacter {
-		return toProtocolCompletionItems(providers.GetKeywordCompletions()), nil
+		// Issues #11 / #12: only surface keywords when ':' begins a new
+		// token (preceded by whitespace or SOL), and replace the typed ':'
+		// via a TextEdit so selecting a keyword yields ':IF', not '::IF'.
+		content, ok := s.documents.GetDocument(uri)
+		if !ok {
+			return []protocol.CompletionItem{}, nil
+		}
+		if !colonStartsToken(content, params.Position) {
+			return []protocol.CompletionItem{}, nil
+		}
+		return keywordCompletionsForColonTrigger(params.Position), nil
 	}
 
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
@@ -405,6 +415,71 @@ func containsSubstring(value, query string) bool {
 	queryLower := strings.ToLower(query)
 
 	return strings.Contains(valueLower, queryLower)
+}
+
+// colonStartsToken reports whether the ':' just typed at `position` begins a
+// new token — i.e. the character immediately before it is whitespace, or the
+// ':' is at the start of a line.
+//
+// `position` points to the cursor location AFTER the ':' was inserted, so the
+// ':' itself sits at character-1 and the preceding char (if any) is at
+// character-2. character is in UTF-16 code units per LSP, but SSL source is
+// ASCII in practice so byte indexing is safe.
+func colonStartsToken(content string, position protocol.Position) bool {
+	if position.Character < 2 {
+		return true
+	}
+	line := int(position.Line)
+	idx := 0
+	current := 0
+	for idx < len(content) && current < line {
+		if content[idx] == '\n' {
+			current++
+		}
+		idx++
+	}
+	// idx now points at the start of the target line (or end of content).
+	target := int(position.Character) - 2
+	for j := 0; j < target; j++ {
+		if idx+j >= len(content) || content[idx+j] == '\n' {
+			return true
+		}
+	}
+	if idx+target >= len(content) {
+		return true
+	}
+	c := content[idx+target]
+	return c == ' ' || c == '\t' || c == '\r'
+}
+
+// keywordCompletionsForColonTrigger builds keyword completion items for a
+// ':' trigger. Each item carries a TextEdit that replaces the typed ':' with
+// ':KEYWORD' so the editor cannot end up with '::KEYWORD'. See issue #12.
+func keywordCompletionsForColonTrigger(position protocol.Position) []protocol.CompletionItem {
+	// The typed ':' lives at the column before the cursor.
+	colonRange := protocol.Range{
+		Start: protocol.Position{Line: position.Line, Character: position.Character - 1},
+		End:   protocol.Position{Line: position.Line, Character: position.Character},
+	}
+	items := providers.GetKeywordCompletions()
+	result := make([]protocol.CompletionItem, 0, len(items))
+	plain := protocol.InsertTextFormatPlainText
+	for _, c := range items {
+		detail := c.Detail
+		doc := protocol.MarkupContent{Kind: protocol.MarkupKindMarkdown, Value: c.Documentation}
+		newText := c.InsertText
+		edit := protocol.TextEdit{Range: colonRange, NewText: newText}
+		var editAny any = edit
+		result = append(result, protocol.CompletionItem{
+			Label:            c.Label,
+			Kind:             ptrTo(protocol.CompletionItemKind(c.Kind)),
+			Detail:           &detail,
+			Documentation:    &doc,
+			InsertTextFormat: &plain,
+			TextEdit:         editAny,
+		})
+	}
+	return result
 }
 
 func toProtocolCompletionItems(items []providers.CompletionItem) []protocol.CompletionItem {
