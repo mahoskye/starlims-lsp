@@ -456,3 +456,102 @@ func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
 		t.Error("expected at least one method-kind completion for Me:")
 	}
 }
+
+// Issue #11: ':' trigger should NOT surface keyword completions when the
+// preceding character is non-whitespace (e.g. unknown identifier `foo:`).
+func TestHandleCompletion_ColonTriggerSuppressedAfterIdentifier(t *testing.T) {
+	s := newTestServerWithDocument(`foo:`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 4},
+		},
+		Context: &protocol.CompletionContext{
+			TriggerKind:      protocol.CompletionTriggerKindTriggerCharacter,
+			TriggerCharacter: ptrTo(":"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) != 0 {
+		t.Errorf("expected zero completions for unknown 'foo:' trigger, got %d", len(items))
+	}
+}
+
+// Issue #11: ':' trigger SHOULD surface keyword completions when ':' begins
+// a new token (preceded by whitespace or SOL).
+func TestHandleCompletion_ColonTriggerOffersKeywordsAtStartOfLine(t *testing.T) {
+	s := newTestServerWithDocument(`:`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 1},
+		},
+		Context: &protocol.CompletionContext{
+			TriggerKind:      protocol.CompletionTriggerKindTriggerCharacter,
+			TriggerCharacter: ptrTo(":"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) == 0 {
+		t.Fatal("expected keyword completions when ':' starts a line")
+	}
+	if !containsCompletionLabel(items, ":IF") {
+		t.Error("expected :IF among keyword completions")
+	}
+}
+
+// Issue #12: keyword completions returned for a ':' trigger must carry a
+// TextEdit that replaces the typed ':' with ':KEYWORD' so the editor cannot
+// produce '::KEYWORD'.
+func TestHandleCompletion_ColonTriggerKeywordsHaveReplacingTextEdit(t *testing.T) {
+	s := newTestServerWithDocument(`    :`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 5},
+		},
+		Context: &protocol.CompletionContext{
+			TriggerKind:      protocol.CompletionTriggerKindTriggerCharacter,
+			TriggerCharacter: ptrTo(":"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	item := findCompletionItem(items, ":IF")
+	if item == nil {
+		t.Fatal("expected :IF in keyword completions")
+	}
+	edit, ok := item.TextEdit.(protocol.TextEdit)
+	if !ok {
+		t.Fatalf("expected TextEdit on :IF, got %T", item.TextEdit)
+	}
+	if edit.Range.Start.Line != 0 || edit.Range.Start.Character != 4 {
+		t.Errorf("expected TextEdit start at (0,4), got (%d,%d)", edit.Range.Start.Line, edit.Range.Start.Character)
+	}
+	if edit.Range.End.Line != 0 || edit.Range.End.Character != 5 {
+		t.Errorf("expected TextEdit end at (0,5), got (%d,%d)", edit.Range.End.Line, edit.Range.End.Character)
+	}
+	if edit.NewText != ":IF" {
+		t.Errorf("expected TextEdit NewText ':IF', got %q", edit.NewText)
+	}
+}

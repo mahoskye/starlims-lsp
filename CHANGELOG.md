@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-05-08
+
+### Fixed
+- **Issue #11 — `:` trigger should only suggest keywords when ':' begins a
+  new token.** Previously, completing after an unknown identifier (e.g.
+  `foo:`) fell through to the keyword inventory, producing a noisy popup
+  in member-access positions. The trigger-character branch in
+  `handleCompletion` now checks the character immediately before the typed
+  `:` and returns an empty list unless it is whitespace or start-of-line.
+- **Issue #12 — `:` trigger no longer produces `::KEYWORD` on accept.**
+  Keyword completions returned for a `:` trigger now carry an explicit
+  `TextEdit` whose range covers the typed `:`, so accepting `:IF` always
+  yields exactly `:IF` regardless of editor word-boundary heuristics.
+
 ## [0.7.4] - 2026-05-06
 
 ### Added
