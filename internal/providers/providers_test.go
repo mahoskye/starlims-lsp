@@ -930,7 +930,7 @@ func TestGetAllCompletions(t *testing.T) {
 		{Name: "myVar", Line: 2, Column: 10, Scope: parser.ScopeLocal},
 	}
 
-	completions := GetAllCompletions(procedures, variables, false, false)
+	completions := GetAllCompletions(procedures, variables, false, false, false)
 
 	if len(completions) == 0 {
 		t.Fatal("expected some completions")
@@ -970,7 +970,7 @@ func TestGetAllCompletions(t *testing.T) {
 }
 
 func TestGetAllCompletions_ClassMethodContextIncludesClassForms(t *testing.T) {
-	completions := GetAllCompletions(nil, nil, true, false)
+	completions := GetAllCompletions(nil, nil, true, false, false)
 
 	foundMe := false
 	foundBase := false
@@ -6812,7 +6812,7 @@ func TestGetSnippetCompletions_DataSource(t *testing.T) {
 }
 
 func TestGetAllCompletions_DataSourceIncludesBuilderDirectives(t *testing.T) {
-	completions := GetAllCompletions(nil, nil, false, true)
+	completions := GetAllCompletions(nil, nil, false, true, false)
 
 	foundDSN := false
 	foundTableName := false
@@ -6834,11 +6834,36 @@ func TestGetAllCompletions_DataSourceIncludesBuilderDirectives(t *testing.T) {
 }
 
 func TestGetAllCompletions_NonDataSourceExcludesBuilderDirectives(t *testing.T) {
-	completions := GetAllCompletions(nil, nil, false, false)
+	completions := GetAllCompletions(nil, nil, false, false, false)
 
 	for _, c := range completions {
 		if c.Label == ":DSN" || c.Label == ":TABLENAME" || c.Label == ":NULLASBLANK" || c.Label == ":INVARIANTDATECOLUMNS" {
 			t.Errorf("regular script should not offer builder directive completion %q", c.Label)
+		}
+	}
+}
+
+func TestGetAllCompletions_EndpointFileOffersAmbients(t *testing.T) {
+	completions := GetAllCompletions(nil, nil, false, false, true)
+	gotRequest, gotResponse := false, false
+	for _, c := range completions {
+		if c.Label == "Request" {
+			gotRequest = true
+		}
+		if c.Label == "Response" {
+			gotResponse = true
+		}
+	}
+	if !gotRequest || !gotResponse {
+		t.Errorf("endpoint file should offer Request and Response completions (got Request=%v Response=%v)", gotRequest, gotResponse)
+	}
+}
+
+func TestGetAllCompletions_NonEndpointFileExcludesAmbients(t *testing.T) {
+	completions := GetAllCompletions(nil, nil, false, false, false)
+	for _, c := range completions {
+		if c.Label == "Request" || c.Label == "Response" {
+			t.Errorf("non-endpoint file should not offer ambient completion %q", c.Label)
 		}
 	}
 }
@@ -7412,5 +7437,163 @@ func TestGetDiagnostics_PanicRecovery(t *testing.T) {
 	}()
 	if len(got) != 1 || got[0].Code != "internal_error" {
 		t.Fatalf("recovery contract: expected one internal_error diagnostic, got %+v", got)
+	}
+}
+
+func hasDiagnosticCode(diags []Diagnostic, code string) bool {
+	for _, d := range diags {
+		if d.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func TestUnqualifiedFieldAssignment_BareAssignmentFlagged(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sValue;
+	sName := sValue;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if !hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("expected unqualified_field_assignment, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_QualifiedSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sValue;
+	Me:sName := sValue;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("did not expect unqualified_field_assignment, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_LocalShadowSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:DECLARE sName;
+	sName := "local";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("local-shadow should suppress, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_ParameterShadowSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sName;
+	sName := "param";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("parameter-shadow should suppress, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_NonClassFileNoOp(t *testing.T) {
+	text := `:PROCEDURE Run;
+:DECLARE sName;
+	sName := "ok";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("non-class file should not trigger the rule, got %+v", diags)
+	}
+}
+
+func TestEndpointAmbients_RequestAndResponseAcceptedInEndpoint(t *testing.T) {
+	text := `:DECLARE sUrl;
+	sUrl := Request:Url;
+	Response:Body := "ok";`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	opts.IsEndpointFile = true
+
+	diags := GetDiagnostics(text, opts)
+	for _, d := range diags {
+		if d.Code == CodeUndeclaredVariable {
+			if strings.EqualFold(extractVarName(d.Message), "Request") ||
+				strings.EqualFold(extractVarName(d.Message), "Response") {
+				t.Fatalf("Request/Response should be ambient in endpoint files, got %+v", d)
+			}
+		}
+	}
+}
+
+func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
+	text := `:DECLARE sUrl;
+	sUrl := Request:Url;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	opts.IsEndpointFile = false
+
+	diags := GetDiagnostics(text, opts)
+	found := false
+	for _, d := range diags {
+		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "Request") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected Request to be flagged as undeclared in non-endpoint file, got %+v", diags)
+	}
+}
+
+func TestEndpointAmbientHover_RequestAndResponse(t *testing.T) {
+	if h := GetEndpointAmbientHover("Request"); h == nil || !strings.Contains(h.Contents, "endpoint ambient") {
+		t.Fatalf("expected Request ambient hover, got %+v", h)
+	}
+	if h := GetEndpointAmbientHover("Response"); h == nil || !strings.Contains(h.Contents, "endpoint ambient") {
+		t.Fatalf("expected Response ambient hover, got %+v", h)
+	}
+	if h := GetEndpointAmbientHover("Other"); h != nil {
+		t.Fatalf("expected no hover for non-ambient, got %+v", h)
+	}
+}
+
+// extractVarName pulls the quoted identifier out of an undeclared-variable
+// diagnostic message ("Variable 'X' is not declared").
+func extractVarName(msg string) string {
+	const prefix = "Variable '"
+	i := strings.Index(msg, prefix)
+	if i < 0 {
+		return ""
+	}
+	rest := msg[i+len(prefix):]
+	j := strings.Index(rest, "'")
+	if j < 0 {
+		return ""
+	}
+	return rest[:j]
+}
+
+func TestUnqualifiedFieldAssignment_CompoundOperatorFlagged(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE nCount;
+:PROCEDURE Bump;
+	nCount += 1;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if !hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("compound assignment should be flagged, got %+v", diags)
 	}
 }

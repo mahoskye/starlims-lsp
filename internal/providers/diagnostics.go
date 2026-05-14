@@ -63,6 +63,10 @@ type DiagnosticOptions struct {
 	GlobalVariables        []string
 	MaxBlockDepth          int
 	IsDataSourceFile       bool
+	// IsEndpointFile marks the file as an SSL endpoint script. When true,
+	// `Request` and `Response` are treated as pre-injected runtime
+	// ambients (not declared, not flagged as undeclared, not assignable).
+	IsEndpointFile bool
 
 	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
 	// Recognized values: "off" (drop the diagnostic), "info", "warn",
@@ -208,7 +212,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
-		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables)...)
+		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables, opts.IsEndpointFile)...)
 	}
 
 	// Check for unused variable declarations (opt-in)
@@ -1452,6 +1456,8 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 		}
 	}
 
+	diagnostics = append(diagnostics, checkUnqualifiedFieldAssignment(tokens, classStartLine, classMethodRanges)...)
+
 	for _, proc := range classMethodRanges {
 		if !strings.EqualFold(proc.Name, "Constructor") {
 			continue
@@ -1492,6 +1498,139 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 					Code:     CodeConstructorReturnValue,
 				})
 			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkUnqualifiedFieldAssignment flags bare assignments inside class methods
+// where the target name matches a :DECLAREd class field but is not shadowed
+// by a method-local declaration or :PARAMETERS entry. In SSL, a bare
+// identifier on the LHS of an assignment creates a local — it does NOT
+// write to the class field — so the field stays unchanged and the user
+// has a silent footgun. The fix is `Me:fieldName := ...`.
+func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, classMethodRanges []parser.ProcedureInfo) []Diagnostic {
+	var diagnostics []Diagnostic
+	if classStartLine <= 0 || len(classMethodRanges) == 0 {
+		return diagnostics
+	}
+
+	// First method's start line bounds the class-body field region.
+	firstMethodStart := classMethodRanges[0].StartLine
+	for _, m := range classMethodRanges {
+		if m.StartLine < firstMethodStart {
+			firstMethodStart = m.StartLine
+		}
+	}
+
+	// Collect class fields: identifiers appearing on :DECLARE lines
+	// between the :CLASS line and the first method's start.
+	fields := make(map[string]bool)
+	for i, tok := range tokens {
+		if tok.Type != lexer.TokenKeyword {
+			continue
+		}
+		if tok.Line <= classStartLine || tok.Line >= firstMethodStart {
+			continue
+		}
+		if strings.ToUpper(strings.TrimPrefix(tok.Text, ":")) != "DECLARE" {
+			continue
+		}
+		// Collect identifiers on the same logical declaration (until ';').
+		for j := i + 1; j < len(tokens); j++ {
+			t := tokens[j]
+			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+			if t.Type == lexer.TokenIdentifier {
+				fields[strings.ToUpper(t.Text)] = true
+			}
+		}
+	}
+	if len(fields) == 0 {
+		return diagnostics
+	}
+
+	builtins := buildBuiltinSet()
+
+	for _, proc := range classMethodRanges {
+		// Collect method-local names (:DECLARE / :PARAMETERS inside the method).
+		locals := make(map[string]bool)
+		for i, tok := range tokens {
+			if tok.Line < proc.StartLine || tok.Line > proc.EndLine {
+				continue
+			}
+			if tok.Type != lexer.TokenKeyword {
+				continue
+			}
+			norm := strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))
+			if norm != "DECLARE" && norm != "PARAMETERS" {
+				continue
+			}
+			for j := i + 1; j < len(tokens); j++ {
+				t := tokens[j]
+				if t.Line > proc.EndLine {
+					break
+				}
+				if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+					break
+				}
+				if t.Type == lexer.TokenIdentifier {
+					locals[strings.ToUpper(t.Text)] = true
+				}
+			}
+		}
+
+		// Walk tokens in the method body looking for bare-identifier assignments.
+		for i, tok := range tokens {
+			if tok.Line < proc.StartLine || tok.Line > proc.EndLine {
+				continue
+			}
+			if tok.Type != lexer.TokenIdentifier {
+				continue
+			}
+
+			upper := strings.ToUpper(tok.Text)
+			if !fields[upper] {
+				continue
+			}
+			if locals[upper] || builtins[upper] {
+				continue
+			}
+
+			// Skip if part of a declaration / parameters / etc.
+			if isDeclarationIdentifier(tokens, i) {
+				continue
+			}
+
+			// Skip qualified access: preceded by ':' (Me:foo / Base:foo / obj:foo).
+			prevIdx := previousSignificantTokenIndex(tokens, i-1)
+			if prevIdx >= 0 {
+				p := tokens[prevIdx]
+				if p.Type == lexer.TokenPunctuation && p.Text == ":" {
+					continue
+				}
+			}
+
+			// Must be immediately followed by an assignment operator.
+			nextIdx := nextSignificantTokenIndex(tokens, i+1)
+			if nextIdx < 0 || tokens[nextIdx].Type != lexer.TokenOperator {
+				continue
+			}
+			switch tokens[nextIdx].Text {
+			case ":=", "+=", "-=", "*=", "/=", "^=", "%=":
+			default:
+				continue
+			}
+
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(tok),
+				Message:  fmt.Sprintf("Bare assignment to '%s' inside a class method creates a local — use 'Me:%s' to assign the class field", tok.Text, tok.Text),
+				Source:   "ssl-lsp",
+				Code:     CodeUnqualifiedFieldAssignment,
+			})
 		}
 	}
 
@@ -4325,7 +4464,7 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 //   - Issue #56: :INCLUDE paths should be skipped from checking
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
-func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string) []Diagnostic {
+func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, isEndpoint bool) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Build set of declared variables from the AST
@@ -4338,6 +4477,15 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 	// Add configured globals to declared variables (Issue #55)
 	for _, g := range globals {
 		declaredVars[strings.ToUpper(g)] = true
+	}
+
+	// Endpoint ambients: in endpoint scripts, Request and Response are
+	// pre-injected runtime objects in scope. Treat them as declared so
+	// they don't fire `undeclared_variable`. In non-endpoint files we
+	// leave them out — using them there is a real bug.
+	if isEndpoint {
+		declaredVars["REQUEST"] = true
+		declaredVars["RESPONSE"] = true
 	}
 
 	// Build set of built-in identifiers to skip

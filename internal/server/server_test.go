@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"starlims-lsp/internal/providers"
@@ -611,6 +612,45 @@ func TestIsDataSourceURI(t *testing.T) {
 		if got := isDataSourceURI(tt.uri); got != tt.want {
 			t.Errorf("isDataSourceURI(%q) = %v, want %v", tt.uri, got, tt.want)
 		}
+	}
+}
+
+func TestIsEndpointFile_PatternMatch(t *testing.T) {
+	if !isEndpointFile("file:///work/Endpoints/Foo.ssl", "", []string{"/endpoints/"}) {
+		t.Error("expected pattern /endpoints/ to match")
+	}
+	if isEndpointFile("file:///work/lib/Bar.ssl", "", []string{"/endpoints/"}) {
+		t.Error("did not expect lib/Bar.ssl to match")
+	}
+}
+
+func TestIsEndpointFile_DocblockMarker(t *testing.T) {
+	content := `/*
+ * Endpoint: GetUser
+ * Description: returns the user
+;
+:DECLARE sUser;`
+	if !isEndpointFile("file:///x.ssl", content, nil) {
+		t.Error("expected docblock marker to activate endpoint mode")
+	}
+}
+
+func TestIsEndpointFile_NoSignal(t *testing.T) {
+	content := `:DECLARE sValue;
+	sValue := "ok";`
+	if isEndpointFile("file:///x.ssl", content, nil) {
+		t.Error("plain file should not be flagged as endpoint")
+	}
+}
+
+func TestIsEndpointFile_MarkerOnlyInLeadingRegion(t *testing.T) {
+	var b strings.Builder
+	for range 50 {
+		b.WriteString(":DECLARE x;\n")
+	}
+	b.WriteString("/* Endpoint: late ;\n")
+	if isEndpointFile("file:///x.ssl", b.String(), nil) {
+		t.Error("marker past the leading region should not activate endpoint mode")
 	}
 }
 

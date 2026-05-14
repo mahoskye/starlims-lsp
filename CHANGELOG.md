@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-05-13
+
+Picks up the ssl-style-guide changes from upstream commit `386d57e`
+(2026-05-13 sync) and incorporates them into the LSP.
+
+### Added
+- **`unqualified_field_assignment` diagnostic.** Warns when a class
+  method assigns to a bare identifier matching a `:DECLARE`d class
+  field. In SSL a bare LHS creates a method-local — it does NOT write
+  to the field — so the field stays unchanged and the user has a
+  silent footgun. The fix is `Me:fieldName := ...` (or `Base:` for an
+  inherited field). Suppressed when a method-local `:DECLARE` or
+  `:PARAMETERS` entry of the same name shadows the field. Covers `:=`
+  and the compound forms (`+=`, `-=`, `*=`, `/=`, `^=`, `%=`).
+- **`Request` / `Response` endpoint ambients.** SSL endpoint scripts
+  run with two pre-injected runtime identifiers in scope. A new
+  `ssl.diagnostics.endpointPatterns` workspace setting (list of
+  case-insensitive path substrings) plus a leading-docblock
+  `Endpoint:` marker (scanned in the first ~30 lines) activate
+  endpoint mode. In endpoint files the ambients no longer trigger
+  `undeclared_variable`, hover surfaces their documentation, and
+  completion offers them. In non-endpoint files behavior is unchanged:
+  using `Request` / `Response` still flags as undeclared (which it
+  should — they fail at runtime there).
+- **Forward-looking docs note for `.NET` method dispatch on built-in
+  types** (`docs/features/completion.md`). When the LSP eventually
+  grows type-aware member completion or unknown-member diagnostics
+  on `:` access, receivers typed `string` / `number` / `date` /
+  `array` / `boolean` / `netobject` must be treated as .NET
+  passthrough rather than flagged. Tracked in #22.
+
+### Changed
+- **Terminology: `:CLASS DECLARE` slots are "fields", not
+  "properties".** Doc-comment fix on the `Me:` / `Base:` completion
+  context description. The rest of the LSP's user-facing "property"
+  usage already correctly refers to built-in class accessors,
+  SSLExpando, AddProperty, and CreateUdObject members.
+
 ## [0.7.6] - 2026-05-13
 
 ### Fixed

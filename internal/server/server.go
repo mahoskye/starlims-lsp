@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"starlims-lsp/internal/providers"
@@ -45,6 +46,12 @@ type DiagnosticsSettings struct {
 	Globals           *[]string          `json:"globals"`
 	MaxBlockDepth     *int               `json:"maxBlockDepth"`
 	Rules             *map[string]string `json:"rules"`
+	// EndpointPatterns is a list of substrings/suffixes; any URI whose
+	// lowercased path contains one of these is treated as an endpoint
+	// script (Request/Response are then pre-injected ambients). In
+	// addition to this setting, a leading-docblock `Endpoint:` marker
+	// in the first ~30 lines also activates endpoint mode.
+	EndpointPatterns *[]string `json:"endpointPatterns"`
 }
 
 // InlayHintsSettings represents inlay hint settings from the client.
@@ -126,6 +133,10 @@ type Settings struct {
 	Formatting               providers.FormattingOptions
 	InlayHints               providers.InlayHintOptions
 	SignatureHelpAutoTrigger bool
+	// EndpointPatterns is a list of case-insensitive path substrings;
+	// any document URI whose lowercased path contains one of these
+	// patterns is treated as an SSL endpoint script.
+	EndpointPatterns []string
 }
 
 // DefaultSettings returns default settings.
@@ -458,6 +469,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)
 		applyOptional(&s.settings.Diagnostics.RuleOverrides, diagnostics.Rules)
+		applyOptional(&s.settings.EndpointPatterns, diagnostics.EndpointPatterns)
 	}
 
 	// Apply inlay hints settings
@@ -485,6 +497,61 @@ func isDataSourceURI(uri string) bool {
 	return strings.HasSuffix(lower, ".ds") || strings.HasSuffix(lower, ".ds.txt")
 }
 
+// isEndpointFile decides whether a document should be treated as an SSL
+// endpoint script (where `Request` and `Response` are pre-injected runtime
+// ambients). It uses two signals:
+//
+//  1. Configured `EndpointPatterns` — any pattern whose lowercased value
+//     appears as a substring of the lowercased URI activates endpoint mode.
+//  2. A leading-docblock `Endpoint:` marker scanned from the first ~30
+//     lines of the file (the same convention used by the SSL agent guides).
+//
+// The default-empty pattern list means there are zero false positives
+// out of the box: users opt in either via the marker in their files or
+// the workspace setting.
+func isEndpointFile(uri string, content string, patterns []string) bool {
+	lowerURI := strings.ToLower(uri)
+	for _, p := range patterns {
+		if p == "" {
+			continue
+		}
+		if strings.Contains(lowerURI, strings.ToLower(p)) {
+			return true
+		}
+	}
+
+	// Scan only the leading docblock region — keep this cheap and
+	// resistant to false positives from a stray "Endpoint:" appearing
+	// deeper in the file (e.g. inside a string literal or comment block
+	// that documents something unrelated).
+	const maxLines = 30
+	lines := 0
+	for i := 0; i < len(content) && lines < maxLines; i++ {
+		if content[i] == '\n' {
+			lines++
+		}
+	}
+	head := content
+	if lines >= maxLines {
+		// Truncate to the first `maxLines` lines.
+		count := 0
+		for i := 0; i < len(content); i++ {
+			if content[i] == '\n' {
+				count++
+				if count >= maxLines {
+					head = content[:i]
+					break
+				}
+			}
+		}
+	}
+	// Match `Endpoint:` on a docblock line (preceded by `*` or at line start).
+	// Case-insensitive.
+	return endpointMarkerRegexp.MatchString(head)
+}
+
+var endpointMarkerRegexp = regexp.MustCompile(`(?im)^[\s*]*Endpoint\s*:`)
+
 // validateDocument validates a document and sends diagnostics.
 func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	if _, ok := s.documents.GetDocument(uri); !ok {
@@ -495,6 +562,9 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	cache := s.documents.ParseDocument(uri, version)
 	opts := s.settings.Diagnostics
 	opts.IsDataSourceFile = isDataSourceURI(uri)
+	if content, ok := s.documents.GetDocument(uri); ok {
+		opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
+	}
 	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 
 	// Convert to protocol diagnostics
