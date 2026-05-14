@@ -847,6 +847,36 @@ func TestGetProcedureCompletions(t *testing.T) {
 	}
 }
 
+func TestGetProcedureCompletions_DocblockSurfaces(t *testing.T) {
+	// vs-code-ssl-formatter#75 — the description, per-parameter docs, and
+	// return doc parsed from the leading /* ... ; block must appear in the
+	// completion item's Documentation field so users see them in the popup.
+	procedures := []parser.ProcedureInfo{
+		{
+			Name: "Greet", StartLine: 7, EndLine: 10, Parameters: []string{"sName"},
+			Doc: parser.ProcedureDoc{
+				Description:   "Composes a friendly greeting.",
+				ParameterDocs: map[string]string{"sName": "the user name"},
+				Returns:       "sGreeting - the composed greeting",
+			},
+		},
+	}
+	items := GetProcedureCompletions(procedures, false)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	doc := items[0].Documentation
+	if !strings.Contains(doc, "Composes a friendly greeting") {
+		t.Errorf("completion missing description: %s", doc)
+	}
+	if !strings.Contains(doc, "the user name") {
+		t.Errorf("completion missing parameter doc: %s", doc)
+	}
+	if !strings.Contains(doc, "Returns") {
+		t.Errorf("completion missing returns: %s", doc)
+	}
+}
+
 func TestGetProcedureCompletions_ClassMethodContext(t *testing.T) {
 	procedures := []parser.ProcedureInfo{
 		{Name: "MyMethod", StartLine: 2, EndLine: 6, Parameters: []string{"sValue", "nCount"}},
@@ -6576,6 +6606,49 @@ func TestGetDiagnostics_ParametersAfterProcedureWithComment(t *testing.T) {
 }
 
 // ==================== New Diagnostic Tests ====================
+
+// Companion check: removing the != asymmetry diagnostic must not also have
+// removed the related '=' prefix-matching warning. Both diagnostics share
+// the CodeEqualsVsStrictEquals code, so we verify the '=' branch is still
+// active by writing the canonical pattern that should still fire.
+func TestGetDiagnostics_BarePrefixEqualsStringStillWarns(t *testing.T) {
+	text := `:DECLARE sStatus;
+:IF sStatus = "Logged";
+	x := 1;
+:ENDIF;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+
+	found := false
+	for _, d := range diagnostics {
+		if d.Code == CodeEqualsVsStrictEquals {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected equals_vs_strict_equals to STILL fire on bare '=' string comparison; got: %#v", diagnostics)
+	}
+}
+
+// Non-string operands on either side of != must continue to be silent.
+// Prior to the removal this was guarded by a separate test that we replaced;
+// keep this regression in place.
+func TestGetDiagnostics_NotEqualsNonStringStaysSilent(t *testing.T) {
+	text := `:DECLARE nVal;
+:IF nVal != 0;
+	x := 1;
+:ENDIF;`
+
+	opts := DefaultDiagnosticOptions()
+	diagnostics := GetDiagnostics(text, opts)
+	for _, d := range diagnostics {
+		if d.Code == CodeEqualsVsStrictEquals {
+			t.Errorf("unexpected equals_vs_strict_equals for numeric '!=' comparison: %s", d.Message)
+		}
+	}
+}
 
 func TestGetDiagnostics_NotEqualsNoAsymmetryWarning(t *testing.T) {
 	// '!=' is the well-defined exact-match negation operator in SSL. Using it with a

@@ -1730,6 +1730,41 @@ func TestFormat_DoesNotSplitMemberAccessAcrossLines(t *testing.T) {
 	}
 }
 
+func TestFormat_DoesNotSplitChainedMemberAccess(t *testing.T) {
+	// `a:b:c` must remain intact when the line is too long.
+	src := "DoSomething(arg1, arg2, oRoot:childObject:deeplyNamedField, arg3);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 40
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oRoot:childObject:deeplyNamedField") {
+		t.Errorf("expected chained member access to stay together:\n%s", out)
+	}
+}
+
+func TestFormat_DoesNotSplitMemberAccess_AssignmentLHS(t *testing.T) {
+	// Even when `oVar:property` is the assignment target, it must not be
+	// split.
+	src := "oReceiverWithVeryLongName:propertyName := DoSomething(a, b, c);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 30
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oReceiverWithVeryLongName:propertyName") {
+		t.Errorf("expected LHS member access to stay together:\n%s", out)
+	}
+}
+
+func TestFormat_StillWrapsLongLinesWithMemberAccess(t *testing.T) {
+	// The fix must not silently disable wrapping — if there's a valid
+	// break point elsewhere, the formatter should still use it.
+	src := "DoSomething(firstArg, secondArg, oVar:prop, thirdArg, fourthArg);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 30
+	out := FormatDocument(src, opts)[0].NewText
+	if strings.Count(out, "\n") < 2 {
+		t.Errorf("expected the long line to wrap at SOME comma boundary:\n%s", out)
+	}
+}
+
 func TestFormat_BlankLineBetweenSiblingBlocks(t *testing.T) {
 	// Two adjacent :IF / :ENDIF blocks at the same indent should be separated
 	// by a blank line so they read as distinct units (vs-code-ssl-formatter#77).
@@ -1763,6 +1798,54 @@ func TestFormat_BlankLineBetweenSiblingBlocks_DifferentIndents(t *testing.T) {
 	want := ":IF outer;\n\t:IF inner;\n\t:ENDIF;\n:ENDIF;\n\n:IF next;\n:ENDIF;\n"
 	if out != want {
 		t.Errorf("indent-aware sibling detection failed\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_MixedFamilies(t *testing.T) {
+	// :ENDIF immediately followed by :WHILE at the same indent counts as
+	// adjacent sibling blocks even though the families differ.
+	src := ":IF a;\n:ENDIF;\n:WHILE b;\n:ENDWHILE;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;\n\n:WHILE b;\n:ENDWHILE;\n"
+	if out != want {
+		t.Errorf("mixed-family separation failed\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_Tabs(t *testing.T) {
+	// The indent-equality check must compare the raw leading-whitespace
+	// strings — two lines with different indent characters (tabs vs spaces)
+	// are NOT considered siblings even if they render the same width.
+	src := "\t:IF inner;\n\t:ENDIF;\n    :IF outer;\n    :ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no insertion when indent characters differ\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_TrailingComment(t *testing.T) {
+	// A trailing inline comment on the closer line still counts as the
+	// closer — the firstKeyword helper looks at the keyword at the start
+	// of the trimmed line, not the whole line.
+	src := ":IF a;\n:ENDIF;  /* note ;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;  /* note ;\n\n:IF b;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("trailing-comment closer not recognised\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_FullPipeline(t *testing.T) {
+	// Exercise FormatDocument end-to-end (not just the post-pass) so we
+	// catch any interaction with the token streamer.
+	src := ":PROCEDURE Demo;\n:IF a;\n\tx := 1;\n:ENDIF;\n:IF b;\n\ty := 2;\n:ENDIF;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, ":ENDIF;\n\n\t:IF b;") {
+		t.Errorf("expected blank line between the two :IF blocks in full pipeline output:\n%s", out)
 	}
 }
 

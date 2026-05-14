@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"strings"
 	"testing"
 
 	"starlims-lsp/internal/lexer"
@@ -210,6 +211,111 @@ DoProc("Use", {oResult});
 	}
 	if !names["alpha"] || !names["beta"] {
 		t.Errorf("expected propagated props {alpha, beta}, got %#v", got.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_MultiArgPositionalBinding(t *testing.T) {
+	// `DoProc("Bar", {oFirst, oSecond})` should bind oFirst's shape to the
+	// callee's first parameter and oSecond's to the second.
+	src := `:PROCEDURE Build;
+oFirst := CreateUDObject({{"a", ""}});
+oSecond := CreateUDObject({{"b", 0}});
+DoProc("Use", {oFirst, oSecond});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oOne, oTwo;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+
+	oneShape, ok := shapes["oone"]
+	if !ok || len(oneShape.Properties) == 0 {
+		t.Fatalf("expected oOne to inherit shape from oFirst; got %#v", shapes)
+	}
+	if oneShape.Properties[0].Name != "a" {
+		t.Errorf("oOne should carry prop 'a', got %#v", oneShape.Properties)
+	}
+
+	twoShape, ok := shapes["otwo"]
+	if !ok || len(twoShape.Properties) == 0 {
+		t.Fatalf("expected oTwo to inherit shape from oSecond; got %#v", shapes)
+	}
+	if twoShape.Properties[0].Name != "b" {
+		t.Errorf("oTwo should carry prop 'b', got %#v", twoShape.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_StatementStartGuard(t *testing.T) {
+	// `Foo(oBar:prop := 1)` is a function call with a named-argument-like
+	// construct. The `oBar:prop := 1` inside parentheses must NOT be
+	// mistaken for a statement-level property assignment that augments
+	// oBar's shape.
+	src := `:PROCEDURE Demo;
+oBar := CreateUDObject({{"existing", ""}});
+SomeFunc(oBar:trickProp := 1);
+:ENDPROC;`
+	shapes := BuildUDObjectShapes(tokenize(t, src))
+	got := shapes["obar"]
+	for _, p := range got.Properties {
+		if strings.EqualFold(p.Name, "trickProp") {
+			t.Errorf("inside-parens assignment leaked into shape: %#v", got.Properties)
+		}
+	}
+}
+
+func TestBuildUDObjectShapes_PropagationThroughCalleeChain(t *testing.T) {
+	// Build → Use1 → Use2. When the fixpoint runs, Use2's parameter
+	// should also receive the shape originally built in Build, because
+	// Use1's call to Use2 happens AFTER Use1's parameter has been bound.
+	src := `:PROCEDURE Build;
+oResult := CreateUDObject({{"prop", ""}});
+DoProc("Use1", {oResult});
+:ENDPROC;
+
+:PROCEDURE Use1;
+:PARAMETERS oFromBuild;
+DoProc("Use2", {oFromBuild});
+:ENDPROC;
+
+:PROCEDURE Use2;
+:PARAMETERS oFinal;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+
+	finalShape, ok := shapes["ofinal"]
+	if !ok || len(finalShape.Properties) == 0 {
+		t.Fatalf("expected propagation to reach oFinal; got keys %v", keys(shapes))
+	}
+	if finalShape.Properties[0].Name != "prop" {
+		t.Errorf("oFinal: expected prop 'prop', got %#v", finalShape.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_ReassignmentDoesNotEraseAugmentations(t *testing.T) {
+	// After CreateUDObject + augmentation, a property assignment continues
+	// to extend the shape. The "last write wins" rule applies to fresh
+	// CreateUDObject assignments only.
+	src := `:PROCEDURE Demo;
+oFoo := CreateUDObject({{"a", ""}});
+oFoo:b := 1;
+oFoo:c := 2;
+:ENDPROC;`
+	shapes := BuildUDObjectShapes(tokenize(t, src))
+	got := shapes["ofoo"]
+	names := map[string]bool{}
+	for _, p := range got.Properties {
+		names[p.Name] = true
+	}
+	for _, want := range []string{"a", "b", "c"} {
+		if !names[want] {
+			t.Errorf("expected prop %q in augmented shape, got %#v", want, got.Properties)
+		}
 	}
 }
 

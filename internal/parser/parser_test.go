@@ -165,6 +165,76 @@ x := 1;
 	}
 }
 
+func TestParser_ExtractProcedures_DocblockWithoutStarPrefix(t *testing.T) {
+	// Some authors write the docblock as plain text without leading `*`
+	// markers. Description/Parameters/Returns lines should still parse.
+	input := `/*
+   Description: Plain-text docblock, no asterisks.
+   Parameters:
+     sName - the name
+   Returns: a value
+;
+:PROCEDURE Plain;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	doc := procedures[0].Doc
+	if doc.Description != "Plain-text docblock, no asterisks." {
+		t.Errorf("description: got %q", doc.Description)
+	}
+	if got := doc.ParameterDocs["sName"]; got != "the name" {
+		t.Errorf("sName doc: got %q", got)
+	}
+	if doc.Returns != "a value" {
+		t.Errorf("returns: got %q", doc.Returns)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockMultiLineDescription(t *testing.T) {
+	// A description that spans multiple lines (continuation lines have no
+	// recognised keyword) is concatenated into a single Description field.
+	input := `/*
+ * Description: First sentence of the description.
+ *   Continuation line giving more detail.
+ *   A third line.
+ * Returns: r - the result
+;
+:PROCEDURE MultiLine;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	doc := procedures[0].Doc
+	want := "First sentence of the description. Continuation line giving more detail. A third line."
+	if doc.Description != want {
+		t.Errorf("multi-line description: got %q\nwant %q", doc.Description, want)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockParamColonSeparator(t *testing.T) {
+	// `name : desc` and `name - desc` should both work — addParamDoc
+	// splits on the first `-` or `:` after the name.
+	input := `/*
+ * Parameters:
+ *   sName : the colon form
+ *   nMode - the dash form
+;
+:PROCEDURE Mixed;
+:PARAMETERS sName, nMode;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if got := doc.ParameterDocs["sName"]; got != "the colon form" {
+		t.Errorf("sName (colon): got %q", got)
+	}
+	if got := doc.ParameterDocs["nMode"]; got != "the dash form" {
+		t.Errorf("nMode (dash): got %q", got)
+	}
+}
+
 func TestParser_ExtractProcedures_NoEndproc(t *testing.T) {
 	input := `:PROCEDURE Test;
 value := 1;`

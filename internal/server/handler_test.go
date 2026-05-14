@@ -132,6 +132,82 @@ ExecFunction("");
 	}
 }
 
+func TestHandleCompletion_InDoProcString_CaseInsensitive(t *testing.T) {
+	// SSL identifiers are case-insensitive; `DOPROC`, `doproc`, `DoProc`
+	// must all open the procedure-name completion.
+	for _, fname := range []string{"DOPROC", "doproc", "DoProc"} {
+		src := ":PROCEDURE Greet;\n:ENDPROC;\n\n:PROCEDURE Caller;\n" + fname + "(\"\");\n:ENDPROC;"
+		s := newTestServerWithDocument(src)
+		col := len(fname) + 2 // position right after the opening quote
+		result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: 4, Character: uint32(col)},
+			},
+		})
+		if err != nil {
+			t.Fatalf("[%s] unexpected error: %v", fname, err)
+		}
+		items := result.([]protocol.CompletionItem)
+		if !containsCompletionLabel(items, "Greet") {
+			t.Errorf("[%s] expected 'Greet' in completion list", fname)
+		}
+	}
+}
+
+func TestHandleCompletion_InDoProcString_PartialTypedName(t *testing.T) {
+	// Even when the user has typed a partial name, the full list comes
+	// back; the editor handles prefix filtering.
+	s := newTestServerWithDocument(`:PROCEDURE Greeter;
+:ENDPROC;
+
+:PROCEDURE Greedy;
+:ENDPROC;
+
+:PROCEDURE Caller;
+DoProc("Gr");
+:ENDPROC;`)
+	// Cursor right after the partial "Gr": line 7 (0-based), column 11.
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 7, Character: 11},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	if !containsCompletionLabel(items, "Greeter") || !containsCompletionLabel(items, "Greedy") {
+		t.Errorf("expected both candidates, got %d items", len(items))
+	}
+}
+
+func TestHandleCompletion_InComment_NoProcedureNames(t *testing.T) {
+	// Comment context still suppresses completions — the DoProc exception
+	// is string-only.
+	s := newTestServerWithDocument(`:PROCEDURE Greet;
+:ENDPROC;
+
+/* DoProc("") ;
+:PROCEDURE Caller;
+:ENDPROC;`)
+	// Cursor inside the empty string within the comment.
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 12},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	if len(items) != 0 {
+		t.Errorf("expected no completions inside comment, got %d", len(items))
+	}
+}
+
 func TestHandleCompletion_InRegularString_NoCompletions(t *testing.T) {
 	// Sanity check: a plain string literal (not DoProc/ExecFunction) still
 	// suppresses completions.
