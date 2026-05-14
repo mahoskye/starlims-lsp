@@ -123,4 +123,5 @@ const (
 	CodeSqlInjection                = "sql_injection"
 	CodeClassNameCollision          = "class_name_collision"
 	CodeReturnFromConstructor       = "return_from_constructor"
+	CodeUnqualifiedFieldAssignment  = "unqualified_field_assignment"
 )

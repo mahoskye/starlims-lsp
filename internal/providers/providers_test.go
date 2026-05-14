@@ -7414,3 +7414,93 @@ func TestGetDiagnostics_PanicRecovery(t *testing.T) {
 		t.Fatalf("recovery contract: expected one internal_error diagnostic, got %+v", got)
 	}
 }
+
+func hasDiagnosticCode(diags []Diagnostic, code string) bool {
+	for _, d := range diags {
+		if d.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func TestUnqualifiedFieldAssignment_BareAssignmentFlagged(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sValue;
+	sName := sValue;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if !hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("expected unqualified_field_assignment, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_QualifiedSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sValue;
+	Me:sName := sValue;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("did not expect unqualified_field_assignment, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_LocalShadowSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:DECLARE sName;
+	sName := "local";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("local-shadow should suppress, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_ParameterShadowSuppressed(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE sName;
+:PROCEDURE SetIt;
+:PARAMETERS sName;
+	sName := "param";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("parameter-shadow should suppress, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_NonClassFileNoOp(t *testing.T) {
+	text := `:PROCEDURE Run;
+:DECLARE sName;
+	sName := "ok";
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("non-class file should not trigger the rule, got %+v", diags)
+	}
+}
+
+func TestUnqualifiedFieldAssignment_CompoundOperatorFlagged(t *testing.T) {
+	text := `:CLASS MyClass;
+:DECLARE nCount;
+:PROCEDURE Bump;
+	nCount += 1;
+:ENDPROC;`
+
+	diags := GetDiagnostics(text, DefaultDiagnosticOptions())
+	if !hasDiagnosticCode(diags, CodeUnqualifiedFieldAssignment) {
+		t.Fatalf("compound assignment should be flagged, got %+v", diags)
+	}
+}
