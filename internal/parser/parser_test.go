@@ -235,6 +235,56 @@ func TestParser_ExtractProcedures_DocblockParamColonSeparator(t *testing.T) {
 	}
 }
 
+func TestParser_ExtractProcedures_DocblockEmptyDescription(t *testing.T) {
+	// `Description:` with no value on the same line should produce an
+	// empty Description string, not a crash.
+	input := `/*
+ * Description:
+ * Parameters:
+ *   sName - a name
+;
+:PROCEDURE EmptyDesc;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "" {
+		// Implementation detail: continuation lines AFTER an empty
+		// Description: would normally fall into the "default" branch
+		// and get appended to descParts. We had no description text
+		// to append, so descParts stays empty and Description should
+		// remain "".
+		t.Errorf("expected empty Description, got %q", doc.Description)
+	}
+	if got := doc.ParameterDocs["sName"]; got != "a name" {
+		t.Errorf("sName doc: got %q", got)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockOnlyParametersAndReturns(t *testing.T) {
+	// A docblock without a Description field still produces useful
+	// per-parameter docs and a Returns string.
+	input := `/*
+ * Parameters:
+ *   sName - the name
+ * Returns: sResult - the result
+;
+:PROCEDURE NoDesc;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "" {
+		t.Errorf("expected empty description, got %q", doc.Description)
+	}
+	if doc.ParameterDocs["sName"] != "the name" {
+		t.Errorf("sName doc: got %q", doc.ParameterDocs["sName"])
+	}
+	if doc.Returns != "sResult - the result" {
+		t.Errorf("returns: got %q", doc.Returns)
+	}
+}
+
 func TestParser_ExtractProcedures_NoEndproc(t *testing.T) {
 	input := `:PROCEDURE Test;
 value := 1;`

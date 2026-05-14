@@ -1765,6 +1765,18 @@ func TestFormat_StillWrapsLongLinesWithMemberAccess(t *testing.T) {
 	}
 }
 
+func TestFormat_DoesNotSplitMethodCall(t *testing.T) {
+	// `oVar:method(args)` uses the same member-access colon. The wrap
+	// rule must keep the receiver, colon, and method name together.
+	src := "DoSomething(arg1, arg2, oReceiver:doVeryLongMethodName(x), arg3);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 50
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oReceiver:doVeryLongMethodName") {
+		t.Errorf("expected method call to stay glued:\n%s", out)
+	}
+}
+
 func TestFormat_BlankLineBetweenSiblingBlocks(t *testing.T) {
 	// Two adjacent :IF / :ENDIF blocks at the same indent should be separated
 	// by a blank line so they read as distinct units (vs-code-ssl-formatter#77).
@@ -1846,6 +1858,44 @@ func TestFormat_BlankLineBetweenSiblingBlocks_FullPipeline(t *testing.T) {
 	out := FormatDocument(src, opts)[0].NewText
 	if !strings.Contains(out, ":ENDIF;\n\n\t:IF b;") {
 		t.Errorf("expected blank line between the two :IF blocks in full pipeline output:\n%s", out)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_ClosersFollowedByOrdinaryCode(t *testing.T) {
+	// :ENDIF followed by a plain assignment statement at the same indent is
+	// NOT a block boundary — the post-pass must leave it alone.
+	src := ":IF a;\n:ENDIF;\nx := 1;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no blank line before plain statement\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_CommentBetween(t *testing.T) {
+	// When a stand-alone comment sits between the closer and the next
+	// opener, prevContent becomes the comment line — so the post-pass
+	// does not insert a blank line. (The blank-line concern was about
+	// tightly-packed blocks; a comment between them already acts as a
+	// visual separator.)
+	src := ":IF a;\n:ENDIF;\n/* divider ;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no insertion when a comment separates the blocks\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_SurvivesMaxConsecutiveCap(t *testing.T) {
+	// MaxConsecutiveBlankLines runs after our pass. A cap of 1 must let
+	// the single inserted blank line pass through unchanged.
+	src := ":IF a;\n:ENDIF;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxConsecutiveBlankLines = 1
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;\n\n:IF b;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("blank line should survive cap of 1\n got: %q\nwant: %q", out, want)
 	}
 }
 

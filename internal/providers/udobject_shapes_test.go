@@ -319,6 +319,98 @@ oFoo:c := 2;
 	}
 }
 
+func TestBuildUDObjectShapes_DoProcWithoutArgsArray(t *testing.T) {
+	// `DoProc("Name")` — no comma, no args array. Propagation must
+	// short-circuit gracefully.
+	src := `:PROCEDURE Build;
+oResult := CreateUDObject({{"prop", ""}});
+DoProc("Use");
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oIncoming;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	// oIncoming receives no propagation (no args were passed).
+	if got, ok := shapes["oincoming"]; ok && len(got.Properties) > 0 {
+		t.Errorf("expected no shape on oIncoming when no args were passed, got %#v", got.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_MoreArgsThanParameters(t *testing.T) {
+	// Caller passes 3 shaped args, callee has only 2 parameters. The
+	// extra arg must be ignored (no panic, no out-of-range access).
+	src := `:PROCEDURE Build;
+oA := CreateUDObject({{"a", ""}});
+oB := CreateUDObject({{"b", ""}});
+oC := CreateUDObject({{"c", ""}});
+DoProc("Use", {oA, oB, oC});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oOne, oTwo;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	if shapes["oone"].Properties[0].Name != "a" {
+		t.Errorf("oOne should carry 'a', got %#v", shapes["oone"].Properties)
+	}
+	if shapes["otwo"].Properties[0].Name != "b" {
+		t.Errorf("oTwo should carry 'b', got %#v", shapes["otwo"].Properties)
+	}
+	// No third parameter — extra arg simply doesn't propagate.
+}
+
+func TestBuildUDObjectShapes_CalleeHasNoParameters(t *testing.T) {
+	// A target procedure with zero parameters: nothing to bind.
+	src := `:PROCEDURE Build;
+oResult := CreateUDObject({{"prop", ""}});
+DoProc("Use", {oResult});
+:ENDPROC;
+
+:PROCEDURE Use;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	// Should not panic.
+	BuildUDObjectShapesWithProcedures(tokens, procedures)
+}
+
+func TestBuildUDObjectShapes_MixedArgs_NonShapedSkipped(t *testing.T) {
+	// Caller passes [oShaped, "literal", nUntracked]. Only oShaped's
+	// shape should propagate, to the first parameter. The literal and
+	// the untracked variable must not cause off-by-one mis-binding.
+	src := `:PROCEDURE Build;
+oShaped := CreateUDObject({{"prop", ""}});
+:DECLARE nUntracked;
+DoProc("Use", {oShaped, "literal", nUntracked});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oOne, sTwo, oThree;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	if len(shapes["oone"].Properties) == 0 || shapes["oone"].Properties[0].Name != "prop" {
+		t.Errorf("oOne should receive prop from oShaped, got %#v", shapes["oone"])
+	}
+	// sTwo and oThree must NOT have invented shapes.
+	if got, ok := shapes["stwo"]; ok && len(got.Properties) > 0 {
+		t.Errorf("sTwo should have no shape (literal arg), got %#v", got)
+	}
+	if got, ok := shapes["othree"]; ok && len(got.Properties) > 0 {
+		t.Errorf("oThree should have no shape (untracked arg), got %#v", got)
+	}
+}
+
 func keys(m map[string]UDObjectShape) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
