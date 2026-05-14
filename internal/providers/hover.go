@@ -65,6 +65,31 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	return nil
 }
 
+// GetEndpointAmbientHover returns hover information for `Request` or
+// `Response` when the cursor is inside an endpoint script. These are
+// pre-injected runtime objects available only in endpoint scripts; in
+// other contexts the identifiers are unbound. Returns nil if the word
+// isn't one of the ambients.
+func GetEndpointAmbientHover(word string) *Hover {
+	switch strings.ToUpper(word) {
+	case "REQUEST":
+		return &Hover{
+			Contents: "**Request** *(endpoint ambient)*\n\n" +
+				"The incoming HTTP request, pre-injected in endpoint scripts. " +
+				"Access URL, headers, body, and query/form values via `Request:` members. " +
+				"Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.",
+		}
+	case "RESPONSE":
+		return &Hover{
+			Contents: "**Response** *(endpoint ambient)*\n\n" +
+				"The outgoing HTTP reply being built, pre-injected in endpoint scripts. " +
+				"Shape the response via `Response:` members (status, headers, body). " +
+				"Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.",
+		}
+	}
+	return nil
+}
+
 // getKeywordHover returns hover information for a keyword.
 func getKeywordHover(word string) *Hover {
 	upper := strings.ToUpper(strings.TrimPrefix(word, ":"))

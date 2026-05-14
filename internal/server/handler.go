@@ -62,7 +62,11 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
 	dsFile := isDataSourceURI(uri)
-	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile)
+	endpointFile := false
+	if content, ok := s.documents.GetDocument(uri); ok {
+		endpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
+	}
+	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile, endpointFile)
 	snippets := providers.GetSnippetCompletions(dsFile)
 
 	items := make([]protocol.CompletionItem, 0, len(completions)+len(snippets))
@@ -312,13 +316,21 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 		return nil, nil
 	}
 
-	hover := providers.GetHover(
-		content,
-		line,
-		column,
-		cache.Procedures,
-		cache.Variables,
-	)
+	var hover *providers.Hover
+	if isEndpointFile(uri, content, s.settings.EndpointPatterns) {
+		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
+			hover = providers.GetEndpointAmbientHover(word)
+		}
+	}
+	if hover == nil {
+		hover = providers.GetHover(
+			content,
+			line,
+			column,
+			cache.Procedures,
+			cache.Variables,
+		)
+	}
 
 	if hover == nil {
 		return nil, nil

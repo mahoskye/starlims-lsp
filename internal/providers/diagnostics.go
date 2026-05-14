@@ -63,6 +63,10 @@ type DiagnosticOptions struct {
 	GlobalVariables        []string
 	MaxBlockDepth          int
 	IsDataSourceFile       bool
+	// IsEndpointFile marks the file as an SSL endpoint script. When true,
+	// `Request` and `Response` are treated as pre-injected runtime
+	// ambients (not declared, not flagged as undeclared, not assignable).
+	IsEndpointFile bool
 
 	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
 	// Recognized values: "off" (drop the diagnostic), "info", "warn",
@@ -208,7 +212,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
-		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables)...)
+		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables, opts.IsEndpointFile)...)
 	}
 
 	// Check for unused variable declarations (opt-in)
@@ -4460,7 +4464,7 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 //   - Issue #56: :INCLUDE paths should be skipped from checking
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
-func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string) []Diagnostic {
+func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, isEndpoint bool) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Build set of declared variables from the AST
@@ -4473,6 +4477,15 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 	// Add configured globals to declared variables (Issue #55)
 	for _, g := range globals {
 		declaredVars[strings.ToUpper(g)] = true
+	}
+
+	// Endpoint ambients: in endpoint scripts, Request and Response are
+	// pre-injected runtime objects in scope. Treat them as declared so
+	// they don't fire `undeclared_variable`. In non-endpoint files we
+	// leave them out — using them there is a real bug.
+	if isEndpoint {
+		declaredVars["REQUEST"] = true
+		declaredVars["RESPONSE"] = true
 	}
 
 	// Build set of built-in identifiers to skip

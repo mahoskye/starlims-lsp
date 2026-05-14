@@ -483,7 +483,7 @@ func GetBuilderDirectiveCompletions() []CompletionItem {
 }
 
 // GetAllCompletions returns all completions.
-func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, classMethodContext bool, isDataSourceFile bool) []CompletionItem {
+func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, classMethodContext bool, isDataSourceFile bool, isEndpointFile bool) []CompletionItem {
 	var items []CompletionItem
 	items = append(items, GetKeywordCompletions()...)
 	items = append(items, GetFunctionCompletions()...)
@@ -491,6 +491,26 @@ func GetAllCompletions(procedures []parser.ProcedureInfo, variables []parser.Var
 	items = append(items, GetLiteralCompletions()...)
 	if isDataSourceFile {
 		items = append(items, GetBuilderDirectiveCompletions()...)
+	}
+	if isEndpointFile {
+		items = append(items,
+			CompletionItem{
+				Label:            "Request",
+				Kind:             CompletionKindVariable,
+				Detail:           "Endpoint ambient (HTTP request)",
+				Documentation:    "Pre-injected runtime object representing the incoming HTTP request. Access URL/headers/body/query/form via `Request:` members. Only bound inside endpoint scripts.",
+				InsertText:       "Request",
+				InsertTextFormat: InsertTextFormatPlainText,
+			},
+			CompletionItem{
+				Label:            "Response",
+				Kind:             CompletionKindVariable,
+				Detail:           "Endpoint ambient (HTTP response)",
+				Documentation:    "Pre-injected runtime object representing the outgoing HTTP reply. Shape the response via `Response:` members. Only bound inside endpoint scripts.",
+				InsertText:       "Response",
+				InsertTextFormat: InsertTextFormatPlainText,
+			},
+		)
 	}
 	if classMethodContext {
 		items = append(items,
