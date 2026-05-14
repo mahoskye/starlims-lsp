@@ -98,6 +98,231 @@ func TestParser_ExtractProcedures_WithParameters(t *testing.T) {
 	}
 }
 
+func TestParser_ExtractProcedures_DocblockParsed(t *testing.T) {
+	input := `/*
+ * Procedure: Greet
+ * Description: Greets the named user.
+ * Parameters:
+ *   sName - The user's display name.
+ *   nMode - 0 for short, 1 for long.
+ * Returns: sGreeting - The composed greeting string.
+;
+:PROCEDURE Greet;
+:PARAMETERS sName, nMode;
+:RETURN "hi";
+:ENDPROC;`
+
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	doc := procedures[0].Doc
+	if doc.Description != "Greets the named user." {
+		t.Errorf("description: got %q", doc.Description)
+	}
+	if got := doc.ParameterDocs["sName"]; got != "The user's display name." {
+		t.Errorf("sName doc: got %q", got)
+	}
+	if got := doc.ParameterDocs["nMode"]; got != "0 for short, 1 for long." {
+		t.Errorf("nMode doc: got %q", got)
+	}
+	if doc.Returns == "" {
+		t.Errorf("returns: got empty")
+	}
+}
+
+func TestParser_ExtractProcedures_NoDocblock(t *testing.T) {
+	input := `:PROCEDURE Bare;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	doc := procedures[0].Doc
+	if doc.Description != "" || doc.Returns != "" || len(doc.ParameterDocs) != 0 {
+		t.Errorf("expected zero-value doc, got %+v", doc)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockNotAttachedThroughCode(t *testing.T) {
+	// A docblock separated from :PROCEDURE by intervening code should not be
+	// attached — only the *immediately* preceding comment counts.
+	input := `/*
+ * Description: belongs to nothing
+;
+x := 1;
+:PROCEDURE Bare;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	if procedures[0].Doc.Description != "" {
+		t.Errorf("expected no description; got %q", procedures[0].Doc.Description)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockWithoutStarPrefix(t *testing.T) {
+	// Some authors write the docblock as plain text without leading `*`
+	// markers. Description/Parameters/Returns lines should still parse.
+	input := `/*
+   Description: Plain-text docblock, no asterisks.
+   Parameters:
+     sName - the name
+   Returns: a value
+;
+:PROCEDURE Plain;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	doc := procedures[0].Doc
+	if doc.Description != "Plain-text docblock, no asterisks." {
+		t.Errorf("description: got %q", doc.Description)
+	}
+	if got := doc.ParameterDocs["sName"]; got != "the name" {
+		t.Errorf("sName doc: got %q", got)
+	}
+	if doc.Returns != "a value" {
+		t.Errorf("returns: got %q", doc.Returns)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockMultiLineDescription(t *testing.T) {
+	// A description that spans multiple lines (continuation lines have no
+	// recognised keyword) is concatenated into a single Description field.
+	input := `/*
+ * Description: First sentence of the description.
+ *   Continuation line giving more detail.
+ *   A third line.
+ * Returns: r - the result
+;
+:PROCEDURE MultiLine;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	doc := procedures[0].Doc
+	want := "First sentence of the description. Continuation line giving more detail. A third line."
+	if doc.Description != want {
+		t.Errorf("multi-line description: got %q\nwant %q", doc.Description, want)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockParamColonSeparator(t *testing.T) {
+	// `name : desc` and `name - desc` should both work — addParamDoc
+	// splits on the first `-` or `:` after the name.
+	input := `/*
+ * Parameters:
+ *   sName : the colon form
+ *   nMode - the dash form
+;
+:PROCEDURE Mixed;
+:PARAMETERS sName, nMode;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if got := doc.ParameterDocs["sName"]; got != "the colon form" {
+		t.Errorf("sName (colon): got %q", got)
+	}
+	if got := doc.ParameterDocs["nMode"]; got != "the dash form" {
+		t.Errorf("nMode (dash): got %q", got)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockEmptyDescription(t *testing.T) {
+	// `Description:` with no value on the same line should produce an
+	// empty Description string, not a crash.
+	input := `/*
+ * Description:
+ * Parameters:
+ *   sName - a name
+;
+:PROCEDURE EmptyDesc;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "" {
+		// Implementation detail: continuation lines AFTER an empty
+		// Description: would normally fall into the "default" branch
+		// and get appended to descParts. We had no description text
+		// to append, so descParts stays empty and Description should
+		// remain "".
+		t.Errorf("expected empty Description, got %q", doc.Description)
+	}
+	if got := doc.ParameterDocs["sName"]; got != "a name" {
+		t.Errorf("sName doc: got %q", got)
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockOnlyParametersAndReturns(t *testing.T) {
+	// A docblock without a Description field still produces useful
+	// per-parameter docs and a Returns string.
+	input := `/*
+ * Parameters:
+ *   sName - the name
+ * Returns: sResult - the result
+;
+:PROCEDURE NoDesc;
+:PARAMETERS sName;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "" {
+		t.Errorf("expected empty description, got %q", doc.Description)
+	}
+	if doc.ParameterDocs["sName"] != "the name" {
+		t.Errorf("sName doc: got %q", doc.ParameterDocs["sName"])
+	}
+	if doc.Returns != "sResult - the result" {
+		t.Errorf("returns: got %q", doc.Returns)
+	}
+}
+
+func TestParser_ExtractProcedures_OnlyImmediatePrecedingCommentAttaches(t *testing.T) {
+	// When two comments stack above :PROCEDURE with only whitespace
+	// between them, only the IMMEDIATELY preceding comment counts.
+	input := `/*
+ * Description: from the OLD comment
+;
+/*
+ * Description: from the CURRENT comment
+;
+:PROCEDURE Test;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "from the CURRENT comment" {
+		t.Errorf("expected only immediate predecessor to attach; got %q", doc.Description)
+	}
+}
+
+func TestParser_ExtractProcedures_NonDocCommentStillAttachesGracefully(t *testing.T) {
+	// A plain (non-doc-format) comment right above :PROCEDURE should
+	// attach as Raw text without crashing, even though no recognised
+	// fields are parsed.
+	input := `/* TODO: rewrite this proc someday ;
+:PROCEDURE Legacy;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Raw == "" {
+		t.Errorf("expected Raw to be populated from the preceding comment, got empty")
+	}
+	if doc.Description != "" {
+		t.Errorf("expected empty Description for non-doc comment, got %q", doc.Description)
+	}
+	if doc.Returns != "" {
+		t.Errorf("expected empty Returns for non-doc comment, got %q", doc.Returns)
+	}
+}
+
 func TestParser_ExtractProcedures_NoEndproc(t *testing.T) {
 	input := `:PROCEDURE Test;
 value := 1;`

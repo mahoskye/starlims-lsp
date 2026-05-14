@@ -66,6 +66,31 @@ type ProcedureInfo struct {
 	StartLine  int
 	EndLine    int
 	Node       *Node
+	// Doc is the parsed leading docblock immediately preceding the
+	// :PROCEDURE declaration (if any). Zero value means no docblock.
+	Doc ProcedureDoc
+}
+
+// ProcedureDoc holds the structured pieces of a procedure's leading docblock,
+// parsed from the SSL convention documented in the SSL style guide:
+//
+//	/*
+//	 * Procedure: ProcedureName
+//	 * Description: Brief description
+//	 * Parameters:
+//	 *   sParam1 - Description
+//	 * Returns: sResult - Description
+//	;
+//
+// Empty fields mean the docblock either didn't include them or wasn't present
+// at all. Raw is the original comment text (without `/*` / `;` framing) so
+// callers can fall back to the raw form.
+type ProcedureDoc struct {
+	Description string
+	// ParameterDocs is keyed by parameter name (preserves doc-block casing).
+	ParameterDocs map[string]string
+	Returns       string
+	Raw           string
 }
 
 // VariableScope represents the scope of a variable.
@@ -169,11 +194,124 @@ func (p *Parser) findProcedures(node *Node, procedures *[]ProcedureInfo) {
 					StartLine:  child.StartLine,
 					EndLine:    p.findProcedureEndLine(node, child),
 					Node:       child,
+					Doc:        p.extractProcedureDoc(firstToken),
 				})
 			}
 		}
 		p.findProcedures(child, procedures)
 	}
+}
+
+// extractProcedureDoc walks backward from the :PROCEDURE token in the global
+// token stream to find the immediately preceding /* ... ; comment block. The
+// search skips whitespace tokens; any non-whitespace, non-comment token aborts
+// (the comment isn't "attached" to this procedure). Multiple adjacent comment
+// blocks are concatenated, with the closest one to the procedure taking
+// precedence for parsed fields.
+func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
+	idx := -1
+	for i := range p.tokens {
+		if p.tokens[i].Offset == procToken.Offset && p.tokens[i].Line == procToken.Line {
+			idx = i
+			break
+		}
+	}
+	if idx <= 0 {
+		return ProcedureDoc{}
+	}
+
+	var commentText string
+	for j := idx - 1; j >= 0; j-- {
+		t := p.tokens[j]
+		if t.Type == lexer.TokenWhitespace {
+			continue
+		}
+		if t.Type == lexer.TokenComment {
+			commentText = t.Text
+		}
+		break
+	}
+	if commentText == "" {
+		return ProcedureDoc{}
+	}
+	return parseProcedureDoc(commentText)
+}
+
+// parseProcedureDoc reads the SSL convention docblock format. It is tolerant
+// of variations: lines may or may not start with `*`, fields may be missing,
+// and the Parameters section may be absent.
+func parseProcedureDoc(raw string) ProcedureDoc {
+	body := raw
+	body = strings.TrimPrefix(body, "/*")
+	body = strings.TrimSuffix(body, ";")
+
+	doc := ProcedureDoc{Raw: strings.TrimSpace(body)}
+
+	type section int
+	const (
+		sectionNone section = iota
+		sectionParams
+	)
+
+	current := sectionNone
+	descParts := []string{}
+	for _, line := range strings.Split(body, "\n") {
+		stripped := strings.TrimSpace(line)
+		stripped = strings.TrimPrefix(stripped, "*")
+		stripped = strings.TrimSpace(stripped)
+		if stripped == "" {
+			continue
+		}
+
+		lower := strings.ToLower(stripped)
+		switch {
+		case strings.HasPrefix(lower, "procedure:"):
+			current = sectionNone
+		case strings.HasPrefix(lower, "description:"):
+			current = sectionNone
+			descParts = append(descParts, strings.TrimSpace(stripped[len("description:"):]))
+		case strings.HasPrefix(lower, "parameters:"):
+			current = sectionParams
+			rest := strings.TrimSpace(stripped[len("parameters:"):])
+			if rest != "" {
+				addParamDoc(&doc, rest)
+			}
+		case strings.HasPrefix(lower, "returns:"):
+			current = sectionNone
+			doc.Returns = strings.TrimSpace(stripped[len("returns:"):])
+		default:
+			if current == sectionParams {
+				addParamDoc(&doc, stripped)
+			} else if len(descParts) > 0 {
+				descParts = append(descParts, stripped)
+			}
+		}
+	}
+	doc.Description = strings.TrimSpace(strings.Join(descParts, " "))
+	return doc
+}
+
+// addParamDoc records a "name - description" line into the params map. Lines
+// that don't match this shape are recorded under the bare name (no description).
+func addParamDoc(doc *ProcedureDoc, line string) {
+	if doc.ParameterDocs == nil {
+		doc.ParameterDocs = map[string]string{}
+	}
+	dash := strings.IndexAny(line, "-:")
+	if dash <= 0 {
+		name := strings.Fields(line)
+		if len(name) == 0 {
+			return
+		}
+		doc.ParameterDocs[name[0]] = ""
+		return
+	}
+	name := strings.TrimSpace(line[:dash])
+	desc := strings.TrimSpace(line[dash+1:])
+	if name == "" {
+		return
+	}
+	doc.ParameterDocs[name] = desc
 }
 
 func (p *Parser) extractProcedureName(stmt *Node) string {

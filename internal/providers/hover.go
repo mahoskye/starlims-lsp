@@ -499,19 +499,60 @@ func getProcedureHover(word string, procedures []parser.ProcedureInfo) *Hover {
 
 	for _, proc := range procedures {
 		if strings.ToLower(proc.Name) == wordLower {
-			paramsDoc := "*No parameters*"
-			if len(proc.Parameters) > 0 {
-				paramsDoc = fmt.Sprintf("**Parameters:** %s", strings.Join(proc.Parameters, ", "))
-			}
-
-			return &Hover{
-				Contents: fmt.Sprintf("**%s**\n\n*Procedure defined in this file*\n\n%s\n\n**Location:** Line %d-%d",
-					proc.Name, paramsDoc, proc.StartLine, proc.EndLine),
-			}
+			return &Hover{Contents: renderProcedureHover(proc)}
 		}
 	}
 
 	return nil
+}
+
+// renderProcedureHover formats a hover panel for a script procedure, weaving
+// in any docblock-derived description / parameter docs / return doc.
+func renderProcedureHover(proc parser.ProcedureInfo) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n*Procedure defined in this file*", proc.Name)
+
+	if proc.Doc.Description != "" {
+		fmt.Fprintf(&b, "\n\n%s", proc.Doc.Description)
+	}
+
+	if len(proc.Parameters) > 0 {
+		b.WriteString("\n\n**Parameters:**")
+		for _, name := range proc.Parameters {
+			if desc := lookupParamDoc(proc.Doc.ParameterDocs, name); desc != "" {
+				fmt.Fprintf(&b, "\n- `%s` — %s", name, desc)
+			} else {
+				fmt.Fprintf(&b, "\n- `%s`", name)
+			}
+		}
+	} else {
+		b.WriteString("\n\n*No parameters*")
+	}
+
+	if proc.Doc.Returns != "" {
+		fmt.Fprintf(&b, "\n\n**Returns:** %s", proc.Doc.Returns)
+	}
+
+	fmt.Fprintf(&b, "\n\n**Location:** Line %d-%d", proc.StartLine, proc.EndLine)
+	return b.String()
+}
+
+// lookupParamDoc resolves a parameter name against the parsed doc map,
+// case-insensitively (docblocks rarely match SSL's loose casing exactly).
+func lookupParamDoc(docs map[string]string, name string) string {
+	if docs == nil {
+		return ""
+	}
+	if v, ok := docs[name]; ok {
+		return v
+	}
+	lower := strings.ToLower(name)
+	for k, v := range docs {
+		if strings.ToLower(k) == lower {
+			return v
+		}
+	}
+	return ""
 }
 
 // getVariableHover returns hover information for a variable defined in the document.

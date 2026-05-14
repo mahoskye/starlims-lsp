@@ -1708,6 +1708,207 @@ func TestFormat_MaxConsecutiveBlankLines(t *testing.T) {
 	}
 }
 
+func TestFormat_DoesNotSplitMemberAccessAcrossLines(t *testing.T) {
+	// vs-code-ssl-formatter#76 — wrapping a long line must keep `oVar:property`
+	// together; never break before or after the member-access colon.
+	src := "DoSomething(a, b, c, oCurrentRequest:somewhatLongPropertyName, d);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 50
+	out := FormatDocument(src, opts)[0].NewText
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasSuffix(trimmed, ":") {
+			t.Errorf("line ends with member-access colon (split member access): %q\nfull output:\n%s", line, out)
+		}
+		if strings.HasPrefix(trimmed, ":") {
+			// Must be a keyword (:IF, :ENDIF, etc.) — keywords are uppercase letters.
+			rest := trimmed[1:]
+			if rest == "" || !(rest[0] >= 'A' && rest[0] <= 'Z') {
+				t.Errorf("line starts with non-keyword colon (split member access): %q\nfull output:\n%s", line, out)
+			}
+		}
+	}
+}
+
+func TestFormat_DoesNotSplitChainedMemberAccess(t *testing.T) {
+	// `a:b:c` must remain intact when the line is too long.
+	src := "DoSomething(arg1, arg2, oRoot:childObject:deeplyNamedField, arg3);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 40
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oRoot:childObject:deeplyNamedField") {
+		t.Errorf("expected chained member access to stay together:\n%s", out)
+	}
+}
+
+func TestFormat_DoesNotSplitMemberAccess_AssignmentLHS(t *testing.T) {
+	// Even when `oVar:property` is the assignment target, it must not be
+	// split.
+	src := "oReceiverWithVeryLongName:propertyName := DoSomething(a, b, c);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 30
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oReceiverWithVeryLongName:propertyName") {
+		t.Errorf("expected LHS member access to stay together:\n%s", out)
+	}
+}
+
+func TestFormat_StillWrapsLongLinesWithMemberAccess(t *testing.T) {
+	// The fix must not silently disable wrapping — if there's a valid
+	// break point elsewhere, the formatter should still use it.
+	src := "DoSomething(firstArg, secondArg, oVar:prop, thirdArg, fourthArg);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 30
+	out := FormatDocument(src, opts)[0].NewText
+	if strings.Count(out, "\n") < 2 {
+		t.Errorf("expected the long line to wrap at SOME comma boundary:\n%s", out)
+	}
+}
+
+func TestFormat_DoesNotSplitMethodCall(t *testing.T) {
+	// `oVar:method(args)` uses the same member-access colon. The wrap
+	// rule must keep the receiver, colon, and method name together.
+	src := "DoSomething(arg1, arg2, oReceiver:doVeryLongMethodName(x), arg3);\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxLineLength = 50
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, "oReceiver:doVeryLongMethodName") {
+		t.Errorf("expected method call to stay glued:\n%s", out)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks(t *testing.T) {
+	// Two adjacent :IF / :ENDIF blocks at the same indent should be separated
+	// by a blank line so they read as distinct units (vs-code-ssl-formatter#77).
+	src := ":IF a;\n\tx := 1;\n:ENDIF;\n:IF b;\n\ty := 2;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n\tx := 1;\n:ENDIF;\n\n:IF b;\n\ty := 2;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("expected blank line between sibling :IF blocks\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_AlreadySeparated(t *testing.T) {
+	// If the user already left a blank line, the post-pass must not add another.
+	src := ":IF a;\n:ENDIF;\n\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("blank-already-present output drifted\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_DifferentIndents(t *testing.T) {
+	// When :ENDIF closes an inner block and the next :IF sits at an OUTER indent,
+	// they aren't siblings — no blank line should be inserted.
+	src := ":IF outer;\n\t:IF inner;\n\t:ENDIF;\n:ENDIF;\n:IF next;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	// The outer :ENDIF and the next :IF ARE at the same indent (both 0), so
+	// they should be separated. The inner pair must NOT be touched.
+	want := ":IF outer;\n\t:IF inner;\n\t:ENDIF;\n:ENDIF;\n\n:IF next;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("indent-aware sibling detection failed\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_MixedFamilies(t *testing.T) {
+	// :ENDIF immediately followed by :WHILE at the same indent counts as
+	// adjacent sibling blocks even though the families differ.
+	src := ":IF a;\n:ENDIF;\n:WHILE b;\n:ENDWHILE;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;\n\n:WHILE b;\n:ENDWHILE;\n"
+	if out != want {
+		t.Errorf("mixed-family separation failed\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_Tabs(t *testing.T) {
+	// The indent-equality check must compare the raw leading-whitespace
+	// strings — two lines with different indent characters (tabs vs spaces)
+	// are NOT considered siblings even if they render the same width.
+	src := "\t:IF inner;\n\t:ENDIF;\n    :IF outer;\n    :ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no insertion when indent characters differ\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_TrailingComment(t *testing.T) {
+	// A trailing inline comment on the closer line still counts as the
+	// closer — the firstKeyword helper looks at the keyword at the start
+	// of the trimmed line, not the whole line.
+	src := ":IF a;\n:ENDIF;  /* note ;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;  /* note ;\n\n:IF b;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("trailing-comment closer not recognised\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_FullPipeline(t *testing.T) {
+	// Exercise FormatDocument end-to-end (not just the post-pass) so we
+	// catch any interaction with the token streamer.
+	src := ":PROCEDURE Demo;\n:IF a;\n\tx := 1;\n:ENDIF;\n:IF b;\n\ty := 2;\n:ENDIF;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(src, opts)[0].NewText
+	if !strings.Contains(out, ":ENDIF;\n\n\t:IF b;") {
+		t.Errorf("expected blank line between the two :IF blocks in full pipeline output:\n%s", out)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_ClosersFollowedByOrdinaryCode(t *testing.T) {
+	// :ENDIF followed by a plain assignment statement at the same indent is
+	// NOT a block boundary — the post-pass must leave it alone.
+	src := ":IF a;\n:ENDIF;\nx := 1;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no blank line before plain statement\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_CommentBetween(t *testing.T) {
+	// When a stand-alone comment sits between the closer and the next
+	// opener, prevContent becomes the comment line — so the post-pass
+	// does not insert a blank line. (The blank-line concern was about
+	// tightly-packed blocks; a comment between them already acts as a
+	// visual separator.)
+	src := ":IF a;\n:ENDIF;\n/* divider ;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("expected no insertion when a comment separates the blocks\n got: %q\nwant: %q", out, src)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_SurvivesMaxConsecutiveCap(t *testing.T) {
+	// MaxConsecutiveBlankLines runs after our pass. A cap of 1 must let
+	// the single inserted blank line pass through unchanged.
+	src := ":IF a;\n:ENDIF;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxConsecutiveBlankLines = 1
+	out := applyPostFormatPasses(src, opts)
+	want := ":IF a;\n:ENDIF;\n\n:IF b;\n:ENDIF;\n"
+	if out != want {
+		t.Errorf("blank line should survive cap of 1\n got: %q\nwant: %q", out, want)
+	}
+}
+
+func TestFormat_BlankLineBetweenSiblingBlocks_Disabled(t *testing.T) {
+	src := ":IF a;\n:ENDIF;\n:IF b;\n:ENDIF;\n"
+	opts := DefaultFormattingOptions()
+	opts.BlankLineBetweenBlocks = false
+	out := applyPostFormatPasses(src, opts)
+	if out != src {
+		t.Errorf("disabled flag should be a no-op\n got: %q\nwant: %q", out, src)
+	}
+}
+
 func TestFormat_BuiltinFunctionCase_PascalCase(t *testing.T) {
 	// The published inventory uses canonical PascalCase. `len` and `empty`
 	// should be rewritten to their canonical forms `Len` and `Empty`. A

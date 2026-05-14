@@ -348,29 +348,54 @@ func GetOperatorCompletions() []CompletionItem {
 func GetProcedureCompletions(procedures []parser.ProcedureInfo, classMethodContext bool) []CompletionItem {
 	var items []CompletionItem
 	for _, proc := range procedures {
-		paramsDoc := "*No parameters*"
-		if len(proc.Parameters) > 0 {
-			paramsDoc = fmt.Sprintf("**Parameters:** %s", strings.Join(proc.Parameters, ", "))
-		}
-
 		dispatchDoc := "Use `DoProc(...)` for same-file script procedures, or `ExecFunction(...)` for external script procedures."
 		if classMethodContext {
 			dispatchDoc = "Inside `:CLASS` methods, call sibling or inherited members with `Me:MethodName(...)` or `Base:MethodName(...)`."
 		}
 
-		doc := fmt.Sprintf("**Procedure:** %s\n\n%s\n\n%s\n\n**Location:** Line %d-%d",
-			proc.Name, paramsDoc, dispatchDoc, proc.StartLine, proc.EndLine)
-
 		items = append(items, CompletionItem{
 			Label:            proc.Name,
 			Kind:             CompletionKindFunction,
 			Detail:           fmt.Sprintf("Procedure (line %d)", proc.StartLine),
-			Documentation:    doc,
+			Documentation:    renderProcedureCompletionDoc(proc, dispatchDoc),
 			InsertText:       buildProcedureDispatchSnippet(proc, classMethodContext),
 			InsertTextFormat: InsertTextFormatSnippet,
 		})
 	}
 	return items
+}
+
+// renderProcedureCompletionDoc builds the markdown documentation panel shown
+// next to a procedure completion. It mirrors the hover layout: description
+// from the docblock, per-parameter docs when known, return doc, then the
+// dispatch hint and source location.
+func renderProcedureCompletionDoc(proc parser.ProcedureInfo, dispatchDoc string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**Procedure:** %s", proc.Name)
+
+	if proc.Doc.Description != "" {
+		fmt.Fprintf(&b, "\n\n%s", proc.Doc.Description)
+	}
+
+	if len(proc.Parameters) > 0 {
+		b.WriteString("\n\n**Parameters:**")
+		for _, name := range proc.Parameters {
+			if desc := lookupParamDoc(proc.Doc.ParameterDocs, name); desc != "" {
+				fmt.Fprintf(&b, "\n- `%s` — %s", name, desc)
+			} else {
+				fmt.Fprintf(&b, "\n- `%s`", name)
+			}
+		}
+	} else {
+		b.WriteString("\n\n*No parameters*")
+	}
+
+	if proc.Doc.Returns != "" {
+		fmt.Fprintf(&b, "\n\n**Returns:** %s", proc.Doc.Returns)
+	}
+
+	fmt.Fprintf(&b, "\n\n%s\n\n**Location:** Line %d-%d", dispatchDoc, proc.StartLine, proc.EndLine)
+	return b.String()
 }
 
 func buildProcedureDispatchSnippet(proc parser.ProcedureInfo, classMethodContext bool) string {
@@ -396,6 +421,29 @@ func buildProcedureDispatchSnippet(proc parser.ProcedureInfo, classMethodContext
 	}
 
 	return fmt.Sprintf(`DoProc("%s", {%s})`, proc.Name, strings.Join(placeholders, ", "))
+}
+
+// GetProcedureNameCompletions returns plain-text procedure-name completions
+// for use inside a DoProc/ExecFunction string literal — i.e. when the user is
+// typing `DoProc("…")` and the cursor is between the quotes. These items
+// insert just the bare procedure name (no DoProc snippet, no parens) since
+// the surrounding call already provides that scaffolding. Doc and parameter
+// information is still surfaced in the completion's documentation panel so
+// the user can verify they've picked the right procedure.
+func GetProcedureNameCompletions(procedures []parser.ProcedureInfo) []CompletionItem {
+	var items []CompletionItem
+	for _, proc := range procedures {
+		doc := renderProcedureCompletionDoc(proc, "Called via `DoProc(...)` / `ExecFunction(...)`.")
+		items = append(items, CompletionItem{
+			Label:            proc.Name,
+			Kind:             CompletionKindFunction,
+			Detail:           fmt.Sprintf("Procedure (line %d)", proc.StartLine),
+			Documentation:    doc,
+			InsertText:       proc.Name,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+	return items
 }
 
 // GetVariableCompletions returns variable completions from the current document.

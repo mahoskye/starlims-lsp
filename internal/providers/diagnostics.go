@@ -241,7 +241,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
 	diagnostics = append(diagnostics, checkRegionLegacyWarning(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
-	diagnostics = append(diagnostics, checkNotEqualsAsymmetry(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
 	diagnostics = applySuppressionComments(tokens, diagnostics)
@@ -4987,41 +4986,6 @@ func checkCodeBlockStructure(tokens []lexer.Token) []Diagnostic {
 					Code:     CodeCodeBlockStructure,
 				})
 			}
-		}
-	}
-
-	return diagnostics
-}
-
-// checkNotEqualsAsymmetry warns when != is used with string literals, since != negates == (exact),
-// not = (prefix). This means = and != are NOT logical opposites for strings.
-// Source of truth: ssl_agent_instructions.md gotcha #18.
-func checkNotEqualsAsymmetry(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		if token.Type != lexer.TokenOperator || token.Text != "!=" {
-			continue
-		}
-
-		prevIdx := previousSignificantTokenIndex(tokens, i-1)
-		nextIdx := nextSignificantTokenIndex(tokens, i+1)
-		if prevIdx < 0 || nextIdx < 0 {
-			continue
-		}
-
-		left := tokens[prevIdx]
-		right := tokens[nextIdx]
-
-		if left.Type == lexer.TokenString || right.Type == lexer.TokenString {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range:    tokenToRange(token),
-				Message:  "'!=' is exact-match negation. SSL's '=' does prefix matching on strings, so '=' and '!=' are not logical opposites — use '==' for exact equality.",
-				Source:   "ssl-lsp",
-				Code:     CodeEqualsVsStrictEquals,
-			})
 		}
 	}
 

@@ -17,6 +17,12 @@ type FormattingOptions struct {
 	CommaSpacing           bool   // space after commas
 	SemicolonEnforcement   bool   // ensure statements end with semicolon
 	BlankLinesBetweenProcs int    // blank lines between procedures
+	// BlankLineBetweenBlocks inserts a blank line between sibling control-flow
+	// blocks (:IF / :WHILE / :FOR / :BEGINCASE / :TRY) at the same indent so
+	// they read as distinct units rather than one wall of code. The blank line
+	// is inserted between the closing keyword of the previous block and the
+	// opening keyword of the next block. Default true.
+	BlankLineBetweenBlocks bool
 	// TrimTrailingWhitespace removes trailing space/tab characters from
 	// every formatted line. Default true.
 	TrimTrailingWhitespace bool
@@ -40,6 +46,7 @@ func DefaultFormattingOptions() FormattingOptions {
 		CommaSpacing:             true,
 		SemicolonEnforcement:     true,
 		BlankLinesBetweenProcs:   1,
+		BlankLineBetweenBlocks:   true,
 		TrimTrailingWhitespace:   true,
 		MaxConsecutiveBlankLines: 0,
 		BuiltinFunctionCase:      "preserve",
@@ -799,6 +806,16 @@ func canWrapBefore(token, prevToken lexer.Token, parenDepth int) bool {
 	if prevToken.Type == 0 {
 		return false
 	}
+	// Never split a member-access chain `oVar:property` — the ':' (TokenPunctuation)
+	// binds the identifier to its receiver. Wrapping after the colon produces
+	// "oVar:\n    property" which is unreadable; wrapping before it strands the
+	// receiver on its own line. See vs-code-ssl-formatter#76.
+	if prevToken.Type == lexer.TokenPunctuation && prevToken.Text == ":" {
+		return false
+	}
+	if token.Type == lexer.TokenPunctuation && token.Text == ":" {
+		return false
+	}
 	// Good wrap points: after comma, after assignment, inside parens
 	if prevToken.Text == "," {
 		return true
@@ -1043,10 +1060,107 @@ func applyPostFormatPasses(text string, opts FormattingOptions) string {
 	if opts.TrimTrailingWhitespace {
 		text = trimTrailingWhitespacePerLine(text)
 	}
+	if opts.BlankLineBetweenBlocks {
+		text = blankLineBetweenSiblingBlocks(text)
+	}
 	if opts.MaxConsecutiveBlankLines > 0 {
 		text = capConsecutiveBlankLines(text, opts.MaxConsecutiveBlankLines)
 	}
 	return text
+}
+
+// innerBlockOpeners and innerBlockClosers cover the control-flow constructs
+// that need vertical separation. :PROCEDURE/:REGION are excluded — they're
+// handled by BlankLinesBetweenProcs in the streaming formatter.
+var innerBlockOpeners = map[string]bool{
+	"IF":        true,
+	"WHILE":     true,
+	"FOR":       true,
+	"BEGINCASE": true,
+	"TRY":       true,
+}
+
+var innerBlockClosers = map[string]bool{
+	"ENDIF":    true,
+	"ENDWHILE": true,
+	"NEXT":     true,
+	"ENDCASE":  true,
+	"ENDTRY":   true,
+}
+
+// blankLineBetweenSiblingBlocks inserts a blank line between adjacent
+// control-flow blocks at the same indent, so that two `:IF / :ENDIF` siblings
+// read as separate units. A blank line is inserted only when the previous
+// non-blank line is the closer of an inner block and the current non-blank
+// line is the opener of another inner block at the *same* leading indent, and
+// no blank line already separates them.
+func blankLineBetweenSiblingBlocks(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines)+8)
+
+	prevContent := ""
+	prevContentIdx := -1 // index in `out` where the previous non-blank line was written
+	blankSinceLastContent := true
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			out = append(out, line)
+			blankSinceLastContent = true
+			continue
+		}
+
+		if prevContentIdx >= 0 && !blankSinceLastContent {
+			if leadingIndentString(prevContent) == leadingIndentString(line) {
+				prevKey := firstKeyword(prevContent)
+				currKey := firstKeyword(line)
+				if innerBlockClosers[prevKey] && innerBlockOpeners[currKey] {
+					out = append(out, "")
+				}
+			}
+		}
+
+		out = append(out, line)
+		prevContent = line
+		prevContentIdx = len(out) - 1
+		blankSinceLastContent = false
+	}
+
+	return strings.Join(out, "\n")
+}
+
+// leadingIndentString returns the leading whitespace of a line.
+func leadingIndentString(line string) string {
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if c != ' ' && c != '\t' {
+			return line[:i]
+		}
+	}
+	return line
+}
+
+// firstKeyword returns the uppercase keyword that starts the line (without the
+// leading colon), or "" if the line doesn't start with a colon-prefixed
+// keyword. Trailing characters (parameters, semicolons) are ignored.
+func firstKeyword(line string) string {
+	trimmed := strings.TrimLeft(line, " \t")
+	if !strings.HasPrefix(trimmed, ":") {
+		return ""
+	}
+	rest := trimmed[1:]
+	end := 0
+	for end < len(rest) {
+		c := rest[end]
+		isAlpha := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+		if !isAlpha {
+			break
+		}
+		end++
+	}
+	if end == 0 {
+		return ""
+	}
+	return strings.ToUpper(rest[:end])
 }
 
 // trimTrailingWhitespacePerLine removes trailing space/tab characters from
