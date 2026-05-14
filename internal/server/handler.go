@@ -76,7 +76,7 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 // is in a context that maps cleanly to one of the new providers helpers:
 //
 //   - `<BuiltInClass>{`           — constructor signatures for that class
-//   - `Me:` / `Base:` (in a class) — method/property suggestions for the
+//   - `Me:` / `Base:` (in a class) — method/field suggestions for the
 //     enclosing class declaration
 //   - `<BuiltInClass>:`           — methods/properties of that class
 //
