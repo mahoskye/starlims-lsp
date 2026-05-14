@@ -164,6 +164,19 @@ Snippet templates follow the bundled style-guide defaults:
 | No semantic ranking | The server does not reorder items by context or prefix relevance |
 | No type inference | Cannot suggest methods based on object type |
 
+> **Future work — .NET method dispatch on built-in types.** When the LSP
+> grows type-aware member completion or an "unknown member" diagnostic on
+> `:` access, suppress warnings for receivers typed `string`, `number`,
+> `date`, `array`, `boolean`, or `netobject`: the SSL runtime forwards
+> unmatched `:` access on these to the underlying .NET value (e.g.
+> `sName:Length`, `sName:ToUpper()`, `dDate:AddDays(1)`, `aList:Count`).
+> A reasonable surface: treat unmatched members on these receivers as
+> "unresolved .NET member" rather than an error, and offer completions
+> only for SSL-side members (the .NET surface is too broad to enumerate).
+> See `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md`
+> ("`.NET Method Dispatch on Built-in Types`") for the canonical rule.
+> Tracked in [issue #22](https://github.com/mahoskye/starlims-lsp/issues/22).
+
 ---
 
 ## 6. Test Specifications
