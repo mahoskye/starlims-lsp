@@ -253,6 +253,88 @@ Foo(DoProc(""));
 	}
 }
 
+func TestHandleCompletion_InDoProcString_AtOpeningQuoteBoundary(t *testing.T) {
+	// Cursor sitting at the opening quote position (col 8, 0-based: 7).
+	// Per GetContextAtPosition, the column == tokenStartCol case counts as
+	// inside the string, so the exception applies.
+	s := newTestServerWithDocument(`:PROCEDURE Greet;
+:ENDPROC;
+
+:PROCEDURE Caller;
+DoProc("");
+:ENDPROC;`)
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	if !containsCompletionLabel(items, "Greet") {
+		t.Errorf("expected 'Greet' at opening-quote boundary, got %d items", len(items))
+	}
+}
+
+func TestHandleCompletion_AfterClosingQuote_NoLongerInString(t *testing.T) {
+	// Cursor right after the closing quote — we're no longer in the
+	// string context, so the DoProc exception must NOT fire.
+	s := newTestServerWithDocument(`:PROCEDURE Greet;
+:ENDPROC;
+
+:PROCEDURE Caller;
+DoProc("name");
+:ENDPROC;`)
+	// `DoProc("name")` — closing `"` at col 13 (1-based: 14). Cursor at
+	// col 14 (0-based) is immediately after the closing quote.
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 14},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	// Outside the string, fall through to general completions — these
+	// will include keywords/snippets but NOT the bare-name procedure
+	// completion (that one carries InsertText = bare proc name).
+	for _, it := range items {
+		if it.Label == "Greet" && it.InsertText != nil && *it.InsertText == "Greet" {
+			t.Errorf("did not expect bare-name DoProc completion outside the string; items=%d", len(items))
+		}
+	}
+}
+
+func TestHandleCompletion_DoProcWithVariableName_NoTrigger(t *testing.T) {
+	// `DoProc(sName, {arg})` — first arg is an identifier, not a string
+	// literal. The cursor sits inside a later string literal that is the
+	// args array. The DoProc exception must NOT trigger because the
+	// preceding string token isn't the FIRST positional arg of DoProc.
+	s := newTestServerWithDocument(`:PROCEDURE Caller;
+:DECLARE sName;
+sName := "Greet";
+DoProc(sName, {""});
+:ENDPROC;`)
+	// Cursor inside the literal "" on line 3 (0-based), col 16.
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 16},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	if len(items) != 0 {
+		t.Errorf("expected no completion (not in DoProc's first-arg string), got %d items", len(items))
+	}
+}
+
 func TestHandleCompletion_InRegularString_NoCompletions(t *testing.T) {
 	// Sanity check: a plain string literal (not DoProc/ExecFunction) still
 	// suppresses completions.

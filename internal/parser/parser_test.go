@@ -285,6 +285,44 @@ func TestParser_ExtractProcedures_DocblockOnlyParametersAndReturns(t *testing.T)
 	}
 }
 
+func TestParser_ExtractProcedures_OnlyImmediatePrecedingCommentAttaches(t *testing.T) {
+	// When two comments stack above :PROCEDURE with only whitespace
+	// between them, only the IMMEDIATELY preceding comment counts.
+	input := `/*
+ * Description: from the OLD comment
+;
+/*
+ * Description: from the CURRENT comment
+;
+:PROCEDURE Test;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Description != "from the CURRENT comment" {
+		t.Errorf("expected only immediate predecessor to attach; got %q", doc.Description)
+	}
+}
+
+func TestParser_ExtractProcedures_NonDocCommentStillAttachesGracefully(t *testing.T) {
+	// A plain (non-doc-format) comment right above :PROCEDURE should
+	// attach as Raw text without crashing, even though no recognised
+	// fields are parsed.
+	input := `/* TODO: rewrite this proc someday ;
+:PROCEDURE Legacy;
+:ENDPROC;`
+	p, root := parseInput(t, input)
+	doc := p.ExtractProcedures(root)[0].Doc
+	if doc.Raw == "" {
+		t.Errorf("expected Raw to be populated from the preceding comment, got empty")
+	}
+	if doc.Description != "" {
+		t.Errorf("expected empty Description for non-doc comment, got %q", doc.Description)
+	}
+	if doc.Returns != "" {
+		t.Errorf("expected empty Returns for non-doc comment, got %q", doc.Returns)
+	}
+}
+
 func TestParser_ExtractProcedures_NoEndproc(t *testing.T) {
 	input := `:PROCEDURE Test;
 value := 1;`

@@ -411,6 +411,59 @@ DoProc("Use", {oShaped, "literal", nUntracked});
 	}
 }
 
+func TestBuildUDObjectShapes_AugmentedPropertyPropagates(t *testing.T) {
+	// Augmentation followed by DoProc: the late-added property must reach
+	// the callee. Validates that the fixpoint loop runs augmentation +
+	// propagation together rather than freezing the shape too early.
+	src := `:PROCEDURE Build;
+oFoo := CreateUDObject({{"initial", ""}});
+oFoo:lateAdded := "x";
+DoProc("Use", {oFoo});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oRecv;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	recv := shapes["orecv"]
+	names := map[string]bool{}
+	for _, p := range recv.Properties {
+		names[p.Name] = true
+	}
+	if !names["initial"] {
+		t.Errorf("oRecv missing 'initial': %#v", recv.Properties)
+	}
+	if !names["lateAdded"] {
+		t.Errorf("oRecv missing augmented 'lateAdded': %#v", recv.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_DoProcWithVariableName_NoPropagation(t *testing.T) {
+	// `DoProc(sName, {oFoo})` — first arg is a variable, not a string
+	// literal. Without a resolvable target, no propagation can happen.
+	// Must not crash and must not bind oFoo to some random procedure.
+	src := `:PROCEDURE Build;
+:DECLARE sName;
+oFoo := CreateUDObject({{"a", ""}});
+sName := "Use";
+DoProc(sName, {oFoo});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oRecv;
+:ENDPROC;`
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	procedures := p.ExtractProcedures(p.Parse())
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	if got, ok := shapes["orecv"]; ok && len(got.Properties) > 0 {
+		t.Errorf("expected no propagation through variable proc name, got %#v", got.Properties)
+	}
+}
+
 func keys(m map[string]UDObjectShape) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
