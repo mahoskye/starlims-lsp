@@ -37,7 +37,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.21"
+          # Track the repo's go directive (go.mod). actions/setup-go@v6 sets
+          # GOTOOLCHAIN=local, so a static pin here cannot auto-upgrade to
+          # satisfy go.mod's `go 1.25.4` — building from go.mod keeps the
+          # workflow in sync with whatever the codebase requires.
+          go-version-file: go.mod
 
       - name: Build binaries
         env:
