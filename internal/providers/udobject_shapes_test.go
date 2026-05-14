@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 )
 
 func tokenize(t *testing.T, src string) []lexer.Token {
@@ -128,4 +129,94 @@ oFoo := CreateUDObject({{"b", 0}, {"c", .T.}});
 	if got.Properties[0].Name != "b" {
 		t.Errorf("expected first prop 'b', got %q", got.Properties[0].Name)
 	}
+}
+
+func TestBuildUDObjectShapes_PropertyAssignmentAugmentsShape(t *testing.T) {
+	// vs-code-ssl-formatter#73 — properties added via `oVar:newProp := …`
+	// should appear in the shape even though they weren't in the original
+	// CreateUDObject initializer.
+	src := `:PROCEDURE Demo;
+oFoo := CreateUDObject({{"tableName", ""}});
+oFoo:lateProp := "hello";
+oFoo:numericProp := 42;
+:ENDPROC;`
+
+	shapes := BuildUDObjectShapes(tokenize(t, src))
+	got, ok := shapes["ofoo"]
+	if !ok {
+		t.Fatalf("expected shape for oFoo")
+	}
+	names := map[string]string{}
+	for _, p := range got.Properties {
+		names[p.Name] = p.Type
+	}
+	if _, ok := names["tableName"]; !ok {
+		t.Errorf("missing original prop tableName: %#v", got.Properties)
+	}
+	if got := names["lateProp"]; got != "string" {
+		t.Errorf("lateProp: got %q, want string", got)
+	}
+	if got := names["numericProp"]; got != "number" {
+		t.Errorf("numericProp: got %q, want number", got)
+	}
+}
+
+func TestBuildUDObjectShapes_PropertyAssignment_NoPriorInitializer(t *testing.T) {
+	// Even without a CreateUDObject anchor, repeated property assignments to
+	// the same variable should build up an implicit shape (best-effort —
+	// could be a strongly-typed object, could be a UDObject; either way the
+	// list of assigned properties is useful for completion).
+	src := `:PROCEDURE Demo;
+oBar:alpha := "x";
+oBar:beta := .T.;
+:ENDPROC;`
+
+	shapes := BuildUDObjectShapes(tokenize(t, src))
+	got, ok := shapes["obar"]
+	if !ok {
+		t.Fatalf("expected implicit shape for oBar")
+	}
+	if len(got.Properties) != 2 {
+		t.Fatalf("expected 2 props, got %d (%#v)", len(got.Properties), got.Properties)
+	}
+}
+
+func TestBuildUDObjectShapes_CrossProcedurePropagation(t *testing.T) {
+	// vs-code-ssl-formatter#73 — when a shaped UDObject is passed into a
+	// procedure, that procedure's first parameter inherits the caller's
+	// shape so completions inside the callee see the same properties.
+	src := `:PROCEDURE Build;
+oResult := CreateUDObject({{"alpha", ""}, {"beta", 0}});
+DoProc("Use", {oResult});
+:ENDPROC;
+
+:PROCEDURE Use;
+:PARAMETERS oIncoming;
+:ENDPROC;`
+
+	tokens := tokenize(t, src)
+	p := parser.NewParser(tokens)
+	root := p.Parse()
+	procedures := p.ExtractProcedures(root)
+
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	got, ok := shapes["oincoming"]
+	if !ok {
+		t.Fatalf("expected shape on callee parameter oIncoming; have keys: %v", keys(shapes))
+	}
+	names := map[string]bool{}
+	for _, p := range got.Properties {
+		names[p.Name] = true
+	}
+	if !names["alpha"] || !names["beta"] {
+		t.Errorf("expected propagated props {alpha, beta}, got %#v", got.Properties)
+	}
+}
+
+func keys(m map[string]UDObjectShape) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

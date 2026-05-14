@@ -20,10 +20,16 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	cache := s.documents.ParseDocument(uri, version)
 
 	// Check if we're inside a string or comment - if so, return no completions
+	// (with one exception below).
 	// LSP positions are 0-based, our functions expect 1-based
 	line := int(params.Position.Line) + 1
 	column := int(params.Position.Character) + 1
 	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
+		// Exception: inside a DoProc("…") / ExecFunction("…") string argument,
+		// offer the procedures defined in this script (vs-code-ssl-formatter#74).
+		if isDoProcStringContext(cache.Tokens, line, column) {
+			return toProtocolCompletionItems(providers.GetProcedureNameCompletions(cache.Procedures)), nil
+		}
 		return []protocol.CompletionItem{}, nil
 	}
 
@@ -113,7 +119,7 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 				return providers.GetClassMemberCompletions(tok.Text)
 			default:
 				// Issue #7: variable bound to an inferred UDObject shape.
-				shapes := providers.BuildUDObjectShapes(cache.Tokens)
+				shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
 				if items := providers.GetUDObjectShapeCompletions(tok.Text, shapes); items != nil {
 					return items
 				}
@@ -122,6 +128,66 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 	}
 
 	return nil
+}
+
+// isDoProcStringContext reports whether the cursor at (line, column) sits
+// inside a string literal that is the first positional argument of a
+// `DoProc(...)` or `ExecFunction(...)` call. It tolerates a cursor positioned
+// anywhere within the string (including at the closing quote) and is
+// case-insensitive on the function name.
+func isDoProcStringContext(tokens []lexer.Token, line, column int) bool {
+	stringIdx := tokenContainingPosition(tokens, line, column)
+	if stringIdx < 0 || tokens[stringIdx].Type != lexer.TokenString {
+		return false
+	}
+
+	parenIdx := indexOfPriorSignificantToken(tokens, stringIdx)
+	if parenIdx < 0 || tokens[parenIdx].Text != "(" {
+		return false
+	}
+
+	nameIdx := indexOfPriorSignificantToken(tokens, parenIdx)
+	if nameIdx < 0 || tokens[nameIdx].Type != lexer.TokenIdentifier {
+		return false
+	}
+	name := strings.ToLower(tokens[nameIdx].Text)
+	return name == "doproc" || name == "execfunction"
+}
+
+// tokenContainingPosition returns the index of the token whose source range
+// contains (line, column), or -1 if no token does. Multi-line tokens (strings,
+// comments) are handled by counting newlines in the token text.
+func tokenContainingPosition(tokens []lexer.Token, line, column int) int {
+	for i := range tokens {
+		tok := tokens[i]
+		startLine := tok.Line
+		startCol := tok.Column
+		endLine := startLine
+		endCol := startCol
+		for _, r := range tok.Text {
+			if r == '\n' {
+				endLine++
+				endCol = 1
+			} else {
+				endCol++
+			}
+		}
+		within := false
+		switch {
+		case line == startLine && line == endLine:
+			within = column >= startCol && column <= endCol
+		case line == startLine:
+			within = column >= startCol
+		case line == endLine:
+			within = column <= endCol
+		case line > startLine && line < endLine:
+			within = true
+		}
+		if within {
+			return i
+		}
+	}
+	return -1
 }
 
 // indexOfTokenBefore returns the index of the latest token whose end

@@ -76,6 +76,50 @@ MyProc(1, 2);
 	}
 }
 
+func TestGetHover_Procedure_DocblockSurfaces(t *testing.T) {
+	// vs-code-ssl-formatter#75 — docblock fields should appear in hover.
+	text := `/*
+ * Description: Composes a friendly greeting.
+ * Parameters:
+ *   sName - the user name
+ * Returns: sGreeting - the composed greeting
+;
+:PROCEDURE Greet;
+:PARAMETERS sName;
+:RETURN "hi " + sName;
+:ENDPROC;
+
+:PROCEDURE Caller;
+Greet("World");
+:ENDPROC;`
+
+	procedures := []parser.ProcedureInfo{
+		{
+			Name: "Greet", StartLine: 7, EndLine: 10, Parameters: []string{"sName"},
+			Doc: parser.ProcedureDoc{
+				Description:   "Composes a friendly greeting.",
+				ParameterDocs: map[string]string{"sName": "the user name"},
+				Returns:       "sGreeting - the composed greeting",
+			},
+		},
+		{Name: "Caller", StartLine: 12, EndLine: 14},
+	}
+
+	hover := GetHover(text, 13, 1, procedures, nil)
+	if hover == nil {
+		t.Fatal("expected hover for Greet")
+	}
+	if !strings.Contains(hover.Contents, "Composes a friendly greeting") {
+		t.Errorf("hover missing description: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "the user name") {
+		t.Errorf("hover missing parameter doc: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "Returns") {
+		t.Errorf("hover missing returns: %s", hover.Contents)
+	}
+}
+
 func TestGetHover_BuiltinFunction(t *testing.T) {
 	text := `result := Len("hello");`
 
@@ -6533,8 +6577,11 @@ func TestGetDiagnostics_ParametersAfterProcedureWithComment(t *testing.T) {
 
 // ==================== New Diagnostic Tests ====================
 
-func TestGetDiagnostics_NotEqualsAsymmetry(t *testing.T) {
-	// != with string literal should warn about asymmetry with =
+func TestGetDiagnostics_NotEqualsNoAsymmetryWarning(t *testing.T) {
+	// '!=' is the well-defined exact-match negation operator in SSL. Using it with a
+	// string literal is a valid pattern (see vs-code-ssl-formatter#78) and must not
+	// trigger the equals_vs_strict_equals diagnostic. The companion warning still
+	// fires on bare '=' string comparisons via the dedicated checker.
 	text := `:DECLARE sStatus;
 :IF sStatus != "Logged";
 	x := 1;
@@ -6543,30 +6590,9 @@ func TestGetDiagnostics_NotEqualsAsymmetry(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
-	found := false
 	for _, d := range diagnostics {
 		if d.Code == CodeEqualsVsStrictEquals {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected equals_vs_strict_equals info for != with string literal")
-	}
-}
-
-func TestGetDiagnostics_NotEqualsAsymmetry_NonString(t *testing.T) {
-	// != with numbers should NOT trigger
-	text := `:DECLARE nVal;
-:IF nVal != 0;
-	x := 1;
-:ENDIF;`
-
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-
-	for _, d := range diagnostics {
-		if d.Code == CodeEqualsVsStrictEquals {
-			t.Errorf("unexpected != asymmetry warning for non-string comparison: %s", d.Message)
+			t.Errorf("unexpected equals_vs_strict_equals diagnostic for '!=': %s", d.Message)
 		}
 	}
 }

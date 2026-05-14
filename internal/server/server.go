@@ -62,6 +62,7 @@ type FormatSettings struct {
 	CommaSpacing             *bool              `json:"commaSpacing"`
 	SemicolonEnforcement     *bool              `json:"semicolonEnforcement"`
 	BlankLinesBetweenProcs   *int               `json:"blankLinesBetweenProcs"`
+	BlankLineBetweenBlocks   *bool              `json:"blankLineBetweenBlocks"`
 	TrimTrailingWhitespace   *bool              `json:"trimTrailingWhitespace"`
 	MaxConsecutiveBlankLines *int               `json:"maxConsecutiveBlankLines"`
 	BuiltinFunctionCase      *string            `json:"builtinFunctionCase"`
@@ -432,6 +433,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Formatting.CommaSpacing, fmt.CommaSpacing)
 		applyOptional(&s.settings.Formatting.SemicolonEnforcement, fmt.SemicolonEnforcement)
 		applyOptional(&s.settings.Formatting.BlankLinesBetweenProcs, fmt.BlankLinesBetweenProcs)
+		applyOptional(&s.settings.Formatting.BlankLineBetweenBlocks, fmt.BlankLineBetweenBlocks)
 		applyOptional(&s.settings.Formatting.TrimTrailingWhitespace, fmt.TrimTrailingWhitespace)
 		applyOptional(&s.settings.Formatting.MaxConsecutiveBlankLines, fmt.MaxConsecutiveBlankLines)
 		applyOptional(&s.settings.Formatting.BuiltinFunctionCase, fmt.BuiltinFunctionCase)

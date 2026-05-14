@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-05-13
+
+### Fixed
+- **Issue #14 — `equals_vs_strict_equals` false positive on `!=`.**
+  The diagnostic that warned about `!=` with a string operand has been
+  removed: `!=` is the well-defined exact-match negation operator in SSL
+  and using it (e.g. `:IF oCurrent:status != "Done";`) is a valid,
+  non-misleading pattern. The companion warning on bare `=` string
+  comparisons (suggesting `==`) is unaffected. Reported in
+  vs-code-ssl-formatter#78.
+- **Issue #16 — Wrap no longer splits `oVar:property`.** The line-wrap
+  rule for long lines treated the member-access `:` as an ordinary
+  punctuation boundary, so `someFunc(oVar:propertyName, …)` could be
+  broken into `oVar:\n    propertyName`. `canWrapBefore` now refuses to
+  split immediately before or after a TokenPunctuation `:`, keeping the
+  receiver and member glued together. Reported in
+  vs-code-ssl-formatter#76.
+
+### Added
+- **Issue #15 — Blank line between sibling control-flow blocks.** A new
+  post-format pass inserts a blank line between adjacent
+  `:IF` / `:WHILE` / `:FOR` / `:BEGINCASE` / `:TRY` blocks at the same
+  indent so a wall of closely-grouped blocks reads as distinct units.
+  Gated by the new `blankLineBetweenBlocks` formatting option (default
+  `true`). Reported in vs-code-ssl-formatter#77.
+- **Issue #17 — Procedure docblock surfaces in hover and completion.**
+  The parser now attaches the leading `/* … ;` comment block that
+  precedes each `:PROCEDURE` to its `ProcedureInfo`, parsing
+  `Description:`, `Parameters: name - desc` lines, and `Returns:` into a
+  structured `ProcedureDoc`. Hover and completion documentation panels
+  weave these in alongside the existing parameter list. Reported in
+  vs-code-ssl-formatter#75.
+- **Issue #18 — In-script procedure name completion inside DoProc /
+  ExecFunction strings.** The completion handler previously suppressed
+  all suggestions when the cursor was inside a string literal. It now
+  detects when that string is the first argument of `DoProc(…)` or
+  `ExecFunction(…)` and offers procedures defined in the current
+  document, inserting just the bare name (no DoProc snippet). Reported
+  in vs-code-ssl-formatter#74.
+- **Issue #19 — UDObject property tracking augments and propagates.**
+  `BuildUDObjectShapesWithProcedures` extends shape inference with two
+  new passes: property assignments (`oVar:newProp := …`) add `newProp`
+  to oVar's shape (creating an implicit shape if none existed), and
+  `DoProc("Bar", {oFoo, …})` propagates oFoo's shape to Bar's first
+  parameter so completions inside the callee see the same property set
+  the caller built up. Passes iterate to fixpoint so shapes built up in
+  one procedure flow through to its callees. Reported in
+  vs-code-ssl-formatter#73.
+
 ## [0.7.5] - 2026-05-08
 
 ### Fixed

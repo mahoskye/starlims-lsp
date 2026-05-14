@@ -66,6 +66,97 @@ func TestHandleCompletion_ReturnsItems(t *testing.T) {
 	}
 }
 
+func TestHandleCompletion_InDoProcString_OffersProcedureNames(t *testing.T) {
+	// vs-code-ssl-formatter#74 — when the cursor is inside the string argument
+	// of DoProc("…"), the LSP must surface procedures defined in the current
+	// script. The default in-string behavior is to suppress completions, so
+	// this exercises the explicit exception.
+	s := newTestServerWithDocument(`:PROCEDURE Greet;
+:ENDPROC;
+
+:PROCEDURE Caller;
+DoProc("");
+:ENDPROC;`)
+
+	// Cursor sits between the two quotes on line 5 (0-based: 4), column 9
+	// (0-based: 8) — i.e. just after the opening quote of "".
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 8},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if !containsCompletionLabel(items, "Greet") {
+		t.Errorf("expected 'Greet' procedure in DoProc string completion list, got %d items", len(items))
+	}
+	// The insert text should be the bare name, not a DoProc(...) snippet.
+	item := findCompletionItem(items, "Greet")
+	if item == nil {
+		t.Fatal("Greet completion item missing")
+	}
+	if item.InsertText == nil || *item.InsertText != "Greet" {
+		t.Errorf("expected bare-name insert text 'Greet', got %#v", item.InsertText)
+	}
+}
+
+func TestHandleCompletion_InExecFunctionString_OffersProcedureNames(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Greet;
+:ENDPROC;
+
+:PROCEDURE Caller;
+ExecFunction("");
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 14},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if !containsCompletionLabel(items, "Greet") {
+		t.Errorf("expected 'Greet' in ExecFunction string completion list, got %d items", len(items))
+	}
+}
+
+func TestHandleCompletion_InRegularString_NoCompletions(t *testing.T) {
+	// Sanity check: a plain string literal (not DoProc/ExecFunction) still
+	// suppresses completions.
+	s := newTestServerWithDocument(`:PROCEDURE Caller;
+x := "";
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 1, Character: 6},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if len(items) != 0 {
+		t.Errorf("expected no completions inside non-DoProc string, got %d", len(items))
+	}
+}
+
 func TestHandleCompletion_ClassMethodUsesMeSnippet(t *testing.T) {
 	s := newTestServerWithDocument(`:CLASS MyClass;
 
