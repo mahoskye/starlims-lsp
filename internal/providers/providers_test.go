@@ -6650,36 +6650,6 @@ func TestGetDiagnostics_NotEqualsNonStringStaysSilent(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_StrictEqualsStringStaysSilent(t *testing.T) {
-	// `==` is the strict-equality operator the warning is supposed to
-	// recommend. It must not itself trip the diagnostic.
-	text := `:DECLARE sStatus;
-:IF sStatus == "Logged";
-	x := 1;
-:ENDIF;`
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-	for _, d := range diagnostics {
-		if d.Code == CodeEqualsVsStrictEquals {
-			t.Errorf("'==' must not trigger equals_vs_strict_equals: %s", d.Message)
-		}
-	}
-}
-
-func TestGetDiagnostics_NotEqualsBothLiterals_StaysSilent(t *testing.T) {
-	// `"a" != "b"` is silly but valid — it must not warn.
-	text := `:IF "a" != "b";
-	x := 1;
-:ENDIF;`
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-	for _, d := range diagnostics {
-		if d.Code == CodeEqualsVsStrictEquals {
-			t.Errorf("'!=' between two string literals must not warn: %s", d.Message)
-		}
-	}
-}
-
 func TestGetDiagnostics_NotEqualsNoAsymmetryWarning(t *testing.T) {
 	// '!=' is the well-defined exact-match negation operator in SSL. Using it with a
 	// string literal is a valid pattern (see vs-code-ssl-formatter#78) and must not

@@ -367,7 +367,9 @@ DoProc("Use", {oA, oB, oC});
 }
 
 func TestBuildUDObjectShapes_CalleeHasNoParameters(t *testing.T) {
-	// A target procedure with zero parameters: nothing to bind.
+	// A target procedure with zero parameters: nothing to bind. We assert
+	// both that the call doesn't panic AND that the caller's own shape
+	// remains intact (no accidental clobber via the propagation loop).
 	src := `:PROCEDURE Build;
 oResult := CreateUDObject({{"prop", ""}});
 DoProc("Use", {oResult});
@@ -378,8 +380,10 @@ DoProc("Use", {oResult});
 	tokens := tokenize(t, src)
 	p := parser.NewParser(tokens)
 	procedures := p.ExtractProcedures(p.Parse())
-	// Should not panic.
-	BuildUDObjectShapesWithProcedures(tokens, procedures)
+	shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+	if got := shapes["oresult"]; len(got.Properties) != 1 || got.Properties[0].Name != "prop" {
+		t.Errorf("caller's shape clobbered by propagation through zero-param callee: %#v", got)
+	}
 }
 
 func TestBuildUDObjectShapes_MixedArgs_NonShapedSkipped(t *testing.T) {

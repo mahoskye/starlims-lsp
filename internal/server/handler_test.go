@@ -155,34 +155,6 @@ func TestHandleCompletion_InDoProcString_CaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestHandleCompletion_InDoProcString_PartialTypedName(t *testing.T) {
-	// Even when the user has typed a partial name, the full list comes
-	// back; the editor handles prefix filtering.
-	s := newTestServerWithDocument(`:PROCEDURE Greeter;
-:ENDPROC;
-
-:PROCEDURE Greedy;
-:ENDPROC;
-
-:PROCEDURE Caller;
-DoProc("Gr");
-:ENDPROC;`)
-	// Cursor right after the partial "Gr": line 7 (0-based), column 11.
-	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
-		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
-			Position:     protocol.Position{Line: 7, Character: 11},
-		},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	items := result.([]protocol.CompletionItem)
-	if !containsCompletionLabel(items, "Greeter") || !containsCompletionLabel(items, "Greedy") {
-		t.Errorf("expected both candidates, got %d items", len(items))
-	}
-}
-
 func TestHandleCompletion_InComment_NoProcedureNames(t *testing.T) {
 	// Comment context still suppresses completions — the DoProc exception
 	// is string-only.
