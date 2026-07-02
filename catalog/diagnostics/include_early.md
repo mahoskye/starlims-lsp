@@ -26,7 +26,7 @@ history:
       Stable code include_early assigned — to BOTH paths, although a
       separate include_in_procedure constant was defined at the same time
       (see Known gaps).
-issues: []
+issues: ["#30"]
 ---
 
 ## Behavior

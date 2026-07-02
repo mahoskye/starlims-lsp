@@ -22,7 +22,7 @@ history:
     ref: "15102d6 (v0.2.0)"
     note: Go-to-definition for DoProc/ExecFunction string targets (double- or
       single-quoted), same-file only.
-issues: []
+issues: ["#41"]
 ---
 
 ## Behavior

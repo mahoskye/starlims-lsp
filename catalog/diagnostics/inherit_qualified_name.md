@@ -18,7 +18,7 @@ history:
       Code constant CodeInheritQualifiedName was added with the stable
       diagnostic codes, but no check has ever emitted it — the rule is
       unimplemented.
-issues: []
+issues: ["#31"]
 ---
 
 ## Behavior

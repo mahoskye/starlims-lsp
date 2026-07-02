@@ -17,7 +17,7 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
-issues: []
+issues: ["#32"]
 ---
 
 ## Behavior

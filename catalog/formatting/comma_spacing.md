@@ -18,7 +18,7 @@ history:
     note: >-
       Adjacent commas (skipped parameters, e.g. {a,,b}) deliberately get no
       space inserted between them.
-issues: []
+issues: ["#35"]
 ---
 
 ## Behavior

@@ -15,7 +15,7 @@ history:
   - date: 2026-04-30
     ref: "PR #4 (v0.5.0)"
     note: Added as a formatter post-pass; 0 disables the cap (default).
-issues: []
+issues: ["#37"]
 ---
 
 ## Behavior

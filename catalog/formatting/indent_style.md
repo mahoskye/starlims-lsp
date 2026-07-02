@@ -16,7 +16,7 @@ history:
     note: >-
       Part of the original document formatter; tab default matches the
       style guide's tabs-preferred guidance.
-issues: []
+issues: ["#36"]
 ---
 
 ## Behavior

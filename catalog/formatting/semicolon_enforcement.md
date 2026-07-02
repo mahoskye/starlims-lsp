@@ -18,7 +18,7 @@ history:
   - date: 2026-01-10
     ref: "v0.1.0 initial release"
     note: LSP formatter carries the same continuation-aware enforcement.
-issues: []
+issues: ["#38"]
 ---
 
 ## Behavior

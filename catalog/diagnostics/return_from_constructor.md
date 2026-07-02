@@ -23,7 +23,7 @@ history:
       by diag.constructor_return_value (checkClassContextRules); this slug
       appears to be a stillborn duplicate. Needs either an implementation
       or removal of the constant plus status: removed here.
-issues: []
+issues: ["#31"]
 ---
 
 ## Behavior

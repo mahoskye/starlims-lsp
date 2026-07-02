@@ -15,7 +15,7 @@ history:
     note: >-
       Part of the original document formatter; blank-line count exposed as
       ssl.format.blankLinesBetweenProcs (default 1).
-issues: []
+issues: ["#33"]
 ---
 
 ## Behavior

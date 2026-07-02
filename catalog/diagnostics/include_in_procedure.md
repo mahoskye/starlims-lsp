@@ -16,7 +16,7 @@ history:
       Constant CodeIncludeInProcedure defined, but the in-procedure emit
       site in checkIncludePlacement was tagged CodeIncludeEarly instead.
       The constant has never been emitted.
-issues: []
+issues: ["#30"]
 ---
 
 ## Behavior

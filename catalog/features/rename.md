@@ -19,7 +19,7 @@ history:
     note: textDocument/rename and prepare-rename added — context/symbol
       validation, new-name validation, scope-aware edits via the shared
       reference search.
-issues: []
+issues: ["#43"]
 ---
 
 ## Behavior

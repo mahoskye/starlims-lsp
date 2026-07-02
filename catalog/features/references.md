@@ -18,7 +18,7 @@ history:
     ref: "0b0acdb (v0.2.0)"
     note: Scope-aware reference finding — local variables and parameters are
       confined to their declaring procedure.
-issues: []
+issues: ["#42", "#43"]
 ---
 
 ## Behavior

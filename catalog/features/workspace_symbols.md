@@ -20,7 +20,7 @@ history:
       initialization (4 bounded workers) and kept fresh via registered file
       watchers, so search covers the whole workspace, not just open
       documents. 500-result cap introduced.
-issues: []
+issues: ["#45"]
 ---
 
 ## Behavior

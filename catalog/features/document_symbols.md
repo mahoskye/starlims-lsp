@@ -19,7 +19,7 @@ history:
     note: Hierarchical symbols added — region comment markers become
       Namespace containers holding the procedures and publics declared
       inside them; fixes the empty-outline report.
-issues: []
+issues: ["#44"]
 ---
 
 ## Behavior

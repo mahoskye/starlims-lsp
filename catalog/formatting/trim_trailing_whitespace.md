@@ -15,7 +15,7 @@ history:
     note: >-
       Added as a dedicated post-pass, default on; the streaming formatter
       had already been trimming line ends unconditionally since v0.1.0.
-issues: []
+issues: ["#39"]
 ---
 
 ## Behavior

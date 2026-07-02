@@ -17,7 +17,7 @@ history:
     note: >-
       Added with "preserve" as default — rewriting user casing is opt-in;
       "PascalCase" rewrites call sites to the canonical inventory casing.
-issues: []
+issues: ["#34"]
 ---
 
 ## Behavior

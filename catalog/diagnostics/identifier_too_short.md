@@ -15,7 +15,7 @@ history:
     note: >-
       Constant CodeIdentifierTooShort defined alongside
       CodeIdentifierTooLong, but no check was ever wired to it.
-issues: []
+issues: ["#31"]
 ---
 
 ## Behavior

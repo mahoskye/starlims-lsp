@@ -18,7 +18,7 @@ history:
       ssl.inlayHints.enabled and minParameterCount (default 2) settings.
       Hints are suppressed inside string and comment contexts — fixes
       extension issue #39, where hints rendered inside SQL string literals.
-issues: []
+issues: ["#46"]
 ---
 
 ## Behavior

@@ -24,7 +24,7 @@ history:
     note: Stopped aggressive signature-help re-trigger that obscured the
       current line; no trigger characters advertised by default. Opt back in
       via ssl.intellisense.signatureHelp.autoTrigger.
-issues: []
+issues: ["#40"]
 ---
 
 ## Behavior
