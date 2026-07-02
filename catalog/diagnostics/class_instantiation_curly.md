@@ -17,6 +17,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-07-02
+    ref: "issue #32"
+    note: >-
+      False positive fixed: identifiers preceded by the ':' member-access
+      punctuation (oSvc:Email(...)) are exempt — that is a member call, not
+      an instantiation.
 issues: ["#32"]
 ---
 
@@ -36,6 +42,9 @@ It must NOT flag:
   and built-in functions followed by `(`;
 - `CreateUdObject("Email")` — string dispatch of a built-in class is the
   separate rule `diag.createudobject_builtin_misuse`;
+- a colon-qualified member call whose method shares a built-in class name
+  (`oSvc:Email("to")`) — that is a member call on a user object, not an
+  instantiation (issue #32);
 - the class name in non-call positions (bare mention, string content,
   comments).
 
@@ -59,31 +68,22 @@ oMail := Email{};
 :ENDPROC;
 ```
 
-## Rationale
-
-`ClassName()` is what every other mainstream language writes, so it is a
-high-frequency porting mistake, and it is guaranteed-broken SSL — hence an
-error with a message that shows the exact replacement. Matching is a
-simple identifier-then-`(` scan, which keeps the rule fast and
-explainable; the one imprecision that scan admits is recorded below.
-Introduced with the gotcha batch (commit 7261172); the code slug was
-stabilized in PR #3 (v0.4.0).
-
-## Known gaps
-
-- The scan does not look left of the identifier, so a colon-qualified
-  member call whose method happens to share a built-in class name — e.g.
-  `oSvc:Email("to")` — flags as if it were an instantiation. That is a
-  method call on a user object, not a class instantiation, and the intent
-  of gotcha #15 is instantiation syntax only. Target: an identifier
-  preceded by the `:` member-access punctuation must be exempt. No issue
-  filed yet; covered by the expect=fail fence below.
-
 ### Does not flag
 
-```ssl expect=fail
+```ssl
 :PROCEDURE Demo;
 :DECLARE oSvc, xResult;
 xResult := oSvc:Email("to");
 :ENDPROC;
 ```
+
+## Rationale
+
+`ClassName()` is what every other mainstream language writes, so it is a
+high-frequency porting mistake, and it is guaranteed-broken SSL — hence an
+error with a message that shows the exact replacement. Matching is a
+simple identifier-then-`(` scan with one look-left exemption: an
+identifier preceded by the `:` member-access punctuation is a member call,
+not an instantiation (issue #32) — the last Does-not-flag fence pins that
+permanently. Introduced with the gotcha batch (commit 7261172); the code
+slug was stabilized in PR #3 (v0.4.0).

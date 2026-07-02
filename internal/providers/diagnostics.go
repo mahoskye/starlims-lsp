@@ -803,6 +803,15 @@ func checkClassInstantiationSyntax(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
+		// Skip qualified access: oSvc:Email(...) is a member call on a user
+		// object, not an instantiation of the built-in class.
+		if prevIdx := previousSignificantTokenIndex(tokens, i-1); prevIdx >= 0 {
+			p := tokens[prevIdx]
+			if p.Type == lexer.TokenPunctuation && p.Text == ":" {
+				continue
+			}
+		}
+
 		// Look ahead for '(' (skip whitespace)
 		for j := i + 1; j < len(tokens); j++ {
 			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
@@ -1671,6 +1680,14 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 		case strings.EqualFold(token.Text, "Me"):
 			if tokenInClassRange(token, classToken) {
 				continue
+			}
+			// Skip qualified access: oObj:Me is a member named Me, not the
+			// self-reference (same guard as checkUnqualifiedFieldAssignment).
+			if prevIdx := previousSignificantTokenIndex(tokens, i-1); prevIdx >= 0 {
+				p := tokens[prevIdx]
+				if p.Type == lexer.TokenPunctuation && p.Text == ":" {
+					continue
+				}
 			}
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
