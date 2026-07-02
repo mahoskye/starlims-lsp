@@ -1,5 +1,7 @@
 # Diagnostics
 
+> **Normative source:** [`feature.diagnostics_pipeline`](../../catalog/features/diagnostics_pipeline.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/publishDiagnostics` (server to client)  
 **Source Files:** `internal/providers/diagnostics.go`
@@ -24,6 +26,16 @@ The diagnostics provider analyzes SSL code and reports potential issues as squig
 | Hint | 4 | Faint dots | Minor suggestions |
 
 ### 2.2 Implemented Diagnostics
+
+The normative rule list lives in the behavior catalog — one entry per code
+slug with expected behavior, executable examples, and decision history:
+
+- Generated table: [docs/reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md)
+- Entries: [`catalog/diagnostics/`](../../catalog/diagnostics/)
+
+The table below was the hand-maintained list this section used to carry; it
+is retained only until every catalog entry is reviewed, and is no longer
+updated. **Do not add rows here — add or edit a catalog entry instead.**
 
 | Diagnostic | Severity | Description |
 |------------|----------|-------------|

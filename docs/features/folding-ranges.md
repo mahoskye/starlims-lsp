@@ -1,5 +1,7 @@
 # Folding Ranges
 
+> **Normative source:** [`feature.folding`](../../catalog/features/folding.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/foldingRange`  
 **Source Files:** `internal/providers/symbols.go`, `internal/server/handler.go`

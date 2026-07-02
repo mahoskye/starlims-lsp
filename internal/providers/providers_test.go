@@ -569,25 +569,30 @@ x := 1;
 	}
 }
 
+// [spec feature.folding/A7]
 func TestGetFoldingRanges_CommentBlocks(t *testing.T) {
 	text := `/* This is a
 multi-line
-comment block */
+comment block ;
 :PROCEDURE Test;
 :ENDPROC;`
 
 	ranges := GetFoldingRanges(text)
 
-	// Should have at least a comment block range
+	// The multi-line comment (not a region marker) must fold with kind
+	// "comment", not "region".
 	foundComment := false
 	for _, r := range ranges {
-		if r.Kind == "comment" {
+		if r.StartLine == 0 && r.EndLine == 2 {
+			if r.Kind != "comment" {
+				t.Errorf("expected kind %q for multi-line comment fold, got %q", "comment", r.Kind)
+			}
 			foundComment = true
 		}
 	}
 
 	if !foundComment {
-		t.Log("Note: Multi-line comment block may not be detected as separate folding range")
+		t.Errorf("expected comment folding range (0-2), got: %+v", ranges)
 	}
 }
 
@@ -2518,6 +2523,7 @@ func TestGetFoldingRanges_TryBlock(t *testing.T) {
 	}
 }
 
+// [spec feature.folding/A1]
 func TestGetFoldingRanges_NestedBlocks(t *testing.T) {
 	text := `:PROCEDURE Test;
     :IF x > 0;
@@ -2535,13 +2541,13 @@ func TestGetFoldingRanges_NestedBlocks(t *testing.T) {
 	foundWhile := false
 
 	for _, r := range ranges {
-		if r.StartLine == 0 && r.EndLine == 6 {
+		if r.StartLine == 0 && r.EndLine == 6 && r.Kind == "region" {
 			foundProcedure = true
 		}
-		if r.StartLine == 1 && r.EndLine == 5 {
+		if r.StartLine == 1 && r.EndLine == 5 && r.Kind == "region" {
 			foundIF = true
 		}
-		if r.StartLine == 2 && r.EndLine == 4 {
+		if r.StartLine == 2 && r.EndLine == 4 && r.Kind == "region" {
 			foundWhile = true
 		}
 	}
@@ -2557,6 +2563,7 @@ func TestGetFoldingRanges_NestedBlocks(t *testing.T) {
 	}
 }
 
+// [spec feature.folding/A3]
 func TestGetFoldingRanges_SingleLineNotFoldable(t *testing.T) {
 	text := `:IF x > 0; :RETURN x; :ENDIF;`
 
@@ -2588,6 +2595,29 @@ func TestGetFoldingRanges_UnclosedBlock(t *testing.T) {
 
 	if !foundIF {
 		t.Errorf("unclosed IF block should have folding range extending to end, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A2]
+func TestGetFoldingRanges_RegionMarkers(t *testing.T) {
+	text := `/* region Helpers;
+:PROCEDURE Helper;
+:ENDPROC;
+/* endregion;`
+
+	ranges := GetFoldingRanges(text)
+
+	// The region marker pair should fold from the region line to the
+	// endregion line with kind "region".
+	foundRegion := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 3 && r.Kind == "region" {
+			foundRegion = true
+		}
+	}
+
+	if !foundRegion {
+		t.Errorf("expected region folding range (0-3) for region markers, got: %+v", ranges)
 	}
 }
 

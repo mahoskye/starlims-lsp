@@ -1,5 +1,7 @@
 # Find References
 
+> **Normative source:** [`feature.references`](../../catalog/features/references.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/references`  
 **Source Files:** `internal/providers/definition.go`, `internal/server/handler.go`

@@ -1,5 +1,7 @@
 # Inlay Hints
 
+> **Normative source:** [`feature.inlay_hints`](../../catalog/features/inlay_hints.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/inlayHint`  
 **Source Files:** `internal/providers/inlayhints.go`, `internal/server/wrapper_handler.go`

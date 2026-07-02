@@ -1,5 +1,7 @@
 # Signature Help
 
+> **Normative source:** [`feature.signature_help`](../../catalog/features/signature_help.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/signatureHelp`  
 **Source Files:** `internal/providers/signaturehelp.go`, `internal/server/handler.go`

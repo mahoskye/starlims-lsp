@@ -85,6 +85,10 @@ interface FormattingOptions {
   commaSpacing: boolean;
   semicolonEnforcement: boolean;
   blankLinesBetweenProcs: number;
+  blankLineBetweenBlocks: boolean;
+  trimTrailingWhitespace: boolean;
+  maxConsecutiveBlankLines: number;
+  builtinFunctionCase: "preserve" | "PascalCase";
   sql: SQLFormattingOptions;
 }
 
@@ -102,6 +106,8 @@ interface DiagnosticOptions {
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
+  rules: { [slug: string]: "off" | "info" | "warn" | "warning" | "error" };
+  endpointPatterns: string[];
 }
 
 interface InlayHintOptions {
@@ -227,6 +233,71 @@ Number of blank lines to insert between procedure definitions.
 
 ```json
 { "ssl.format.blankLinesBetweenProcs": 1 }
+```
+
+### 3.8 ssl.format.blankLineBetweenBlocks
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `true` |
+| **File** | `internal/providers/formatting.go` |
+
+Insert one blank line between sibling control-flow blocks (`:IF`, `:WHILE`,
+`:FOR`, `:BEGINCASE`, `:TRY`) at the same indent level, so consecutive
+blocks read as distinct units. See catalog entry
+`fmt.blank_line_between_blocks` (added in v0.7.6, issue #15).
+
+```json
+{ "ssl.format.blankLineBetweenBlocks": true }
+```
+
+### 3.9 ssl.format.trimTrailingWhitespace
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `true` |
+| **File** | `internal/providers/formatting.go` |
+
+Remove trailing space/tab characters from every formatted line (post-pass,
+added in v0.5.0). See catalog entry `fmt.trim_trailing_whitespace`.
+
+```json
+{ "ssl.format.trimTrailingWhitespace": true }
+```
+
+### 3.10 ssl.format.maxConsecutiveBlankLines
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `0` (disabled) |
+| **File** | `internal/providers/formatting.go` |
+
+Collapse runs of blank lines longer than this threshold. `0` preserves all
+existing vertical whitespace. See catalog entry
+`fmt.max_consecutive_blank_lines`.
+
+```json
+{ "ssl.format.maxConsecutiveBlankLines": 2 }
+```
+
+### 3.11 ssl.format.builtinFunctionCase
+
+| Property | Value |
+|----------|-------|
+| **Type** | `"preserve"` \| `"PascalCase"` |
+| **Default** | `"preserve"` |
+| **File** | `internal/providers/formatting.go` |
+
+`"preserve"` keeps the author's casing of built-in function names;
+`"PascalCase"` rewrites call sites to the canonical inventory casing
+(e.g. `sqlexecute(` → `SQLExecute(`). See catalog entry
+`fmt.builtin_function_case`.
+
+```json
+{ "ssl.format.builtinFunctionCase": "preserve" }
 ```
 
 ---
@@ -498,6 +569,60 @@ Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `
 
 ```json
 { "ssl.diagnostics.maxBlockDepth": 4 }
+```
+
+### 5.5 ssl.diagnostics.rules
+
+| Property | Value |
+|----------|-------|
+| **Type** | `object` (rule slug → severity) |
+| **Default** | `{}` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` (`applyRuleOverrides`) |
+
+Per-rule severity overrides, keyed by the diagnostic's stable code slug
+(the `Code` value shown with each diagnostic; canonical list in
+`internal/providers/diagnostic_codes.go` and `catalog/diagnostics/`).
+Recognized values: `"off"` (drop the diagnostic), `"info"`, `"warn"`,
+`"warning"`, `"error"`. Slugs not present in the map pass through with
+their default severity; unknown slugs are ignored. Added in v0.5.0
+(catalog: DECISIONS.md D2).
+
+```json
+{
+  "ssl.diagnostics.rules": {
+    "hungarian_notation": "off",
+    "equals_vs_strict_equals": "warning"
+  }
+}
+```
+
+### 5.6 ssl.diagnostics.endpointPatterns
+
+| Property | Value |
+|----------|-------|
+| **Type** | `string[]` (glob patterns) |
+| **Default** | `[]` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+Files whose path matches any pattern are treated as SSL endpoint scripts:
+the runtime-injected ambients `Request` and `Response` count as declared
+and are not flagged by `undeclared_variable`. A file can also opt in with
+an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
+
+```json
+{ "ssl.diagnostics.endpointPatterns": ["**/endpoints/**", "**/*.srvscr"] }
+```
+
+### 5.7 Suppression comments (in-file)
+
+Not a configuration key, but part of the same rule-control surface: any
+diagnostic can be suppressed in the source itself (added in v0.5.0,
+catalog: DECISIONS.md D3).
+
+```ssl
+/* @ssl-disable hungarian_notation; */          suppresses for the whole file
+/* @ssl-disable-next-line sql_injection; */     suppresses the next line only
+/* @ssl-disable *; */                           wildcard: all rules
 ```
 
 ---

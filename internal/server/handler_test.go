@@ -307,6 +307,8 @@ DoProc(sName, {""});
 	}
 }
 
+// [spec feature.completion/A5] — the comment half of the criterion is
+// exercised by TestHandleCompletion_InComment_NoProcedureNames above.
 func TestHandleCompletion_InRegularString_NoCompletions(t *testing.T) {
 	// Sanity check: a plain string literal (not DoProc/ExecFunction) still
 	// suppresses completions.
@@ -687,6 +689,7 @@ func TestHandleCompletion_BuiltinClassMemberContext(t *testing.T) {
 	}
 }
 
+// [spec feature.completion/A4]
 func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
 	// Inside :CLASS Email, typing `Me:` should suggest Email members.
 	s := newTestServerWithDocument(`:CLASS Email;
@@ -721,10 +724,34 @@ func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
 	if !hasMethod {
 		t.Error("expected at least one method-kind completion for Me:")
 	}
+
+	// Outside a :CLASS file, class-context forms must NOT be suggested.
+	s = newTestServerWithDocument(`:PROCEDURE Test;
+:ENDPROC;`)
+	result, err = s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok = result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	for _, label := range []string{"Me", "Base", "Constructor"} {
+		if containsCompletionLabel(items, label) {
+			t.Errorf("did not expect class-context completion %q outside a :CLASS file", label)
+		}
+	}
 }
 
 // Issue #11: ':' trigger should NOT surface keyword completions when the
 // preceding character is non-whitespace (e.g. unknown identifier `foo:`).
+//
+// [spec feature.completion/A6]
 func TestHandleCompletion_ColonTriggerSuppressedAfterIdentifier(t *testing.T) {
 	s := newTestServerWithDocument(`foo:`)
 
@@ -752,6 +779,8 @@ func TestHandleCompletion_ColonTriggerSuppressedAfterIdentifier(t *testing.T) {
 
 // Issue #11: ':' trigger SHOULD surface keyword completions when ':' begins
 // a new token (preceded by whitespace or SOL).
+//
+// [spec feature.completion/A1]
 func TestHandleCompletion_ColonTriggerOffersKeywordsAtStartOfLine(t *testing.T) {
 	s := newTestServerWithDocument(`:`)
 
@@ -777,6 +806,28 @@ func TestHandleCompletion_ColonTriggerOffersKeywordsAtStartOfLine(t *testing.T) 
 	}
 	if !containsCompletionLabel(items, ":IF") {
 		t.Error("expected :IF among keyword completions")
+	}
+	// Keyword items ONLY — no procedures, variables, or snippets.
+	for _, item := range items {
+		if item.Kind == nil || *item.Kind != protocol.CompletionItemKindKeyword {
+			t.Errorf("expected only keyword items on ':' trigger, got %q", item.Label)
+		}
+	}
+	// Accepting an item must yield a single leading ':' — the TextEdit
+	// replaces the typed ':' rather than appending after it.
+	item := findCompletionItem(items, ":IF")
+	if item == nil {
+		t.Fatal("expected :IF in keyword completions")
+	}
+	edit, ok := item.TextEdit.(protocol.TextEdit)
+	if !ok {
+		t.Fatalf("expected TextEdit on :IF, got %T", item.TextEdit)
+	}
+	if edit.Range.Start.Character != 0 || edit.Range.End.Character != 1 {
+		t.Errorf("expected TextEdit to replace the typed ':' (0-1), got (%d-%d)", edit.Range.Start.Character, edit.Range.End.Character)
+	}
+	if edit.NewText != ":IF" {
+		t.Errorf("expected TextEdit NewText ':IF', got %q", edit.NewText)
 	}
 }
 
@@ -819,5 +870,29 @@ func TestHandleCompletion_ColonTriggerKeywordsHaveReplacingTextEdit(t *testing.T
 	}
 	if edit.NewText != ":IF" {
 		t.Errorf("expected TextEdit NewText ':IF', got %q", edit.NewText)
+	}
+}
+
+// PR #10 (issues #8/#9): ':' is the only advertised completion trigger
+// character — ',', '.', and '(' must never auto-open completion.
+//
+// [spec feature.completion/A2]
+func TestHandleInitialize_OnlyColonTriggersCompletion(t *testing.T) {
+	s := NewSSLServer()
+
+	result, err := s.handleInitialize(nil, &protocol.InitializeParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	init, ok := result.(ExtendedInitializeResult)
+	if !ok {
+		t.Fatalf("expected ExtendedInitializeResult, got %T", result)
+	}
+	if init.Capabilities.CompletionProvider == nil {
+		t.Fatal("expected completion provider capability")
+	}
+	triggers := init.Capabilities.CompletionProvider.TriggerCharacters
+	if len(triggers) != 1 || triggers[0] != ":" {
+		t.Errorf("expected trigger characters [\":\"], got %v", triggers)
 	}
 }
