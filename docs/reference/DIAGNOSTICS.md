@@ -33,7 +33,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | style_only | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
-| `datasource_default_required` | Data source parameter missing its inline default | error | tool | active | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
+| `datasource_default_required` | Data source parameter missing its inline default | error | authoritative | active | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |
 | `default_on_declare_line` | :DEFAULT on the same line as :DECLARE | error | tool | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |
 | `deprecated_keyword` | Legacy keyword discouraged in new code | warning | tool | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
@@ -45,68 +45,68 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | tool | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
 | `equals_vs_strict_equals` | String comparison with = is prefix matching | info | advisory | active | [diag.equals_vs_strict_equals](../../catalog/diagnostics/equals_vs_strict_equals.md) |
 | `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
-| `execfunction_missing_quotes` | Execfunction missing quotes | error | tool | draft | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
+| `execfunction_missing_quotes` | Unquoted namespace path in ExecFunction/DoProc | error | tool | active | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
 | `exitfor_in_finally` | :EXITFOR inside a :FINALLY block | error | authoritative | active | [diag.exitfor_in_finally](../../catalog/diagnostics/exitfor_in_finally.md) |
 | `exitfor_outside_loop` | EXITFOR outside a FOR loop | error | authoritative | active | [diag.exitfor_outside_loop](../../catalog/diagnostics/exitfor_outside_loop.md) |
 | `exitwhile_in_finally` | EXITWHILE inside a FINALLY block | error | authoritative | active | [diag.exitwhile_in_finally](../../catalog/diagnostics/exitwhile_in_finally.md) |
 | `exitwhile_outside_loop` | :EXITWHILE outside a :WHILE loop | error | authoritative | active | [diag.exitwhile_outside_loop](../../catalog/diagnostics/exitwhile_outside_loop.md) |
-| `finally_empty` | Finally empty | error | tool | draft | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
+| `finally_empty` | Empty :FINALLY block | error | tool | active | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
 | `for_numeric_values` | :FOR loop parts must be numeric | warning | style_only | active | [diag.for_numeric_values](../../catalog/diagnostics/for_numeric_values.md) |
-| `global_assignment` | Global assignment | error | tool | draft | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
-| `hungarian_notation` | Hungarian notation | warning | tool | draft | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
-| `identifier_too_long` | Identifier too long | info | tool | draft | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
+| `global_assignment` | Assignment to a global variable | error | tool | active | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
+| `hungarian_notation` | Missing Hungarian notation prefix | warning | advisory | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
+| `identifier_too_long` | Identifier exceeds style-guide length limit | info | tool | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
 | `identifier_too_short` | Identifier too short | warning | tool | draft | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
-| `include_early` | Include early | warning | tool | draft | [diag.include_early](../../catalog/diagnostics/include_early.md) |
-| `include_in_procedure` | Include in procedure | warning | tool | draft | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
+| `include_early` | :INCLUDE placed late or inside a procedure | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
+| `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | draft | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `inherit_qualified_name` | INHERIT base-name form advice | warning | style_only | draft | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
-| `inline_code_naming` | Inline code naming | error | tool | draft | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
-| `invalid_operator_sequence` | Invalid operator sequence | error | tool | draft | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
-| `invalid_sql_param` | Invalid sql param | warning | tool | draft | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
-| `keyword_uppercase` | Keyword uppercase | error | tool | draft | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
-| `label_keyword_form` | Label keyword form | error | tool | draft | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
+| `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
+| `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
+| `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
+| `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
+| `label_keyword_form` | Label keyword written in the wrong case | error | tool | active | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
 | `limit_public_vars` | PUBLIC variables discouraged | warning | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
 | `loop_in_finally` | LOOP inside a FINALLY block | error | authoritative | active | [diag.loop_in_finally](../../catalog/diagnostics/loop_in_finally.md) |
 | `loop_outside_loop` | :LOOP outside a :WHILE or :FOR loop | error | authoritative | active | [diag.loop_outside_loop](../../catalog/diagnostics/loop_outside_loop.md) |
-| `max_block_depth` | Max block depth | warning | tool | draft | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
+| `max_block_depth` | Block nesting exceeds the configured maximum depth | warning | advisory | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
 | `max_params_warning` | Procedure has too many parameters | warning | style_only | active | [diag.max_params_warning](../../catalog/diagnostics/max_params_warning.md) |
-| `me_outside_class` | Me outside class | error | tool | draft | [diag.me_outside_class](../../catalog/diagnostics/me_outside_class.md) |
-| `mismatched_block_end` | Mismatched block end | error | tool | draft | [diag.mismatched_block_end](../../catalog/diagnostics/mismatched_block_end.md) |
-| `mismatched_delimiter` | Mismatched delimiter | error | tool | draft | [diag.mismatched_delimiter](../../catalog/diagnostics/mismatched_delimiter.md) |
-| `missing_otherwise` | Missing otherwise | hint | tool | draft | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
-| `mixed_type_operator` | Mixed type operator | warning | tool | draft | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
-| `named_sql_param_unsupported` | Named sql param unsupported | warning | tool | draft | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
-| `negative_logic` | Negative logic | hint | tool | draft | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
-| `nested_iif` | Nested iif | info | tool | draft | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
+| `me_outside_class` | Me used outside a class definition | error | tool | active | [diag.me_outside_class](../../catalog/diagnostics/me_outside_class.md) |
+| `mismatched_block_end` | Block end keyword does not match the open block | error | tool | active | [diag.mismatched_block_end](../../catalog/diagnostics/mismatched_block_end.md) |
+| `mismatched_delimiter` | Closing delimiter does not match the open one | error | tool | active | [diag.mismatched_delimiter](../../catalog/diagnostics/mismatched_delimiter.md) |
+| `missing_otherwise` | BEGINCASE without an OTHERWISE clause | hint | tool | active | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
+| `mixed_type_operator` | Mixed operand types in a '+' operation | warning | tool | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
+| `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | warning | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
+| `negative_logic` | Negated IF condition with an ELSE branch | hint | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
+| `nested_iif` | IIF call nested inside another IIF call | info | advisory | active | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
 | `nil_in_operations` | NIL literal in an arithmetic or string operation | warning | style_only | active | [diag.nil_in_operations](../../catalog/diagnostics/nil_in_operations.md) |
-| `nil_method_call` | Nil method call | warning | tool | draft | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
+| `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
 | `nil_not_empty_string` | NIL compared against a default-value literal | info | advisory | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
-| `no_default_statements_in_datasource` | No default statements in datasource | error | tool | draft | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
-| `not_preferred_operator` | Not preferred operator | info | tool | draft | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
+| `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
+| `not_preferred_operator` | Discouraged inequality operator form | info | advisory | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
-| `parameters_first` | Parameters first | error | tool | draft | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
+| `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
-| `procedure_declaration_syntax` | Procedure declaration syntax | error | tool | draft | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
+| `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
 | `region_end_mismatch` | Region end marker does not match an open region | warning | tool | planned | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
-| `region_legacy` | Region legacy | info | tool | draft | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
-| `return_from_constructor` | Return from constructor | warning | tool | draft | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
+| `region_legacy` | REGION keyword flagged as legacy (disputed) | info | tool | active | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
+| `return_from_constructor` | Return from constructor (dead code — never emitted) | warning | tool | draft | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
-| `scientific_notation` | Scientific notation | warning | tool | draft | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
-| `single_catch` | Single catch | error | tool | draft | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
-| `single_finally` | Single finally | error | tool | draft | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
-| `sql_injection` | Sql injection | warning | tool | draft | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
-| `step_spacing` | Step spacing | warning | tool | draft | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
-| `try_requires_handler` | Try requires handler | error | tool | draft | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
-| `try_structure` | Try structure | error | tool | draft | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
-| `udobject_array_in_clause` | Udobject array in clause | warning | tool | draft | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
-| `unclosed_block` | Unclosed block | error | tool | draft | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
-| `unclosed_delimiter` | Unclosed delimiter | error | tool | draft | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
+| `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
+| `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
+| `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
+| `sql_injection` | String concatenation in a SQL call argument | warning | advisory | active | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
+| `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
+| `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
+| `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
+| `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | tool | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
+| `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
+| `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
 | `undeclared_variable` | Use of an undeclared variable | warning | tool | active | [diag.undeclared_variable](../../catalog/diagnostics/undeclared_variable.md) |
-| `unknown_keyword` | Unknown keyword | warning | tool | draft | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
-| `unknown_token` | Unknown token | warning | tool | draft | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
-| `unmatched_block_end` | Unmatched block end | error | tool | draft | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |
-| `unmatched_delimiter` | Unmatched delimiter | error | tool | draft | [diag.unmatched_delimiter](../../catalog/diagnostics/unmatched_delimiter.md) |
-| `unqualified_field_assignment` | Unqualified field assignment | warning | tool | draft | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
-| `unused_variable` | Unused variable | hint | tool | draft | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
-| `visibility_annotation` | Visibility annotation | warning | tool | draft | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
-| `zero_based_array_index` | Zero based array index | error | tool | draft | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |
+| `unknown_keyword` | Unknown colon-prefixed keyword | warning | tool | active | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
+| `unknown_token` | Unknown token | warning | tool | active | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
+| `unmatched_block_end` | Block-end keyword with no open block | error | tool | active | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |
+| `unmatched_delimiter` | Closing delimiter with nothing open | error | tool | active | [diag.unmatched_delimiter](../../catalog/diagnostics/unmatched_delimiter.md) |
+| `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | tool | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
+| `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
+| `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | tool | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
+| `zero_based_array_index` | Array indexed with literal 0 | error | tool | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

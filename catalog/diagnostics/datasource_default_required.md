@@ -3,8 +3,8 @@ id: diag.datasource_default_required
 title: Data source parameter missing its inline default
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: module_structure.data_source_modules.lint_rules.datasource_default_required
 default_severity: error
 severity_overridable: true
 suppressible: true

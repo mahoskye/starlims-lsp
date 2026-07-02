@@ -155,6 +155,7 @@ func TestHandleCompletion_InDoProcString_CaseInsensitive(t *testing.T) {
 	}
 }
 
+// [spec feature.snippets/A6] — the comment half: no items inside comments.
 func TestHandleCompletion_InComment_NoProcedureNames(t *testing.T) {
 	// Comment context still suppresses completions — the DoProc exception
 	// is string-only.
@@ -309,6 +310,8 @@ DoProc(sName, {""});
 
 // [spec feature.completion/A5] — the comment half of the criterion is
 // exercised by TestHandleCompletion_InComment_NoProcedureNames above.
+// [spec feature.snippets/A6] — no snippet (or other) items inside plain
+// string literals.
 func TestHandleCompletion_InRegularString_NoCompletions(t *testing.T) {
 	// Sanity check: a plain string literal (not DoProc/ExecFunction) still
 	// suppresses completions.
@@ -395,6 +398,48 @@ func TestHandleHover_Keyword(t *testing.T) {
 	}
 }
 
+// TestHandleHover_InsideString_NoGeneralHover: general symbol hover must not
+// fire inside string literals — SQL strings legitimately contain
+// function-like words. Only SQL placeholder hover is allowed there, and this
+// string has none. [spec feature.hover/A7]
+func TestHandleHover_InsideString_NoGeneralHover(t *testing.T) {
+	s := newTestServerWithDocument(`x := "SQLExecute is a function";`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			// Over "SQLExecute" inside the string
+			Position: protocol.Position{Line: 0, Character: 9},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Fatalf("expected nil hover inside string, got %+v", hover)
+	}
+}
+
+// TestHandleHover_InsideComment_NoHover: hover must not activate inside
+// comments. [spec feature.hover/A7]
+func TestHandleHover_InsideComment_NoHover(t *testing.T) {
+	s := newTestServerWithDocument(`/* SQLExecute would be here;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			// Over "SQLExecute" inside the comment
+			Position: protocol.Position{Line: 0, Character: 5},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Fatalf("expected nil hover inside comment, got %+v", hover)
+	}
+}
+
 func TestHandleHover_NonexistentDocument(t *testing.T) {
 	s := NewSSLServer()
 
@@ -455,6 +500,7 @@ func TestHandleDefinition_MissingDocument(t *testing.T) {
 	}
 }
 
+// [spec feature.references/A1]
 func TestHandleReferences_Variable(t *testing.T) {
 	s := newTestServerWithDocument(`:PROCEDURE Test;
 :DECLARE myVar;
@@ -501,6 +547,10 @@ func TestHandleDocumentSymbol(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A1] — case-insensitive substring match
+// over open documents, kind Function, correct URI.
+// [spec feature.workspace_symbols/A7] — no workspace root configured (no
+// index): only open documents are consulted and the request succeeds.
 func TestHandleWorkspaceSymbol_ProceduresOnly(t *testing.T) {
 	s := newTestServerWithDocument(`:PROCEDURE ProcA;
 :ENDPROC;
@@ -559,6 +609,7 @@ value := 1;
 	}
 }
 
+// [spec feature.signature_help/A1]
 func TestHandleSignatureHelp(t *testing.T) {
 	s := newTestServerWithDocument(`result := Len("hello", 123);`)
 
@@ -894,5 +945,49 @@ func TestHandleInitialize_OnlyColonTriggersCompletion(t *testing.T) {
 	triggers := init.Capabilities.CompletionProvider.TriggerCharacters
 	if len(triggers) != 1 || triggers[0] != ":" {
 		t.Errorf("expected trigger characters [\":\"], got %v", triggers)
+	}
+}
+
+// Issue #9 / PR #10: signature help advertises no trigger characters by
+// default; opting in via ssl.intellisense.signatureHelp.autoTrigger
+// advertises '(' and ',' (with ',' as retrigger).
+//
+// [spec feature.signature_help/A6]
+func TestHandleInitialize_SignatureHelpTriggerCharacters(t *testing.T) {
+	// Default: no trigger characters.
+	s := NewSSLServer()
+	result, err := s.handleInitialize(nil, &protocol.InitializeParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	init, ok := result.(ExtendedInitializeResult)
+	if !ok {
+		t.Fatalf("expected ExtendedInitializeResult, got %T", result)
+	}
+	sigOpts := init.Capabilities.SignatureHelpProvider
+	if sigOpts == nil {
+		t.Fatal("expected signature help provider capability")
+	}
+	if len(sigOpts.TriggerCharacters) != 0 {
+		t.Errorf("expected no trigger characters by default, got %v", sigOpts.TriggerCharacters)
+	}
+
+	// Opt-in: '(' and ',' advertised, ',' as retrigger.
+	s2 := NewSSLServer()
+	s2.settings.SignatureHelpAutoTrigger = true
+	result2, err := s2.handleInitialize(nil, &protocol.InitializeParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	init2 := result2.(ExtendedInitializeResult)
+	sigOpts2 := init2.Capabilities.SignatureHelpProvider
+	if sigOpts2 == nil {
+		t.Fatal("expected signature help provider capability")
+	}
+	if len(sigOpts2.TriggerCharacters) != 2 || sigOpts2.TriggerCharacters[0] != "(" || sigOpts2.TriggerCharacters[1] != "," {
+		t.Errorf("expected trigger characters [\"(\" \",\"], got %v", sigOpts2.TriggerCharacters)
+	}
+	if len(sigOpts2.RetriggerCharacters) != 1 || sigOpts2.RetriggerCharacters[0] != "," {
+		t.Errorf("expected retrigger characters [\",\"], got %v", sigOpts2.RetriggerCharacters)
 	}
 }

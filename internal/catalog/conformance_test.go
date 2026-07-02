@@ -22,7 +22,7 @@ const configurationDoc = "../../docs/configuration/CONFIGURATION.md"
 // that promotes drafts to active lowers this constant; when it reaches zero
 // every entry has been human-reviewed and the constant (and this check) can
 // be deleted.
-const maxDrafts = 59
+const maxDrafts = 4
 
 func loadEntries(t *testing.T) []Entry {
 	t.Helper()

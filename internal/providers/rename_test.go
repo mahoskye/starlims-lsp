@@ -61,6 +61,7 @@ DoProc("MyProc");
 	}
 }
 
+// [spec feature.rename/A3]
 func TestPrepareRename_Keyword_NotAllowed(t *testing.T) {
 	text := `:PROCEDURE Test;
 :IF .T.;
@@ -78,6 +79,7 @@ x := 1;
 	}
 }
 
+// [spec feature.rename/A3]
 func TestPrepareRename_BuiltinFunction_NotAllowed(t *testing.T) {
 	text := `:PROCEDURE Test;
 x := Len("hello");
@@ -93,6 +95,7 @@ x := Len("hello");
 	}
 }
 
+// [spec feature.rename/A4]
 func TestPrepareRename_InsideString_NotAllowed(t *testing.T) {
 	text := `:PROCEDURE Test;
 x := "hello world";
@@ -108,6 +111,7 @@ x := "hello world";
 	}
 }
 
+// [spec feature.rename/A4]
 func TestPrepareRename_InsideComment_NotAllowed(t *testing.T) {
 	text := `:PROCEDURE Test;
 /* This is a comment;
@@ -124,6 +128,7 @@ x := 1;
 	}
 }
 
+// [spec feature.rename/A3]
 func TestPrepareRename_MeKeyword_NotAllowed(t *testing.T) {
 	text := `:CLASS MyClass;
 :PROCEDURE Init;
@@ -142,6 +147,7 @@ Me:Name := "test";
 
 // ==================== Rename Tests ====================
 
+// [spec feature.rename/A1]
 func TestRename_Variable(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
@@ -176,6 +182,7 @@ x := sName;
 	}
 }
 
+// [spec feature.rename/A6]
 func TestRename_Procedure(t *testing.T) {
 	text := `:PROCEDURE MyProc;
 x := 1;
@@ -205,6 +212,7 @@ MyProc();
 	}
 }
 
+// [spec feature.rename/A2]
 func TestRename_ScopedVariable(t *testing.T) {
 	text := `:PROCEDURE Proc1;
 :DECLARE sValue;
@@ -243,6 +251,7 @@ sValue := "two";
 	}
 }
 
+// [spec feature.rename/A5]
 func TestRename_InvalidNewName_Keyword(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
@@ -259,6 +268,7 @@ sName := "test";
 	}
 }
 
+// [spec feature.rename/A5]
 func TestRename_InvalidNewName_BuiltinFunction(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
@@ -275,6 +285,7 @@ sName := "test";
 	}
 }
 
+// [spec feature.rename/A5]
 func TestRename_InvalidNewName_InvalidChars(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
@@ -291,6 +302,7 @@ sName := "test";
 	}
 }
 
+// [spec feature.rename/A1]
 func TestRename_CaseInsensitive(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
@@ -318,6 +330,7 @@ SNAME := sname;
 	}
 }
 
+// [spec feature.rename/A3]
 func TestPrepareRename_BaseKeyword_NotAllowed(t *testing.T) {
 	text := `:CLASS MyClass;
 :INHERIT ParentClass;
@@ -335,6 +348,7 @@ Base:Init();
 	}
 }
 
+// [spec feature.rename/A3]
 func TestPrepareRename_ConstructorKeyword_NotAllowed(t *testing.T) {
 	text := `:CLASS MyClass;
 :PROCEDURE Constructor;
@@ -468,6 +482,7 @@ func TestGetWordRange_NotWholeWord(t *testing.T) {
 
 // ==================== Integration Tests ====================
 
+// [spec feature.rename/A1]
 func TestRename_EndToEnd(t *testing.T) {
 	text := `:PROCEDURE ProcessData;
 :PARAMETERS sInput;
@@ -499,6 +514,7 @@ sOutput := Upper(sInput);
 	}
 }
 
+// [spec feature.rename/A1]
 func TestRename_ParameterVariable(t *testing.T) {
 	text := `:PROCEDURE Calculate;
 :PARAMETERS nValue;
@@ -523,6 +539,7 @@ result := nValue * 2;
 	}
 }
 
+// [spec feature.rename/A6]
 func TestRename_PublicVariable(t *testing.T) {
 	text := `:PUBLIC gCounter;
 gCounter := 0;
@@ -549,6 +566,51 @@ gCounter := gCounter + 1;
 	// gCounter appears 5 times across the file
 	if len(edits) < 5 {
 		t.Errorf("expected at least 5 edits for public variable rename, got %d", len(edits))
+	}
+}
+
+// TestRename_Procedure_UpdatesDoProcStringTarget: renaming a procedure also
+// updates the dispatch string in DoProc("Name") so the call keeps working —
+// the string target is a real reference (see feature.references/A7).
+// [spec feature.rename/A7]
+func TestRename_Procedure_UpdatesDoProcStringTarget(t *testing.T) {
+	text := `:PROCEDURE CalcTotal;
+:RETURN 100;
+:ENDPROC;
+
+:PROCEDURE Main;
+result := DoProc("CalcTotal", {});
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Rename CalcTotal at its declaration (line 1, column 12)
+	result := Rename(text, 1, 12, "CalculateTotal", "file:///test.ssl", procedures, variables)
+	if result == nil {
+		t.Fatal("expected rename to succeed")
+	}
+
+	edits := result.Changes["file:///test.ssl"]
+	if len(edits) != 2 {
+		t.Fatalf("expected 2 edits (declaration + DoProc string target), got %d", len(edits))
+	}
+
+	foundStringTarget := false
+	for _, edit := range edits {
+		if edit.NewText != "CalculateTotal" {
+			t.Errorf("expected NewText 'CalculateTotal', got %q", edit.NewText)
+		}
+		if edit.Range.Start.Line == 5 { // 0-based: the DoProc call line
+			foundStringTarget = true
+			// The edit must cover exactly the name inside the quotes.
+			if edit.Range.Start.Character != 18 || edit.Range.End.Character != 27 {
+				t.Errorf("expected string-target edit at [18,27), got [%d,%d)",
+					edit.Range.Start.Character, edit.Range.End.Character)
+			}
+		}
+	}
+	if !foundStringTarget {
+		t.Error("expected the DoProc string target to be updated")
 	}
 }
 

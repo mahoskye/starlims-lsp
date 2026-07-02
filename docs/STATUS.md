@@ -13,18 +13,18 @@ dropped (entry retains the history).
 | Entry | Title | Status |
 |-------|-------|--------|
 | [feature.completion](../catalog/features/completion.md) | Completion | active |
-| [feature.definition](../catalog/features/definition.md) | Go to definition | draft |
-| [feature.diagnostics_pipeline](../catalog/features/diagnostics_pipeline.md) | Diagnostics pipeline (codes, overrides, suppression, panic recovery) | draft |
-| [feature.document_symbols](../catalog/features/document_symbols.md) | Document symbols (outline) | draft |
+| [feature.definition](../catalog/features/definition.md) | Go to definition | active |
+| [feature.diagnostics_pipeline](../catalog/features/diagnostics_pipeline.md) | Diagnostics pipeline (codes, overrides, suppression, panic recovery) | active |
+| [feature.document_symbols](../catalog/features/document_symbols.md) | Document symbols (outline) | active |
 | [feature.folding](../catalog/features/folding.md) | Folding ranges | active |
-| [feature.formatting](../catalog/features/formatting.md) | Document and range formatting | draft |
-| [feature.hover](../catalog/features/hover.md) | Hover | draft |
-| [feature.inlay_hints](../catalog/features/inlay_hints.md) | Parameter-name inlay hints | draft |
-| [feature.references](../catalog/features/references.md) | Find references | draft |
-| [feature.rename](../catalog/features/rename.md) | Rename | draft |
-| [feature.signature_help](../catalog/features/signature_help.md) | Signature help | draft |
-| [feature.snippets](../catalog/features/snippets.md) | Snippets | draft |
-| [feature.workspace_symbols](../catalog/features/workspace_symbols.md) | Workspace symbol search | draft |
+| [feature.formatting](../catalog/features/formatting.md) | Document and range formatting | active |
+| [feature.hover](../catalog/features/hover.md) | Hover | active |
+| [feature.inlay_hints](../catalog/features/inlay_hints.md) | Parameter-name inlay hints | active |
+| [feature.references](../catalog/features/references.md) | Find references | active |
+| [feature.rename](../catalog/features/rename.md) | Rename | active |
+| [feature.signature_help](../catalog/features/signature_help.md) | Signature help | active |
+| [feature.snippets](../catalog/features/snippets.md) | Snippets | active |
+| [feature.workspace_symbols](../catalog/features/workspace_symbols.md) | Workspace symbol search | active |
 
 ## Formatter behaviors
 
@@ -45,5 +45,5 @@ dropped (entry retains the history).
 
 ## Diagnostics
 
-100 rules cataloged: 51 active, 48 draft, 1 planned, 0 removed.
+100 rules cataloged: 95 active, 4 draft, 1 planned, 0 removed.
 Full table: [docs/reference/DIAGNOSTICS.md](reference/DIAGNOSTICS.md).

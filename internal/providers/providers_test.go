@@ -26,6 +26,7 @@ func TestGetHover_Keyword(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A4]
 func TestGetHover_Variable(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE myVar;
@@ -49,6 +50,7 @@ myVar := 1;
 	}
 }
 
+// [spec feature.hover/A3]
 func TestGetHover_Procedure(t *testing.T) {
 	text := `:PROCEDURE MyProc;
 :PARAMETERS param1, param2;
@@ -78,6 +80,7 @@ MyProc(1, 2);
 
 func TestGetHover_Procedure_DocblockSurfaces(t *testing.T) {
 	// vs-code-ssl-formatter#75 — docblock fields should appear in hover.
+	// [spec feature.hover/A3]
 	text := `/*
  * Description: Composes a friendly greeting.
  * Parameters:
@@ -139,6 +142,7 @@ func TestGetHover_BuiltinFunction(t *testing.T) {
 // ("Called with no arguments at all." and "aParameters is provided but
 // is not an array.").
 func TestGetHover_FunctionExceptions(t *testing.T) {
+	// [spec feature.hover/A2]
 	text := `result := ExecFunction("Foo", {});`
 	hover := GetHover(text, 1, 12, nil, nil)
 	if hover == nil {
@@ -154,13 +158,48 @@ func TestGetHover_FunctionExceptions(t *testing.T) {
 }
 
 func TestGetHover_NoMatch(t *testing.T) {
+	// Unknown identifiers must return nil rather than an empty or
+	// fabricated hover. [spec feature.hover/A8]
 	text := `unknownThing := 1;`
 
 	hover := GetHover(text, 1, 5, nil, nil)
-	// unknownThing is not a keyword, function, or known variable
-	// It may return nil or a generic message
 	if hover != nil {
-		t.Logf("Hover returned for unknown symbol: %s", hover.Contents)
+		t.Errorf("expected nil hover for unknown identifier, got: %s", hover.Contents)
+	}
+}
+
+// TestGetHover_BuiltinFunction_SignatureAndParameters pins the built-in
+// function hover contract: Markdown containing the canonical signature label,
+// the parameter list, and the return type. [spec feature.hover/A1]
+func TestGetHover_BuiltinFunction_SignatureAndParameters(t *testing.T) {
+	text := `result := SQLExecute(query, "ds");`
+
+	hover := GetHover(text, 1, 12, nil, nil)
+	if hover == nil {
+		t.Fatal("expected hover info for SQLExecute")
+	}
+	if !strings.Contains(hover.Contents, "SQLExecute(") {
+		t.Errorf("expected hover to contain the signature label, got: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "**Parameters:**") {
+		t.Errorf("expected hover to contain a parameter list, got: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "**Returns:**") {
+		t.Errorf("expected hover to contain the return type, got: %s", hover.Contents)
+	}
+}
+
+// TestGetHover_BuiltinFunction_CaseInsensitive: lowercase `sqlexecute`
+// resolves to the canonical SQLExecute hover. [spec feature.hover/A5]
+func TestGetHover_BuiltinFunction_CaseInsensitive(t *testing.T) {
+	text := `result := sqlexecute(query);`
+
+	hover := GetHover(text, 1, 12, nil, nil)
+	if hover == nil {
+		t.Fatal("expected hover info for lowercase sqlexecute")
+	}
+	if !strings.Contains(hover.Contents, "SQLExecute(") {
+		t.Errorf("expected canonical SQLExecute hover, got: %s", hover.Contents)
 	}
 }
 
@@ -188,6 +227,7 @@ MyProc();
 	}
 }
 
+// [spec feature.definition/A2]
 func TestFindDefinition_Variable(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE myVar;
@@ -218,8 +258,53 @@ func TestFindDefinition_NotFound(t *testing.T) {
 	}
 }
 
+// TestFindDefinition_Parameter: a use of a :PARAMETERS name navigates to the
+// :PARAMETERS declaration line. [spec feature.definition/A2]
+func TestFindDefinition_Parameter(t *testing.T) {
+	text := `:PROCEDURE Calculate;
+:PARAMETERS nValue, sType;
+result := nValue * 2;
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Cursor on nValue use (line 3, column 11)
+	location := FindDefinition(text, 3, 11, "file:///test.ssl", procedures, variables)
+	if location == nil {
+		t.Fatal("expected to find definition for parameter")
+	}
+	if location.Range.Start.Line != 1 { // 0-based, :PARAMETERS is line 2
+		t.Errorf("expected definition on line 1 (:PARAMETERS), got %d", location.Range.Start.Line)
+	}
+}
+
+// TestFindDefinition_BuiltinAndKeyword_ReturnsNil: built-in functions and
+// keywords have no navigable source in user code — the response must be
+// null, never a spurious location. [spec feature.definition/A5]
+func TestFindDefinition_BuiltinAndKeyword_ReturnsNil(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sQuery;
+result := SQLExecute(sQuery, "ds");
+:IF result > 0;
+:ENDIF;
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Cursor on SQLExecute (line 3, column 12)
+	if loc := FindDefinition(text, 3, 12, "file:///test.ssl", procedures, variables); loc != nil {
+		t.Errorf("expected nil definition for built-in function, got %+v", loc)
+	}
+
+	// Cursor on the :IF keyword (line 4, column 2)
+	if loc := FindDefinition(text, 4, 2, "file:///test.ssl", procedures, variables); loc != nil {
+		t.Errorf("expected nil definition for keyword, got %+v", loc)
+	}
+}
+
 // ==================== References Tests ====================
 
+// [spec feature.references/A1]
 func TestFindReferences_Variable(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE myVar;
@@ -238,6 +323,7 @@ y := myVar * 2;
 	}
 }
 
+// [spec feature.references/A1]
 func TestFindReferences_Procedure(t *testing.T) {
 	text := `:PROCEDURE MyProc;
 :ENDPROC;
@@ -257,6 +343,7 @@ MyProc();
 	}
 }
 
+// [spec feature.references/A2]
 func TestFindReferences_ExcludeDeclaration_Declare(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE myVar;
@@ -281,6 +368,7 @@ x := myVar + 1;
 	}
 }
 
+// [spec feature.references/A2]
 func TestFindReferences_ExcludeDeclaration_Parameters(t *testing.T) {
 	text := `:PROCEDURE Test;
 :PARAMETERS param1;
@@ -306,6 +394,7 @@ result := param1 + 1;
 
 func TestFindReferencesWithScope_LocalVariablesScopedToProcedure(t *testing.T) {
 	// Test case from documentation 6.6: Local variables in different procedures
+	// [spec feature.references/A5]
 	text := `:PROCEDURE ProcA;
 :DECLARE localVar;
 x := localVar;
@@ -346,6 +435,7 @@ y := localVar;
 
 func TestFindReferencesWithScope_PublicVariablesGlobalScope(t *testing.T) {
 	// Public variables should find references across entire document
+	// [spec feature.references/A6]
 	text := `:PUBLIC gCounter;
 
 :PROCEDURE ProcA;
@@ -378,6 +468,7 @@ x := gCounter + 1;
 
 func TestFindReferencesWithScope_ParametersScopedToProcedure(t *testing.T) {
 	// Parameters should be scoped to their procedure
+	// [spec feature.references/A5]
 	text := `:PROCEDURE ProcA;
 :PARAMETERS sName;
 x := sName;
@@ -417,6 +508,7 @@ y := sName;
 
 func TestFindReferencesWithScope_ProcedureReferencesGlobalScope(t *testing.T) {
 	// Procedure names should find references across entire document
+	// [spec feature.references/A6]
 	text := `:PROCEDURE HelperProc;
 :ENDPROC;
 
@@ -470,8 +562,82 @@ y := localVar;
 	}
 }
 
+// TestFindReferences_CaseInsensitive: every case variant of the identifier
+// is the same symbol and is returned. [spec feature.references/A3]
+func TestFindReferences_CaseInsensitive(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE MyVariable;
+x := myvariable;
+y := MYVARIABLE;
+:ENDPROC;`
+
+	locations := FindReferences(text, 2, 10, "file:///test.ssl", true)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	if len(locations) != 3 {
+		t.Errorf("expected 3 case-insensitive references, got %d", len(locations))
+	}
+}
+
+// TestFindReferences_WholeWordOnly: `count` must not match `countAll` or
+// `recount`. [spec feature.references/A4]
+func TestFindReferences_WholeWordOnly(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE count;
+x := count;
+y := countAll;
+z := recount;
+:ENDPROC;`
+
+	locations := FindReferences(text, 2, 10, "file:///test.ssl", true)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	if len(locations) != 2 {
+		t.Errorf("expected 2 whole-word references, got %d", len(locations))
+	}
+	for _, loc := range locations {
+		if loc.Range.Start.Line == 3 || loc.Range.Start.Line == 4 {
+			t.Errorf("partial identifier matched on line %d", loc.Range.Start.Line)
+		}
+	}
+}
+
+// TestFindReferences_DoProcStringTarget: the first string argument of
+// DoProc/ExecFunction is the only legal call syntax for user procedures, so
+// it counts as a reference. [spec feature.references/A7]
+func TestFindReferences_DoProcStringTarget(t *testing.T) {
+	text := `:PROCEDURE TargetProc;
+:ENDPROC;
+
+:PROCEDURE Main;
+DoProc("TargetProc");
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	locations := FindReferencesWithScope(text, 1, 12, "file:///test.ssl", true, procedures, variables)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	if len(locations) != 2 {
+		t.Fatalf("expected 2 references (declaration + DoProc target), got %d", len(locations))
+	}
+	foundStringTarget := false
+	for _, loc := range locations {
+		if loc.Range.Start.Line == 4 { // 0-based: the DoProc call line
+			foundStringTarget = true
+		}
+	}
+	if !foundStringTarget {
+		t.Error("expected the DoProc string target to be included as a reference")
+	}
+}
+
 // ==================== Document Symbols Tests ====================
 
+// [spec feature.document_symbols/A1]
 func TestGetDocumentSymbols_Procedures(t *testing.T) {
 	text := `:PROCEDURE Test1;
 :ENDPROC;
@@ -521,6 +687,9 @@ func TestGetDocumentSymbols_Procedures(t *testing.T) {
 	}
 }
 
+// [spec feature.document_symbols/A2] — one Variable symbol per declared
+// :PUBLIC name.
+// [spec feature.document_symbols/A6] — :DECLARE locals never appear.
 func TestGetDocumentSymbols_PublicVariables(t *testing.T) {
 	text := `:PUBLIC gVar1, gVar2;
 
@@ -530,16 +699,52 @@ func TestGetDocumentSymbols_PublicVariables(t *testing.T) {
 
 	symbols := GetDocumentSymbols(text)
 
-	// Should include the public variables
-	foundPublic := 0
+	// Should include one symbol per declared public name.
+	publicNames := map[string]bool{}
 	for _, sym := range symbols {
 		if strings.Contains(sym.Detail, "public") {
-			foundPublic++
+			if sym.Kind != SymbolKindVariable {
+				t.Errorf("expected public variable %q to have kind Variable, got %v", sym.Name, sym.Kind)
+			}
+			publicNames[sym.Name] = true
 		}
 	}
+	if len(publicNames) != 2 || !publicNames["gVar1"] || !publicNames["gVar2"] {
+		t.Errorf("expected public symbols gVar1 and gVar2, got %v", publicNames)
+	}
 
-	if foundPublic < 1 {
-		t.Error("expected to find public variable symbols")
+	// :DECLARE locals must not be emitted as symbols at any level.
+	var walk func([]DocumentSymbol)
+	walk = func(syms []DocumentSymbol) {
+		for _, sym := range syms {
+			if sym.Name == "localVar" {
+				t.Error(":DECLARE local localVar must not appear in document symbols")
+			}
+			walk(sym.Children)
+		}
+	}
+	walk(symbols)
+}
+
+// [spec feature.document_symbols/A5] — results follow file order, not
+// alphabetical order.
+func TestGetDocumentSymbols_FileOrder(t *testing.T) {
+	text := `:PROCEDURE Zebra;
+:ENDPROC;
+
+:PROCEDURE Alpha;
+:ENDPROC;`
+
+	symbols := GetDocumentSymbols(text)
+
+	var procNames []string
+	for _, sym := range symbols {
+		if sym.Kind == SymbolKindFunction {
+			procNames = append(procNames, sym.Name)
+		}
+	}
+	if len(procNames) != 2 || procNames[0] != "Zebra" || procNames[1] != "Alpha" {
+		t.Errorf("expected file order [Zebra Alpha], got %v", procNames)
 	}
 }
 
@@ -643,6 +848,7 @@ func TestGetSignatureHelp_NestedCalls(t *testing.T) {
 	}
 }
 
+// [spec feature.signature_help/A4]
 func TestGetSignatureHelpWithProcedures_UserDefinedProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE MyCustomProc;
 :PARAMETERS sName, nValue, bFlag;
@@ -734,6 +940,7 @@ result := Len(`
 	}
 }
 
+// [spec feature.signature_help/A4]
 func TestGetSignatureHelpWithProcedures_CaseInsensitiveUserProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE myproc;
 :PARAMETERS sValue;
@@ -752,6 +959,118 @@ result := MYPROC(`
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
+	}
+}
+
+func tokenizeForSignatureHelp(t *testing.T, text string) []lexer.Token {
+	t.Helper()
+	return lexer.NewLexer(text).Tokenize()
+}
+
+// TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero: immediately
+// after the opening paren of a built-in call, the signature with its
+// parameter list is returned and activeParameter is 0.
+// [spec feature.signature_help/A1]
+func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
+	text := `result := SQLExecute(`
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		t.Fatal("expected signature help for SQLExecute")
+	}
+	if len(help.Signatures) != 1 {
+		t.Fatalf("expected 1 signature, got %d", len(help.Signatures))
+	}
+	if !strings.Contains(help.Signatures[0].Label, "SQLExecute(") {
+		t.Errorf("expected SQLExecute signature label, got %q", help.Signatures[0].Label)
+	}
+	if len(help.Signatures[0].Parameters) == 0 {
+		t.Error("expected parameter information")
+	}
+	if help.ActiveParameter != 0 {
+		t.Errorf("expected activeParameter 0, got %d", help.ActiveParameter)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_TopLevelCommasOnly: activeParameter
+// counts top-level commas only — commas inside string literals must not
+// advance it, and it stays put while typing within an argument.
+// [spec feature.signature_help/A2]
+func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
+	// One top-level comma; the commas inside the SQL string don't count.
+	text := `result := SQLExecute("SELECT a, b, c FROM t", `
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		t.Fatal("expected signature help for SQLExecute")
+	}
+	if help.ActiveParameter != 1 {
+		t.Errorf("expected activeParameter 1 (string commas ignored), got %d", help.ActiveParameter)
+	}
+
+	// Still parameter 1 while typing the second argument.
+	text2 := `result := SQLExecute("SELECT a, b, c FROM t", sName`
+	tokens2 := tokenizeForSignatureHelp(t, text2)
+
+	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(text2)+1)
+	if help2 == nil {
+		t.Fatal("expected signature help for SQLExecute")
+	}
+	if help2.ActiveParameter != 1 {
+		t.Errorf("expected activeParameter to stay 1 mid-argument, got %d", help2.ActiveParameter)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_NestedCallsInnermost: inside nested
+// calls the innermost enclosing call's signature is shown; once the inner
+// call closes, the outer one is. [spec feature.signature_help/A3]
+func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
+	inner := `result := Upper(AllTrim(`
+	tokens := tokenizeForSignatureHelp(t, inner)
+
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(inner)+1)
+	if help == nil {
+		t.Fatal("expected signature help inside AllTrim(")
+	}
+	if !strings.Contains(help.Signatures[0].Label, "AllTrim(") {
+		t.Errorf("expected inner AllTrim signature, got %q", help.Signatures[0].Label)
+	}
+
+	outer := `result := Upper(AllTrim(sValue)`
+	tokens2 := tokenizeForSignatureHelp(t, outer)
+
+	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(outer)+1)
+	if help2 == nil {
+		t.Fatal("expected signature help after inner call closed")
+	}
+	if !strings.Contains(help2.Signatures[0].Label, "Upper(") {
+		t.Errorf("expected outer Upper signature, got %q", help2.Signatures[0].Label)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil: names not in
+// the built-in inventory produce no signature help.
+// [spec feature.signature_help/A5]
+func TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil(t *testing.T) {
+	text := `result := NotARealFunction(`
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+		t.Fatalf("expected no signature help for unknown function, got %+v", help)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil: positions outside
+// any call's argument list produce no signature help.
+// [spec feature.signature_help/A7]
+func TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil(t *testing.T) {
+	text := `x := 5;`
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+		t.Fatalf("expected no signature help outside a call, got %+v", help)
 	}
 }
 
@@ -789,6 +1108,8 @@ func TestGetFunctionCompletions(t *testing.T) {
 	}
 }
 
+// [spec feature.snippets/A1] — every snippet item carries kind Snippet,
+// insertTextFormat Snippet, and $-style tab stops.
 func TestGetSnippetCompletions(t *testing.T) {
 	snippets := GetSnippetCompletions(false)
 
@@ -820,6 +1141,96 @@ func TestGetSnippetCompletions(t *testing.T) {
 	}
 	if !foundFor {
 		t.Error("expected 'for' snippet")
+	}
+
+	// Every snippet (both sets) must be a real LSP snippet with tab stops.
+	for _, set := range [][]CompletionItem{GetSnippetCompletions(false), GetSnippetCompletions(true)} {
+		for _, s := range set {
+			if s.Kind != CompletionKindSnippet {
+				t.Errorf("snippet %q has kind %v, want CompletionKindSnippet", s.Label, s.Kind)
+			}
+			if s.InsertTextFormat != InsertTextFormatSnippet {
+				t.Errorf("snippet %q has insertTextFormat %v, want InsertTextFormatSnippet", s.Label, s.InsertTextFormat)
+			}
+			if !strings.Contains(s.InsertText, "$") {
+				t.Errorf("snippet %q has no $-style tab stop", s.Label)
+			}
+		}
+	}
+}
+
+// TestGetSnippetCompletions_BodiesWellFormed pins the structural contract of
+// snippet bodies: block openers are matched by their closers and
+// colon-keyword statements are semicolon-terminated, so no snippet can
+// expand to structurally broken SSL.
+// [spec feature.snippets/A2] — proc expands to a complete block.
+// [spec feature.snippets/A3] — case snippet structure.
+// [spec feature.snippets/A4] — sql snippet uses named ?value? placeholders.
+// [spec feature.snippets/A5] — matched closers and terminators everywhere.
+func TestGetSnippetCompletions_BodiesWellFormed(t *testing.T) {
+	standard := GetSnippetCompletions(false)
+	dataSource := GetSnippetCompletions(true)
+
+	byLabel := map[string]string{}
+	for _, s := range append(append([]CompletionItem{}, standard...), dataSource...) {
+		byLabel[s.Label] = s.InsertText
+	}
+
+	// A2: proc is a complete :PROCEDURE/:ENDPROC block with a header comment
+	// and a tab stop on the procedure name.
+	proc := byLabel["proc"]
+	if proc == "" {
+		t.Fatal("missing 'proc' snippet")
+	}
+	if !strings.Contains(proc, ":PROCEDURE ${1:") || !strings.Contains(proc, ":ENDPROC;") {
+		t.Errorf("proc snippet must open :PROCEDURE with a name tab stop and close with :ENDPROC;, got:\n%s", proc)
+	}
+	if !strings.HasPrefix(proc, "/*") {
+		t.Errorf("proc snippet must start with a header comment, got:\n%s", proc)
+	}
+
+	// A3: case snippet contains the full :BEGINCASE structure.
+	caseBody := byLabel["case"]
+	for _, part := range []string{":BEGINCASE;", ":CASE ", ":EXITCASE;", ":OTHERWISE;", ":ENDCASE;"} {
+		if !strings.Contains(caseBody, part) {
+			t.Errorf("case snippet missing %q, got:\n%s", part, caseBody)
+		}
+	}
+
+	// A4: sql snippet is a SQLExecute call with named ?value? placeholders.
+	sqlBody := byLabel["sql"]
+	if !strings.Contains(sqlBody, "SQLExecute(") {
+		t.Errorf("sql snippet must call SQLExecute, got:\n%s", sqlBody)
+	}
+	if !strings.Contains(sqlBody, "?${") || strings.Index(sqlBody, "?${") >= strings.LastIndex(sqlBody, "}?") {
+		t.Errorf("sql snippet must use named ?value? placeholder syntax, got:\n%s", sqlBody)
+	}
+
+	// A5: every block opener in every snippet has its matching closer, and
+	// colon-keyword lines are semicolon-terminated.
+	pairs := [][2]string{
+		{":PROCEDURE", ":ENDPROC"},
+		{":IF ", ":ENDIF"},
+		{":WHILE ", ":ENDWHILE"},
+		{":FOR ", ":NEXT"},
+		{":BEGINCASE", ":ENDCASE"},
+		{":TRY", ":ENDTRY"},
+		{":BEGININLINECODE", ":ENDINLINECODE"},
+		{"/* region", "/* endregion"},
+	}
+	for label, body := range byLabel {
+		for _, p := range pairs {
+			open, close := strings.Count(body, p[0]), strings.Count(body, p[1])
+			if open != close {
+				t.Errorf("snippet %q: %d %q openers but %d %q closers", label, open, p[0], close, p[1])
+			}
+		}
+		for _, line := range strings.Split(body, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, ":") && !strings.HasSuffix(trimmed, ";") {
+				t.Errorf("snippet %q: colon-keyword line not semicolon-terminated: %q", label, trimmed)
+			}
+		}
 	}
 }
 
@@ -1817,11 +2228,12 @@ func TestReferences_EmptyText(t *testing.T) {
 	}
 }
 
+// [spec feature.document_symbols/A7]
 func TestDocumentSymbols_EmptyText(t *testing.T) {
 	symbols := GetDocumentSymbols("")
-	// Empty text should return empty (but valid) slice
-	if symbols == nil {
-		t.Log("GetDocumentSymbols returns nil for empty text")
+	// Empty text must produce an empty result, not an error/panic.
+	if len(symbols) != 0 {
+		t.Errorf("expected no symbols for empty text, got %d", len(symbols))
 	}
 }
 
@@ -2657,6 +3069,7 @@ func TestGetHover_MeKeyword_CaseInsensitive(t *testing.T) {
 
 // ==================== Definition Scope Precedence Tests ====================
 
+// [spec feature.definition/A4]
 func TestFindDefinition_LocalPrecedence(t *testing.T) {
 	text := `:PUBLIC globalVar;
 
@@ -2683,6 +3096,7 @@ x := globalVar;
 	}
 }
 
+// [spec feature.definition/A2]
 func TestFindDefinition_PublicWhenNoLocal(t *testing.T) {
 	text := `:PUBLIC gGlobalVar;
 
@@ -2709,6 +3123,7 @@ x := gGlobalVar;
 
 // ==================== DoProc/ExecFunction Definition Tests ====================
 
+// [spec feature.definition/A1]
 func TestFindDefinition_DoProc(t *testing.T) {
 	text := `:PROCEDURE Main;
 result := DoProc("Helper", {param1, param2});
@@ -2734,6 +3149,7 @@ x := p1 + p2;
 	}
 }
 
+// [spec feature.definition/A7]
 func TestFindDefinition_ExecFunction(t *testing.T) {
 	text := `:PROCEDURE Main;
 result := ExecFunction("Calculate", {10, 20});
@@ -2759,6 +3175,7 @@ result := ExecFunction("Calculate", {10, 20});
 	}
 }
 
+// [spec feature.definition/A1]
 func TestFindDefinition_DoProc_SingleQuotes(t *testing.T) {
 	text := `:PROCEDURE Main;
 result := DoProc('Helper', {});
@@ -2782,6 +3199,7 @@ result := DoProc('Helper', {});
 	}
 }
 
+// [spec feature.definition/A6]
 func TestFindDefinition_DoProc_NotFound(t *testing.T) {
 	text := `:PROCEDURE Main;
 result := DoProc("NonExistent", {});
@@ -2798,6 +3216,7 @@ result := DoProc("NonExistent", {});
 	}
 }
 
+// [spec feature.definition/A3]
 func TestFindDefinition_DoProc_CaseInsensitive(t *testing.T) {
 	text := `:PROCEDURE Main;
 result := DoProc("helper", {});
@@ -2823,6 +3242,7 @@ result := DoProc("helper", {});
 
 // ==================== Hierarchical Document Symbols Tests ====================
 
+// [spec feature.document_symbols/A3]
 func TestGetDocumentSymbols_RegionContainsProcedures(t *testing.T) {
 	text := `/* region Helpers;
 :PROCEDURE HelperOne;
@@ -2872,6 +3292,8 @@ func TestGetDocumentSymbols_RegionContainsProcedures(t *testing.T) {
 	}
 }
 
+// [spec feature.document_symbols/A3] — a procedure outside the markers is a
+// sibling, not a child.
 func TestGetDocumentSymbols_ProcedureOutsideRegion(t *testing.T) {
 	text := `:PROCEDURE OutsideProc;
 :ENDPROC;
@@ -3290,6 +3712,7 @@ func TestParseSQLPlaceholders_ComplexNamedParameters(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A6]
 func TestGetSQLPlaceholderHover_NamedParameter(t *testing.T) {
 	content := "SELECT * FROM users WHERE id = ?userId?"
 
@@ -3310,6 +3733,7 @@ func TestGetSQLPlaceholderHover_NamedParameter(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A6]
 func TestGetSQLPlaceholderHover_PositionalParameter(t *testing.T) {
 	content := "INSERT INTO t VALUES (?, ?)"
 
@@ -3359,6 +3783,7 @@ func TestGetSQLPlaceholderHover_OutsidePlaceholder(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A6]
 func TestGetSQLPlaceholderHoverFromToken(t *testing.T) {
 	text := `result := SQLExecute("SELECT * FROM users WHERE id = ?userId?", "ds");`
 
@@ -6806,6 +7231,8 @@ func TestGetDiagnostics_IncludeBeforeProcedure_NoWarning(t *testing.T) {
 
 // ==================== Data Source Completions ====================
 
+// [spec feature.snippets/A7] — data-source files get the DS snippet set and
+// none of the standard script snippets.
 func TestGetSnippetCompletions_DataSource(t *testing.T) {
 	snippets := GetSnippetCompletions(true)
 
@@ -7092,6 +7519,7 @@ func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testin
 // TestDiagnosticsAlwaysCarryCode asserts that every emitted diagnostic carries
 // a non-empty Code so clients can wire quick-fixes / suppression / per-rule
 // severity overrides without inspecting message text.
+// [spec feature.diagnostics_pipeline/A1]
 func TestDiagnosticsAlwaysCarryCode(t *testing.T) {
 	// A grab-bag of patterns that exercises many distinct check functions.
 	code := `:CLASS Email;
@@ -7133,6 +7561,8 @@ y := 1;
 
 // TestRuleOverrides_DropAndRemap verifies that DiagnosticOptions.RuleOverrides
 // drops "off" rules and remaps severity for info/warn/error.
+// [spec feature.diagnostics_pipeline/A2] — "off" drops, "info" remaps.
+// [spec feature.diagnostics_pipeline/A3] — unknown override value is a no-op.
 func TestRuleOverrides_DropAndRemap(t *testing.T) {
 	// Source emits at least one parameters_first diagnostic (statement before
 	// :PARAMETERS) and at least one keyword_uppercase diagnostic (lowercase :if).
@@ -7195,6 +7625,9 @@ nLocal := 1;
 // TestSuppressionComments_FileScopeAndNextLine verifies that
 // /* @ssl-disable <slug>; */ suppresses every matching diagnostic file-wide,
 // and /* @ssl-disable-next-line <slug>; */ suppresses only the next line.
+// [spec feature.diagnostics_pipeline/A4] — file-scope suppression.
+// [spec feature.diagnostics_pipeline/A5] — next-line scope only.
+// [spec feature.diagnostics_pipeline/A6] — wildcard '*' silences everything.
 func TestSuppressionComments_FileScopeAndNextLine(t *testing.T) {
 	// File-scope: silence every parameters_first finding in the file.
 	fileWide := `/* @ssl-disable parameters_first; */
@@ -7441,6 +7874,7 @@ SqlCommand := "TABLE " + sCols + " end";`
 // Panic recovery: a panic anywhere inside collectDiagnostics should NOT
 // kill the server. It should surface as a single internal_error diagnostic
 // so the editor stays usable and bug reports are easy to file.
+// [spec feature.diagnostics_pipeline/A7]
 func TestGetDiagnostics_PanicRecovery(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -7587,6 +8021,7 @@ func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A9]
 func TestEndpointAmbientHover_RequestAndResponse(t *testing.T) {
 	if h := GetEndpointAmbientHover("Request"); h == nil || !strings.Contains(h.Contents, "endpoint ambient") {
 		t.Fatalf("expected Request ambient hover, got %+v", h)
