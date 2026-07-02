@@ -2463,7 +2463,7 @@ func checkIncludePlacement(tokens []lexer.Token) []Diagnostic {
 						Range:    tokenToRange(token),
 						Message:  "':INCLUDE' inside a procedure body is not supported",
 						Source:   "ssl-lsp",
-						Code:     CodeIncludeEarly,
+						Code:     CodeIncludeInProcedure,
 					})
 				} else if seenNonPreambleStatement {
 					diagnostics = append(diagnostics, Diagnostic{
