@@ -2,27 +2,49 @@
 id: fmt.max_line_length
 title: Maximum line length and wrapping
 kind: formatter
-status: draft
+status: active
 authority: style_only
 schema_ref: null
 config:
   - ssl.format.maxLineLength
 tests:
   - internal/providers/formatting_test.go
-history: []
+history:
+  - date: 2026-01-10
+    ref: "v0.1.0 initial release"
+    note: Original wrap pass; 90-column default matches the style guide.
+  - date: 2026-05-13
+    ref: "PR #20 (v0.7.6), issue #16"
+    note: Member-access chains excluded as wrap points (fmt.atomic_property_chains).
 issues: []
 ---
 
 ## Behavior
 
-Lines longer than `ssl.format.maxLineLength` (default 90; 0 = unlimited) are
-wrapped at argument and expression boundaries, with continuations indented
-one level past the statement. Wrapping never splits: string literals,
-comments, member-access chains (see fmt.atomic_property_chains), or SQL
-parameter placeholders. A line that cannot be shortened without such a split
-is left long.
+When a token would push the current line past `ssl.format.maxLineLength`
+(default 90; 0 disables wrapping), the formatter breaks the line at the
+nearest legal wrap point and indents the continuation exactly one level
+past the statement (fixed, not proportional to paren depth; a tab counts as
+`indentSize` columns). Legal wrap points:
+
+- after a comma;
+- after `:=`;
+- before an identifier or keyword inside parentheses/braces/brackets;
+- before the logical operators `.AND.` / `.OR.` / `.NOT.`, arithmetic
+  operators, compound assignments, and `$`.
+
+Wrapping never happens: immediately before or after a member-access `:`
+(fmt.atomic_property_chains); before comparison operators (they bind to
+their operands); or inside a string literal or comment — string tokens are
+atomic, so a single long string argument leaves the line over-long rather
+than being split or moved. A string about to be reflowed as multi-line SQL
+(fmt.sql_in_strings) is also not wrapped before — the SQL engine manages
+its own line breaks.
 
 ## Examples
+
+The array literal overflows at `nThirdQuarterRevenue`, so the line wraps at
+the preceding comma with a one-level continuation indent:
 
 ### Before
 
@@ -37,9 +59,19 @@ DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
 	nThirdQuarterRevenue, nFourthQuarter});
 ```
 
+A single long string argument has no legal wrap point and is left over-long
+(98 columns) rather than split:
+
+### Idempotent
+
+```ssl
+DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNinetyColumns");
+```
+
 ## Rationale
 
-The 90-column default matches the style guide's max_line_length. The
-never-split list encodes hard-won regressions (extension #31/#33: flattened
-intentional structure; #16: split chains) — correctness of meaning beats
-column compliance.
+The 90-column default matches the style guide's `max_line_length`. The
+never-split list encodes hard-won regressions — splitting strings or
+member-access chains (issue #16) changes how the code reads or what it
+means, so correctness of meaning beats column compliance; a line that can
+only be shortened by such a split stays long.

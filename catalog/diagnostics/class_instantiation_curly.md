@@ -1,37 +1,89 @@
 ---
 id: diag.class_instantiation_curly
-title: Class instantiation curly
+title: Built-in class instantiated with parentheses
 kind: diagnostic
-status: draft
+status: active
 authority: tool
 schema_ref: null
 default_severity: error
 severity_overridable: true
 suppressible: true
-tests: []
-history: []
+tests:
+  - internal/providers/providers_test.go
+history:
+  - date: 2026-02-02
+    ref: "commit 7261172"
+    note: Introduced with the gotcha-detection batch (gotcha #15 in gotchas.md).
+  - date: 2026-04-30
+    ref: "PR #3 (v0.4.0)"
+    note: Stable diagnostic code assigned; rule behavior unchanged.
 issues: []
 ---
 
 ## Behavior
 
-TODO: normative statement — what this rule flags, and the boundaries of what
-it must not flag.
+Flags an identifier that names a built-in SSL class (the generated
+`constants.SSLClassNames` list, matched case-insensitively — `Email`,
+`SSLRegex`, `AzureStorage`, ...) when its next significant token is `(`.
+Built-in classes are instantiated with curly braces — `Email{}` — and the
+call form `Email()` fails at runtime. The message shows the curly-brace
+form; the range covers the class-name identifier.
+
+It must NOT flag:
+
+- curly-brace instantiation `Email{}` / `Email{args}`;
+- identifiers that are not built-in class names, including user procedures
+  and built-in functions followed by `(`;
+- `CreateUdObject("Email")` — string dispatch of a built-in class is the
+  separate rule `diag.createudobject_builtin_misuse`;
+- the class name in non-call positions (bare mention, string content,
+  comments).
 
 ## Examples
 
 ### Flags
 
 ```ssl
-/* TODO: minimal SSL that must produce class_instantiation_curly; */
+:PROCEDURE Demo;
+:DECLARE oMail;
+oMail := Email();
+:ENDPROC;
 ```
 
 ### Does not flag
 
 ```ssl
-/* TODO: nearby-but-valid SSL that must NOT produce class_instantiation_curly; */
+:PROCEDURE Demo;
+:DECLARE oMail;
+oMail := Email{};
+:ENDPROC;
 ```
 
 ## Rationale
 
-TODO: why this behavior and this severity; cite history refs.
+`ClassName()` is what every other mainstream language writes, so it is a
+high-frequency porting mistake, and it is guaranteed-broken SSL — hence an
+error with a message that shows the exact replacement. Matching is a
+simple identifier-then-`(` scan, which keeps the rule fast and
+explainable; the one imprecision that scan admits is recorded below.
+Introduced with the gotcha batch (commit 7261172); the code slug was
+stabilized in PR #3 (v0.4.0).
+
+## Known gaps
+
+- The scan does not look left of the identifier, so a colon-qualified
+  member call whose method happens to share a built-in class name — e.g.
+  `oSvc:Email("to")` — flags as if it were an instantiation. That is a
+  method call on a user object, not a class instantiation, and the intent
+  of gotcha #15 is instantiation syntax only. Target: an identifier
+  preceded by the `:` member-access punctuation must be exempt. No issue
+  filed yet; covered by the expect=fail fence below.
+
+### Does not flag
+
+```ssl expect=fail
+:PROCEDURE Demo;
+:DECLARE oSvc, xResult;
+xResult := oSvc:Email("to");
+:ENDPROC;
+```

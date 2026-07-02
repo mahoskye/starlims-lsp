@@ -30,20 +30,20 @@ dropped (entry retains the history).
 
 | Entry | Title | Status |
 |-------|-------|--------|
-| [fmt.atomic_property_chains](../catalog/formatting/atomic_property_chains.md) | Property chains are atomic when wrapping | draft |
-| [fmt.blank_line_between_blocks](../catalog/formatting/blank_line_between_blocks.md) | Blank line between sibling control-flow blocks | draft |
-| [fmt.blank_lines_between_procs](../catalog/formatting/blank_lines_between_procs.md) | Blank lines between procedures | draft |
-| [fmt.builtin_function_case](../catalog/formatting/builtin_function_case.md) | Built-in function name casing | draft |
-| [fmt.comma_spacing](../catalog/formatting/comma_spacing.md) | Space after commas | draft |
-| [fmt.indent_style](../catalog/formatting/indent_style.md) | Indentation style and width | draft |
-| [fmt.max_consecutive_blank_lines](../catalog/formatting/max_consecutive_blank_lines.md) | Cap consecutive blank lines | draft |
-| [fmt.max_line_length](../catalog/formatting/max_line_length.md) | Maximum line length and wrapping | draft |
-| [fmt.operator_spacing](../catalog/formatting/operator_spacing.md) | Spacing around operators | draft |
-| [fmt.semicolon_enforcement](../catalog/formatting/semicolon_enforcement.md) | Statement semicolon enforcement | draft |
-| [fmt.sql_in_strings](../catalog/formatting/sql_in_strings.md) | SQL formatting inside string literals | draft |
-| [fmt.trim_trailing_whitespace](../catalog/formatting/trim_trailing_whitespace.md) | Trim trailing whitespace | draft |
+| [fmt.atomic_property_chains](../catalog/formatting/atomic_property_chains.md) | Property chains are atomic when wrapping | active |
+| [fmt.blank_line_between_blocks](../catalog/formatting/blank_line_between_blocks.md) | Blank line between sibling control-flow blocks | active |
+| [fmt.blank_lines_between_procs](../catalog/formatting/blank_lines_between_procs.md) | Blank lines between procedures | active |
+| [fmt.builtin_function_case](../catalog/formatting/builtin_function_case.md) | Built-in function name casing | active |
+| [fmt.comma_spacing](../catalog/formatting/comma_spacing.md) | Space after commas | active |
+| [fmt.indent_style](../catalog/formatting/indent_style.md) | Indentation style and width | active |
+| [fmt.max_consecutive_blank_lines](../catalog/formatting/max_consecutive_blank_lines.md) | Cap consecutive blank lines | active |
+| [fmt.max_line_length](../catalog/formatting/max_line_length.md) | Maximum line length and wrapping | active |
+| [fmt.operator_spacing](../catalog/formatting/operator_spacing.md) | Spacing around operators | active |
+| [fmt.semicolon_enforcement](../catalog/formatting/semicolon_enforcement.md) | Statement semicolon enforcement | active |
+| [fmt.sql_in_strings](../catalog/formatting/sql_in_strings.md) | SQL formatting inside string literals | active |
+| [fmt.trim_trailing_whitespace](../catalog/formatting/trim_trailing_whitespace.md) | Trim trailing whitespace | active |
 
 ## Diagnostics
 
-100 rules cataloged: 4 active, 95 draft, 1 planned, 0 removed.
+100 rules cataloged: 51 active, 48 draft, 1 planned, 0 removed.
 Full table: [docs/reference/DIAGNOSTICS.md](reference/DIAGNOSTICS.md).
