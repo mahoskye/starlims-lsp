@@ -567,6 +567,7 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	if content, ok := s.documents.GetDocument(uri); ok {
 		opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
 	}
+	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
 	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 
 	// Convert to protocol diagnostics

@@ -69,6 +69,13 @@ type DiagnosticOptions struct {
 	// ambients (not declared, not flagged as undeclared, not assignable).
 	IsEndpointFile bool
 
+	// IncludeDeclaredVariables carries variable names declared by the
+	// file's resolved :INCLUDE targets (full-splice semantics, supplied by
+	// the server's workspace closure — spec
+	// feature.cross_file_resolution/A18-A19). They count as declared for
+	// undeclared_variable and invalid_sql_param.
+	IncludeDeclaredVariables []string
+
 	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
 	// Recognized values: "off" (drop the diagnostic), "info", "warn",
 	// "warning", "error". Diagnostics whose Code is not in the map pass
@@ -213,7 +220,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
-		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables, opts.IsEndpointFile)...)
+		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables, opts.IncludeDeclaredVariables, opts.IsEndpointFile)...)
 	}
 
 	// Check for unused variable declarations (opt-in)
@@ -223,7 +230,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	// Check for SQL parameter validation (opt-in)
 	if opts.CheckSQLParams {
-		diagnostics = append(diagnostics, checkSQLParameterValidation(tokens, ast, p, opts.GlobalVariables)...)
+		diagnostics = append(diagnostics, checkSQLParameterValidation(tokens, ast, p, opts.GlobalVariables, opts.IncludeDeclaredVariables)...)
 	}
 
 	// SSL gotcha detection (always enabled)
@@ -4530,7 +4537,7 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 //   - Issue #56: :INCLUDE paths should be skipped from checking
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
-func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, isEndpoint bool) []Diagnostic {
+func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Build set of declared variables from the AST
@@ -4542,6 +4549,13 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 
 	// Add configured globals to declared variables (Issue #55)
 	for _, g := range globals {
+		declaredVars[strings.ToUpper(g)] = true
+	}
+
+	// Names declared by resolved :INCLUDE targets count as declared —
+	// :INCLUDE splices the included script's full text
+	// (spec feature.cross_file_resolution/A18-A19).
+	for _, g := range includeDeclared {
 		declaredVars[strings.ToUpper(g)] = true
 	}
 
@@ -4829,7 +4843,7 @@ func countVariableUsages(tokens []lexer.Token, v parser.VariableInfo, procedures
 // checkSQLParameterValidation checks that SQL parameters (?param?) match declared variables.
 // This validation ensures that named parameters in SQL strings reference variables
 // that are actually declared in the current scope (case-insensitive).
-func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string) []Diagnostic {
+func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, includeDeclared []string) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Build set of all declared variables (case-insensitive)
@@ -4837,6 +4851,13 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 	variables := p.ExtractVariables(ast)
 	for _, v := range variables {
 		declaredVars[strings.ToUpper(v.Name)] = true
+	}
+
+	// Names declared by resolved :INCLUDE targets count as declared —
+	// :INCLUDE splices the included script's full text
+	// (spec feature.cross_file_resolution/A18-A19).
+	for _, g := range includeDeclared {
+		declaredVars[strings.ToUpper(g)] = true
 	}
 
 	// Add built-in predefined globals (MYUSERNAME, etc.) and status keywords

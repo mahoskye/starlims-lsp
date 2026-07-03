@@ -36,6 +36,13 @@ history:
       docblock) treat Request/Response as pre-injected ambients — declared
       for reads, never flagged. In non-endpoint files they still flag:
       using them there is a real bug (DECISIONS.md D4).
+  - date: 2026-07-03
+    ref: "include-aware diagnostics PR"
+    note: >-
+      Names declared by resolved :INCLUDE targets count as declared
+      (feature.cross_file_resolution A18-A19) — :INCLUDE is a full-splice
+      textual paste, so the included script's declarations belong to the
+      including file. Single-file behavior (and every fence) unchanged.
 issues: []
 ---
 
@@ -47,9 +54,14 @@ scope, reported once per scope.
 
 Treated as declared, never flagged: built-in function and class names,
 `Me`/`Base` forms, identifiers inside `:INCLUDE` paths, names listed in
-`ssl.diagnostics.globals`, and — in endpoint scripts only — the runtime
-ambients `Request` and `Response`. In non-endpoint files `Request` and
-`Response` flag like any other undeclared name.
+`ssl.diagnostics.globals`, names declared by the file's resolved
+`:INCLUDE` targets (the include declaration closure,
+`feature.cross_file_resolution` A18-A19 — `:INCLUDE` splices the included
+script's text, so its declarations are in scope), and — in endpoint
+scripts only — the runtime ambients `Request` and `Response`. In
+non-endpoint files `Request` and `Response` flag like any other
+undeclared name. Without a workspace index (or when includes don't
+resolve) the check is single-file, exactly as before.
 
 ## Examples
 

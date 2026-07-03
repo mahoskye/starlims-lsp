@@ -696,3 +696,106 @@ func TestHandleHover_RunDSTarget(t *testing.T) {
 		t.Errorf("expected null hover for unresolvable RunDS target, got %+v", hover)
 	}
 }
+
+// [spec feature.cross_file_resolution/A18]
+func TestIncludeDeclaredVariables_TransitiveAndCycle(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	// LibB -> LibC -> LibB is a cycle; the closure must terminate and
+	// carry both files' declarations.
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/LIBB.srvscr",
+		":PUBLIC gShared;\n:INCLUDE LibC;\n:DECLARE nFileLevel;")
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/LIBC.srvscr",
+		":PUBLIC gDeep;\n:INCLUDE LibB;")
+
+	source := ":INCLUDE LibB;\nnTotal := gShared + gDeep;"
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+	cache := s.documents.ParseDocument(testURI, 1)
+
+	names := (liveResolver{s}).includeDeclaredVariables(cache.Tokens, testURI)
+	for _, want := range []string{"gShared", "gDeep", "nFileLevel"} {
+		if !containsFold(names, want) {
+			t.Errorf("closure missing %q, got %v", want, names)
+		}
+	}
+
+	// End to end: the closure suppresses undeclared_variable for included
+	// names while a genuinely undeclared name still flags.
+	opts := providers.DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	opts.IncludeDeclaredVariables = names
+	source = ":INCLUDE LibB;\n:PROCEDURE Demo;\nnTotal := gShared + gDeep + nMissing;\n:ENDPROC;"
+	s.documents.SetDocument(testURI, source, 2)
+	s.documentVersion[testURI] = 2
+	cache = s.documents.ParseDocument(testURI, 2)
+	var flagged []string
+	for _, d := range providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts) {
+		if d.Code == providers.CodeUndeclaredVariable {
+			flagged = append(flagged, d.Message)
+		}
+	}
+	if len(flagged) != 1 || !strings.Contains(flagged[0], "nMissing") {
+		t.Errorf("expected exactly one undeclared flag for nMissing, got %v", flagged)
+	}
+}
+
+// [spec feature.cross_file_resolution/A19]
+func TestIncludeDeclaredVariables_AmbiguousUnionAndUnresolvable(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/CATA/SHAREDLIB.srvscr", ":PUBLIC gFromA;")
+	writeAndIndex(t, wi, dir, "Server Scripts/CATB/SHAREDLIB.srvscr", ":PUBLIC gFromB;")
+
+	s.documents.SetDocument(testURI, ":INCLUDE SharedLib;", 1)
+	s.documentVersion[testURI] = 1
+	cache := s.documents.ParseDocument(testURI, 1)
+
+	names := (liveResolver{s}).includeDeclaredVariables(cache.Tokens, testURI)
+	for _, want := range []string{"gFromA", "gFromB"} {
+		if !containsFold(names, want) {
+			t.Errorf("ambiguous include must union candidates, missing %q in %v", want, names)
+		}
+	}
+
+	// Unresolvable target contributes nothing.
+	s.documents.SetDocument(testURI, ":INCLUDE NoSuchLib;", 2)
+	s.documentVersion[testURI] = 2
+	cache = s.documents.ParseDocument(testURI, 2)
+	if names := (liveResolver{s}).includeDeclaredVariables(cache.Tokens, testURI); len(names) != 0 {
+		t.Errorf("unresolvable include must contribute nothing, got %v", names)
+	}
+}
+
+// Open included documents contribute live-buffer declarations (overlay
+// consistency with feature.cross_file_resolution/A12).
+func TestIncludeDeclaredVariables_OpenDocumentOverlay(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	libURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/LIBB.srvscr", ":PUBLIC gShared;")
+
+	// The included file is open with an unsaved edit renaming the public.
+	s.documents.SetDocument(libURI, ":PUBLIC gLive;", 1)
+	s.documentVersion[libURI] = 1
+
+	s.documents.SetDocument(testURI, ":INCLUDE LibB;", 1)
+	s.documentVersion[testURI] = 1
+	cache := s.documents.ParseDocument(testURI, 1)
+
+	names := (liveResolver{s}).includeDeclaredVariables(cache.Tokens, testURI)
+	if !containsFold(names, "gLive") || containsFold(names, "gShared") {
+		t.Errorf("expected live-buffer declarations only, got %v", names)
+	}
+}
+
+func containsFold(names []string, want string) bool {
+	for _, n := range names {
+		if strings.EqualFold(n, want) {
+			return true
+		}
+	}
+	return false
+}

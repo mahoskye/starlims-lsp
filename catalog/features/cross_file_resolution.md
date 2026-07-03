@@ -24,6 +24,13 @@ history:
       script/data-source partition: dispatch and include resolution no
       longer return data-source files, and RunDS resolution returns only
       them.
+  - date: 2026-07-03
+    ref: "include-aware diagnostics PR"
+    note: >-
+      Include declaration closure added (A18-A19): resolved :INCLUDE
+      targets contribute their declared variable names to the including
+      file's diagnostics, transitively with a cycle guard. Consumed by
+      diag.undeclared_variable and diag.invalid_sql_param.
 issues: []
 ---
 
@@ -82,6 +89,18 @@ only non-data-source files; data-source resolution considers only
 data-source files (`.ds`/`.ds.txt`). `RunDS` is the only dispatcher that
 reaches data sources, and it reaches nothing else.
 
+**Include declaration closure** (for diagnostics): `:INCLUDE` splices the
+included script's full text, so every variable name the included script
+declares (`:DECLARE`/`:PUBLIC`/`:PARAMETERS`, anywhere in the file) counts
+as declared in the including file. The closure is transitive — included
+scripts' own `:INCLUDE`s contribute too — with a visited-set cycle guard,
+and an ambiguous include target contributes the union of all its
+resolution candidates (erring toward fewer false positives). Unresolvable
+targets contribute nothing; without a workspace index, diagnostics behave
+exactly as before (single-file). Open included documents contribute their
+live-buffer declarations, consistent with the open-document overlay.
+Consumers: `diag.undeclared_variable` and `diag.invalid_sql_param`.
+
 **Candidate ordering and cap**: anchored canonical-layout matches order
 before flat matches, path-lexicographic within each group, capped at 10.
 
@@ -113,6 +132,8 @@ buffer drops that candidate entirely.
 - A15: Given a data-source file at `Data Sources/QUERIES/ORDERS.ds`, when the data-source target `QUERIES.ORDERS` resolves, then the result is that file's entry (its file-level `:PARAMETERS` line when present, else line 0).
 - A16: Given a flat-layout data-source file `Orders.ds`, when the 1-part data-source target `Orders` resolves, then the file is returned — 1-part data-source targets resolve by basename.
 - A17: Given a script and a data source sharing a name, when a dispatch or include target names it, then only the script is returned; when a data-source target names it, then only the data source is returned.
+- A18: Given file A with `:INCLUDE B;` where B declares `:PUBLIC gShared;` and B itself includes C declaring `:PUBLIC gDeep;`, when A's include declaration closure is computed, then it contains both `gShared` and `gDeep`; a cyclic include chain (C including A) terminates without error.
+- A19: Given an include target resolving to two candidate files with different declarations, when the closure is computed, then it contains the union of both candidates' declared names; an unresolvable include target contributes nothing.
 
 ## Rationale
 
