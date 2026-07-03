@@ -604,6 +604,139 @@ z := recount;
 	}
 }
 
+// TestFindReferences_ExcludeDeclaration_FromUseSite: includeDeclaration=false
+// must exclude the declaration even when the request originates on a use
+// site — the declaration is resolved from the parsed symbol, not the cursor
+// line (issue #42). [spec feature.references/A8]
+func TestFindReferences_ExcludeDeclaration_FromUseSite(t *testing.T) {
+	t.Run("variable", func(t *testing.T) {
+		text := `:PROCEDURE Test;
+:DECLARE myVar;
+myVar := 1;
+x := myVar + 1;
+:ENDPROC;`
+
+		procedures, variables := parseText(text)
+
+		// Cursor on the use at line 3, not the :DECLARE line
+		locations := FindReferencesWithScope(text, 3, 2, "file:///test.ssl", false, procedures, variables)
+		if locations == nil {
+			t.Fatal("expected to find references")
+		}
+		if len(locations) != 2 {
+			t.Errorf("expected 2 references excluding declaration, got %d", len(locations))
+		}
+		for _, loc := range locations {
+			if loc.Range.Start.Line == 1 {
+				t.Error("declaration should be excluded when includeDeclaration=false, even from a use site")
+			}
+		}
+	})
+
+	t.Run("procedure", func(t *testing.T) {
+		text := `:PROCEDURE TargetProc;
+:ENDPROC;
+
+:PROCEDURE Main;
+TargetProc();
+x := TargetProc();
+:ENDPROC;`
+
+		procedures, variables := parseText(text)
+
+		// Cursor on the call site at line 5, not the :PROCEDURE line
+		locations := FindReferencesWithScope(text, 5, 2, "file:///test.ssl", false, procedures, variables)
+		if locations == nil {
+			t.Fatal("expected to find references")
+		}
+		if len(locations) != 2 {
+			t.Errorf("expected 2 references excluding declaration, got %d", len(locations))
+		}
+		for _, loc := range locations {
+			if loc.Range.Start.Line == 0 {
+				t.Error(":PROCEDURE declaration should be excluded when includeDeclaration=false, even from a call site")
+			}
+		}
+	})
+}
+
+// TestFindReferences_SkipsCommentsAndNonDispatchStrings: whole-word matches
+// inside comments and unrelated string literals are not references; only
+// code-context matches are returned (issue #43). [spec feature.references/A9]
+func TestFindReferences_SkipsCommentsAndNonDispatchStrings(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sName;
+/* sName is mentioned in this comment;
+sName := "sName is a variable";
+other := "prefix sName suffix";
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	locations := FindReferencesWithScope(text, 2, 10, "file:///test.ssl", true, procedures, variables)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	// Only the declaration (line 2) and the assignment target (line 4).
+	if len(locations) != 2 {
+		t.Errorf("expected 2 references (declaration + assignment), got %d", len(locations))
+	}
+	for _, loc := range locations {
+		if loc.Range.Start.Line == 2 {
+			t.Error("match inside a comment must not be returned")
+		}
+		if loc.Range.Start.Line == 3 && loc.Range.Start.Character > 0 {
+			t.Error("match inside an unrelated string must not be returned")
+		}
+		if loc.Range.Start.Line == 4 {
+			t.Error("match inside an unrelated string must not be returned")
+		}
+	}
+}
+
+// TestFindReferences_NonDispatchStringWithProcName: a string mentioning a
+// procedure name only counts as a reference when it is the whole first
+// argument of DoProc/ExecFunction — the dispatch-target case; strings passed
+// to other functions or containing extra text are skipped (issue #43).
+// [spec feature.references/A9]
+func TestFindReferences_NonDispatchStringWithProcName(t *testing.T) {
+	text := `:PROCEDURE TargetProc;
+:ENDPROC;
+
+:PROCEDURE Main;
+DoProc("TargetProc");
+ExecFunction("TargetProc");
+LogMessage("TargetProc failed");
+DoProc("TargetProc extra");
+x := "TargetProc";
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	locations := FindReferencesWithScope(text, 1, 12, "file:///test.ssl", true, procedures, variables)
+	if locations == nil {
+		t.Fatal("expected to find references")
+	}
+	// Declaration + DoProc target + ExecFunction target.
+	if len(locations) != 3 {
+		t.Errorf("expected 3 references (declaration + 2 dispatch targets), got %d", len(locations))
+	}
+	foundDoProc, foundExecFunction := false, false
+	for _, loc := range locations {
+		switch loc.Range.Start.Line {
+		case 4:
+			foundDoProc = true
+		case 5:
+			foundExecFunction = true
+		case 6, 7, 8:
+			t.Errorf("non-dispatch string match on line %d must not be returned", loc.Range.Start.Line)
+		}
+	}
+	if !foundDoProc || !foundExecFunction {
+		t.Error("dispatch string targets must remain references (feature.references/A7)")
+	}
+}
+
 // TestFindReferences_DoProcStringTarget: the first string argument of
 // DoProc/ExecFunction is the only legal call syntax for user procedures, so
 // it counts as a reference. [spec feature.references/A7]

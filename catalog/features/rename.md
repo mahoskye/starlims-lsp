@@ -19,6 +19,11 @@ history:
     note: textDocument/rename and prepare-rename added — context/symbol
       validation, new-name validation, scope-aware edits via the shared
       reference search.
+  - date: 2026-07-02
+    ref: "issue #43"
+    note: Rename edits no longer touch comments or unrelated strings — the
+      shared reference search classifies every match against lexer tokens;
+      DoProc/ExecFunction dispatch string targets are still renamed.
 issues: ["#43"]
 ---
 
@@ -45,8 +50,11 @@ issues: ["#43"]
   `ExecFunction("Name")` string targets — they are the only legal call
   syntax, so leaving them behind would silently break dispatch.
 - Rename MUST NOT modify unrelated string literal or comment content that
-  happens to contain the old name. (Currently violated by the text-based
-  search — see Known gaps / A8.)
+  happens to contain the old name. Edits come from the shared reference
+  search, which classifies each text match against the lexer tokens: comment
+  matches are dropped, and string matches are dropped unless the string is
+  the first argument of `DoProc`/`ExecFunction` (case-insensitive) and the
+  match spans the entire string content — the dispatch-target case above.
 - All edits MUST be returned as a single WorkspaceEdit against the current
   document; no other files are modified.
 
@@ -59,7 +67,7 @@ issues: ["#43"]
 - A5: Given a valid rename target, when the user supplies `IF`, `Len`, or `my-var` as the new name, then the rename is rejected and no edits are produced.
 - A6: Given `:PROCEDURE CalcTotal;` or a `:PUBLIC` variable referenced across the file, when the user renames it, then all file-wide identifier occurrences are updated.
 - A7: Given a procedure rename with a `DoProc("CalcTotal")` call present, when the rename executes, then the name inside the dispatch string is updated too (exactly the name, quotes untouched), keeping the call working.
-- A8: Given an unrelated string such as `"sName is a variable"` or a comment mentioning the old name, when a rename of `sName` executes, then that string/comment content is NOT edited. (planned)
+- A8: Given an unrelated string such as `"sName is a variable"` or a comment mentioning the old name, when a rename of `sName` executes, then that string/comment content is NOT edited.
 
 ## Rationale
 
@@ -73,15 +81,7 @@ validation prevents producing code that cannot parse or that shadows the
 rename for the same reason references counts them (feature.references/A7):
 `DoProc("Name")` is the call site, and a rename that breaks every call is
 worse than no rename. The flip side — unrelated strings and comments must
-stay untouched — is the same context-awareness defect tracked for
-references; the contract keeps it normative so the shared fix has a target.
-
-## Known gaps
-
-- Rename edits are produced by the same text-based reference search that
-  leaks into comments and non-dispatch strings
-  (feature.references Known gaps): renaming `sName` also rewrites
-  `"sName is a variable"`. TestRename_DoesNotAffectStrings currently
-  documents the leak rather than preventing it. Covered by A8 (planned);
-  the fix must preserve A7 (dispatch strings ARE renamed). Shares its root
-  cause — and its fix — with feature.references/A9.
+stay untouched — was the same context-awareness defect tracked for
+references; issue #43 fixed it at the shared reference search (the same fix
+resolves feature.references/A9), preserving A7 (dispatch strings ARE
+renamed).

@@ -614,10 +614,18 @@ result := DoProc("CalcTotal", {});
 	}
 }
 
-func TestRename_DoesNotAffectStrings(t *testing.T) {
+// TestRename_LeavesCommentsAndUnrelatedStringsUntouched: renaming a symbol
+// must not edit unrelated string literal or comment content that merely
+// mentions the old name (issue #43). This test replaces the misnamed
+// TestRename_DoesNotAffectStrings, which pinned the defect that string
+// content WAS renamed. Dispatch strings are still renamed — see
+// TestRename_Procedure_UpdatesDoProcStringTarget (feature.rename/A7).
+// [spec feature.rename/A8]
+func TestRename_LeavesCommentsAndUnrelatedStringsUntouched(t *testing.T) {
 	text := `:PROCEDURE Test;
 :DECLARE sName;
 sName := "sName is a variable";
+/* sName appears in this comment too;
 :ENDPROC;`
 
 	procedures, variables := parseText(text)
@@ -630,11 +638,17 @@ sName := "sName is a variable";
 
 	edits := result.Changes["file:///test.ssl"]
 
-	// Note: FindReferencesWithScope uses regex text search, so it may find matches
-	// in strings. This is a known limitation - the current implementation finds 3 edits.
-	// A more sophisticated implementation would filter out string content.
-	// For now, we verify the rename succeeds and returns edits.
-	if len(edits) < 2 {
-		t.Errorf("expected at least 2 edits, got %d", len(edits))
+	// Exactly 2 edits: the declaration and the assignment target — nothing
+	// inside the string literal or the comment.
+	if len(edits) != 2 {
+		t.Errorf("expected exactly 2 edits (declaration + assignment), got %d", len(edits))
+	}
+	for _, edit := range edits {
+		if edit.Range.Start.Line == 2 && edit.Range.Start.Character > 0 {
+			t.Error("unrelated string content must not be edited by rename")
+		}
+		if edit.Range.Start.Line == 3 {
+			t.Error("comment content must not be edited by rename")
+		}
 	}
 }
