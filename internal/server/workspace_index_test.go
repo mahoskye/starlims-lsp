@@ -113,6 +113,9 @@ func TestWorkspaceIndex_IndexFile_Class(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A5] — a query matching nothing returns an
+// empty result without error (also pins case-insensitive substring match
+// and empty-query-returns-all over the index).
 func TestWorkspaceIndex_SearchSymbols(t *testing.T) {
 	dir := t.TempDir()
 
@@ -164,6 +167,9 @@ func TestWorkspaceIndex_SearchSymbols(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A3] — the index never contributes results
+// for URIs that are open; open documents stay authoritative and duplicates
+// are impossible.
 func TestWorkspaceIndex_SearchSkipsOpenURIs(t *testing.T) {
 	dir := t.TempDir()
 
@@ -194,6 +200,8 @@ func TestWorkspaceIndex_SearchSkipsOpenURIs(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A6] — removed files drop out of search
+// results (the didChangeWatchedFiles delete path calls RemoveFile).
 func TestWorkspaceIndex_RemoveFile(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTestFile(t, dir, "test.srvscr", testSSLContent)
@@ -218,6 +226,8 @@ func TestWorkspaceIndex_RemoveFile(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A2] — on-disk files (not open anywhere)
+// are indexed in the background and searchable; non-SSL files are ignored.
 func TestWorkspaceIndex_BackgroundIndex(t *testing.T) {
 	dir := t.TempDir()
 
@@ -258,6 +268,7 @@ func TestWorkspaceIndex_BackgroundIndex(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A2] — all five SSL extensions are indexed.
 func TestWorkspaceIndex_BackgroundIndex_MultipleExtensions(t *testing.T) {
 	dir := t.TempDir()
 
@@ -324,6 +335,8 @@ func TestWorkspaceIndex_ConcurrentAccess(t *testing.T) {
 	}
 }
 
+// [spec feature.workspace_symbols/A4] — indexed :CLASS files report their
+// procedures as Method (6), scripts as Function (12).
 func TestWorkspaceIndex_ClassSymbolKind(t *testing.T) {
 	dir := t.TempDir()
 

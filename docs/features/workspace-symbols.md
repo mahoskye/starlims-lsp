@@ -1,5 +1,7 @@
 # Workspace Symbols
 
+> **Normative source:** [`feature.workspace_symbols`](../../catalog/features/workspace_symbols.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED
 **LSP Method:** `workspace/symbol`
 **Source Files:** `internal/server/workspace_index.go`, `internal/server/handler.go`

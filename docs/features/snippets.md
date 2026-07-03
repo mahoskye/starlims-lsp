@@ -1,5 +1,7 @@
 # Snippets
 
+> **Normative source:** [`feature.snippets`](../../catalog/features/snippets.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** Via `textDocument/completion`  
 **Source Files:** `internal/providers/completion.go`

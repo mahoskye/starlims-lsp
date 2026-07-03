@@ -1,5 +1,7 @@
 # Rename Support
 
+> **Normative source:** [`feature.rename`](../../catalog/features/rename.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 The SSL Language Server provides rename functionality (`textDocument/rename`) for renaming symbols across the current document.
 
 ## Overview

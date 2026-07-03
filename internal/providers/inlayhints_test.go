@@ -7,6 +7,7 @@ import (
 	"starlims-lsp/internal/parser"
 )
 
+// [spec feature.inlay_hints/A1]
 func TestGetInlayHints_BuiltinFunction(t *testing.T) {
 	// Test built-in function with 3 parameters (above threshold)
 	code := `x := Substr("Hello", 1, 5);`
@@ -33,6 +34,7 @@ func TestGetInlayHints_BuiltinFunction(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A2]
 func TestGetInlayHints_SingleParameter_BelowThreshold(t *testing.T) {
 	// Test single parameter function - should not show hints with default threshold
 	code := `x := Len(sValue);`
@@ -46,6 +48,7 @@ func TestGetInlayHints_SingleParameter_BelowThreshold(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A2] — with minParameterCount 1 the hint appears.
 func TestGetInlayHints_SingleParameter_ThresholdOne(t *testing.T) {
 	// Test single parameter function with threshold = 1
 	code := `x := Len(sValue);`
@@ -66,6 +69,7 @@ func TestGetInlayHints_SingleParameter_ThresholdOne(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A6]
 func TestGetInlayHints_Disabled(t *testing.T) {
 	code := `x := Substr("Hello", 1, 5);`
 	tokens := lexer.NewLexer(code).Tokenize()
@@ -81,6 +85,7 @@ func TestGetInlayHints_Disabled(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A7]
 func TestGetInlayHints_RangeFiltering(t *testing.T) {
 	code := `x := Substr("a", 1, 2);
 y := Substr("b", 3, 4);
@@ -105,6 +110,7 @@ z := Substr("c", 5, 6);`
 	}
 }
 
+// [spec feature.inlay_hints/A3]
 func TestGetInlayHints_DoProc(t *testing.T) {
 	code := `DoProc("MyProc", {100, 200});`
 	tokens := lexer.NewLexer(code).Tokenize()
@@ -126,6 +132,7 @@ func TestGetInlayHints_DoProc(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A3] — ExecFunction behaves like DoProc.
 func TestGetInlayHints_ExecFunction(t *testing.T) {
 	code := `ExecFunction("MyProc", {arg1});`
 	tokens := lexer.NewLexer(code).Tokenize()
@@ -166,6 +173,7 @@ func TestGetInlayHints_NestedCalls(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A8]
 func TestGetInlayHints_UnknownFunction(t *testing.T) {
 	code := `x := UnknownFunc(a, b, c);`
 	tokens := lexer.NewLexer(code).Tokenize()
@@ -216,6 +224,7 @@ func TestGetInlayHints_HintPositions(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A1] — hints carry kind Parameter.
 func TestGetInlayHints_HintKind(t *testing.T) {
 	code := `x := Substr("Hello", 1, 5);`
 	tokens := lexer.NewLexer(code).Tokenize()
@@ -348,6 +357,24 @@ func TestParseArguments_WithNestedBraces(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A5] — no hints for call-shaped text inside
+// string literals or comments.
+func TestGetInlayHints_InsideStringOrComment_NoHints(t *testing.T) {
+	opts := DefaultInlayHintOptions()
+
+	inString := `s := "Substr(a, 1, 2)";`
+	tokens := lexer.NewLexer(inString).Tokenize()
+	if hints := GetInlayHints(tokens, nil, 1, 1, opts); len(hints) != 0 {
+		t.Errorf("expected 0 hints for call inside string literal, got %d", len(hints))
+	}
+
+	inComment := `/* Substr(a, 1, 2) ;`
+	tokens = lexer.NewLexer(inComment).Tokenize()
+	if hints := GetInlayHints(tokens, nil, 1, 1, opts); len(hints) != 0 {
+		t.Errorf("expected 0 hints for call inside comment, got %d", len(hints))
+	}
+}
+
 func TestDefaultInlayHintOptions(t *testing.T) {
 	opts := DefaultInlayHintOptions()
 
@@ -382,6 +409,7 @@ func TestGetInlayHints_WithProcedures(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A3] — DoProc matching is case-insensitive.
 func TestGetInlayHints_CaseInsensitiveDoProc(t *testing.T) {
 	// Test that DoProc/doproc/DOPROC all work
 	testCases := []string{

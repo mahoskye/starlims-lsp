@@ -93,6 +93,7 @@ oBar := oFoo:clone();
 	}
 }
 
+// [spec feature.completion/A3]
 func TestGetUDObjectShapeCompletions(t *testing.T) {
 	shapes := map[string]UDObjectShape{
 		"ofoo": {Properties: []UDObjectProperty{

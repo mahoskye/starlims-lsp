@@ -1,5 +1,7 @@
 # Hover
 
+> **Normative source:** [`feature.hover`](../../catalog/features/hover.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/hover`  
 **Source Files:** `internal/providers/hover.go`, `internal/server/handler.go`

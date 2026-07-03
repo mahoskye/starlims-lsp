@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// [spec feature.formatting/A1] — full-document formatting returns exactly
+// one edit spanning the whole document.
 func TestFormatDocument_BasicIndentation(t *testing.T) {
 	input := `:PROCEDURE Test;:DECLARE x;x:=1;:IF x=1;x:=2;:ENDIF;:ENDPROC;`
 
@@ -232,6 +234,8 @@ x := 1
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// [spec feature.formatting/A4] — SQL function arguments are delegated to
+// the SQL formatter.
 func TestFormatDocument_SQLStringFormatting(t *testing.T) {
 	// SSL code with SQL string in SQLExecute function
 	input := `ds := SQLExecute("SELECT id, name FROM users WHERE status = 'active' AND role = 'admin'");`
@@ -255,6 +259,7 @@ func TestFormatDocument_SQLStringFormatting(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// [spec feature.formatting/A5]
 func TestFormatDocument_SQLFormattingDisabled(t *testing.T) {
 	// SSL code with SQL string
 	input := `ds := SQLExecute("select id from users");`
@@ -275,6 +280,8 @@ func TestFormatDocument_SQLFormattingDisabled(t *testing.T) {
 
 // Range formatting tests
 
+// [spec feature.formatting/A2] — range formatting edits only the requested
+// lines.
 func TestFormatDocumentRange_BasicRange(t *testing.T) {
 	// Document with multiple lines, we'll format just a portion
 	input := `:PROCEDURE Test;
@@ -304,6 +311,7 @@ x:=2;
 	t.Logf("Formatted range:\n%s", formatted)
 }
 
+// [spec feature.formatting/A2] — surrounding base indentation is preserved.
 func TestFormatDocumentRange_PreservesBaseIndentation(t *testing.T) {
 	// Document with indented code
 	input := `:PROCEDURE Test;
@@ -858,6 +866,7 @@ DoOne();
 // End-of-Line Comment Preservation Tests
 // ============================================================================
 
+// [spec feature.formatting/A3] — comment content is preserved.
 func TestFormatDocument_EndOfLineCommentPreserved(t *testing.T) {
 	input := `x := 5;  /* set x to 5;`
 
@@ -1041,6 +1050,8 @@ func TestFormatDocument_MultiLineArrayPreserved(t *testing.T) {
 // SQL String Detection and Formatting Tests
 // ============================================================================
 
+// [spec feature.formatting/A4] — detected standalone SQL strings are
+// formatted when detection is on.
 func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
 	// Issue #64: a single-line SQL assignment that already fits within
 	// MaxLineLength must not be reflowed. Reformatting `sSQL := "..."`
@@ -1073,6 +1084,8 @@ func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// [spec feature.formatting/A7] — with detection off, standalone strings are
+// untouched.
 func TestFormatDocument_DetectedSQLStringDisabled(t *testing.T) {
 	// When DetectSQLStrings is false, only SQL function args should be formatted
 	input := `sSQL := "select * from users where status = 'active'";`
@@ -1097,6 +1110,8 @@ func TestFormatDocument_DetectedSQLStringDisabled(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// [spec feature.formatting/A3] — non-SQL string content is preserved.
+// [spec feature.formatting/A4] — plain-English strings are not treated as SQL.
 func TestFormatDocument_NonSQLStringNotFormatted(t *testing.T) {
 	// Regular English strings should not be touched by SQL detection
 	input := `msg := "Hello world, this is a message";`
@@ -1116,6 +1131,8 @@ func TestFormatDocument_NonSQLStringNotFormatted(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
+// [spec feature.formatting/A7] — SQL function arguments still format when
+// detection is off.
 func TestFormatDocument_SQLFunctionArgStillFormattedWhenDetectionDisabled(t *testing.T) {
 	// Issue #64: SQL inside SQLExecute should still be formatted when
 	// detection is off, but only when the line genuinely overflows. Use a
@@ -2015,5 +2032,39 @@ func TestFormatDocument_Issue64_ShortSQLStringNotReformatted(t *testing.T) {
 				t.Errorf("Issue #64: short SQL must stay single-line, got:\n%s", out)
 			}
 		})
+	}
+}
+
+// TestFormatDocument_Idempotent pins the feature-level idempotence contract:
+// formatting already-formatted output again under the same options must be
+// byte-identical.
+// [spec feature.formatting/A6]
+func TestFormatDocument_Idempotent(t *testing.T) {
+	input := `:PROCEDURE Test;
+:PARAMETERS sName, nCount;
+:DECLARE sResult;
+sResult := "";
+:IF nCount > 0;
+	sResult := sName;
+:ENDIF;
+:RETURN sResult;
+:ENDPROC;`
+
+	opts := DefaultFormattingOptions()
+
+	first := FormatDocument(input, opts)
+	if len(first) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(first))
+	}
+	once := first[0].NewText
+
+	second := FormatDocument(once, opts)
+	if len(second) != 1 {
+		t.Fatalf("expected 1 edit on reformat, got %d", len(second))
+	}
+	twice := second[0].NewText
+
+	if once != twice {
+		t.Errorf("formatting is not idempotent:\n--- first pass ---\n%q\n--- second pass ---\n%q", once, twice)
 	}
 }

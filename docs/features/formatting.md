@@ -1,5 +1,7 @@
 # Formatting
 
+> **Normative source:** [`feature.formatting`](../../catalog/features/formatting.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Methods:** `textDocument/formatting`, `textDocument/rangeFormatting`  
 **Source Files:** `internal/providers/formatting.go`, `internal/providers/sql_formatter.go`

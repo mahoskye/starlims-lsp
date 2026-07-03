@@ -2,7 +2,10 @@ module starlims-lsp
 
 go 1.25.4
 
-require github.com/tliron/glsp v0.2.2
+require (
+	github.com/tliron/glsp v0.2.2
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

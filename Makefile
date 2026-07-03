@@ -3,7 +3,7 @@ VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 
-.PHONY: all build clean test install build-all build-linux build-darwin build-windows
+.PHONY: all build clean test catalog-check generate-docs install build-all build-linux build-darwin build-windows
 
 all: build
 
@@ -30,6 +30,14 @@ build-windows:
 
 test:
 	go test -v -race ./...
+
+# Catalog conformance + executable specs only (subset of `make test`).
+catalog-check:
+	go test ./internal/catalog/
+
+# Regenerate catalog-derived docs (docs/reference/DIAGNOSTICS.md, docs/STATUS.md).
+generate-docs:
+	go generate ./internal/catalog
 
 test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...

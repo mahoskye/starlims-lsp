@@ -12,6 +12,8 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
+// [spec feature.diagnostics_pipeline/A9] — configuration changes re-publish
+// diagnostics for every open document.
 func TestHandleDidChangeConfiguration_RevalidatesDocuments(t *testing.T) {
 	s := NewSSLServer()
 	uriA := "file:///alpha.ssl"
@@ -557,6 +559,8 @@ func TestPtrTo(t *testing.T) {
 }
 
 // Test that formatting settings actually affect output
+// [spec feature.formatting/A8] — configured ssl.format.* options change the
+// output accordingly.
 func TestSettingsAffectFormatting(t *testing.T) {
 	input := `:PROCEDURE Test;:DECLARE x;x:=1;:ENDPROC;`
 
@@ -615,6 +619,8 @@ func TestIsDataSourceURI(t *testing.T) {
 	}
 }
 
+// [spec feature.diagnostics_pipeline/A8] — URI pattern activates endpoint
+// mode; non-matching URIs stay non-endpoint.
 func TestIsEndpointFile_PatternMatch(t *testing.T) {
 	if !isEndpointFile("file:///work/Endpoints/Foo.ssl", "", []string{"/endpoints/"}) {
 		t.Error("expected pattern /endpoints/ to match")
@@ -624,6 +630,7 @@ func TestIsEndpointFile_PatternMatch(t *testing.T) {
 	}
 }
 
+// [spec feature.diagnostics_pipeline/A8] — leading-docblock Endpoint: marker.
 func TestIsEndpointFile_DocblockMarker(t *testing.T) {
 	content := `/*
  * Endpoint: GetUser
@@ -635,6 +642,8 @@ func TestIsEndpointFile_DocblockMarker(t *testing.T) {
 	}
 }
 
+// Non-endpoint files must not get endpoint-ambient treatment.
+// [spec feature.hover/A9]
 func TestIsEndpointFile_NoSignal(t *testing.T) {
 	content := `:DECLARE sValue;
 	sValue := "ok";`
@@ -643,6 +652,8 @@ func TestIsEndpointFile_NoSignal(t *testing.T) {
 	}
 }
 
+// [spec feature.diagnostics_pipeline/A8] — a marker past the leading region
+// must not activate endpoint mode.
 func TestIsEndpointFile_MarkerOnlyInLeadingRegion(t *testing.T) {
 	var b strings.Builder
 	for range 50 {
@@ -656,6 +667,7 @@ func TestIsEndpointFile_MarkerOnlyInLeadingRegion(t *testing.T) {
 
 // Issue #9: signature-help auto-trigger is opt-in via
 // ssl.intellisense.signatureHelp.autoTrigger. Default is off.
+// [spec feature.signature_help/A6]
 func TestSignatureHelpAutoTriggerSetting(t *testing.T) {
 	s := NewSSLServer()
 	if s.settings.SignatureHelpAutoTrigger {

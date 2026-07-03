@@ -1,5 +1,7 @@
 # Document Symbols
 
+> **Normative source:** [`feature.document_symbols`](../../catalog/features/document_symbols.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
+
 **Status:** IMPLEMENTED  
 **LSP Method:** `textDocument/documentSymbol`  
 **Source Files:** `internal/providers/symbols.go`, `internal/server/handler.go`
