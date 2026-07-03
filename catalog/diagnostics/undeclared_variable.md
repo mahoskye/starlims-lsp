@@ -98,6 +98,16 @@ resolve) the check is single-file, exactly as before.
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sName;
+	sName := "abc";
+	sName:SomeRandomDotNetMethod();
+:ENDPROC;
+```
+
 ## Rationale
 
 Undeclared-variable detection is the highest-value and highest-noise check
@@ -107,3 +117,7 @@ exemptions permanently. The endpoint-ambient fence runs with
 `is_endpoint_file: true` (spec_options); the inverse case — `Request`
 flagging in a non-endpoint file — is covered by PR #23's tests in
 providers_test.go, since spec fences share one option set per entry.
+The member-access fence pins DECISIONS.md D10 (issue #22): the member of
+a `:` access is never a variable reference, and built-in value types
+forward unmatched members to .NET at runtime, so flagging them would
+false-positive every legitimate passthrough.
