@@ -553,14 +553,7 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		// Multi-line detection: if a /* comment spans multiple lines (contains
-		// newlines in its token text) and the next token is an identifier whose
-		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
-		// semicolon almost certainly terminated the comment prematurely.
 		if !strings.HasPrefix(token.Text, "/*") {
-			continue
-		}
-		if !strings.Contains(token.Text, "\n") {
 			continue
 		}
 		// Issue #6: suppress when there's a paragraph break (blank line or
@@ -571,7 +564,13 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		if commentChainBreaksBeforeNext(tokens, i, nextIdx) {
 			continue
 		}
-		if nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
+
+		// Multi-line detection: if a /* comment spans multiple lines (contains
+		// newlines in its token text) and the next token is an identifier whose
+		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
+		// semicolon almost certainly terminated the comment prematurely.
+		if strings.Contains(token.Text, "\n") &&
+			nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Range:    tokenToRange(token),
@@ -579,10 +578,52 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 				Source:   "ssl-lsp",
 				Code:     CodeCommentTextAfterTerminator,
 			})
+			continue
+		}
+
+		// Issue #25: orphaned-prose signal. When the stranded lines are plain
+		// prose with no keyword-named word up front, the bare-keyword check
+		// above sees nothing. But prose betrays itself: the next significant
+		// line starts with two or more consecutive bare identifiers with
+		// nothing between them, which never forms a valid SSL statement
+		// (assignments, calls, and keyword statements all place an operator,
+		// parenthesis, or keyword between/before names). Applies to both
+		// multi-line comments and a comment whose ';' lands on its first
+		// line (the issue's original shape) — the stranded prose is on the
+		// following lines either way. Weaker signal than the bare-keyword
+		// break-out, so this path warns rather than errors.
+		if startsOrphanedProse(tokens, nextIdx) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  "Comment likely terminated early by semicolon. The following lines read as prose but are being parsed as code. Rewrite the comment to avoid internal semicolons",
+				Source:   "ssl-lsp",
+				Code:     CodeCommentTextAfterTerminator,
+			})
 		}
 	}
 
 	return diagnostics
+}
+
+// startsOrphanedProse reports whether the significant token at idx begins a
+// run of two consecutive bare identifiers on the same line with nothing
+// between them — the signature of comment prose stranded as code (issue #25).
+// A single identifier is not enough: it could be the start of a legitimate
+// statement continued on the next line, so the second identifier must share
+// the first one's line. Any operator, parenthesis, bracket, or keyword after
+// the first identifier means legitimate code and does not match.
+func startsOrphanedProse(tokens []lexer.Token, idx int) bool {
+	first := tokens[idx]
+	if first.Type != lexer.TokenIdentifier {
+		return false
+	}
+	secondIdx := nextSignificantTokenIndex(tokens, idx+1)
+	if secondIdx < 0 {
+		return false
+	}
+	second := tokens[secondIdx]
+	return second.Type == lexer.TokenIdentifier && second.Line == first.Line
 }
 
 // commentChainBreaksBeforeNext reports whether the run of tokens between
