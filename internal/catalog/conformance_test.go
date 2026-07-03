@@ -18,12 +18,6 @@ const repoRoot = "../.."
 const diagnosticCodesFile = "../providers/diagnostic_codes.go"
 const configurationDoc = "../../docs/configuration/CONFIGURATION.md"
 
-// maxDrafts is the review ratchet: it only ever decreases. Each review batch
-// that promotes drafts to active lowers this constant; when it reaches zero
-// every entry has been human-reviewed and the constant (and this check) can
-// be deleted.
-const maxDrafts = 0
-
 func loadEntries(t *testing.T) []Entry {
 	t.Helper()
 	entries, err := Load(catalogRoot)
@@ -116,11 +110,12 @@ func TestSlugBijection(t *testing.T) {
 func TestEntryLints(t *testing.T) {
 	entries := loadEntries(t)
 
-	drafts := 0
 	for _, e := range entries {
+		// The review ratchet reached zero on 2026-07-02: every entry has
+		// been human-reviewed, so drafts are no longer permitted at all.
 		if e.Status == StatusDraft {
-			drafts++
-			continue // drafts are exempt from prose lints
+			t.Errorf("%s: draft entries are no longer allowed — every entry is reviewed; use planned/active/removed", e.Path)
+			continue
 		}
 		if e.Status == StatusRemoved || e.Status == StatusPlanned {
 			// Removed/planned entries must at least explain themselves.
@@ -173,9 +168,6 @@ func TestEntryLints(t *testing.T) {
 		}
 	}
 
-	if drafts > maxDrafts {
-		t.Errorf("draft count %d exceeds maxDrafts %d — review a batch and ratchet the constant down", drafts, maxDrafts)
-	}
 }
 
 // countExecutable counts the fences the spec-runner will actually assert on
