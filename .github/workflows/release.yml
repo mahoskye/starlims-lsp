@@ -50,7 +50,13 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p dist
-          go build -o "dist/starlims-lsp-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}" ./cmd/starlims-lsp
+          # Stamp the tag's version and build time into the binary so
+          # `starlims-lsp --version` and the LSP serverInfo report the
+          # release, not "dev (built unknown)".
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+            -o "dist/starlims-lsp-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}" ./cmd/starlims-lsp
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
