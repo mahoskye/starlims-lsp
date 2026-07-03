@@ -4249,17 +4249,10 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		text := strings.TrimSpace(token.Text)
-		// Check for visibility annotation pattern
-		if !strings.HasPrefix(text, "/*@") {
-			continue
-		}
-
-		// Extract the annotation
-		content := strings.TrimSpace(strings.TrimSuffix(text[3:], ";"))
-		lower := strings.ToLower(content)
-
-		if lower != "private" && lower != "protected" {
+		// Shared matcher with parser.ProcedureInfo.IsPrivate extraction —
+		// the two must agree on what counts as an annotation.
+		content, ok := parser.ParseVisibilityAnnotation(token.Text)
+		if !ok {
 			continue
 		}
 

@@ -69,6 +69,11 @@ type ProcedureInfo struct {
 	// Doc is the parsed leading docblock immediately preceding the
 	// :PROCEDURE declaration (if any). Zero value means no docblock.
 	Doc ProcedureDoc
+	// IsPrivate is true when a /*@private; or /*@protected; visibility
+	// annotation immediately precedes the :PROCEDURE declaration. Both
+	// annotations make the procedure unreachable via DoProc/ExecFunction
+	// dispatch, so cross-file surfaces treat them alike.
+	IsPrivate bool
 }
 
 // ProcedureDoc holds the structured pieces of a procedure's leading docblock,
@@ -195,6 +200,7 @@ func (p *Parser) findProcedures(node *Node, procedures *[]ProcedureInfo) {
 					EndLine:    p.findProcedureEndLine(node, child),
 					Node:       child,
 					Doc:        p.extractProcedureDoc(firstToken),
+					IsPrivate:  p.isPrivateProcedure(firstToken),
 				})
 			}
 		}
@@ -227,6 +233,11 @@ func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
 			continue
 		}
 		if t.Type == lexer.TokenComment {
+			// A visibility annotation sits between the docblock and the
+			// :PROCEDURE line — skip it and keep walking to the docblock.
+			if _, ok := ParseVisibilityAnnotation(t.Text); ok {
+				continue
+			}
 			commentText = t.Text
 		}
 		break
@@ -235,6 +246,64 @@ func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
 		return ProcedureDoc{}
 	}
 	return parseProcedureDoc(commentText)
+}
+
+// isPrivateProcedure reports whether the comment immediately preceding the
+// :PROCEDURE token (skipping whitespace) is a visibility annotation. Only
+// the nearest comment counts, matching the placement rule the
+// visibility_annotation diagnostic enforces (annotation on its own line
+// immediately before :PROCEDURE).
+func (p *Parser) isPrivateProcedure(procToken *lexer.Token) bool {
+	idx := -1
+	for i := range p.tokens {
+		if p.tokens[i].Offset == procToken.Offset && p.tokens[i].Line == procToken.Line {
+			idx = i
+			break
+		}
+	}
+	if idx <= 0 {
+		return false
+	}
+
+	for j := idx - 1; j >= 0; j-- {
+		t := p.tokens[j]
+		if t.Type == lexer.TokenWhitespace {
+			continue
+		}
+		if t.Type == lexer.TokenComment {
+			_, ok := ParseVisibilityAnnotation(t.Text)
+			return ok
+		}
+		break
+	}
+	return false
+}
+
+// ExtractTopLevelParameters returns the names and 1-based line of the
+// script's entry-point :PARAMETERS statement — the first top-level
+// :PARAMETERS appearing before any :PROCEDURE. Cross-script 2-part
+// ExecFunction("Category.Script") calls bind their arguments to this list.
+// Returns (nil, -1) when the script has none.
+func (p *Parser) ExtractTopLevelParameters(root *Node) ([]string, int) {
+	for _, child := range root.Children {
+		firstToken := p.getFirstSignificantToken(child)
+		if firstToken == nil {
+			continue
+		}
+		switch p.getNormalizedText(firstToken) {
+		case "PROCEDURE":
+			return nil, -1
+		case "PARAMETERS":
+			var params []string
+			for _, token := range child.Tokens {
+				if token.Type == lexer.TokenIdentifier && p.getNormalizedText(&token) != "PARAMETERS" {
+					params = append(params, token.Text)
+				}
+			}
+			return params, firstToken.Line
+		}
+	}
+	return nil, -1
 }
 
 // parseProcedureDoc reads the SSL convention docblock format. It is tolerant
