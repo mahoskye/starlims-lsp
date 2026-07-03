@@ -142,11 +142,12 @@ scripts, so hover follows the same file classification.
 ## Known gaps
 
 - Member hover covers shape-inferred UDObject receivers only. `:` access
-  on built-in value types (`sName:Length` — .NET passthrough, issue #22)
-  and on receivers shape inference cannot see (built in another file,
-  passed through untracked bindings) still follows the legacy word-based
-  path or returns null. Extending receiver typing is issue #22's scope
-  decision.
+  on built-in value types (`sName:Length` — .NET passthrough) and on
+  receivers shape inference cannot see (built in another file, passed
+  through untracked bindings) still follows the legacy word-based path
+  or returns null. Per DECISIONS.md D10 (issue #22), absent knowledge is
+  silence: any future receiver typing must exempt the six .NET
+  passthrough value types from unknown-member treatment.
 - Cross-file hover covers dispatch strings and `:INCLUDE` paths; a bare
   identifier that happens to be defined in another workspace file still
   gets no hover (word-based hover stays same-file — deliberate, to avoid

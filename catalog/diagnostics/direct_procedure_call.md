@@ -84,6 +84,16 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sName;
+	sName := "abc";
+	sName:SomeRandomDotNetMethod();
+:ENDPROC;
+```
+
 ## Rationale
 
 Direct calls are gotcha #1 for developers arriving from C-style languages:
@@ -92,4 +102,6 @@ severity is warranted (7261172). Precision comes from subtraction — every
 legitimate identifier-paren shape (built-ins, dispatchers, member calls,
 declarations) is carved out, and d134334 moved the malformed-declaration
 shape to its own rule so users see a syntax message rather than a misleading
-dispatch message.
+dispatch message. The colon-member fence pins DECISIONS.md D10 (issue
+#22): built-in value types forward unmatched `:` members to .NET at
+runtime, so member calls are legitimate dispatch, never C-style calls.

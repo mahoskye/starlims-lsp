@@ -4,6 +4,24 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D10 — `:` member access never warns (2026-07-03, issue #22)
+
+Member access is analyzed only from positive knowledge, and the absence
+of knowledge is silence, never a warning. Built-in value types (`string`,
+`number`, `date`, `array`, `boolean`, `netobject`) forward unmatched `:`
+members to their underlying .NET object at runtime — a legitimate call
+surface far too broad to enumerate — so an "unknown member" diagnostic
+cannot distinguish a typo from a valid passthrough. Consequences:
+
+- No diagnostic ever fires on the member of a `:` access
+  (`sName:SomeRandomDotNetMethod()` is clean under every check; pinned
+  by diag.undeclared_variable and diag.direct_procedure_call fences).
+- Member hover/definition act only where inference gives real knowledge
+  (UDObject shapes — feature.hover A15-A16, feature.definition A14-A15)
+  and return truthful null for a shaped receiver's unknown member.
+- Any future member completion or diagnostic on typed receivers MUST
+  exempt the six passthrough types above.
+
 ## D9 — The catalog is normative (2026-07-01)
 
 Every diagnostic, feature contract, and formatter behavior has exactly one
