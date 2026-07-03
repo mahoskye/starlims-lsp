@@ -32,8 +32,14 @@ Parameters sName;
 	tokens := lex.Tokenize()
 	diags := checkCommentTermination(tokens)
 
+	// The paragraph-break guard protects the SECOND comment (line 8,
+	// 0-based 7): its broken-out "Parameters" keyword sits across a blank
+	// line and must not be reported. The FIRST comment (0-based line 3)
+	// legitimately warns since issue #25's orphaned-prose signal landed —
+	// its "With more body" lines are genuinely stranded as code with no
+	// paragraph break in between.
 	for _, d := range diags {
-		if d.Code == CodeCommentTextAfterTerminator {
+		if d.Code == CodeCommentTextAfterTerminator && d.Range.Start.Line == 7 {
 			t.Errorf("expected no comment_text_after_terminator across paragraph break, got: line=%d msg=%s",
 				d.Range.Start.Line, d.Message)
 		}
@@ -165,5 +171,30 @@ DoProc("X");
 			t.Errorf("valid code after a terminated multi-line comment must not flag, got: line=%d msg=%s",
 				d.Range.Start.Line, d.Message)
 		}
+	}
+}
+
+// Issue #25's original report: the comment's ';' lands on its FIRST line,
+// so the comment token is single-line and the continuation prose on the
+// next line is stranded as code. The orphaned-prose signal must fire.
+func TestCheckCommentTermination_Issue25_SingleLineCommentStrandsProse(t *testing.T) {
+	text := `/* Client address: treat as a single composite object;
+   if any component changes, the whole address is flagged;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	diags := checkCommentTermination(tokens)
+
+	found := false
+	for _, d := range diags {
+		if d.Code == CodeCommentTextAfterTerminator {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for orphaned prose, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected orphaned-prose warning for single-line comment shape, got: %+v", diags)
 	}
 }

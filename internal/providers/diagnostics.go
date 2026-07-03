@@ -553,14 +553,7 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		// Multi-line detection: if a /* comment spans multiple lines (contains
-		// newlines in its token text) and the next token is an identifier whose
-		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
-		// semicolon almost certainly terminated the comment prematurely.
 		if !strings.HasPrefix(token.Text, "/*") {
-			continue
-		}
-		if !strings.Contains(token.Text, "\n") {
 			continue
 		}
 		// Issue #6: suppress when there's a paragraph break (blank line or
@@ -571,7 +564,13 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		if commentChainBreaksBeforeNext(tokens, i, nextIdx) {
 			continue
 		}
-		if nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
+
+		// Multi-line detection: if a /* comment spans multiple lines (contains
+		// newlines in its token text) and the next token is an identifier whose
+		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
+		// semicolon almost certainly terminated the comment prematurely.
+		if strings.Contains(token.Text, "\n") &&
+			nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Range:    tokenToRange(token),
@@ -588,8 +587,11 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		// line starts with two or more consecutive bare identifiers with
 		// nothing between them, which never forms a valid SSL statement
 		// (assignments, calls, and keyword statements all place an operator,
-		// parenthesis, or keyword between/before names). Weaker signal than
-		// the bare-keyword break-out, so this path warns rather than errors.
+		// parenthesis, or keyword between/before names). Applies to both
+		// multi-line comments and a comment whose ';' lands on its first
+		// line (the issue's original shape) — the stranded prose is on the
+		// following lines either way. Weaker signal than the bare-keyword
+		// break-out, so this path warns rather than errors.
 		if startsOrphanedProse(tokens, nextIdx) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,

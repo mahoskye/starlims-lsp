@@ -32,10 +32,12 @@ history:
   - date: 2026-07-02
     ref: "issue #25"
     note: >-
-      Gap closed: the multi-line signal now also fires (warning) when the
-      next significant line — no paragraph break in between — begins with
-      two consecutive bare identifiers, the signature of orphaned prose.
-      Paragraph-break suppression (issue #6) still applies unchanged.
+      Gap closed: fires (warning) when the next significant line — no
+      paragraph break in between — begins with two consecutive bare
+      identifiers, the signature of orphaned prose. Applies to multi-line
+      comments AND to a comment whose ';' lands on its first line (the
+      issue's original shape). Paragraph-break suppression (issue #6)
+      still applies unchanged.
 issues: ["#25"]
 ---
 
@@ -50,13 +52,14 @@ the author intended, in exactly three situations:
   terminates, and the next significant token is an identifier that matches
   an SSL keyword name (e.g. `Parameters`, `Default`) — the signature of a
   doc-header comment cut in half.
-- **Orphaned-prose break-out** (warning): a `/*` comment spanning multiple
-  lines terminates, and the next significant line — with no paragraph break
-  in between — begins with two or more consecutive bare identifiers with
-  nothing between them. No valid SSL statement starts with two adjacent
-  bare identifiers (assignments, calls, and keyword statements all place an
-  operator, parenthesis, or keyword between/before names), so the line is
-  comment prose stranded as code (issue #25).
+- **Orphaned-prose break-out** (warning): a terminated `/*` comment —
+  whether it spans multiple lines or its `;` lands on the first line — is
+  followed, with no paragraph break in between, by a significant line that
+  begins with two or more consecutive bare identifiers with nothing between
+  them. No valid SSL statement starts with two adjacent bare identifiers
+  (assignments, calls, and keyword statements all place an operator,
+  parenthesis, or keyword between/before names), so the line is comment
+  prose stranded as code (issue #25).
 
 This rule deliberately emits two severities: `default_severity: warning`
 records the same-line path; the bare-keyword break-out path escalates to
@@ -104,6 +107,13 @@ Default values apply to each one
 and this line accidentally ends with one;
 so these words are now parsed as code
 ;
+```
+
+### Flags
+
+```ssl
+/* Client address: treat as a single composite object;
+   if any component changes, the whole address is flagged;
 ```
 
 ### Does not flag
