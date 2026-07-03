@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-03
+
+The cross-file navigation release (milestone 1 of the cross-file plan;
+normative spec: `catalog/features/cross_file_resolution.md`).
+
+### Added
+- **Cross-file go-to-definition.** Dotted `DoProc`/`ExecFunction` targets
+  and `:INCLUDE` paths (bare, dotted, or quoted; cursor on the keyword or
+  the path) jump across the workspace: `ExecFunction("Cat.Script")` lands
+  on the target script's entry-point `:PARAMETERS`,
+  `"Cat.Script.Proc"` on the procedure, includes on the file. Ambiguous
+  targets return multiple locations, canonical-layout candidates first.
+- **Cross-file hover.** Dispatch-target strings become the second
+  string-context hover exception (after SQL placeholders): resolved
+  targets show the procedure's signature/docblock with a
+  "defined in `Cat.Script`" origin, or the entry-point summary for
+  2-part targets; `:INCLUDE` statements hover with the resolved script's
+  summary.
+- **Segment-aware dispatch-string completion.** Inside
+  `DoProc("…")`/`ExecFunction("…")`: same-file procedures plus workspace
+  category names before any dot (the deliberate noise floor), a
+  category's scripts after `Category.`, and a script's procedures after
+  `Category.Script.` or flat `Script.` — with `/*@private;` and
+  `/*@protected;` procedures excluded. `.` remains a non-trigger
+  character.
+- **Workspace script identity.** Files under canonical export anchors
+  (`Server Scripts/CATEGORY/`, `Applications/APP/MODULE/Server Scripts/`,
+  `Data Sources/CATEGORY/`) resolve as `Category.Script`; anything else
+  degrades gracefully to basename matching plus a workspace-unique
+  procedure-name fallback — flat checkouts navigate without the export
+  tree. All matching is case-insensitive.
+
+### Changed
+- Workspace index now carries procedure docblocks, visibility flags,
+  script identity, and entry-point parameters (workspace-symbol search
+  behavior unchanged).
+- Docblock extraction no longer loses the docblock when a
+  `/*@private;`/`/*@protected;` annotation sits between it and
+  `:PROCEDURE`.
+- Definition responses may return multiple locations for ambiguous
+  cross-file targets (single-location responses keep the previous wire
+  shape).
+
+
 ## [0.8.0] - 2026-07-02
 
 The behavior-catalog release: every diagnostic rule, LSP feature
