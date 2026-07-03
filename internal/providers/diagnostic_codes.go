@@ -36,7 +36,6 @@ const (
 
 	// Schema lints — class_rules / coding_standards.
 	CodeClassMemberOrder        = "class_member_order"
-	CodeInheritQualifiedName    = "inherit_qualified_name"
 	CodeMaxParamsWarning        = "max_params_warning"
 	CodeLimitPublicVars         = "limit_public_vars"
 	CodePreferExitCase          = "prefer_exitcase"
@@ -120,9 +119,7 @@ const (
 	CodeCodeBlockStructure          = "code_block_structure"
 	CodeBuilderDirectiveCase        = "builder_directive_case"
 	CodeIdentifierTooLong           = "identifier_too_long"
-	CodeIdentifierTooShort          = "identifier_too_short"
 	CodeSqlInjection                = "sql_injection"
 	CodeClassNameCollision          = "class_name_collision"
-	CodeReturnFromConstructor       = "return_from_constructor"
 	CodeUnqualifiedFieldAssignment  = "unqualified_field_assignment"
 )
