@@ -202,6 +202,30 @@ func TestApplySettings_Globals(t *testing.T) {
 	}
 }
 
+// Issue #48: ssl.diagnostics.unusedVariables wires the previously
+// unreachable CheckUnusedVars opt-in.
+func TestApplySettings_UnusedVariables(t *testing.T) {
+	s := NewSSLServer()
+
+	if s.settings.Diagnostics.CheckUnusedVars {
+		t.Fatal("CheckUnusedVars must default to false (DECISIONS.md D5)")
+	}
+
+	settings := map[string]interface{}{
+		"ssl": map[string]interface{}{
+			"diagnostics": map[string]interface{}{
+				"unusedVariables": true,
+			},
+		},
+	}
+
+	s.applySettings(settings)
+
+	if !s.settings.Diagnostics.CheckUnusedVars {
+		t.Error("expected ssl.diagnostics.unusedVariables to enable CheckUnusedVars")
+	}
+}
+
 // Issue #55: settings sent via initializationOptions during the LSP
 // `initialize` request must be applied. Previously they were dropped, which
 // meant `ssl.globals` configured by the user never reached the diagnostic
