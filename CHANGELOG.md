@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-03
+
+Cross-file milestone follow-ups: `RunDS` navigation and `:INCLUDE`-aware
+diagnostics (spec: `catalog/features/cross_file_resolution.md` A15-A19).
+
+### Added
+- **RunDS data-source navigation.** Go-to-definition and hover inside
+  `RunDS("Category.Name")` strings resolve to the workspace data-source
+  file, landing on its file-level `:PARAMETERS` line. Bare
+  `RunDS("Name")` resolves by basename too — unlike dispatch targets, a
+  data source is always a separate file.
+- **`:INCLUDE`-aware diagnostics.** `:INCLUDE` is a full-splice textual
+  paste, so variable names declared by resolved include targets
+  (`:DECLARE`/`:PUBLIC`/`:PARAMETERS`) now count as declared in the
+  including file for `undeclared_variable` and `invalid_sql_param`.
+  Transitive with a cycle guard; ambiguous targets contribute the union
+  of their candidates; open included files use their live buffer.
+  Without a workspace index, behavior is single-file as before.
+
+### Changed
+- **Script/data-source partition.** `DoProc`/`ExecFunction`/`:INCLUDE`
+  resolution no longer returns `.ds`/`.ds.txt` files; `RunDS` resolution
+  returns only them.
+
 ## [0.9.0] - 2026-07-03
 
 The cross-file navigation release (milestone 1 of the cross-file plan;
