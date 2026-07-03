@@ -29,26 +29,6 @@ type ParameterInformation struct {
 	Documentation string
 }
 
-// GetSignatureHelp returns signature help for the current position. It
-// recognizes both function calls (`Foo(...)`) and built-in class
-// instantiation (`Email{...}`), dispatching to the appropriate signature
-// list. Class constructors fall back to the function-call form on the same
-// line if no constructor context is detected.
-func GetSignatureHelp(text string, line, column int) *SignatureHelp {
-	if name, activeParam, ok := findClassInstantiationContext(text, line, column); ok {
-		if help := buildConstructorSignatureHelp(name, activeParam); help != nil {
-			return help
-		}
-	}
-
-	funcName, activeParam := findFunctionContext(text, line, column)
-	if funcName == "" {
-		return nil
-	}
-
-	return buildSignatureHelp(funcName, activeParam)
-}
-
 func buildSignatureHelp(funcName string, activeParam int) *SignatureHelp {
 	sig, ok := constants.GetFunctionSignature(funcName)
 	if !ok {
@@ -116,140 +96,6 @@ func buildConstructorSignatureHelp(className string, activeParam int) *Signature
 	}
 }
 
-// findClassInstantiationContext looks for an open `{` preceded by a built-in
-// class name. Returns (className, activeParam, true) if found.
-func findClassInstantiationContext(text string, line, column int) (string, int, bool) {
-	lines := strings.Split(text, "\n")
-	if line < 1 || line > len(lines) {
-		return "", 0, false
-	}
-
-	var sb strings.Builder
-	for i := 0; i < line-1; i++ {
-		sb.WriteString(lines[i])
-		sb.WriteString("\n")
-	}
-	lineText := lines[line-1]
-	if column > len(lineText)+1 {
-		column = len(lineText) + 1
-	}
-	sb.WriteString(lineText[:column-1])
-
-	runes := []rune(sb.String())
-
-	braceDepth := 0
-	parenDepth := 0
-	commaCount := 0
-
-	for i := len(runes) - 1; i >= 0; i-- {
-		ch := runes[i]
-		switch ch {
-		case '}':
-			braceDepth++
-		case ')':
-			parenDepth++
-		case '(':
-			if parenDepth == 0 {
-				return "", 0, false
-			}
-			parenDepth--
-		case '{':
-			if braceDepth == 0 && parenDepth == 0 {
-				// Look for class name before `{`.
-				j := i - 1
-				for j >= 0 && (runes[j] == ' ' || runes[j] == '\t') {
-					j--
-				}
-				end := j + 1
-				for j >= 0 && isIdentChar(runes[j]) {
-					j--
-				}
-				name := string(runes[j+1 : end])
-				if name == "" {
-					return "", 0, false
-				}
-				if _, ok := constants.GeneratedClassDetails[strings.ToLower(name)]; !ok {
-					return "", 0, false
-				}
-				return name, commaCount, true
-			}
-			braceDepth--
-		case ',':
-			if braceDepth == 0 && parenDepth == 0 {
-				commaCount++
-			}
-		}
-	}
-
-	return "", 0, false
-}
-
-// findFunctionContext finds the function name and active parameter index at the given position.
-func findFunctionContext(text string, line, column int) (string, int) {
-	lines := strings.Split(text, "\n")
-	if line < 1 || line > len(lines) {
-		return "", 0
-	}
-
-	// Get the text up to the cursor position
-	var textBefore strings.Builder
-	for i := 0; i < line-1; i++ {
-		textBefore.WriteString(lines[i])
-		textBefore.WriteString("\n")
-	}
-	lineText := lines[line-1]
-	if column > len(lineText)+1 {
-		column = len(lineText) + 1
-	}
-	textBefore.WriteString(lineText[:column-1])
-
-	content := textBefore.String()
-
-	// Find the innermost function call by scanning backwards
-	parenDepth := 0
-	commaCount := 0
-	funcStart := -1
-	funcEnd := -1
-
-	runes := []rune(content)
-	for i := len(runes) - 1; i >= 0; i-- {
-		ch := runes[i]
-		switch ch {
-		case ')':
-			parenDepth++
-		case '(':
-			if parenDepth == 0 {
-				// Found the opening paren of our function call
-				funcEnd = i
-				// Find the function name before the paren
-				funcStart = i - 1
-				for funcStart >= 0 && (isIdentChar(runes[funcStart])) {
-					funcStart--
-				}
-				funcStart++
-				if funcStart < funcEnd {
-					funcName := string(runes[funcStart:funcEnd])
-					return funcName, commaCount
-				}
-				return "", 0
-			}
-			parenDepth--
-		case ',':
-			if parenDepth == 0 {
-				commaCount++
-			}
-		}
-	}
-
-	return "", 0
-}
-
-// isIdentChar checks if a rune is valid in an identifier.
-func isIdentChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
-}
-
-// GetSignatureHelpFromTokens returns signature help using tokenized input.
 func GetSignatureHelpFromTokens(tokens []lexer.Token, line, column int) *SignatureHelp {
 	return GetSignatureHelpWithProcedures(tokens, nil, line, column)
 }
@@ -261,10 +107,15 @@ func GetSignatureHelpFromTokens(tokens []lexer.Token, line, column int) *Signatu
 func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.ProcedureInfo, line, column int) *SignatureHelp {
 	_ = procedures
 
-	// Find the function call context from tokens
-	funcName, activeParam := findFunctionContextFromTokens(tokens, line, column)
+	// Find the call context from tokens: a function call `Foo(...)` or a
+	// built-in class instantiation `Email{...}` (issue #40).
+	funcName, activeParam, isConstructor := findFunctionContextFromTokens(tokens, line, column)
 	if funcName == "" {
 		return nil
+	}
+
+	if isConstructor {
+		return buildConstructorSignatureHelp(funcName, activeParam)
 	}
 
 	// First, try to find in built-in functions
@@ -286,8 +137,11 @@ func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.Pr
 	return nil
 }
 
-// findFunctionContextFromTokens finds function context using tokens.
-func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (string, int) {
+// findFunctionContextFromTokens finds the enclosing call context using
+// tokens. It returns the callee name, the active (comma-counted) parameter
+// index, and whether the context is a built-in class instantiation
+// (`Email{...}`) rather than a function call.
+func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (string, int, bool) {
 	// Find the token index at the current position
 	currentIdx := -1
 	for i, token := range tokens {
@@ -309,8 +163,9 @@ func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (stri
 		currentIdx = len(tokens) - 1
 	}
 
-	// Scan backwards to find function call context
+	// Scan backwards to find the enclosing call context
 	parenDepth := 0
+	braceDepth := 0
 	commaCount := 0
 
 	for i := currentIdx; i >= 0; i-- {
@@ -324,7 +179,7 @@ func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (stri
 			case ")":
 				parenDepth++
 			case "(":
-				if parenDepth == 0 {
+				if parenDepth == 0 && braceDepth == 0 {
 					// Found the opening paren, look for the function name before it
 					for j := i - 1; j >= 0; j-- {
 						prev := tokens[j]
@@ -332,20 +187,42 @@ func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (stri
 							continue
 						}
 						if prev.Type == lexer.TokenIdentifier {
-							return prev.Text, commaCount
+							return prev.Text, commaCount, false
 						}
 						break
 					}
-					return "", 0
+					return "", 0, false
 				}
 				parenDepth--
+			case "}":
+				braceDepth++
+			case "{":
+				if braceDepth == 0 && parenDepth == 0 {
+					// Unmatched '{': a built-in class instantiation if the
+					// preceding significant token names a built-in class;
+					// otherwise an array literal — the commas counted so far
+					// belong to the literal, not an enclosing call.
+					for j := i - 1; j >= 0; j-- {
+						prev := tokens[j]
+						if prev.Type == lexer.TokenWhitespace || prev.Type == lexer.TokenComment {
+							continue
+						}
+						if prev.Type == lexer.TokenIdentifier && constants.IsSSLClass(prev.Text) {
+							return prev.Text, commaCount, true
+						}
+						break
+					}
+					commaCount = 0
+					continue
+				}
+				braceDepth--
 			case ",":
-				if parenDepth == 0 {
+				if parenDepth == 0 && braceDepth == 0 {
 					commaCount++
 				}
 			}
 		}
 	}
 
-	return "", 0
+	return "", 0, false
 }

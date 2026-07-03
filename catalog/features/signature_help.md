@@ -24,6 +24,13 @@ history:
     note: Stopped aggressive signature-help re-trigger that obscured the
       current line; no trigger characters advertised by default. Opt back in
       via ssl.intellisense.signatureHelp.autoTrigger.
+  - date: 2026-07-02
+    ref: "issue #40"
+    note: >-
+      Constructor signature help wired into the token-based path the
+      handler actually calls (brace-context detection); the unwired
+      text-based GetSignatureHelp entry point deleted. Array-literal
+      commas no longer advance the enclosing call's parameter index.
 issues: ["#40"]
 ---
 
@@ -61,7 +68,7 @@ issues: ["#40"]
 - A5: Given `UnknownFunc(` for a name not in the inventory, when signature help is invoked, then the response is null.
 - A6: Given default configuration, when the server capabilities are advertised, then no signature-help trigger characters are declared; given `ssl.intellisense.signatureHelp.autoTrigger: true`, then `(` and `,` are declared with `,` as retrigger.
 - A7: Given the cursor on a statement outside any function call (e.g. after `x := 5;`), when signature help is invoked, then the response is null.
-- A8: Given the cursor inside `Email{`, when signature help is requested over LSP, then the Email constructor signatures are returned, one per documented constructor form. (planned)
+- A8: Given the cursor inside `Email{`, when signature help is requested over LSP, then the Email constructor signatures are returned, one per documented constructor form.
 
 ## Rationale
 
@@ -77,16 +84,5 @@ are the dominant argument shapes in real SSL.
 
 ## Known gaps
 
-- Constructor signature help (`ClassName{...}`) is dead code from the LSP
-  client's perspective: `buildConstructorSignatureHelp` is reachable only
-  through the text-based `GetSignatureHelp` entry point
-  (internal/providers/signaturehelp.go), but the handler calls the
-  token-based `GetSignatureHelpWithProcedures`, whose context scan only
-  recognizes `(` calls. Requesting signature help inside `Email{` over LSP
-  returns null. Covered by A8 (planned); the provider-level behavior is
-  pinned by TestConstructorSignatureHelp so wiring it up is a handler-only
-  change.
-- The unwired text-based `GetSignatureHelp` also counts commas inside string
-  literals (raw rune scan); the wired token-based path does not. Fold the
-  text-based entry point into the token-based one (or delete it) when fixing
-  the constructor gap.
+(None currently — the constructor-path gap and the duplicate text-based
+entry point were resolved together in the issue #40 fix.)
