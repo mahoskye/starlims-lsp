@@ -6691,6 +6691,41 @@ func TestGetDiagnostics_ScientificNotation_NoDotBeforeExponent(t *testing.T) {
 	}
 }
 
+// Issue #47: the fix-it text must itself be valid SSL — explicit '+'
+// exponent signs are unsupported, so suggestions drop them.
+func TestGetDiagnostics_ScientificNotation_SuggestionsAreValidSSL(t *testing.T) {
+	cases := []struct {
+		text        string
+		wantSuggest string
+	}{
+		{`x := 9E+1;`, "'9.0E1'"},
+		{`x := 7e+2;`, "'7.0e2'"},
+		{`x := 3e-2;`, "'3.0e-2'"},
+	}
+
+	opts := DefaultDiagnosticOptions()
+	for _, tc := range cases {
+		diagnostics := GetDiagnostics(tc.text, opts)
+		found := false
+		for _, d := range diagnostics {
+			if d.Code != CodeScientificNotation {
+				continue
+			}
+			found = true
+			if !strings.Contains(d.Message, tc.wantSuggest) {
+				t.Errorf("text %q: expected suggestion %s in message, got: %s", tc.text, tc.wantSuggest, d.Message)
+			}
+			suggestion := d.Message[strings.Index(d.Message, "use '") : strings.Index(d.Message, "' instead")+1]
+			if strings.Contains(strings.ToUpper(suggestion), "E+") {
+				t.Errorf("text %q: suggested fix contains invalid '+' exponent sign: %s", tc.text, d.Message)
+			}
+		}
+		if !found {
+			t.Errorf("text %q: expected scientific_notation diagnostic", tc.text)
+		}
+	}
+}
+
 func TestGetDiagnostics_ScientificNotation_ValidForms(t *testing.T) {
 	// Valid scientific notation should NOT warn
 	cases := []string{

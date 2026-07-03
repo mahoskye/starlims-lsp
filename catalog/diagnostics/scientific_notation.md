@@ -20,6 +20,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-07-02
+    ref: "issue #47"
+    note: >-
+      Fix-it wording corrected: suggestions no longer reproduce explicit
+      '+' exponent signs, which are themselves invalid SSL — 9E+1 now
+      suggests 9.0E1.
 issues: ["#47"]
 ---
 
@@ -97,7 +103,6 @@ lints slug for them, so the rule is tool-authored. Warning (not error)
 severity because the code still lexes and may even run with the exponent
 part silently misread as an identifier — which is precisely why it deserves
 a loud nudge: `7e2` is almost never an intentional variable reference.
-Note the fix-it message for the `9E+1` shape suggests `9.0E+1`, although
-the schema also says explicit `+` exponent signs are unsupported; the
-schema-correct target is `90.0` or `9.0E1` (message-wording nit, tracked in
-the review notes, not a behavioral gap).
+The fix-it messages themselves suggest only valid SSL: explicit `+`
+exponent signs — which the schema also rejects — are dropped from
+suggestions, so `9E+1` suggests `9.0E1` (issue #47).
