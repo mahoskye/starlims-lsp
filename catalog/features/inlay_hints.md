@@ -18,6 +18,13 @@ history:
       ssl.inlayHints.enabled and minParameterCount (default 2) settings.
       Hints are suppressed inside string and comment contexts — fixes
       extension issue #39, where hints rendered inside SQL string literals.
+  - date: 2026-07-02
+    ref: "issue #46"
+    note: >-
+      DoProc/ExecFunction argument-array hints implemented: a lone
+      string-literal first argument resolves to a same-file procedure and
+      the array elements are hinted with its parameter names. Dynamic
+      targets stay unhinted.
 issues: ["#46"]
 ---
 
@@ -51,7 +58,7 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - A1: Given `x := Substr("Hello", 1, 5);`, when hints are requested, then parameter-name hints of kind Parameter appear before each of the three arguments.
 - A2: Given `x := Len(sValue);` with `minParameterCount` at its default of 2, when hints are requested, then no hint is produced for the call; with `minParameterCount: 1` the `source` hint appears.
 - A3: Given `DoProc("MyProc", {100, 200});` or `ExecFunction(...)` in any casing, when hints are requested, then `sProcName:` and `aParams:` hints are produced for the two outer arguments.
-- A4: Given a document defining `:PROCEDURE Calc;` with `:PARAMETERS nQty, nPrice;` and a call `DoProc("Calc", {100, 25.50});`, when hints are requested, then `nQty:` and `nPrice:` hints are additionally produced inside the array literal. (planned)
+- A4: Given a document defining `:PROCEDURE Calc;` with `:PARAMETERS nQty, nPrice;` and a call `DoProc("Calc", {100, 25.50});`, when hints are requested, then `nQty:` and `nPrice:` hints are additionally produced inside the array literal.
 - A5: Given `s := "Substr(a, 1, 2)";` or the same text inside a comment, when hints are requested, then no hint is produced for the call-shaped text in string or comment context.
 - A6: Given `ssl.inlayHints.enabled: false`, when hints are requested, then the result is empty.
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
@@ -70,14 +77,6 @@ for the same reason hover returns null when it has no information.
 
 ## Known gaps
 
-- DoProc inner-array parameter hints (A4) are specified here and documented
-  in docs/features/inlay-hints.md §2.4, but not implemented:
-  `extractProcedureNameFromFirstArg` (internal/providers/inlayhints.go) is a
-  stub that always returns `""` because call tokens are not threaded through
-  to it, so `generateArrayParamHints` is never reached. Covered by A4
-  (planned); fix is a follow-up PR citing this entry — proposed issue:
-  "inlay hints: resolve DoProc/ExecFunction string-literal targets and hint
-  the array elements with the procedure's own parameter names".
 - The `paramName:` label suffix and right padding live in the server
   handler (handleInlayHint), outside the provider tests' reach; the wire
   format has no direct test.

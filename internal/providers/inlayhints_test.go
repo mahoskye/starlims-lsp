@@ -132,6 +132,55 @@ func TestGetInlayHints_DoProc(t *testing.T) {
 	}
 }
 
+// [spec feature.inlay_hints/A4] — DoProc argument-array elements are hinted
+// with the resolved procedure's parameter names (issue #46).
+func TestGetInlayHints_DoProcArrayParamHints(t *testing.T) {
+	code := `DoProc("Calc", {100, 25.50});`
+	tokens := lexer.NewLexer(code).Tokenize()
+	procs := []parser.ProcedureInfo{
+		{Name: "Calc", Parameters: []string{"nQty", "nPrice"}, StartLine: 10, EndLine: 15},
+	}
+	opts := DefaultInlayHintOptions()
+
+	hints := GetInlayHints(tokens, procs, 1, 1, opts)
+
+	// Outer DoProc hints (sProcName, aParams) plus the two inner
+	// array-element hints (nQty, nPrice).
+	var labels []string
+	for _, h := range hints {
+		labels = append(labels, h.Label)
+	}
+	want := map[string]bool{"sProcName": false, "aParams": false, "nQty": false, "nPrice": false}
+	for _, l := range labels {
+		if _, ok := want[l]; ok {
+			want[l] = true
+		}
+	}
+	for label, found := range want {
+		if !found {
+			t.Errorf("expected hint %q, got labels %v", label, labels)
+		}
+	}
+}
+
+// Dynamic first arguments stay unhinted: the target cannot be resolved
+// statically, so no inner-array hints appear (issue #46).
+func TestGetInlayHints_DoProcDynamicTargetNoArrayHints(t *testing.T) {
+	code := `DoProc(sName, {100, 25.50});`
+	tokens := lexer.NewLexer(code).Tokenize()
+	procs := []parser.ProcedureInfo{
+		{Name: "Calc", Parameters: []string{"nQty", "nPrice"}, StartLine: 10, EndLine: 15},
+	}
+
+	hints := GetInlayHints(tokens, procs, 1, 1, DefaultInlayHintOptions())
+
+	for _, h := range hints {
+		if h.Label == "nQty" || h.Label == "nPrice" {
+			t.Errorf("dynamic DoProc target must not produce array hints, got %q", h.Label)
+		}
+	}
+}
+
 // [spec feature.inlay_hints/A3] — ExecFunction behaves like DoProc.
 func TestGetInlayHints_ExecFunction(t *testing.T) {
 	code := `ExecFunction("MyProc", {arg1});`
