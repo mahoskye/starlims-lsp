@@ -33,6 +33,12 @@ history:
       Cross-file resolution added: dotted dispatch targets and :INCLUDE
       paths navigate across the workspace; A6 narrowed to 1-part targets
       and unresolvable dotted targets. Same-file behavior unchanged.
+  - date: 2026-07-03
+    ref: "RunDS navigation PR"
+    note: >-
+      RunDS string targets navigate to the resolved data-source file
+      (A13); 1-part RunDS targets resolve by basename, unlike dispatch
+      targets, per feature.cross_file_resolution A16.
 issues: ["#41"]
 ---
 
@@ -65,6 +71,11 @@ issues: ["#41"]
   multiple Locations, anchored-layout candidates first.
 - Bare 1-part dispatch targets keep same-script semantics: they resolve
   same-file or return null, never cross-file.
+- `RunDS` string targets (`RunDS("Category.Name")` or `RunDS("Name")`)
+  resolve to the data-source file's entry through the workspace resolver's
+  data-source rules (`feature.cross_file_resolution` A15-A17). Unlike
+  dispatch targets, 1-part RunDS targets resolve cross-file — a data
+  source is always a separate file.
 - Definition MUST return null when nothing matches — a dotted target
   the workspace cannot resolve, or a non-dotted name with no same-file
   declaration. Resolution never guesses: a resolved script that lacks
@@ -84,6 +95,7 @@ issues: ["#41"]
 - A10: Given `:INCLUDE SharedLib;`, `:INCLUDE Cat.SharedLib;`, or `:INCLUDE "SharedLib";` with the cursor on the keyword or path, when go-to-definition is invoked, then the resolved file is returned at line 0.
 - A11: Given a dispatch target matching two workspace files (one anchored, one flat), when go-to-definition is invoked, then multiple Locations are returned with the anchored candidate first.
 - A12: Given a dotted target differing from the indexed names only by case, when go-to-definition is invoked, then it resolves identically to the exact-case form.
+- A13: Given `RunDS("QUERIES.ORDERS")` with a workspace data source `Data Sources/QUERIES/ORDERS.ds`, or `RunDS("Orders")` with a flat `Orders.ds`, when go-to-definition is invoked inside the string, then a Location in the data-source file is returned; a RunDS target resolving nowhere is null.
 
 ## Rationale
 

@@ -9,8 +9,9 @@ import (
 
 // fakeResolver implements WorkspaceResolver for provider-level tests.
 type fakeResolver struct {
-	dispatch map[string][]ResolvedTarget
-	include  map[string][]ResolvedTarget
+	dispatch   map[string][]ResolvedTarget
+	include    map[string][]ResolvedTarget
+	dataSource map[string][]ResolvedTarget
 }
 
 func (f fakeResolver) ResolveDispatch(target string) []ResolvedTarget {
@@ -18,6 +19,9 @@ func (f fakeResolver) ResolveDispatch(target string) []ResolvedTarget {
 }
 func (f fakeResolver) ResolveInclude(target string) []ResolvedTarget {
 	return f.include[strings.ToLower(target)]
+}
+func (f fakeResolver) ResolveDataSource(target string) []ResolvedTarget {
+	return f.dataSource[strings.ToLower(target)]
 }
 
 func TestDispatchTargetAt(t *testing.T) {
@@ -181,5 +185,51 @@ func TestFindDefinitionCrossFile_NilResolver(t *testing.T) {
 	tokens := lexer.NewLexer(text).Tokenize()
 	if locs := FindDefinitionCrossFile(text, tokens, 1, 26, "file:///self.ssl", nil, nil, nil); locs != nil {
 		t.Errorf("expected nil with nil resolver, got %+v", locs)
+	}
+}
+
+func TestDataSourceTargetAt(t *testing.T) {
+	text := `aRows := RunDS("QUERIES.ORDERS", {1});`
+	dst := DataSourceTargetAt(text, 1, 20)
+	if dst == nil {
+		t.Fatal("expected RunDS target")
+	}
+	if dst.Raw != "QUERIES.ORDERS" || len(dst.Parts) != 2 {
+		t.Errorf("unexpected target: %+v", dst)
+	}
+
+	// Cursor outside the string: nil.
+	if dst := DataSourceTargetAt(text, 1, 3); dst != nil {
+		t.Errorf("expected nil outside the string, got %+v", dst)
+	}
+}
+
+// [spec feature.definition/A13]
+func TestFindDefinitionCrossFile_RunDSTarget(t *testing.T) {
+	resolver := fakeResolver{dataSource: map[string][]ResolvedTarget{
+		"queries.orders": {{URI: "file:///Orders.ds", Line: 1, Kind: ResolvedScriptEntry}},
+		"inventory":      {{URI: "file:///Inventory.ds", Line: 0, Kind: ResolvedScriptEntry}},
+	}}
+
+	text := `aRows := RunDS("QUERIES.ORDERS", {});`
+	tokens := lexer.NewLexer(text).Tokenize()
+	locs := FindDefinitionCrossFile(text, tokens, 1, 20, "file:///main.ssl", nil, nil, resolver)
+	if len(locs) != 1 || locs[0].URI != "file:///Orders.ds" || locs[0].Range.Start.Line != 1 {
+		t.Fatalf("expected Orders.ds line 1, got %+v", locs)
+	}
+
+	// 1-part RunDS targets resolve too (unlike dispatch targets).
+	text = `aRows := RunDS("Inventory", {});`
+	tokens = lexer.NewLexer(text).Tokenize()
+	locs = FindDefinitionCrossFile(text, tokens, 1, 20, "file:///main.ssl", nil, nil, resolver)
+	if len(locs) != 1 || locs[0].URI != "file:///Inventory.ds" {
+		t.Fatalf("expected Inventory.ds, got %+v", locs)
+	}
+
+	// Unresolvable RunDS target: null, no fallthrough to word lookup.
+	text = `aRows := RunDS("NO.SUCHDS", {});`
+	tokens = lexer.NewLexer(text).Tokenize()
+	if locs := FindDefinitionCrossFile(text, tokens, 1, 20, "file:///main.ssl", nil, nil, resolver); locs != nil {
+		t.Fatalf("expected nil for unresolvable RunDS target, got %+v", locs)
 	}
 }

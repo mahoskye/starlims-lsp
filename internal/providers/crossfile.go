@@ -5,6 +5,7 @@
 package providers
 
 import (
+	"regexp"
 	"strings"
 
 	"starlims-lsp/internal/lexer"
@@ -41,6 +42,10 @@ type WorkspaceResolver interface {
 	// ResolveInclude resolves an :INCLUDE target ("Name" or "Cat.Script",
 	// already unquoted) to candidate files.
 	ResolveInclude(target string) []ResolvedTarget
+	// ResolveDataSource resolves a RunDS target ("Cat.Name" or bare
+	// "Name") to candidate data-source files — and only data-source
+	// files (spec feature.cross_file_resolution/A15-A17).
+	ResolveDataSource(target string) []ResolvedTarget
 }
 
 // DispatchTarget is a DoProc/ExecFunction string target under the cursor.
@@ -80,6 +85,42 @@ func DispatchTargetAt(text string, line, column int) *DispatchTarget {
 			Range: Range{
 				Start: Position{Line: line - 1, Character: match[4]},
 				End:   Position{Line: line - 1, Character: match[5]},
+			},
+		}
+	}
+	return nil
+}
+
+// runDSPattern matches RunDS calls to extract the data-source target,
+// mirroring doProcPattern's shape (single capture group for the target).
+var runDSPattern = regexp.MustCompile(`(?i)\bRunDS\s*\(\s*["']([^"']+)["']`)
+
+// DataSourceTargetAt returns the RunDS target whose string literal contains
+// the cursor position (1-based line/column), or nil. Same line-based
+// limitations as DispatchTargetAt.
+func DataSourceTargetAt(text string, line, column int) *DispatchTarget {
+	lines := strings.Split(text, "\n")
+	if line < 1 || line > len(lines) {
+		return nil
+	}
+	lineText := lines[line-1]
+
+	for _, match := range runDSPattern.FindAllStringSubmatchIndex(lineText, -1) {
+		if len(match) < 4 {
+			continue
+		}
+		nameStart := match[2] + 1 // 1-based
+		nameEnd := match[3] + 1
+		if column < nameStart || column > nameEnd {
+			continue
+		}
+		raw := lineText[match[2]:match[3]]
+		return &DispatchTarget{
+			Raw:   raw,
+			Parts: strings.Split(raw, "."),
+			Range: Range{
+				Start: Position{Line: line - 1, Character: match[2]},
+				End:   Position{Line: line - 1, Character: match[3]},
 			},
 		}
 	}
@@ -190,6 +231,15 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 			return nil
 		}
 		return resolvedToLocations(resolver.ResolveDispatch(dt.Raw))
+	}
+
+	if dst := DataSourceTargetAt(text, line, column); dst != nil {
+		// RunDS targets resolve even as 1-part names — a data source is
+		// always a separate file (feature.definition A13).
+		if resolver == nil {
+			return nil
+		}
+		return resolvedToLocations(resolver.ResolveDataSource(dst.Raw))
 	}
 
 	if it := IncludeTargetAt(tokens, line, column); it != nil {

@@ -482,13 +482,13 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 	if len(parts) == 2 {
 		// Rule 1: Category.Script -> entry point.
 		for _, uri := range wi.byCategory[strings.ToLower(parts[0])][strings.ToLower(parts[1])] {
-			if fs := wi.files[uri]; fs != nil {
+			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 				results = append(results, entryResolutionLocked(fs))
 			}
 		}
 		// Rule 2: Script.Procedure (flat form).
 		for _, uri := range wi.byScriptName[strings.ToLower(parts[0])] {
-			if fs := wi.files[uri]; fs != nil {
+			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 				if r, ok := procResolutionLocked(fs, parts[1]); ok {
 					results = append(results, r)
 				}
@@ -501,7 +501,7 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 
 		// Rule 1: Category.Script.Proc.
 		for _, uri := range wi.byCategory[category][script] {
-			if fs := wi.files[uri]; fs != nil {
+			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 				if r, ok := procResolutionLocked(fs, procName); ok {
 					results = append(results, r)
 				}
@@ -510,7 +510,7 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 		// Rule 2: degrade to script-basename match, ignoring the category.
 		if len(results) == 0 {
 			for _, uri := range wi.byScriptName[script] {
-				if fs := wi.files[uri]; fs != nil {
+				if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 					if r, ok := procResolutionLocked(fs, procName); ok {
 						results = append(results, r)
 					}
@@ -524,7 +524,7 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 	if len(results) == 0 {
 		procName := parts[len(parts)-1]
 		if uris := wi.byProcName[strings.ToLower(procName)]; len(uris) == 1 {
-			if fs := wi.files[uris[0]]; fs != nil {
+			if fs := wi.files[uris[0]]; fs != nil && !fs.IsDataSource {
 				if r, ok := procResolutionLocked(fs, procName); ok {
 					results = append(results, r)
 				}
@@ -554,7 +554,7 @@ func (wi *WorkspaceIndex) ResolveIncludeTarget(target string) []IndexResolution 
 		category := strings.ToLower(strings.Join(parts[:len(parts)-1], "."))
 		script := strings.ToLower(parts[len(parts)-1])
 		for _, uri := range wi.byCategory[category][script] {
-			if fs := wi.files[uri]; fs != nil {
+			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 				results = append(results, IndexResolution{URI: fs.URI, IsEntry: true, Anchored: fs.HasLayoutAnchor})
 			}
 		}
@@ -562,8 +562,47 @@ func (wi *WorkspaceIndex) ResolveIncludeTarget(target string) []IndexResolution 
 	if len(results) == 0 {
 		// Bare name, or dotted target degrading to a basename match.
 		for _, uri := range wi.byScriptName[strings.ToLower(parts[len(parts)-1])] {
-			if fs := wi.files[uri]; fs != nil {
+			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
 				results = append(results, IndexResolution{URI: fs.URI, IsEntry: true, Anchored: fs.HasLayoutAnchor})
+			}
+		}
+	}
+
+	return orderResolutions(results)
+}
+
+// ResolveDataSourceTarget resolves a RunDS target ("Category.Name" or bare
+// "Name") to data-source files only. 1-part targets resolve by basename —
+// unlike dispatch targets, a data source is always a separate file
+// (spec feature.cross_file_resolution/A15-A17). Targets resolve to the
+// file's entry (its file-level :PARAMETERS line when present).
+func (wi *WorkspaceIndex) ResolveDataSourceTarget(target string) []IndexResolution {
+	parts := strings.Split(target, ".")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return nil
+		}
+	}
+
+	wi.mu.RLock()
+	defer wi.mu.RUnlock()
+
+	var results []IndexResolution
+
+	if len(parts) >= 2 {
+		category := strings.ToLower(strings.Join(parts[:len(parts)-1], "."))
+		name := strings.ToLower(parts[len(parts)-1])
+		for _, uri := range wi.byCategory[category][name] {
+			if fs := wi.files[uri]; fs != nil && fs.IsDataSource {
+				results = append(results, entryResolutionLocked(fs))
+			}
+		}
+	}
+	if len(results) == 0 {
+		// Bare name, or dotted target degrading to a basename match.
+		for _, uri := range wi.byScriptName[strings.ToLower(parts[len(parts)-1])] {
+			if fs := wi.files[uri]; fs != nil && fs.IsDataSource {
+				results = append(results, entryResolutionLocked(fs))
 			}
 		}
 	}

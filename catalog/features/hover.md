@@ -40,6 +40,12 @@ history:
       Cross-file hover added for dispatch-target strings (second
       string-context exception after SQL placeholders) and :INCLUDE
       paths. Same-file hover output unchanged.
+  - date: 2026-07-03
+    ref: "RunDS navigation PR"
+    note: >-
+      RunDS target strings join the string-context exceptions: a
+      resolvable target shows the data-source summary (A14);
+      unresolvable targets keep the string suppression.
 issues: []
 ---
 
@@ -63,12 +69,14 @@ issues: []
   symbols inside string literals. String-context hover has exactly two
   exceptions: SQL placeholders — named `?varName?` (SQLExecute only) shows
   the parameter name and runtime-substitution note, positional `?` shows
-  its 1-based position — and dotted DoProc/ExecFunction dispatch targets
+  its 1-based position — dotted DoProc/ExecFunction dispatch targets
   that resolve through the workspace resolver
   (feature.cross_file_resolution), which show the target procedure's
   signature/docblock with a "defined in" origin, or the target script's
-  entry-point summary for 2-part targets. An unresolvable dispatch target
-  falls through to the normal string suppression (null).
+  entry-point summary for 2-part targets — and RunDS string targets that
+  resolve to a workspace data source, which show the data-source summary
+  (identity and entry parameters). An unresolvable dispatch or RunDS
+  target falls through to the normal string suppression (null).
 - In endpoint files (matched via `ssl.diagnostics.endpointPatterns` or a
   leading `Endpoint:` docblock marker), `Request` and `Response` MUST hover
   with their ambient documentation; in non-endpoint files they get no
@@ -97,6 +105,7 @@ issues: []
 - A11: Given `ExecFunction("Cat.Script")` resolving to a script, when the user hovers inside the string, then the hover shows the script's entry-point summary (entry :PARAMETERS).
 - A12: Given `:INCLUDE SharedLib;` resolving to a workspace file, when the user hovers the include path, then the hover shows the resolved script's summary.
 - A13: Given a dispatch-target string that resolves nowhere, when the user hovers inside it, then the response is null — the string suppression (A7) holds.
+- A14: Given `RunDS("QUERIES.ORDERS")` resolving to a workspace data source, when the user hovers inside the string, then the hover shows the data-source summary (identity and entry parameters); a RunDS target resolving nowhere hovers as null.
 
 ## Rationale
 
