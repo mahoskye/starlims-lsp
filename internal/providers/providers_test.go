@@ -302,6 +302,38 @@ result := SQLExecute(sQuery, "ds");
 	}
 }
 
+// TestFindDefinition_ForeignLocalNotSurfaced: with procedure info available,
+// an out-of-scope name must resolve to null — never to another procedure's
+// local (issue #41). Top-level declarations remain navigable from anywhere.
+func TestFindDefinition_ForeignLocalNotSurfaced(t *testing.T) {
+	text := `:DECLARE gShared;
+:PROCEDURE First;
+:DECLARE nPrivate;
+:ENDPROC;
+:PROCEDURE Second;
+result := nPrivate;
+result := gShared;
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	// Cursor on nPrivate use inside Second (line 6, column 11): First's
+	// local is out of scope — expect nil, not First's declaration.
+	if loc := FindDefinition(text, 6, 11, "file:///test.ssl", procedures, variables); loc != nil {
+		t.Errorf("expected nil for another procedure's local, got %+v", loc)
+	}
+
+	// Cursor on gShared use (line 7, column 11): the file-level declaration
+	// is in scope and must still resolve via the fallback.
+	loc := FindDefinition(text, 7, 11, "file:///test.ssl", procedures, variables)
+	if loc == nil {
+		t.Fatal("expected file-level declaration to resolve")
+	}
+	if loc.Range.Start.Line != 0 {
+		t.Errorf("expected definition on line 0 (:DECLARE gShared), got %d", loc.Range.Start.Line)
+	}
+}
+
 // ==================== References Tests ====================
 
 // [spec feature.references/A1]
