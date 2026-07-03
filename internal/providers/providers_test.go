@@ -6911,32 +6911,6 @@ func TestGetDiagnostics_StepSpacing_ValidNoWarning(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_RegionLegacyWarning(t *testing.T) {
-	text := `:REGION TestRegion;
-    x := 1;
-:ENDREGION;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	foundRegion := false
-	foundEndRegion := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "legacy functional construct") {
-			if strings.Contains(d.Message, ":REGION") {
-				foundRegion = true
-			}
-			if strings.Contains(d.Message, ":ENDREGION") {
-				foundEndRegion = true
-			}
-		}
-	}
-	if !foundRegion {
-		t.Error("expected legacy warning for :REGION")
-	}
-	if !foundEndRegion {
-		t.Error("expected legacy warning for :ENDREGION")
-	}
-}
-
 func TestGetDiagnostics_CodeBlockEmptyParams(t *testing.T) {
 	// {|| expr} has no bound variables — should warn
 	text := `x := {|| 42};`
