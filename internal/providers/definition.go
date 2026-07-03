@@ -93,17 +93,23 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 		}
 	}
 
-	// Step 3: Fallback - return any matching variable (for backward compatibility
-	// when procedures info isn't provided)
+	// Step 3: Fallback. Without procedure info there is no scope to respect,
+	// so any match wins (backward compatibility). With procedure info, only
+	// file-level declarations qualify — another procedure's local is out of
+	// scope at the cursor and must not be surfaced (issue #41).
 	for _, v := range variables {
-		if strings.ToLower(v.Name) == wordLower {
-			return &Location{
-				URI: uri,
-				Range: Range{
-					Start: Position{Line: v.Line - 1, Character: v.Column - 1},
-					End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
-				},
-			}
+		if strings.ToLower(v.Name) != wordLower {
+			continue
+		}
+		if procedures != nil && parser.FindProcedureAtLine(procedures, v.Line) != nil {
+			continue
+		}
+		return &Location{
+			URI: uri,
+			Range: Range{
+				Start: Position{Line: v.Line - 1, Character: v.Column - 1},
+				End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
+			},
 		}
 	}
 

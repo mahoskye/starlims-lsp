@@ -22,6 +22,11 @@ history:
     ref: "15102d6 (v0.2.0)"
     note: Go-to-definition for DoProc/ExecFunction string targets (double- or
       single-quoted), same-file only.
+  - date: 2026-07-02
+    ref: "issue #41"
+    note: Scope fallback restricted — with procedure info available, only
+      file-level declarations qualify; another procedure's local resolves
+      to null instead of a foreign location.
 issues: ["#41"]
 ---
 
@@ -73,13 +78,6 @@ not navigation.
 
 ## Known gaps
 
-- When the cursor's procedure has no matching local and no `:PUBLIC`
-  matches, the provider falls back to *any* declared variable of that name
-  — including a local belonging to a different procedure (definition.go
-  step 3). The fallback exists for callers that pass no procedure info; at
-  the LSP layer it can surface an out-of-scope declaration instead of null.
-  Low impact (requires using an undeclared name that collides with another
-  procedure's local), fix alongside the reference-scope work.
 - Cross-file targets (`:INCLUDE`, namespace paths) are unresolved; the
   workspace index provides the foundation, resolution is the planned
   cross-file feature.
