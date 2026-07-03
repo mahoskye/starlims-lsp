@@ -70,6 +70,9 @@ type ArgumentPosition struct {
 	Line int
 	// Column is the 1-based column where the argument starts.
 	Column int
+	// TokenIndex is the index of the argument's first token in the token
+	// stream the call was parsed from.
+	TokenIndex int
 }
 
 // doProcPattern matches DoProc or ExecFunction calls to extract the procedure name.
@@ -91,7 +94,7 @@ func GetInlayHints(tokens []lexer.Token, procedures []parser.ProcedureInfo, star
 	var hints []InlayHint
 
 	for _, call := range calls {
-		callHints := generateHintsForCall(call, procedures, opts)
+		callHints := generateHintsForCall(tokens, call, procedures, opts)
 		hints = append(hints, callHints...)
 	}
 
@@ -186,8 +189,9 @@ func parseArguments(tokens []lexer.Token, startIdx int) []ArgumentPosition {
 					if argStart >= 0 {
 						argToken := tokens[argStart]
 						args = append(args, ArgumentPosition{
-							Line:   argToken.Line,
-							Column: argToken.Column,
+							Line:       argToken.Line,
+							Column:     argToken.Column,
+							TokenIndex: argStart,
 						})
 					}
 					return args
@@ -215,8 +219,9 @@ func parseArguments(tokens []lexer.Token, startIdx int) []ArgumentPosition {
 					if argStart >= 0 {
 						argToken := tokens[argStart]
 						args = append(args, ArgumentPosition{
-							Line:   argToken.Line,
-							Column: argToken.Column,
+							Line:       argToken.Line,
+							Column:     argToken.Column,
+							TokenIndex: argStart,
 						})
 					}
 					argStart = -1
@@ -239,12 +244,12 @@ func parseArguments(tokens []lexer.Token, startIdx int) []ArgumentPosition {
 }
 
 // generateHintsForCall creates hints for a single function call.
-func generateHintsForCall(call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
+func generateHintsForCall(tokens []lexer.Token, call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
 	var hints []InlayHint
 
 	// Check if it's DoProc/ExecFunction
 	if inlayDoProcPattern.MatchString(call.Name) {
-		return generateDoProcHints(call, procedures, opts)
+		return generateDoProcHints(tokens, call, procedures, opts)
 	}
 
 	// Check built-in function signatures
@@ -276,7 +281,7 @@ func generateHintsForCall(call FunctionCall, procedures []parser.ProcedureInfo, 
 }
 
 // generateDoProcHints creates hints for DoProc/ExecFunction calls.
-func generateDoProcHints(call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
+func generateDoProcHints(tokens []lexer.Token, call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
 	var hints []InlayHint
 
 	// DoProc always has at least sProcName parameter hint
@@ -300,13 +305,13 @@ func generateDoProcHints(call FunctionCall, procedures []parser.ProcedureInfo, o
 	if len(call.Arguments) >= 2 && len(procedures) > 0 {
 		// Try to find the procedure name from the first argument
 		// This requires looking at the tokens to extract the string literal
-		procName := extractProcedureNameFromFirstArg(call)
+		procName := extractProcedureNameFromFirstArg(tokens, call)
 		if procName != "" {
 			// Find matching procedure
 			for _, proc := range procedures {
 				if strings.EqualFold(proc.Name, procName) {
 					// Found the procedure - generate hints for array elements
-					innerHints := generateArrayParamHints(call, proc, opts)
+					innerHints := generateArrayParamHints(tokens, call, proc, opts)
 					hints = append(hints, innerHints...)
 					break
 				}
@@ -317,21 +322,99 @@ func generateDoProcHints(call FunctionCall, procedures []parser.ProcedureInfo, o
 	return hints
 }
 
-// extractProcedureNameFromFirstArg attempts to extract a string literal procedure name
-// from the first argument of a DoProc/ExecFunction call.
-// This is a simplified approach - in practice, the tokens would need to be passed in.
-func extractProcedureNameFromFirstArg(call FunctionCall) string {
-	// For now, we can't easily extract this without token access
-	// This would need to be enhanced to pass tokens through
-	// Return empty to indicate we couldn't resolve it
-	return ""
+// extractProcedureNameFromFirstArg extracts the target procedure name from a
+// DoProc/ExecFunction call whose first argument is a lone string literal
+// ("Name" or 'Name'). Dynamic names (variables, concatenations) return ""
+// — hints are only offered when the target is statically known (issue #46).
+func extractProcedureNameFromFirstArg(tokens []lexer.Token, call FunctionCall) string {
+	idx := call.Arguments[0].TokenIndex
+	if idx < 0 || idx >= len(tokens) || tokens[idx].Type != lexer.TokenString {
+		return ""
+	}
+
+	// The string must be the whole argument: the next significant token has
+	// to be the separating comma (a concatenation like "A" + sName is not a
+	// static target).
+	for j := idx + 1; j < len(tokens); j++ {
+		next := tokens[j]
+		if next.Type == lexer.TokenWhitespace || next.Type == lexer.TokenComment {
+			continue
+		}
+		if next.Type == lexer.TokenPunctuation && next.Text == "," {
+			break
+		}
+		return ""
+	}
+
+	text := tokens[idx].Text
+	if len(text) < 2 {
+		return ""
+	}
+	quote := text[0]
+	if (quote != '"' && quote != '\'') || text[len(text)-1] != quote {
+		return ""
+	}
+	return text[1 : len(text)-1]
 }
 
-// generateArrayParamHints generates hints for parameters inside a DoProc array argument.
-// This is called when we know the target procedure and its parameters.
-func generateArrayParamHints(call FunctionCall, proc parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
-	// This would require parsing the array literal to find individual elements
-	// For now, we only support DoProc-level hints
-	// Full implementation would scan tokens inside the {} to find argument positions
-	return nil
+// generateArrayParamHints hints the elements of a DoProc/ExecFunction
+// argument array with the resolved procedure's parameter names:
+// DoProc("Calc", {100, 25.50}) shows nQty: and nPrice: inside the braces.
+func generateArrayParamHints(tokens []lexer.Token, call FunctionCall, proc parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
+	if len(proc.Parameters) < opts.MinParameterCount {
+		return nil
+	}
+
+	start := call.Arguments[1].TokenIndex
+	if start < 0 || start >= len(tokens) ||
+		tokens[start].Type != lexer.TokenPunctuation || tokens[start].Text != "{" {
+		return nil
+	}
+
+	var hints []InlayHint
+	braceDepth := 1
+	parenDepth := 0
+	elem := 0
+	expectElement := true
+
+	for i := start + 1; i < len(tokens) && braceDepth > 0; i++ {
+		token := tokens[i]
+		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+			continue
+		}
+
+		if token.Type == lexer.TokenPunctuation {
+			switch token.Text {
+			case "{":
+				braceDepth++
+			case "}":
+				braceDepth--
+				continue
+			case "(":
+				parenDepth++
+			case ")":
+				parenDepth--
+			case ",":
+				if braceDepth == 1 && parenDepth == 0 {
+					elem++
+					expectElement = true
+					continue
+				}
+			}
+		}
+
+		if expectElement && braceDepth == 1 && parenDepth == 0 {
+			expectElement = false
+			if elem < len(proc.Parameters) {
+				hints = append(hints, InlayHint{
+					Line:      token.Line,
+					Character: token.Column,
+					Label:     proc.Parameters[elem],
+					Kind:      InlayHintKindParameter,
+				})
+			}
+		}
+	}
+
+	return hints
 }
