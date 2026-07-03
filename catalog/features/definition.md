@@ -27,12 +27,18 @@ history:
     note: Scope fallback restricted — with procedure info available, only
       file-level declarations qualify; another procedure's local resolves
       to null instead of a foreign location.
+  - date: 2026-07-02
+    ref: "feature.cross_file_resolution"
+    note: >-
+      Cross-file resolution added: dotted dispatch targets and :INCLUDE
+      paths navigate across the workspace; A6 narrowed to 1-part targets
+      and unresolvable dotted targets. Same-file behavior unchanged.
 issues: ["#41"]
 ---
 
 ## Behavior
 
-- Definition MUST resolve, within the current file only:
+- Definition MUST resolve, within the current file:
   - procedure names to their `:PROCEDURE` declaration line, with the range
     covering the procedure name;
   - variable and parameter uses to their `:DECLARE`, `:PARAMETERS`, or
@@ -48,10 +54,21 @@ issues: ["#41"]
   be returned.
 - Definition MUST return null for built-in functions, built-in classes, and
   keywords — they have no navigable source in user code.
-- Definition MUST return null when no same-file declaration matches;
-  it MUST NOT guess across files (`:INCLUDE` targets and namespace paths such
-  as `DoProc("Helpers.CalculateTotal")` are unresolved — cross-file
-  navigation is planned on top of the workspace index).
+- Dotted dispatch targets (`ExecFunction("Cat.Script")`,
+  `ExecFunction("Cat.Script.Proc")`, `DoProc("Cat.Script.Proc")`,
+  flat-layout `"Script.Proc"`) and `:INCLUDE` paths (bare, dotted, or
+  quoted; cursor on the keyword or the path) resolve through the
+  workspace resolver (`feature.cross_file_resolution`): 2-part
+  category.script targets land on the target script's entry point
+  (file-level `:PARAMETERS` line), procedure targets land on the
+  procedure, includes land on the file. Ambiguous targets return
+  multiple Locations, anchored-layout candidates first.
+- Bare 1-part dispatch targets keep same-script semantics: they resolve
+  same-file or return null, never cross-file.
+- Definition MUST return null when nothing matches — a dotted target
+  the workspace cannot resolve, or a non-dotted name with no same-file
+  declaration. Resolution never guesses: a resolved script that lacks
+  the named procedure is null, not a nearby location.
 
 ## Acceptance
 
@@ -60,8 +77,13 @@ issues: ["#41"]
 - A3: Given `:PROCEDURE Helper;` and a dispatch string spelled `DoProc("helper")`, when go-to-definition is invoked, then the declaration is found despite the case difference.
 - A4: Given a file-level `:PUBLIC globalVar;` and a procedure-local `:DECLARE globalVar;`, when go-to-definition is invoked on a use inside that procedure, then the local declaration is returned, not the file-level one.
 - A5: Given `SQLExecute(...)` or a keyword such as `:IF`, when go-to-definition is invoked on it, then the response is null — built-ins and keywords must not navigate anywhere.
-- A6: Given `DoProc("SomeProc")` where `SomeProc` is not defined in the current file, when go-to-definition is invoked, then the response is null — the provider must not return a location in another file or a spurious same-file match.
+- A6: Given `DoProc("SomeProc")` where `SomeProc` is not defined in the current file, when go-to-definition is invoked, then the response is null — 1-part targets are same-script by language semantics and never resolve cross-file; a dotted target that resolves nowhere in the workspace is null too.
 - A7: Given `ExecFunction("Calculate")` with a same-file `:PROCEDURE Calculate;`, when go-to-definition is invoked inside the string, then the `Calculate` declaration is returned.
+- A8: Given `ExecFunction("Cat.Script.Proc")` where the workspace contains that script with that procedure, when go-to-definition is invoked inside the string, then a Location in the target file at the procedure's line is returned.
+- A9: Given `ExecFunction("Cat.Script")` resolving to a workspace script with a file-level `:PARAMETERS`, when go-to-definition is invoked, then the Location is that script's entry point at the `:PARAMETERS` line.
+- A10: Given `:INCLUDE SharedLib;`, `:INCLUDE Cat.SharedLib;`, or `:INCLUDE "SharedLib";` with the cursor on the keyword or path, when go-to-definition is invoked, then the resolved file is returned at line 0.
+- A11: Given a dispatch target matching two workspace files (one anchored, one flat), when go-to-definition is invoked, then multiple Locations are returned with the anchored candidate first.
+- A12: Given a dotted target differing from the indexed names only by case, when go-to-definition is invoked, then it resolves identically to the exact-case form.
 
 ## Rationale
 
@@ -78,6 +100,6 @@ not navigation.
 
 ## Known gaps
 
-- Cross-file targets (`:INCLUDE`, namespace paths) are unresolved; the
-  workspace index provides the foundation, resolution is the planned
-  cross-file feature.
+- Diagnostics remain `:INCLUDE`-unaware (included symbols do not count
+  as declared) — a later milestone; navigation resolves the include
+  itself.

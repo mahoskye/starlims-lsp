@@ -356,20 +356,30 @@ func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.Def
 
 	cache := s.documents.ParseDocument(uri, version)
 
-	location := providers.FindDefinition(
+	locations := providers.FindDefinitionCrossFile(
 		content,
+		cache.Tokens,
 		int(params.Position.Line)+1,
 		int(params.Position.Character)+1,
 		uri,
 		cache.Procedures,
 		cache.Variables,
+		liveResolver{s},
 	)
 
-	if location == nil {
+	switch len(locations) {
+	case 0:
 		return nil, nil
+	case 1:
+		// Preserve the historical single-Location wire shape.
+		return toProtocolLocation(locations[0]), nil
+	default:
+		out := make([]protocol.Location, 0, len(locations))
+		for _, loc := range locations {
+			out = append(out, toProtocolLocation(loc))
+		}
+		return out, nil
 	}
-
-	return toProtocolLocation(*location), nil
 }
 
 // handleReferences handles find references requests.
