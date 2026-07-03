@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-03
+
+`:` member access on shape-inferred UDObjects (spec:
+`catalog/features/hover.md` A15-A16, `catalog/features/definition.md`
+A14-A15).
+
+### Added
+- **Member hover.** Hovering the member in `oObj:Prop`, where `oObj` has
+  a CreateUDObject-inferred shape (initializer literals, `:prop :=`
+  augmentation, `:clone()`, cross-procedure propagation — issues #7/#19),
+  shows the property's name, inferred value type, receiver, and
+  definition line. Closes the long-standing "property access after `:`
+  has no hover" gap.
+- **Member go-to-definition.** The member navigates to where the shape
+  learned the property: the `CreateUDObject` initializer key or the
+  first augmenting assignment.
+
+### Changed
+- On a shaped receiver, an unknown member now returns null for hover and
+  definition (truthful null) instead of potentially matching an
+  unrelated same-named symbol. Unshaped receivers are unchanged.
+
 ## [0.10.0] - 2026-07-03
 
 Cross-file milestone follow-ups: `RunDS` navigation and `:INCLUDE`-aware
