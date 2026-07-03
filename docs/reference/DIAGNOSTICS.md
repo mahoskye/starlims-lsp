@@ -56,8 +56,8 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `hungarian_notation` | Missing Hungarian notation prefix | warning | advisory | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
 | `identifier_too_long` | Identifier exceeds style-guide length limit | info | tool | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
 | `identifier_too_short` | Identifier too short | warning | tool | draft | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
-| `include_early` | :INCLUDE placed late or inside a procedure | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
-| `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | draft | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
+| `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
+| `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `inherit_qualified_name` | INHERIT base-name form advice | warning | style_only | draft | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |

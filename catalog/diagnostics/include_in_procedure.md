@@ -2,57 +2,69 @@
 id: diag.include_in_procedure
 title: ":INCLUDE inside a procedure body"
 kind: diagnostic
-status: draft
+status: active
 authority: tool
 schema_ref: null
 default_severity: warning
 severity_overridable: true
 suppressible: true
-tests: []
+tests:
+  - internal/providers/providers_test.go
 history:
+  - date: 2026-03-28
+    ref: "commit be7a174"
+    note: >-
+      In-procedure detection introduced in checkIncludePlacement, but
+      emitted under code include_early.
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: >-
       Constant CodeIncludeInProcedure defined, but the in-procedure emit
-      site in checkIncludePlacement was tagged CodeIncludeEarly instead.
-      The constant has never been emitted.
+      site in checkIncludePlacement stayed tagged CodeIncludeEarly, leaving
+      this code dead.
+  - date: 2026-07-02
+    ref: "issue #30"
+    note: >-
+      Emit site retagged to CodeIncludeInProcedure; include_early narrowed
+      to the late-placement path. The two situations are now configurable
+      apart in ssl.diagnostics.rules.
 issues: ["#30"]
 ---
 
 ## Behavior
 
-NOT PROMOTABLE — dead code. `include_in_procedure` has a code constant
-(`CodeIncludeInProcedure`, internal/providers/diagnostic_codes.go) but no
-emit site: the ":INCLUDE inside a procedure body is not supported"
-diagnostic in `checkIncludePlacement` (internal/providers/diagnostics.go)
-emits code `include_early` (warning severity) instead. See the
-`include_early` entry, whose Behavior and Known gaps document the shared
-code.
+Flags an `:INCLUDE` directive that appears between `:PROCEDURE` and
+`:ENDPROC`. Unlike late top-level placement (`include_early`, a style
+hint), `:INCLUDE` inside a procedure body is not supported at all, so this
+escalates to warning severity.
 
-A `### Flags` fence for this slug cannot fire, so this entry stays `draft`
-until either (a) the in-procedure emit site is switched to
-`CodeIncludeInProcedure` — at which point this entry is promoted and
-`include_early` narrows to the late-placement path — or (b) the constant is
-removed and this entry becomes `status: removed`.
+It must NOT flag top-level `:INCLUDE` directives, wherever they appear in
+the file — top-level placement is `include_early`'s concern.
 
 ## Examples
 
 ### Flags
 
 ```ssl
-/* unreachable: no emit site uses code include_in_procedure — see Behavior; */
+:PROCEDURE Setup;
+	:INCLUDE "MyLibrary";
+:ENDPROC;
 ```
 
 ### Does not flag
 
 ```ssl
 :INCLUDE "MyLibrary";
+:PROCEDURE Setup;
+	:DECLARE nCount;
+:ENDPROC;
 ```
 
 ## Rationale
 
-Keeping the draft (rather than deleting the entry) preserves the catalog's
-bijection with diagnostic_codes.go: the constant exists in code, so the
-catalog must carry its entry. The severity recorded here (warning) matches
-what the in-procedure situation actually emits today under the
-`include_early` code.
+The in-procedure situation is a stronger claim than late placement
+(unsupported, not just unconventional), which is why it carries its own
+code and warning severity rather than sharing `include_early`'s info-level
+default. The split (issue #30) lets `ssl.diagnostics.rules` target the two
+situations independently — both constants were defined together in PR #3,
+but the emit site was mis-tagged until 2026-07-02.
