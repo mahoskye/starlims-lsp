@@ -20,6 +20,10 @@ history:
       initialization (4 bounded workers) and kept fresh via registered file
       watchers, so search covers the whole workspace, not just open
       documents. 500-result cap introduced.
+  - date: 2026-07-02
+    ref: "issue #45"
+    note: Open-document results now classify :CLASS file procedures as
+      Method (6), matching the index-side kind for the same file.
 issues: ["#45"]
 ---
 
@@ -75,12 +79,6 @@ predictable.
 
 ## Known gaps
 
-- Open-document results are always kind Function (12): handleWorkspaceSymbol
-  phase 1 (internal/server/handler.go) hardcodes `SymbolKindFunction`, so a
-  `:CLASS` file that is currently open reports its procedures as Function
-  while the same file reports Method (6) once closed and re-indexed. The
-  index-side kind (A4) is the intended behavior; align the open-document
-  path in a follow-up PR citing this entry.
 - The deletion path is specified at the index level (A6 exercises
   RemoveFile); the `workspace/didChangeWatchedFiles` handler wiring that
   invokes it has no direct test.
