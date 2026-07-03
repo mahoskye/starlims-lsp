@@ -24,6 +24,13 @@ history:
     ref: "issue #45"
     note: Open-document results now classify :CLASS file procedures as
       Method (6), matching the index-side kind for the same file.
+  - date: 2026-07-02
+    ref: "feature.cross_file_resolution"
+    note: >-
+      Index enriched for cross-file resolution: per-file script identity
+      (category/script/anchor), entry-point :PARAMETERS, procedure
+      docblocks (Raw dropped) and visibility flags. Symbol search
+      behavior is unchanged; memory grows by the docblock prose.
 issues: ["#45"]
 ---
 
