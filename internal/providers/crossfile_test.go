@@ -233,3 +233,24 @@ func TestFindDefinitionCrossFile_RunDSTarget(t *testing.T) {
 		t.Fatalf("expected nil for unresolvable RunDS target, got %+v", locs)
 	}
 }
+
+func TestExtractIncludeTargets(t *testing.T) {
+	text := ":PARAMETERS sMode;\n:INCLUDE SharedLib;\n:INCLUDE Cat.Helpers;\n:INCLUDE \"Quoted.Lib\";\nnCount := 1;"
+	tokens := lexer.NewLexer(text).Tokenize()
+	got := ExtractIncludeTargets(tokens)
+	want := []string{"SharedLib", "Cat.Helpers", "Quoted.Lib"}
+	if len(got) != len(want) {
+		t.Fatalf("ExtractIncludeTargets = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("target[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+
+	// No includes: nil.
+	tokens = lexer.NewLexer("nCount := 1;").Tokenize()
+	if got := ExtractIncludeTargets(tokens); got != nil {
+		t.Errorf("expected nil for no includes, got %v", got)
+	}
+}

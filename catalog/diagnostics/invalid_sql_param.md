@@ -26,6 +26,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code invalid_sql_param assigned.
+  - date: 2026-07-03
+    ref: "include-aware diagnostics PR"
+    note: >-
+      Names declared by resolved :INCLUDE targets count as declared
+      (feature.cross_file_resolution A18-A19), closing the
+      included-script false-positive noted in the Rationale.
 issues: []
 ---
 
@@ -40,7 +46,9 @@ name per line; the range covers the placeholder including both `?` marks.
 
 Treated as declared: names from `:DECLARE`/`:PUBLIC`/`:PARAMETERS`
 statements, procedure parameters, built-in predefined globals and status
-keywords, and names configured in `ssl.diagnostics.globals`.
+keywords, names configured in `ssl.diagnostics.globals`, and names
+declared by the file's resolved `:INCLUDE` targets (the include
+declaration closure, `feature.cross_file_resolution` A18-A19).
 
 It must NOT flag:
 

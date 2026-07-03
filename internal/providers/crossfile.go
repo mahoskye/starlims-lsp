@@ -148,47 +148,8 @@ func IncludeTargetAt(tokens []lexer.Token, line, column int) *IncludeTarget {
 			continue
 		}
 
-		var raw strings.Builder
-		startCol, endCol := -1, -1
-		done := false
-		for j := i + 1; j < len(tokens) && !done; j++ {
-			t := tokens[j]
-			if t.Type == lexer.TokenWhitespace {
-				if raw.Len() > 0 {
-					break // whitespace after the path ends it
-				}
-				continue
-			}
-			if t.Line != line {
-				break
-			}
-			switch t.Type {
-			case lexer.TokenPunctuation:
-				if t.Text == ";" {
-					done = true
-					continue
-				}
-				if t.Text != "." {
-					done = true
-					continue
-				}
-				raw.WriteString(t.Text)
-			case lexer.TokenIdentifier, lexer.TokenUnknown, lexer.TokenNumber:
-				raw.WriteString(t.Text)
-			case lexer.TokenString:
-				raw.WriteString(strings.Trim(t.Text, `"'`))
-			default:
-				done = true
-				continue
-			}
-			if startCol < 0 {
-				startCol = t.Column - 1
-			}
-			endCol = t.Column - 1 + len(t.Text)
-		}
-
-		target := strings.TrimSuffix(strings.TrimSpace(raw.String()), ";")
-		if target == "" || startCol < 0 {
+		target, startCol, endCol := includePathAfter(tokens, i)
+		if target == "" {
 			return nil
 		}
 
@@ -207,6 +168,75 @@ func IncludeTargetAt(tokens []lexer.Token, line, column int) *IncludeTarget {
 		}
 	}
 	return nil
+}
+
+// includePathAfter joins the include path following the :INCLUDE keyword at
+// token index i (same line only), returning the unquoted dotted target and
+// its 0-based column span. Empty target means no path was found.
+func includePathAfter(tokens []lexer.Token, i int) (string, int, int) {
+	line := tokens[i].Line
+	var raw strings.Builder
+	startCol, endCol := -1, -1
+	done := false
+	for j := i + 1; j < len(tokens) && !done; j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenWhitespace {
+			if raw.Len() > 0 {
+				break // whitespace after the path ends it
+			}
+			continue
+		}
+		if t.Line != line {
+			break
+		}
+		switch t.Type {
+		case lexer.TokenPunctuation:
+			if t.Text == ";" {
+				done = true
+				continue
+			}
+			if t.Text != "." {
+				done = true
+				continue
+			}
+			raw.WriteString(t.Text)
+		case lexer.TokenIdentifier, lexer.TokenUnknown, lexer.TokenNumber:
+			raw.WriteString(t.Text)
+		case lexer.TokenString:
+			raw.WriteString(strings.Trim(t.Text, `"'`))
+		default:
+			done = true
+			continue
+		}
+		if startCol < 0 {
+			startCol = t.Column - 1
+		}
+		endCol = t.Column - 1 + len(t.Text)
+	}
+
+	target := strings.TrimSuffix(strings.TrimSpace(raw.String()), ";")
+	if startCol < 0 {
+		return "", -1, -1
+	}
+	return target, startCol, endCol
+}
+
+// ExtractIncludeTargets returns every :INCLUDE target in the token stream,
+// in order of appearance (unquoted, dotted form preserved). Used by the
+// workspace index and the include-aware diagnostics closure
+// (spec feature.cross_file_resolution/A18-A19).
+func ExtractIncludeTargets(tokens []lexer.Token) []string {
+	var targets []string
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword ||
+			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INCLUDE") {
+			continue
+		}
+		if target, _, _ := includePathAfter(tokens, i); target != "" {
+			targets = append(targets, target)
+		}
+	}
+	return targets
 }
 
 // FindDefinitionCrossFile is the definition entry point with cross-file

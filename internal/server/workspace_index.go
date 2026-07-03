@@ -12,6 +12,7 @@ import (
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
+	"starlims-lsp/internal/providers"
 )
 
 // sslFileExtensions are the file extensions to index.
@@ -54,6 +55,13 @@ type FileSymbols struct {
 	// EntryParamsLine is 1-based; -1 when the script has none.
 	EntryParameters []string
 	EntryParamsLine int
+	// DeclaredVars are all variable names declared anywhere in the file
+	// (:DECLARE/:PUBLIC/:PARAMETERS, deduplicated) — what an :INCLUDE of
+	// this file splices into the including script. IncludeTargets are the
+	// file's own :INCLUDE targets, for the transitive closure walk
+	// (spec feature.cross_file_resolution/A18-A19).
+	DeclaredVars   []string
+	IncludeTargets []string
 }
 
 // IndexResolution is one candidate returned by the resolver methods.
@@ -219,6 +227,8 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 		HasLayoutAnchor: anchored,
 		EntryParameters: entryParams,
 		EntryParamsLine: entryLine,
+		DeclaredVars:    dedupeVariableNames(p.ExtractVariables(ast)),
+		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
 	}
 
 	wi.mu.Lock()
@@ -230,6 +240,25 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 	wi.mu.Unlock()
 
 	return nil
+}
+
+// dedupeVariableNames returns the unique variable names (original casing of
+// first occurrence, case-insensitive dedupe) from parsed variable info.
+func dedupeVariableNames(vars []parser.VariableInfo) []string {
+	if len(vars) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(vars))
+	names := make([]string, 0, len(vars))
+	for _, v := range vars {
+		key := strings.ToLower(v.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		names = append(names, v.Name)
+	}
+	return names
 }
 
 // RemoveFile removes a file from the index.

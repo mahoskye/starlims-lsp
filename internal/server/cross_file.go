@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 
+	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
 )
@@ -81,6 +82,56 @@ func (r liveResolver) overlay(resolutions []IndexResolution) []providers.Resolve
 		out = append(out, target)
 	}
 	return out
+}
+
+// includeDeclaredVariables collects the variable names declared by a
+// document's resolved :INCLUDE targets — transitively, cycle-guarded, with
+// all resolution candidates unioned (spec
+// feature.cross_file_resolution/A18-A19). :INCLUDE splices the included
+// script's full text, so its declarations belong to the including file.
+// Open included documents contribute their live-buffer declarations.
+func (r liveResolver) includeDeclaredVariables(tokens []lexer.Token, selfURI string) []string {
+	if r.s.workspaceIndex == nil {
+		return nil
+	}
+	targets := providers.ExtractIncludeTargets(tokens)
+	if len(targets) == 0 {
+		return nil
+	}
+
+	openURIs := r.s.documents.OpenURIs()
+	visited := map[string]bool{selfURI: true}
+	var names []string
+
+	var walk func(targets []string)
+	walk = func(targets []string) {
+		for _, target := range targets {
+			for _, res := range r.s.workspaceIndex.ResolveIncludeTarget(target) {
+				if visited[res.URI] {
+					continue
+				}
+				visited[res.URI] = true
+
+				if _, open := openURIs[res.URI]; open {
+					cache := r.s.documents.ParseDocument(res.URI, r.s.documentVersion[res.URI])
+					for _, v := range cache.Variables {
+						names = append(names, v.Name)
+					}
+					walk(providers.ExtractIncludeTargets(cache.Tokens))
+					continue
+				}
+
+				fs, ok := r.s.workspaceIndex.FileSymbolsFor(res.URI)
+				if !ok {
+					continue
+				}
+				names = append(names, fs.DeclaredVars...)
+				walk(fs.IncludeTargets)
+			}
+		}
+	}
+	walk(targets)
+	return names
 }
 
 // scriptDisplayName renders a file's identity for hover panels:
