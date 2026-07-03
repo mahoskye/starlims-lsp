@@ -441,6 +441,12 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 	for _, uri := range s.documents.AllDocuments() {
 		version := s.documentVersion[uri]
 		cache := s.documents.ParseDocument(uri, version)
+		// Match the index's classification: procedures in a :CLASS file are
+		// methods, so a symbol keeps its kind whether its file is open or not.
+		kind := protocol.SymbolKindFunction
+		if isClassFileFromTokens(cache.Tokens) {
+			kind = protocol.SymbolKindMethod
+		}
 		for _, proc := range cache.Procedures {
 			if query != "" && !containsSubstring(proc.Name, query) {
 				continue
@@ -451,7 +457,7 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 			}
 			results = append(results, protocol.SymbolInformation{
 				Name:     proc.Name,
-				Kind:     protocol.SymbolKindFunction,
+				Kind:     kind,
 				Location: protocol.Location{URI: uri, Range: toProtocolRange(rangeInfo)},
 			})
 		}

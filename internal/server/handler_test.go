@@ -578,6 +578,26 @@ func TestHandleWorkspaceSymbol_ProceduresOnly(t *testing.T) {
 	}
 }
 
+// TestHandleWorkspaceSymbol_OpenClassDocumentReportsMethod: procedures in an
+// open :CLASS document report kind Method (6), matching the workspace
+// index's classification for the same file when closed (issue #45).
+func TestHandleWorkspaceSymbol_OpenClassDocumentReportsMethod(t *testing.T) {
+	s := newTestServerWithDocument(`:CLASS UserRecord;
+:PROCEDURE Load;
+:ENDPROC;`)
+
+	results, err := s.handleWorkspaceSymbol(nil, &protocol.WorkspaceSymbolParams{Query: "load"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Kind != protocol.SymbolKindMethod {
+		t.Errorf("expected method symbol kind for class member, got %v", results[0].Kind)
+	}
+}
+
 func TestHandleFoldingRange(t *testing.T) {
 	s := newTestServerWithDocument(`/* region Sample;
 :PROCEDURE Test;
