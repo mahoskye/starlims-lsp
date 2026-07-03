@@ -1,0 +1,41 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          # Track the repo's go directive (go.mod), matching release.yml.
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      # Includes the catalog conformance suite (internal/catalog): slug
+      # bijection, executable spec fences, criterion traceability, config-key
+      # and generated-docs checks — the catalog cannot drift from the code
+      # on any push or PR.
+      - name: go test
+        run: go test ./...
