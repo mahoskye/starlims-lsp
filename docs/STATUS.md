@@ -13,6 +13,7 @@ dropped (entry retains the history).
 | Entry | Title | Status |
 |-------|-------|--------|
 | [feature.completion](../catalog/features/completion.md) | Completion | active |
+| [feature.cross_file_resolution](../catalog/features/cross_file_resolution.md) | Cross-file target resolution | active |
 | [feature.definition](../catalog/features/definition.md) | Go to definition | active |
 | [feature.diagnostics_pipeline](../catalog/features/diagnostics_pipeline.md) | Diagnostics pipeline (codes, overrides, suppression, panic recovery) | active |
 | [feature.document_symbols](../catalog/features/document_symbols.md) | Document symbols (outline) | active |
