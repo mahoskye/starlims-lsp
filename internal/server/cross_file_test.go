@@ -438,3 +438,112 @@ func TestHandleHover_UnresolvableDispatchStaysNull(t *testing.T) {
 		t.Errorf("expected null hover for unresolvable target, got %+v", hover)
 	}
 }
+
+func dispatchCompletionLabels(t *testing.T, s *SSLServer, source string, character uint32) []string {
+	t.Helper()
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: character},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items := result.([]protocol.CompletionItem)
+	labels := make([]string, 0, len(items))
+	for _, item := range items {
+		labels = append(labels, item.Label)
+	}
+	return labels
+}
+
+func containsLabel(labels []string, want string) bool {
+	for _, l := range labels {
+		if l == want {
+			return true
+		}
+	}
+	return false
+}
+
+// [spec feature.completion/A7]
+func TestDispatchCompletion_LevelZero_CategoriesOnly(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	source := `:PROCEDURE LocalProc;
+:ENDPROC;` // procedures defined below; completion happens in the call
+	source = `result := ExecFunction("");` + "\n" + source
+	labels := dispatchCompletionLabels(t, s, source, 24)
+
+	if !containsLabel(labels, "LIMS_UTILS") {
+		t.Errorf("expected category LIMS_UTILS at level 0, got %v", labels)
+	}
+	if !containsLabel(labels, "LocalProc") {
+		t.Errorf("expected same-file procedure at level 0, got %v", labels)
+	}
+	// Workspace script names must NOT appear before a dot is typed.
+	if containsLabel(labels, "HELPERS") {
+		t.Errorf("script names must not appear at level 0, got %v", labels)
+	}
+	// Workspace procedures must not appear either.
+	if containsLabel(labels, "CalculateTotal") {
+		t.Errorf("workspace procedures must not appear at level 0, got %v", labels)
+	}
+}
+
+// [spec feature.completion/A8]
+func TestDispatchCompletion_LevelOne_CategoryScripts(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/TASKS.srvscr", ":PROCEDURE Run;\n:ENDPROC;")
+
+	labels := dispatchCompletionLabels(t, s, `result := ExecFunction("LIMS_UTILS.");`, 35)
+
+	for _, want := range []string{"HELPERS", "TASKS"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("expected script %s after category dot, got %v", want, labels)
+		}
+	}
+}
+
+// [spec feature.completion/A9]
+func TestDispatchCompletion_LevelTwo_ProceduresExcludePrivate(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	labels := dispatchCompletionLabels(t, s, `result := ExecFunction("LIMS_UTILS.HELPERS.");`, 43)
+
+	if !containsLabel(labels, "CalculateTotal") {
+		t.Errorf("expected CalculateTotal after script dot, got %v", labels)
+	}
+	if containsLabel(labels, "internalHelper") {
+		t.Errorf("private procedures must be excluded, got %v", labels)
+	}
+}
+
+// [spec feature.completion/A10]
+func TestDispatchCompletion_FlatScriptDot(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "lib/Helpers.ssl", helperScript)
+
+	labels := dispatchCompletionLabels(t, s, `result := DoProc("Helpers.");`, 26)
+
+	if !containsLabel(labels, "CalculateTotal") {
+		t.Errorf("expected flat-layout procedures after Script., got %v", labels)
+	}
+	if containsLabel(labels, "internalHelper") {
+		t.Errorf("private procedures must be excluded, got %v", labels)
+	}
+}

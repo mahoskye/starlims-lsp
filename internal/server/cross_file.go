@@ -157,3 +157,78 @@ func (r liveResolver) renderResolutionHover(resolutions []IndexResolution) strin
 	}
 	return ""
 }
+
+// dispatchCompletionContext enumerates dispatch-target segment candidates
+// for the string prefix typed so far (feature.completion A7-A10). Level 0
+// (no dot) offers same-file procedures plus category names only — the
+// deliberate noise floor; scripts appear after "Category." and procedures
+// after "Category.Script." or flat "Script.". Private/protected procedures
+// are excluded from workspace-sourced lists.
+func (r liveResolver) dispatchCompletionContext(prefix string, sameFile []parser.ProcedureInfo) providers.DispatchCompletionContext {
+	parts := strings.Split(prefix, ".")
+	completed := parts[:len(parts)-1]
+
+	ctx := providers.DispatchCompletionContext{}
+	if len(completed) == 0 {
+		ctx.SameFileProcs = sameFile
+	}
+	if r.s.workspaceIndex == nil {
+		return ctx
+	}
+	wi := r.s.workspaceIndex
+
+	switch len(completed) {
+	case 0:
+		ctx.Categories = wi.CategoryNames()
+	case 1:
+		seen := map[string]bool{}
+		for _, fs := range wi.ScriptsInCategory(completed[0]) {
+			if seen[strings.ToLower(fs.ScriptName)] {
+				continue
+			}
+			seen[strings.ToLower(fs.ScriptName)] = true
+			ctx.Scripts = append(ctx.Scripts, providers.ScriptCompletion{
+				Name:      fs.ScriptName,
+				Display:   scriptDisplayName(fs),
+				IsClass:   fs.IsClass,
+				ProcCount: len(fs.Procedures),
+			})
+		}
+		// The first segment may also be a script name (flat layout):
+		// offer its procedures alongside any category scripts.
+		r.appendTargetProcs(&ctx, wi.ScriptsNamed(completed[0]))
+	default:
+		// "Cat.Script." — prefer the category chain, degrade to basename.
+		var scripts []*FileSymbols
+		for _, fs := range wi.ScriptsInCategory(strings.Join(completed[:len(completed)-1], ".")) {
+			if strings.EqualFold(fs.ScriptName, completed[len(completed)-1]) {
+				scripts = append(scripts, fs)
+			}
+		}
+		if len(scripts) == 0 {
+			scripts = wi.ScriptsNamed(completed[len(completed)-1])
+		}
+		r.appendTargetProcs(&ctx, scripts)
+	}
+	return ctx
+}
+
+func (r liveResolver) appendTargetProcs(ctx *providers.DispatchCompletionContext, scripts []*FileSymbols) {
+	for _, fs := range scripts {
+		if ctx.ScriptDisplay == "" {
+			ctx.ScriptDisplay = scriptDisplayName(fs)
+		}
+		for _, proc := range fs.Procedures {
+			if proc.IsPrivate {
+				continue
+			}
+			ctx.TargetProcs = append(ctx.TargetProcs, providers.WorkspaceProcInfo{
+				Name:       proc.Name,
+				Parameters: proc.Parameters,
+				Doc:        proc.Doc,
+				StartLine:  proc.StartLine,
+				EndLine:    proc.EndLine,
+			})
+		}
+	}
+}

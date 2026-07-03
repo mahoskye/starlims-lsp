@@ -22,6 +22,13 @@ history:
       `:` trigger gated: keyword completions only offered when the `:` is
       preceded by whitespace/start-of-line; accepting a keyword suggestion
       replaces the typed `:` instead of duplicating it.
+  - date: 2026-07-03
+    ref: "feature.cross_file_resolution"
+    note: >-
+      Dispatch-string completion made segment-aware and cross-file
+      (categories-only level 0 per the noise policy); the pre-existing
+      vs-code-ssl-formatter#74 same-file exception is now documented
+      here and A5 narrowed to non-dispatch strings.
 issues: []
 ---
 
@@ -51,6 +58,19 @@ trigger policy:
   property shape (inherited through `:clone()`); member completion after
   `<var>:` lists exactly the inferred properties.
 
+- Inside the first string argument of `DoProc(...)`/`ExecFunction(...)`
+  completion IS offered (the one string-context exception, added for
+  vs-code-ssl-formatter#74 and previously undocumented here — a spec gap
+  found during the cross-file design). The list is segment-aware
+  (feature.cross_file_resolution): before any dot, same-file procedures
+  plus workspace category names only; after `Category.`, that category's
+  scripts; after `Category.Script.` or flat `Script.`, that script's
+  procedures with `/*@private;`/`/*@protected;` ones excluded. All items
+  insert plain text. `.` remains a non-trigger character (the trigger
+  policy above is unchanged): segment completions appear on explicit
+  invocation or while the popup is already open — do not "fix" this by
+  re-adding `.` as a trigger.
+
 ## Acceptance
 
 - A1: Given the user types `:` at the start of a line, when completion
@@ -64,11 +84,14 @@ trigger policy:
 - A4: Given `Me:` inside a `:CLASS` method, when completion triggers, then
   the enclosing class's members are listed; given `Me` typed outside a class
   file, class-context forms are NOT suggested.
-- A5: Given the cursor is inside a string literal or comment, when completion
-  is requested, then no items are returned.
+- A5: Given the cursor is inside a comment or a non-dispatch string literal, when completion is requested, then no items are returned.
 - A6: Given `x:` immediately after an identifier with no known shape, when
   completion auto-triggers, then procedures/variables/snippets are NOT
   included in the response.
+- A7: Given the cursor inside `ExecFunction("")` with nothing typed, when completion is requested, then same-file procedures and workspace category names are offered — workspace script names are NOT offered before a dot is typed (the categories-only noise floor).
+- A8: Given `ExecFunction("Cat.")` where `Cat` is a workspace category, when completion is requested, then the scripts in that category are offered.
+- A9: Given `ExecFunction("Cat.Script.")` resolving to a workspace script, when completion is requested, then that script's procedures are offered, excluding `/*@private;` and `/*@protected;` ones.
+- A10: Given `DoProc("Script.")` where `Script` matches a flat-layout script basename, when completion is requested, then that script's non-private procedures are offered.
 
 ## Rationale
 
