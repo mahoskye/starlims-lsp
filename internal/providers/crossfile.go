@@ -279,6 +279,26 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 		return resolvedToLocations(resolver.ResolveInclude(it.Raw))
 	}
 
+	// Member access on a shape-inferred UDObject receiver navigates to the
+	// property's definition (feature.definition A14); a shaped receiver
+	// whose shape lacks the member is null, never a fallback to an
+	// unrelated same-named symbol (A15). Unshaped receivers fall through.
+	if recv, member, ok := MemberAccessAt(tokens, line, column); ok {
+		shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
+		if shape, shaped := shapes[strings.ToLower(recv)]; shaped {
+			if prop := FindShapeProperty(shape, member); prop != nil && prop.Line > 0 {
+				return []Location{{
+					URI: uri,
+					Range: Range{
+						Start: Position{Line: prop.Line - 1, Character: prop.Column - 1},
+						End:   Position{Line: prop.Line - 1, Character: prop.Column - 1 + len(prop.Name)},
+					},
+				}}
+			}
+			return nil
+		}
+	}
+
 	if loc := FindDefinition(text, line, column, uri, procedures, variables); loc != nil {
 		return []Location{*loc}
 	}

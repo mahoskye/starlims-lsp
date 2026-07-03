@@ -1011,3 +1011,56 @@ func TestHandleInitialize_SignatureHelpTriggerCharacters(t *testing.T) {
 		t.Errorf("expected retrigger characters [\",\"], got %v", sigOpts2.RetriggerCharacters)
 	}
 }
+
+// [spec feature.hover/A15]
+func TestHandleHover_UDObjectMember(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Main;
+:DECLARE oObj, Unknown;
+oObj := CreateUDObject({{"Name", "x"}});
+oObj:Total := 5;
+nVal := oObj:Total;
+sName := oObj:Name;
+x := oObj:Unknown;
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 14},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected member hover for shaped receiver")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	for _, want := range []string{"Total", "number", "oObj", "line 4"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("member hover missing %q:\n%s", want, md)
+		}
+	}
+}
+
+// [spec feature.hover/A16]
+func TestHandleHover_UDObjectMemberUnknown_Null(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Main;
+:DECLARE oObj, Unknown;
+oObj := CreateUDObject({{"Name", "x"}});
+x := oObj:Unknown;
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 12},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Errorf("expected null hover for unknown member on shaped receiver, got %+v", hover.Contents)
+	}
+}

@@ -476,3 +476,71 @@ func keys(m map[string]UDObjectShape) []string {
 	}
 	return out
 }
+
+const memberFixture = `:PROCEDURE Main;
+:DECLARE oObj, Unknown;
+oObj := CreateUDObject({{"Name", "x"}});
+oObj:Total := 5;
+nVal := oObj:Total;
+sName := oObj:Name;
+x := oObj:Unknown;
+:ENDPROC;`
+
+func TestUDObjectProperty_Locations(t *testing.T) {
+	shapes := BuildUDObjectShapes(tokenize(t, memberFixture))
+	shape, ok := shapes["oobj"]
+	if !ok {
+		t.Fatalf("expected shape for oObj, got %#v", shapes)
+	}
+
+	name := FindShapeProperty(shape, "name")
+	if name == nil || name.Line != 3 {
+		t.Errorf("Name property should locate at the initializer key (line 3), got %+v", name)
+	}
+	total := FindShapeProperty(shape, "TOTAL")
+	if total == nil || total.Line != 4 || total.Column != 6 {
+		t.Errorf("Total property should locate at the augmenting assignment (line 4, col 6), got %+v", total)
+	}
+}
+
+func TestMemberAccessAt(t *testing.T) {
+	tokens := tokenize(t, memberFixture)
+
+	// Cursor on the member of `oObj:Total` (line 5, inside "Total").
+	recv, member, ok := MemberAccessAt(tokens, 5, 15)
+	if !ok || recv != "oObj" || member != "Total" {
+		t.Errorf("expected (oObj, Total), got (%q, %q, %v)", recv, member, ok)
+	}
+
+	// Cursor on the receiver: not a member access.
+	if _, _, ok := MemberAccessAt(tokens, 5, 10); ok {
+		t.Error("cursor on the receiver must not report a member access")
+	}
+
+	// Cursor on a plain identifier: not a member access.
+	if _, _, ok := MemberAccessAt(tokens, 5, 2); ok {
+		t.Error("plain identifier must not report a member access")
+	}
+
+	// Keyword colon forms (:DECLARE) never match.
+	if _, _, ok := MemberAccessAt(tokens, 2, 5); ok {
+		t.Error("keyword after ':' must not report a member access")
+	}
+}
+
+// [spec feature.hover/A15]
+func TestRenderUDObjectMemberHover(t *testing.T) {
+	shapes := BuildUDObjectShapes(tokenize(t, memberFixture))
+	shape := shapes["oobj"]
+
+	md := RenderUDObjectMemberHover(shape, "oObj", "total")
+	for _, want := range []string{"Total", "number", "oObj", "line 4"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("member hover missing %q:\n%s", want, md)
+		}
+	}
+
+	if md := RenderUDObjectMemberHover(shape, "oObj", "Missing"); md != "" {
+		t.Errorf("unknown member must render empty, got %q", md)
+	}
+}
