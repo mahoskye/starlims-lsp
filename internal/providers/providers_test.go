@@ -687,6 +687,33 @@ func TestGetDocumentSymbols_Procedures(t *testing.T) {
 	}
 }
 
+// [spec feature.document_symbols/A4] — selectionRange covers exactly the
+// procedure name, not the :PROCEDURE keyword or the trailing semicolon
+// (issue #44).
+func TestGetDocumentSymbols_SelectionRangeIsName(t *testing.T) {
+	text := `:PROCEDURE MyProc;
+:ENDPROC;`
+
+	symbols := GetDocumentSymbols(text)
+
+	for _, sym := range symbols {
+		if sym.Name != "MyProc" {
+			continue
+		}
+		sel := sym.SelectionRange
+		// ":PROCEDURE MyProc;" — name starts at 0-based character 11.
+		if sel.Start.Line != 0 || sel.End.Line != 0 {
+			t.Fatalf("selection range must be on the declaration line, got %+v", sel)
+		}
+		if sel.Start.Character != 11 || sel.End.Character != 11+len("MyProc") {
+			t.Errorf("expected selection range 11-%d (exactly the name), got %d-%d",
+				11+len("MyProc"), sel.Start.Character, sel.End.Character)
+		}
+		return
+	}
+	t.Fatal("MyProc symbol not found")
+}
+
 // [spec feature.document_symbols/A2] — one Variable symbol per declared
 // :PUBLIC name.
 // [spec feature.document_symbols/A6] — :DECLARE locals never appear.

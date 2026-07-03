@@ -111,11 +111,8 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 				Start: Position{Line: proc.StartLine - 1, Character: 0},
 				End:   Position{Line: proc.EndLine - 1, Character: 0},
 			},
-			SelectionRange: Range{
-				Start: Position{Line: proc.StartLine - 1, Character: 0},
-				End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name) + 11},
-			},
-			Children: nil,
+			SelectionRange: procedureNameSelectionRange(tokens, proc),
+			Children:       nil,
 		}
 
 		if len(proc.Parameters) > 0 {
@@ -234,6 +231,37 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 	symbols = append(symbols, regionSymbols...)
 
 	return symbols
+}
+
+// procedureNameSelectionRange returns the range covering exactly the
+// procedure's name identifier on its declaration line — not the :PROCEDURE
+// keyword, whitespace, or the trailing semicolon (spec
+// feature.document_symbols/A4). Falls back to a start-of-line range when the
+// name token cannot be located.
+func procedureNameSelectionRange(tokens []lexer.Token, proc parser.ProcedureInfo) Range {
+	for i, token := range tokens {
+		if token.Line != proc.StartLine || token.Type != lexer.TokenKeyword ||
+			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "PROCEDURE") {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			next := tokens[j]
+			if next.Type == lexer.TokenWhitespace || next.Type == lexer.TokenComment {
+				continue
+			}
+			if next.Type == lexer.TokenIdentifier && strings.EqualFold(next.Text, proc.Name) {
+				return Range{
+					Start: Position{Line: next.Line - 1, Character: next.Column - 1},
+					End:   Position{Line: next.Line - 1, Character: next.Column - 1 + len(next.Text)},
+				}
+			}
+			break
+		}
+	}
+	return Range{
+		Start: Position{Line: proc.StartLine - 1, Character: 0},
+		End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
+	}
 }
 
 // extractRegions extracts region markers from tokens.
