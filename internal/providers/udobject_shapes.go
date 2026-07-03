@@ -25,6 +25,13 @@ type UDObjectProperty struct {
 	// "array", "object", "unknown") inferred from the initializer expression.
 	// Empty when the value couldn't be classified.
 	Type string
+	// Line/Column locate where the shape learned the property — the
+	// initializer literal's key or the first `:prop :=` augmentation
+	// (1-based token coordinates; 0 when unknown). Member hover and
+	// go-to-definition navigate here (feature.definition A14,
+	// feature.hover A15).
+	Line   int
+	Column int
 }
 
 // BuildUDObjectShapes walks the token stream and returns a map from
@@ -158,7 +165,12 @@ func augmentShapesFromPropertyAssignments(tokens []lexer.Token, shapes map[strin
 		if rhsIdx >= 0 {
 			propType = classifyShapeValue(tokens[rhsIdx])
 		}
-		shape.Properties = append(shape.Properties, UDObjectProperty{Name: propName, Type: propType})
+		shape.Properties = append(shape.Properties, UDObjectProperty{
+			Name:   propName,
+			Type:   propType,
+			Line:   tokens[propIdx].Line,
+			Column: tokens[propIdx].Column,
+		})
 		shapes[lhs] = shape
 		changed = true
 	}
@@ -397,7 +409,7 @@ func parseShapePair(tokens []lexer.Token, openIdx int) *UDObjectProperty {
 	if key == "" {
 		return nil
 	}
-	prop := &UDObjectProperty{Name: key}
+	prop := &UDObjectProperty{Name: key, Line: tokens[keyIdx].Line, Column: tokens[keyIdx].Column}
 
 	commaIdx := nextSignificantTokenIndex(tokens, keyIdx+1)
 	if commaIdx >= 0 && tokens[commaIdx].Text == "," {
@@ -451,6 +463,73 @@ func classifyShapeValue(tok lexer.Token) string {
 		return "array"
 	}
 	return "unknown"
+}
+
+// MemberAccessAt reports the `<receiver>:<member>` access whose member
+// identifier contains the (1-based) cursor position. Only fires when the
+// cursor is on the member: the member token is an identifier, the previous
+// significant token is the `:` punctuation, and the one before that is the
+// receiver identifier. Keyword forms (`:DECLARE`) lex as keywords and never
+// match.
+func MemberAccessAt(tokens []lexer.Token, line, column int) (string, string, bool) {
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier || token.Line != line {
+			continue
+		}
+		if column < token.Column || column > token.Column+len(token.Text) {
+			continue
+		}
+		colonIdx := prevSignificantTokenIndex(tokens, i-1)
+		if colonIdx < 0 || tokens[colonIdx].Type != lexer.TokenPunctuation || tokens[colonIdx].Text != ":" {
+			return "", "", false
+		}
+		recvIdx := prevSignificantTokenIndex(tokens, colonIdx-1)
+		if recvIdx < 0 || tokens[recvIdx].Type != lexer.TokenIdentifier {
+			return "", "", false
+		}
+		return tokens[recvIdx].Text, token.Text, true
+	}
+	return "", "", false
+}
+
+func prevSignificantTokenIndex(tokens []lexer.Token, from int) int {
+	for j := from; j >= 0; j-- {
+		if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
+			continue
+		}
+		return j
+	}
+	return -1
+}
+
+// FindShapeProperty returns the shape's property matching name
+// (case-insensitive), or nil.
+func FindShapeProperty(shape UDObjectShape, name string) *UDObjectProperty {
+	for i := range shape.Properties {
+		if strings.EqualFold(shape.Properties[i].Name, name) {
+			return &shape.Properties[i]
+		}
+	}
+	return nil
+}
+
+// RenderUDObjectMemberHover renders hover for a member of a shape-inferred
+// receiver (feature.hover A15), or "" when the shape lacks the member.
+func RenderUDObjectMemberHover(shape UDObjectShape, receiver, member string) string {
+	prop := FindShapeProperty(shape, member)
+	if prop == nil {
+		return ""
+	}
+	propType := prop.Type
+	if propType == "" {
+		propType = "unknown"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n*UDObject property (%s)* of `%s`", prop.Name, propType, receiver)
+	if prop.Line > 0 {
+		fmt.Fprintf(&b, "\n\nDefined at line %d", prop.Line)
+	}
+	return b.String()
 }
 
 // GetUDObjectShapeCompletions returns property completions for a variable

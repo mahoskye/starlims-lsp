@@ -39,6 +39,14 @@ history:
       RunDS string targets navigate to the resolved data-source file
       (A13); 1-part RunDS targets resolve by basename, unlike dispatch
       targets, per feature.cross_file_resolution A16.
+  - date: 2026-07-03
+    ref: "UDObject member navigation PR"
+    note: >-
+      Member go-to-definition for shape-inferred UDObject receivers
+      (A14-A15): the member navigates to the property's definition (the
+      CreateUDObject initializer key or the first `:prop :=`
+      augmentation). Shaped receiver + unknown member is null; unshaped
+      receivers keep prior behavior.
 issues: ["#41"]
 ---
 
@@ -80,6 +88,13 @@ issues: ["#41"]
   the workspace cannot resolve, or a non-dotted name with no same-file
   declaration. Resolution never guesses: a resolved script that lacks
   the named procedure is null, not a nearby location.
+- The member in `<recv>:<member>` where `<recv>` has a
+  CreateUDObject-inferred shape (feature.completion's shape inference)
+  navigates to the property's definition: the initializer literal's key
+  or the first `:prop :=` augmentation, wherever the shape learned it.
+  A shaped receiver whose shape lacks the member is null — never a
+  fallback to an unrelated same-named symbol. Unshaped receivers keep
+  the prior word-based behavior.
 
 ## Acceptance
 
@@ -96,6 +111,8 @@ issues: ["#41"]
 - A11: Given a dispatch target matching two workspace files (one anchored, one flat), when go-to-definition is invoked, then multiple Locations are returned with the anchored candidate first.
 - A12: Given a dotted target differing from the indexed names only by case, when go-to-definition is invoked, then it resolves identically to the exact-case form.
 - A13: Given `RunDS("QUERIES.ORDERS")` with a workspace data source `Data Sources/QUERIES/ORDERS.ds`, or `RunDS("Orders")` with a flat `Orders.ds`, when go-to-definition is invoked inside the string, then a Location in the data-source file is returned; a RunDS target resolving nowhere is null.
+- A14: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;` and later uses, when go-to-definition is invoked on `Name` or `Total` after `oObj:`, then the Location is the initializer key or the first augmenting assignment respectively.
+- A15: Given the same shaped `oObj` and go-to-definition on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
 
 ## Rationale
 

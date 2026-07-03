@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 )
 
 // fakeResolver implements WorkspaceResolver for provider-level tests.
@@ -252,5 +253,41 @@ func TestExtractIncludeTargets(t *testing.T) {
 	tokens = lexer.NewLexer("nCount := 1;").Tokenize()
 	if got := ExtractIncludeTargets(tokens); got != nil {
 		t.Errorf("expected nil for no includes, got %v", got)
+	}
+}
+
+// [spec feature.definition/A14]
+// [spec feature.definition/A15]
+func TestFindDefinitionCrossFile_UDObjectMember(t *testing.T) {
+	text := `:PROCEDURE Main;
+:DECLARE oObj, Unknown;
+oObj := CreateUDObject({{"Name", "x"}});
+oObj:Total := 5;
+nVal := oObj:Total;
+sName := oObj:Name;
+x := oObj:Unknown;
+:ENDPROC;`
+	tokens := lexer.NewLexer(text).Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables(ast)
+
+	// Augmented property: use on line 5 -> assignment on line 4 (0-based 3).
+	locs := FindDefinitionCrossFile(text, tokens, 5, 15, "file:///self.ssl", procedures, variables, nil)
+	if len(locs) != 1 || locs[0].Range.Start.Line != 3 || locs[0].Range.Start.Character != 5 {
+		t.Errorf("expected Total definition at line 3 char 5, got %+v", locs)
+	}
+
+	// Initializer property: use on line 6 -> literal key on line 3 (0-based 2).
+	locs = FindDefinitionCrossFile(text, tokens, 6, 16, "file:///self.ssl", procedures, variables, nil)
+	if len(locs) != 1 || locs[0].Range.Start.Line != 2 {
+		t.Errorf("expected Name definition at line 2, got %+v", locs)
+	}
+
+	// Shaped receiver + unknown member: null, even though a variable named
+	// Unknown is declared in the file (no word fallback).
+	if locs := FindDefinitionCrossFile(text, tokens, 7, 12, "file:///self.ssl", procedures, variables, nil); locs != nil {
+		t.Errorf("expected null for unknown member on shaped receiver, got %+v", locs)
 	}
 }

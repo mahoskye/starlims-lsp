@@ -46,6 +46,13 @@ history:
       RunDS target strings join the string-context exceptions: a
       resolvable target shows the data-source summary (A14);
       unresolvable targets keep the string suppression.
+  - date: 2026-07-03
+    ref: "UDObject member navigation PR"
+    note: >-
+      Member hover for shape-inferred UDObject receivers (A15-A16),
+      closing the long-standing "property access after ':' has no
+      hover" gap for receivers whose shape completion already infers
+      (issues #7/#19). Unshaped receivers keep prior behavior.
 issues: []
 ---
 
@@ -82,6 +89,15 @@ issues: []
   with their ambient documentation; in non-endpoint files they get no
   special hover.
 - When no information exists for the position, the response MUST be null.
+- Hovering the member in `<recv>:<member>` where `<recv>` has a
+  CreateUDObject-inferred shape (the same inference completion uses —
+  initializer literals, `:prop :=` augmentation, `:clone()`,
+  cross-procedure propagation) shows the property's name, inferred value
+  type, receiver, and definition line. A shaped receiver whose shape
+  lacks the member hovers as null — the shape is the best available
+  knowledge, and hover must not fall back to unrelated same-named
+  symbols. Receivers with no inferred shape keep the prior word-based
+  behavior unchanged.
 
 - Hovering an `:INCLUDE` statement (keyword or path) shows the resolved
   script's summary (identity, entry parameters, procedure count) when the
@@ -106,6 +122,8 @@ issues: []
 - A12: Given `:INCLUDE SharedLib;` resolving to a workspace file, when the user hovers the include path, then the hover shows the resolved script's summary.
 - A13: Given a dispatch-target string that resolves nowhere, when the user hovers inside it, then the response is null — the string suppression (A7) holds.
 - A14: Given `RunDS("QUERIES.ORDERS")` resolving to a workspace data source, when the user hovers inside the string, then the hover shows the data-source summary (identity and entry parameters); a RunDS target resolving nowhere hovers as null.
+- A15: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;`, when the user hovers `Name` or `Total` after `oObj:`, then the hover shows the property with its inferred type and definition line.
+- A16: Given the same shaped `oObj` and a hover on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
 
 ## Rationale
 
@@ -123,11 +141,12 @@ scripts, so hover follows the same file classification.
 
 ## Known gaps
 
-- Property access after `:` has no hover: in `oObj:Prop`, hovering `Prop`
-  returns null because no member type tracking exists (docs/features/hover.md
-  §4.4). Acceptable under the null-when-unknown rule, but member hover for
-  shape-inferred UDObject variables would be consistent with completion's
-  shape inference; candidate for the cross-file/index work.
+- Member hover covers shape-inferred UDObject receivers only. `:` access
+  on built-in value types (`sName:Length` — .NET passthrough, issue #22)
+  and on receivers shape inference cannot see (built in another file,
+  passed through untracked bindings) still follows the legacy word-based
+  path or returns null. Extending receiver typing is issue #22's scope
+  decision.
 - Cross-file hover covers dispatch strings and `:INCLUDE` paths; a bare
   identifier that happens to be defined in another workspace file still
   gets no hover (word-based hover stays same-file — deliberate, to avoid

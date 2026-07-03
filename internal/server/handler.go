@@ -363,6 +363,24 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 		}
 	}
 
+	// Member hover for shape-inferred UDObject receivers
+	// (feature.hover A15-A16): a shaped receiver's known member shows the
+	// property; its unknown member is null, never an unrelated symbol.
+	if recv, member, ok := providers.MemberAccessAt(cache.Tokens, line, column); ok {
+		shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
+		if shape, shaped := shapes[strings.ToLower(recv)]; shaped {
+			if md := providers.RenderUDObjectMemberHover(shape, recv, member); md != "" {
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
+						Value: md,
+					},
+				}, nil
+			}
+			return nil, nil
+		}
+	}
+
 	var hover *providers.Hover
 	if isEndpointFile(uri, content, s.settings.EndpointPatterns) {
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
