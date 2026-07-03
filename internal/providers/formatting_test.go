@@ -2068,3 +2068,154 @@ sResult := "";
 		t.Errorf("formatting is not idempotent:\n--- first pass ---\n%q\n--- second pass ---\n%q", once, twice)
 	}
 }
+
+// ============================================================================
+// Catalog formatter gap regressions (issues #33-#39)
+// ============================================================================
+
+// Issue #33 (fmt.blank_lines_between_procs) — the separator is normalized to
+// exactly the configured count, replacing source blank lines rather than
+// stacking on top of them.
+func TestFormat_BlankLinesBetweenProcs_NormalizedNotAdditive(t *testing.T) {
+	input := ":PROCEDURE First;\n:ENDPROC;\n\n\n\n:PROCEDURE Second;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenProcs = 2
+	out := FormatDocument(input, opts)[0].NewText
+	want := ":PROCEDURE First;\n:ENDPROC;\n\n\n:PROCEDURE Second;\n:ENDPROC;\n"
+	if out != want {
+		t.Errorf("expected exactly 2 blank lines between procs\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #33 (fmt.blank_lines_between_procs) — a doc-comment block attached to
+// the next procedure stays attached; the separating blank line is placed
+// above the comment block.
+func TestFormat_BlankLinesBetweenProcs_DocCommentStaysAttached(t *testing.T) {
+	input := ":PROCEDURE First;\n:ENDPROC;\n\n/* First line of doc;\n/* second line of doc;\n:PROCEDURE Second;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	want := ":PROCEDURE First;\n:ENDPROC;\n\n/* First line of doc;\n/* second line of doc;\n:PROCEDURE Second;\n:ENDPROC;\n"
+	if out != want {
+		t.Errorf("doc comment should stay attached to its procedure\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #34 (fmt.builtin_function_case) — built-in names inside string
+// literals and comments are literal text and must not be re-cased.
+func TestFormat_BuiltinFunctionCase_SkipsStringsAndComments(t *testing.T) {
+	input := "sMsg := \"please call upper(sInput) first\";\n/* call len(a) before use;\nnSize := len(sMsg);\n"
+	opts := DefaultFormattingOptions()
+	opts.BuiltinFunctionCase = "PascalCase"
+	out := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(out, "\"please call upper(sInput) first\"") {
+		t.Errorf("string literal content was re-cased:\n%s", out)
+	}
+	if !strings.Contains(out, "/* call len(a) before use;") {
+		t.Errorf("comment content was re-cased:\n%s", out)
+	}
+	if !strings.Contains(out, "nSize := Len(sMsg);") {
+		t.Errorf("real call site should still be re-cased:\n%s", out)
+	}
+}
+
+// Issue #35 (fmt.comma_spacing) — a stray space before a comma is removed;
+// a space between adjacent commas collapses to the tight skipped-parameter
+// form (last comma of the run keeps its trailing space).
+func TestFormat_CommaSpacing_SpaceBeforeCommaRemoved(t *testing.T) {
+	input := "aValues := {nFirst ,nSecond};\naSkips := {nFirst , ,nThird};\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	want := "aValues := {nFirst, nSecond};\naSkips := {nFirst,, nThird};\n"
+	if out != want {
+		t.Errorf("space before comma should be removed\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #35 — with commaSpacing off, comma spacing (before and after) is
+// left as written.
+func TestFormat_CommaSpacing_Disabled_PreservesSpaceBeforeComma(t *testing.T) {
+	input := "aValues := {nFirst ,nSecond};\n"
+	opts := DefaultFormattingOptions()
+	opts.CommaSpacing = false
+	out := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(out, "{nFirst ,nSecond}") {
+		t.Errorf("with commaSpacing off the stray space should be preserved:\n%q", out)
+	}
+}
+
+// Issue #36 (fmt.indent_style) — standalone comments are indented at the
+// enclosing block depth like statements, including nested blocks.
+func TestFormat_StandaloneCommentIndentedWithBlock(t *testing.T) {
+	input := ":PROCEDURE Demo;\n/* outer comment;\n:IF bReady;\n/* inner comment;\nnValue := 1;\n:ENDIF;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	want := ":PROCEDURE Demo;\n\t/* outer comment;\n\t:IF bReady;\n\t\t/* inner comment;\n\t\tnValue := 1;\n\t:ENDIF;\n:ENDPROC;\n"
+	if out != want {
+		t.Errorf("comments should take the block indent\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #37 (fmt.max_consecutive_blank_lines) — the default 0 preserves
+// source blank-line runs through a full format.
+func TestFormat_MaxConsecutiveBlankLines_ZeroPreservesSourceRuns(t *testing.T) {
+	input := "nFirst := 1;\n\n\nnSecond := 2;\n"
+	opts := DefaultFormattingOptions() // MaxConsecutiveBlankLines: 0
+	out := FormatDocument(input, opts)[0].NewText
+	if out != input {
+		t.Errorf("cap 0 must preserve source blank runs\n got: %q\nwant: %q", out, input)
+	}
+}
+
+// Issue #37 — an intermediate cap (2) is reachable: five blank lines become
+// two, an existing two-blank run is untouched.
+func TestFormat_MaxConsecutiveBlankLines_CapTwo(t *testing.T) {
+	input := "nFirst := 1;\n\n\n\n\n\nnSecond := 2;\n\n\nnThird := 3;\n"
+	opts := DefaultFormattingOptions()
+	opts.MaxConsecutiveBlankLines = 2
+	out := FormatDocument(input, opts)[0].NewText
+	want := "nFirst := 1;\n\n\nnSecond := 2;\n\n\nnThird := 3;\n"
+	if out != want {
+		t.Errorf("cap 2 should allow exactly two blank lines\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #38 (fmt.semicolon_enforcement) — a final statement with no trailing
+// newline is terminated at end-of-file.
+func TestFormat_SemicolonEnforcement_AtEOFWithoutNewline(t *testing.T) {
+	input := ":DECLARE nValue;\nnValue := 1"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	want := ":DECLARE nValue;\nnValue := 1;\n"
+	if out != want {
+		t.Errorf("final statement should get its semicolon at EOF\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #38 — the continuation guards still apply at EOF: a document ending
+// mid-expression gets no semicolon.
+func TestFormat_SemicolonEnforcement_NoSemicolonMidExpressionAtEOF(t *testing.T) {
+	input := "nValue := 1 +"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if strings.Contains(out, ";") {
+		t.Errorf("no semicolon may be added after a trailing operator at EOF: %q", out)
+	}
+}
+
+// Issue #39 (fmt.trim_trailing_whitespace) — with the option off, line-end
+// whitespace inside multi-line comment content survives the format.
+func TestFormat_TrimTrailingWhitespaceDisabled_PreservesCommentInterior(t *testing.T) {
+	input := "/* first line   \nsecond line;\nnValue := 1;\n"
+	opts := DefaultFormattingOptions()
+	opts.TrimTrailingWhitespace = false
+	out := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(out, "/* first line   \n") {
+		t.Errorf("trailing whitespace inside comment should be preserved when trim is off:\n%q", out)
+	}
+
+	opts.TrimTrailingWhitespace = true
+	trimmed := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(trimmed, "/* first line\n") {
+		t.Errorf("trailing whitespace inside comment should be trimmed when trim is on:\n%q", trimmed)
+	}
+}

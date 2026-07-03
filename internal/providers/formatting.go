@@ -240,14 +240,21 @@ type formatState struct {
 	pendingComment        *lexer.Token // End-of-line comment to write before newline
 	pendingStatementBreak bool
 	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
+	// commentBlockStart is the builder offset where the current run of
+	// standalone comment lines began, or -1 when the output does not
+	// currently end in such a run. A blank line or any non-comment content
+	// breaks the run. Used by normalizeProcBoundary (issue #33) to place
+	// procedure-separating blank lines above an attached doc comment.
+	commentBlockStart int
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
 	return &formatState{
-		builder:      &strings.Builder{},
-		opts:         opts,
-		lineStart:    true,
-		sqlFormatter: NewSQLFormatter(opts.SQL),
+		builder:           &strings.Builder{},
+		opts:              opts,
+		lineStart:         true,
+		sqlFormatter:      NewSQLFormatter(opts.SQL),
+		commentBlockStart: -1,
 	}
 }
 
@@ -285,10 +292,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 
 	switch normalized {
 	case "PROCEDURE":
-		if s.afterEndProc && s.opts.BlankLinesBetweenProcs > 0 {
-			for j := 0; j < s.opts.BlankLinesBetweenProcs; j++ {
-				s.builder.WriteString("\n")
-			}
+		if s.afterEndProc {
+			s.normalizeProcBoundary()
 		}
 		s.inProcedure = true
 		s.afterEndProc = false
@@ -297,10 +302,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		s.inProcedure = false
 		s.afterEndProc = true
 	case "REGION":
-		if s.afterEndRegion && s.opts.BlankLinesBetweenProcs > 0 {
-			for j := 0; j < s.opts.BlankLinesBetweenProcs; j++ {
-				s.builder.WriteString("\n")
-			}
+		if s.afterEndRegion {
+			s.normalizeProcBoundary()
 		}
 		s.afterEndRegion = false
 		s.afterEndProc = false
@@ -327,6 +330,58 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	}
 }
 
+// normalizeProcBoundary rewrites the blank-line run between the previous
+// :ENDPROC;/:ENDREGION; and the upcoming :PROCEDURE/:REGION keyword so that
+// exactly BlankLinesBetweenProcs blank lines separate them (issue #33). The
+// count is normalized, not additive: blank lines surviving from the source
+// are replaced, never stacked on. When a standalone comment block is attached
+// to the upcoming keyword (no blank line between the comments and the
+// keyword), the blank lines are placed above the comment block so
+// documentation stays with the procedure it documents. A setting of 0
+// disables normalization entirely.
+func (s *formatState) normalizeProcBoundary() {
+	n := s.opts.BlankLinesBetweenProcs
+	if n <= 0 {
+		return
+	}
+
+	// Complete a pending statement line (e.g. mashed ":ENDPROC;:PROCEDURE")
+	// so the boundary sits after a finished line.
+	if s.pendingStatementBreak {
+		if s.pendingComment != nil {
+			s.builder.WriteString("  ")
+			s.builder.WriteString(s.pendingComment.Text)
+			s.pendingComment = nil
+		}
+		s.builder.WriteString("\n")
+		s.pendingStatementBreak = false
+	}
+
+	built := s.builder.String()
+	insertPos := len(built)
+	if s.commentBlockStart >= 0 && s.commentBlockStart <= insertPos {
+		insertPos = s.commentBlockStart
+	}
+	head, tail := built[:insertPos], built[insertPos:]
+	trimmed := strings.TrimRight(head, "\n")
+	if trimmed == "" {
+		return
+	}
+
+	rebuilt := trimmed + "\n" + strings.Repeat("\n", n) + tail
+	if rebuilt != built {
+		s.builder.Reset()
+		s.builder.WriteString(rebuilt)
+		if s.commentBlockStart >= 0 {
+			s.commentBlockStart += len(rebuilt) - len(built)
+		}
+	}
+	if strings.HasSuffix(rebuilt, "\n") {
+		s.lineStart = true
+		s.currentLineLen = 0
+	}
+}
+
 func (s *formatState) updateParenDepth(token lexer.Token) {
 	if isOpenParen(token) {
 		s.parenDepth++
@@ -341,7 +396,11 @@ func (s *formatState) updateParenDepth(token lexer.Token) {
 }
 
 func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
-	if s.lineStart && token.Type != lexer.TokenWhitespace && token.Type != lexer.TokenComment {
+	// Standalone comments are indented like statements at the enclosing
+	// block depth (issue #36); only the first line of a multi-line comment
+	// is indented — its interior lines are part of the token text and stay
+	// verbatim.
+	if s.lineStart && token.Type != lexer.TokenWhitespace {
 		// Calculate continuation indent for lines inside parens
 		contIndent := s.continuationIndent
 		// If the first token on this line is a closing paren/bracket, dedent by one
@@ -396,12 +455,16 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 			s.pendingComment = nil
 		}
 
+		// Source blank-line runs are preserved as written (issue #37); when
+		// ssl.format.maxConsecutiveBlankLines is > 0, the post-format pass
+		// caps them afterwards.
 		newlineCount := strings.Count(token.Text, "\n")
-		if newlineCount > 2 {
-			newlineCount = 2
-		}
 		for j := 0; j < newlineCount; j++ {
 			s.builder.WriteString("\n")
+		}
+		if newlineCount >= 2 {
+			// A blank line detaches any preceding standalone comment run.
+			s.commentBlockStart = -1
 		}
 		s.lineStart = true
 		s.currentLineLen = 0
@@ -449,6 +512,14 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		if next := findNextNonWS(tokens, index); next != nil && next.Text == ";" {
 			s.prevToken = token
 			return true
+		}
+		// Suppress space before commas when comma spacing is managed:
+		// "x ," -> "x," (issue #35)
+		if s.opts.CommaSpacing {
+			if next := findNextNonWS(tokens, index); next != nil && next.Text == "," {
+				s.prevToken = token
+				return true
+			}
 		}
 		s.builder.WriteString(" ")
 		s.currentLineLen++
@@ -674,6 +745,11 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		s.prevKeyword = ""
 	}
 
+	// Any non-comment content ends the current standalone-comment block.
+	if token.Type != lexer.TokenComment {
+		s.commentBlockStart = -1
+	}
+
 	s.prevToken = token
 	s.lastNonWSToken = token
 }
@@ -684,6 +760,12 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 
 	for i, token := range tokens {
 		if token.Type == lexer.TokenEOF {
+			// A final statement with no trailing newline still gets its
+			// semicolon (issue #38) — mirror the newline-triggered check.
+			if opts.SemicolonEnforcement && !state.lineStart &&
+				needsSemicolonAtLineEnd(state.lastNonWSToken, tokens, i-1) {
+				state.builder.WriteString(";")
+			}
 			break
 		}
 
@@ -694,6 +776,11 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				commentCopy := token
 				state.pendingComment = &commentCopy
 				continue
+			}
+			// A standalone comment at line start opens (or continues) a
+			// comment block; remember where it began for issue #33.
+			if state.lineStart && state.commentBlockStart < 0 {
+				state.commentBlockStart = state.builder.Len()
 			}
 		}
 
@@ -750,12 +837,12 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 
 	formatted := state.builder.String()
 
-	// Trim trailing whitespace from each line
-	lines := strings.Split(formatted, "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t")
+	// Trim trailing whitespace from each line — but only when the option is
+	// on (issue #39): with trimTrailingWhitespace disabled, line-end
+	// whitespace (in practice, inside multi-line comment content) survives.
+	if opts.TrimTrailingWhitespace {
+		formatted = trimTrailingWhitespacePerLine(formatted)
 	}
-	formatted = strings.Join(lines, "\n")
 
 	if len(formatted) > 0 && !strings.HasSuffix(formatted, "\n") {
 		formatted += "\n"
@@ -1200,57 +1287,47 @@ func capConsecutiveBlankLines(text string, max int) string {
 }
 
 // canonicalizeBuiltinCasing rewrites built-in function call sites to their
-// canonical PascalCase form. A "call site" is a bare identifier immediately
-// followed by `(`. We only rewrite identifiers whose lowercased form matches
-// a published built-in; user-defined functions and identifiers used as
-// arguments are left alone.
+// canonical PascalCase form. A "call site" is an identifier followed by `(`,
+// optionally with intervening spaces/tabs. We only rewrite identifiers whose
+// lowercased form matches a published built-in; user-defined functions and
+// identifiers used as arguments are left alone. The pass re-lexes the
+// formatted text so string literals and comments are literal text and never
+// rewritten (issue #34).
 func canonicalizeBuiltinCasing(text string) string {
 	canonical := constants.CanonicalFunctionNames()
 	if len(canonical) == 0 {
 		return text
 	}
+	tokens := lexer.NewLexer(text).Tokenize()
 	var b strings.Builder
 	b.Grow(len(text))
-	i := 0
-	n := len(text)
-	for i < n {
-		// Find next identifier start.
-		c := text[i]
-		if !isIdentStart(c) {
-			b.WriteByte(c)
-			i++
-			continue
+	for i, tok := range tokens {
+		if tok.Type == lexer.TokenEOF {
+			break
 		}
-		j := i + 1
-		for j < n && isIdentCont(text[j]) {
-			j++
-		}
-		ident := text[i:j]
-		// Skip over any whitespace following ident; only rewrite if the
-		// next non-whitespace character is '('.
-		k := j
-		for k < n && (text[k] == ' ' || text[k] == '\t') {
-			k++
-		}
-		if k < n && text[k] == '(' {
-			if pascal, ok := canonical[strings.ToLower(ident)]; ok && pascal != ident {
+		if tok.Type == lexer.TokenIdentifier && isCallSite(tokens, i) {
+			if pascal, ok := canonical[strings.ToLower(tok.Text)]; ok {
 				b.WriteString(pascal)
-				b.WriteString(text[j:k])
-				b.WriteByte('(')
-				i = k + 1
 				continue
 			}
 		}
-		b.WriteString(ident)
-		i = j
+		b.WriteString(tok.Text)
 	}
 	return b.String()
 }
 
-func isIdentStart(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
-}
-
-func isIdentCont(c byte) bool {
-	return isIdentStart(c) || (c >= '0' && c <= '9')
+// isCallSite reports whether the identifier at index i is immediately
+// followed by `(`, allowing only same-line spaces/tabs in between.
+func isCallSite(tokens []lexer.Token, i int) bool {
+	for j := i + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenWhitespace {
+			if strings.ContainsAny(t.Text, "\n\r") {
+				return false
+			}
+			continue
+		}
+		return t.Text == "("
+	}
+	return false
 }

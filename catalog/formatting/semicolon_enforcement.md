@@ -18,6 +18,11 @@ history:
   - date: 2026-01-10
     ref: "v0.1.0 initial release"
     note: LSP formatter carries the same continuation-aware enforcement.
+  - date: 2026-07-02
+    ref: "issue #38"
+    note: >-
+      Enforcement now also runs at end-of-file, so a final statement with
+      no trailing newline gets its semicolon.
 issues: ["#38"]
 ---
 
@@ -40,8 +45,10 @@ No semicolon is added when the expression continues past the line break:
   `:FINALLY`, `:TO`, `:STEP`).
 
 Semicolons are never inserted inside strings or comments. The check runs at
-line breaks only, so a final statement at end-of-file with no trailing
-newline is not terminated (see Known gaps).
+every line break and at end-of-file, so a final statement with no trailing
+newline is terminated the same way as one followed by a newline (the
+continuation guards above apply identically: a document ending
+mid-expression gets no semicolon).
 
 ## Examples
 
@@ -85,22 +92,11 @@ aList := {1,
 	2};
 ```
 
-## Rationale
-
-Semicolon termination is SSL syntax (authoritative), so the formatter may
-complete it mechanically — but the v1.1.0 continuation rules (history)
-bound the enforcement: inserting a semicolon mid-expression changes program
-meaning, which the formatter must never do. That is why enforcement keys on
-both what the line ends with and what the next line starts with.
-
-## Known gaps
-
-- Enforcement is triggered by newline tokens, so the last statement of a
-  document that does not end with a newline never gets its semicolon.
+A final statement with no trailing newline is terminated:
 
 ### Before
 
-```ssl expect=fail
+```ssl
 nValue := 1
 ```
 
@@ -109,3 +105,14 @@ nValue := 1
 ```ssl
 nValue := 1;
 ```
+
+## Rationale
+
+Semicolon termination is SSL syntax (authoritative), so the formatter may
+complete it mechanically — but the v1.1.0 continuation rules (history)
+bound the enforcement: inserting a semicolon mid-expression changes program
+meaning, which the formatter must never do. That is why enforcement keys on
+both what the line ends with and what the next line starts with. The
+end-of-file case (issue #38) closes the one hole in the trigger: enforcement
+used to fire only on newline tokens, so a document whose last line had no
+trailing newline kept its unterminated final statement.

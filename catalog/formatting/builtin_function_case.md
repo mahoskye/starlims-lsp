@@ -17,6 +17,12 @@ history:
     note: >-
       Added with "preserve" as default — rewriting user casing is opt-in;
       "PascalCase" rewrites call sites to the canonical inventory casing.
+  - date: 2026-07-02
+    ref: "issue #34"
+    note: >-
+      The pass now re-lexes the formatted text and only rewrites identifier
+      tokens, so built-in names inside string literals and comments are
+      never re-cased.
 issues: ["#34"]
 ---
 
@@ -32,9 +38,10 @@ published built-in inventory to the inventory's canonical casing (e.g.
 
 Identifiers not in the inventory (user procedures, variables) are never
 re-cased, and neither are non-call uses of a built-in name (no following
-`(`). The pass is purely textual: it does not know about receivers, so a
-member call like `oVar:upper(...)` is also rewritten, and — as a known gap —
-matches inside string literals and comments are rewritten too.
+`(`). String literals and comments are literal text and are never rewritten:
+the pass re-lexes the formatted output and only touches identifier tokens.
+It does not know about receivers, so a member call like `oVar:upper(...)`
+is also rewritten.
 
 ## Examples
 
@@ -56,22 +63,11 @@ sKept := MyCustomHelper(sName);
 oObj:Upper(sName);
 ```
 
-## Rationale
-
-SSL built-ins are case-insensitive at runtime, so casing is pure style —
-default-preserve respects the author; opt-in PascalCase serves teams
-standardizing on the inventory's canonical names (PR #4, v0.5.0).
-
-## Known gaps
-
-- The rewrite pass runs on raw text after formatting and does not skip
-  string literals or comments, so prose that happens to contain
-  `builtin(` is re-cased. Intended behavior: strings and comments are
-  literal text and must be untouched.
+A built-in name inside a string literal stays as written:
 
 ### Before
 
-```ssl expect=fail
+```ssl
 sMsg := "please call upper(sInput) first";
 ```
 
@@ -80,3 +76,12 @@ sMsg := "please call upper(sInput) first";
 ```ssl
 sMsg := "please call upper(sInput) first";
 ```
+
+## Rationale
+
+SSL built-ins are case-insensitive at runtime, so casing is pure style —
+default-preserve respects the author; opt-in PascalCase serves teams
+standardizing on the inventory's canonical names (PR #4, v0.5.0). The pass
+originally ran on raw text and re-cased matches inside strings and comments;
+issue #34 moved it onto the lexer's token stream so literal text is
+untouched.
