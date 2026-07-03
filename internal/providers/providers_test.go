@@ -3055,63 +3055,82 @@ nCount := 1;`
 }
 
 // [spec feature.folding/A5]
-func TestGetFoldingRanges_NestedNamedRegions_MismatchedCloseOrder(t *testing.T) {
+func TestGetFoldingRanges_NestedRegions_LIFOClose(t *testing.T) {
 	text := `/* region Outer;
 /* region Inner;
 :DECLARE nCount;
-/* endregion Outer;
-/* endregion Inner;`
+/* endregion;
+/* endregion;`
 
 	ranges := GetFoldingRanges(text)
 
-	// 'endregion Outer' closes the Outer region by name (lines 0-3), not
-	// the innermost Inner region; 'endregion Inner' then closes Inner
-	// (lines 1-4). Name-blind LIFO pairing would produce 1-3 and 0-4.
-	foundOuter, foundInner := false, false
+	// The canonical closer is a bare '/* endregion;' — no name. The first
+	// closer ends the innermost open region (Inner, lines 1-3); the second
+	// ends Outer (lines 0-4).
+	foundInner, foundOuter := false, false
 	for _, r := range ranges {
 		if r.Kind != "region" {
 			continue
 		}
-		if r.StartLine == 0 && r.EndLine == 3 {
-			foundOuter = true
-		}
-		if r.StartLine == 1 && r.EndLine == 4 {
+		if r.StartLine == 1 && r.EndLine == 3 {
 			foundInner = true
 		}
+		if r.StartLine == 0 && r.EndLine == 4 {
+			foundOuter = true
+		}
 	}
-	if !foundOuter || !foundInner {
-		t.Errorf("expected name-matched region ranges 0-3 (Outer) and 1-4 (Inner), got: %+v", ranges)
+	if !foundInner || !foundOuter {
+		t.Errorf("expected LIFO region ranges 1-3 (Inner) and 0-4 (Outer), got: %+v", ranges)
 	}
 }
 
-// [spec feature.folding/A6]
-func TestGetFoldingRanges_EndregionNameMismatch_ClosesNothing(t *testing.T) {
-	text := `/* region A;
+// TestGetFoldingRanges_EndregionTrailingProseIgnored: trailing text before
+// the ';' on an endregion marker is prose — it does not change pairing.
+func TestGetFoldingRanges_EndregionTrailingProseIgnored(t *testing.T) {
+	text := `/* region Helpers;
 :DECLARE nCount;
-/* endregion B;
-nCount := 1;`
+/* endregion Helpers;`
 
 	ranges := GetFoldingRanges(text)
 
-	// 'endregion B' matches no open region, so it closes nothing and
-	// region A stays open to the end of the file (the mismatch itself is
-	// surfaced by diag.region_end_mismatch).
 	found := false
 	for _, r := range ranges {
-		if r.Kind == "region" && r.StartLine == 0 && r.EndLine == 3 {
+		if r.Kind == "region" && r.StartLine == 0 && r.EndLine == 2 {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected region A to stay open to EOF (0-3), got: %+v", ranges)
+		t.Errorf("expected region range 0-2 with prose after endregion, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A6]
+func TestGetFoldingRanges_OrphanEndregion_ClosesNothing(t *testing.T) {
+	text := `/* endregion;
+/* region A;
+:DECLARE nCount;
+/* endregion;`
+
+	ranges := GetFoldingRanges(text)
+
+	// The first endregion has no open region — it closes nothing (the
+	// mistake is surfaced by diag.region_end_mismatch). Region A still
+	// pairs with the second endregion.
+	found := false
+	for _, r := range ranges {
+		if r.Kind == "region" && r.StartLine == 1 && r.EndLine == 3 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected region A range 1-3 despite orphan endregion, got: %+v", ranges)
 	}
 }
 
 func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
-	text := `/* region Helpers;
+	text := `/* endregion;
 :PROCEDURE Helper;
-:ENDPROC;
-/* endregion Utils;`
+:ENDPROC;`
 
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
@@ -3125,22 +3144,22 @@ func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected region_end_mismatch for 'endregion Utils' with only 'Helpers' open, got: %+v", diagnostics)
+		t.Errorf("expected region_end_mismatch for endregion with no open region, got: %+v", diagnostics)
 	}
 }
 
-func TestGetDiagnostics_RegionEndMismatch_MatchedNamesClean(t *testing.T) {
+func TestGetDiagnostics_RegionEndMismatch_BalancedClean(t *testing.T) {
 	text := `/* region Outer;
 /* region Inner;
 :DECLARE nCount;
-/* endregion Outer;
-/* endregion Inner;`
+/* endregion;
+/* endregion Outer is done here;`
 
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
 		if d.Code == CodeRegionEndMismatch {
-			t.Errorf("out-of-order named closes each match an open region and must not flag: %+v", d)
+			t.Errorf("balanced markers (trailing prose ignored) must not flag: %+v", d)
 		}
 	}
 }

@@ -5103,41 +5103,26 @@ func checkRegionLegacyWarning(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkRegionEndMismatch flags a /* endregion <name>; marker whose name
-// matches no currently open /* region; (case-insensitive), and any bare
-// /* endregion; with no open region at all. Mirrors the name-aware pairing
-// in extractRegions (symbols.go): a mismatched endregion closes nothing, so
-// without this signal the editor silently folds the wrong span.
+// checkRegionEndMismatch flags a /* endregion; marker with no open
+// /* region; to close. The canonical closer takes no name (trailing text
+// before the ';' is prose); pairing is innermost-first, mirroring
+// extractRegions (symbols.go). An orphan endregion closes nothing, so
+// without this signal the broken region structure is silent.
 func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
-	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b\s*(.*?)$`)
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*`)
+	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
 
-	var openRegions []string
+	openRegions := 0
 	for _, token := range tokens {
 		if token.Type != lexer.TokenComment {
 			continue
 		}
 		text := strings.TrimSpace(strings.TrimSuffix(token.Text, ";"))
 
-		if matches := regionStartPattern.FindStringSubmatch(text); matches != nil {
-			name := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(matches[1]), ";"))
-			if name == "" {
-				name = "Region"
-			}
-			openRegions = append(openRegions, name)
-			continue
-		}
-
-		matches := regionEndPattern.FindStringSubmatch(text)
-		if matches == nil {
-			continue
-		}
-		name := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(matches[1]), ";"))
-
-		if name == "" {
-			if len(openRegions) == 0 {
+		if regionEndPattern.MatchString(text) {
+			if openRegions == 0 {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityWarning,
 					Range:    tokenToRange(token),
@@ -5147,28 +5132,13 @@ func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
 				})
 				continue
 			}
-			openRegions = openRegions[:len(openRegions)-1]
+			openRegions--
 			continue
 		}
 
-		matchIdx := -1
-		for i := len(openRegions) - 1; i >= 0; i-- {
-			if strings.EqualFold(openRegions[i], name) {
-				matchIdx = i
-				break
-			}
+		if regionStartPattern.MatchString(text) {
+			openRegions++
 		}
-		if matchIdx == -1 {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("'endregion %s' matches no open region of that name — it closes nothing", name),
-				Source:   "ssl-lsp",
-				Code:     CodeRegionEndMismatch,
-			})
-			continue
-		}
-		openRegions = append(openRegions[:matchIdx], openRegions[matchIdx+1:]...)
 	}
 
 	return diagnostics

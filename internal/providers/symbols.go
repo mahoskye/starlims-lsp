@@ -244,7 +244,7 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 	// Match region comments, handling optional trailing semicolon and whitespace.
 	// SSL comments are: /* comment text ;
 	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
-	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b\s*(.*?)$`)
+	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
 
 	for _, token := range tokens {
 		if token.Type != lexer.TokenEOF && token.Line > lastLine {
@@ -266,9 +266,8 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 				continue
 			}
 
-			if matches := regionEndPattern.FindStringSubmatch(text); matches != nil {
-				name := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(matches[1]), ";"))
-				events = append(events, regionEvent{Line: token.Line, Name: name, IsStart: false})
+			if regionEndPattern.MatchString(text) {
+				events = append(events, regionEvent{Line: token.Line, IsStart: false})
 			}
 		}
 	}
@@ -296,26 +295,12 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 			continue
 		}
 
-		// A named endregion closes the innermost open region with a matching
-		// name (case-insensitive); if no open region matches, it closes
-		// nothing (surfaced by diag.region_end_mismatch). A bare endregion
-		// closes the innermost open region.
-		matchIdx := len(regionStack) - 1
-		if event.Name != "" {
-			matchIdx = -1
-			for i := len(regionStack) - 1; i >= 0; i-- {
-				if strings.EqualFold(regionStack[i].name, event.Name) {
-					matchIdx = i
-					break
-				}
-			}
-			if matchIdx == -1 {
-				continue
-			}
-		}
-
-		start := regionStack[matchIdx]
-		regionStack = append(regionStack[:matchIdx], regionStack[matchIdx+1:]...)
+		// The canonical closer is a bare '/* endregion;' — it takes no name
+		// and closes the innermost open region (LIFO). Any trailing text
+		// before the ';' is prose and ignored for pairing. An endregion
+		// with no open region closes nothing (diag.region_end_mismatch).
+		start := regionStack[len(regionStack)-1]
+		regionStack = regionStack[:len(regionStack)-1]
 		regions = append(regions, RegionInfo{
 			Name:      start.name,
 			StartLine: start.startLine,
