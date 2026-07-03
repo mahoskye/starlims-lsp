@@ -753,3 +753,104 @@ func TestExtractControlFlowBlocks_Unclosed(t *testing.T) {
 		t.Errorf("unclosed block should extend to at least line 2, got %d", blocks[0].EndLine)
 	}
 }
+
+// ==================== Visibility Annotation Tests ====================
+
+func TestParser_ExtractProcedures_IsPrivate(t *testing.T) {
+	cases := []struct {
+		name    string
+		input   string
+		private bool
+	}{
+		{"private annotation", "/*@private;\n:PROCEDURE Hidden;\n:ENDPROC;", true},
+		{"protected annotation", "/*@protected;\n:PROCEDURE Guarded;\n:ENDPROC;", true},
+		{"case-insensitive content", "/*@PRIVATE;\n:PROCEDURE Hidden;\n:ENDPROC;", true},
+		{"no annotation", ":PROCEDURE Open;\n:ENDPROC;", false},
+		{"space after /* rejected", "/* @private;\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"other annotation rejected", "/*@deprecated;\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"ordinary docblock", "/* Description: does things;\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"annotation after docblock", "/* Description: does things;\n/*@private;\n:PROCEDURE Hidden;\n:ENDPROC;", true},
+		{"annotation not adjacent", "/*@private;\nx := 1;\n:PROCEDURE Open;\n:ENDPROC;", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p, root := parseInput(t, tc.input)
+			procedures := p.ExtractProcedures(root)
+			if len(procedures) != 1 {
+				t.Fatalf("expected 1 procedure, got %d", len(procedures))
+			}
+			if procedures[0].IsPrivate != tc.private {
+				t.Errorf("IsPrivate = %v, want %v", procedures[0].IsPrivate, tc.private)
+			}
+		})
+	}
+}
+
+func TestParser_ExtractProcedures_DocblockSurvivesAnnotation(t *testing.T) {
+	// The visibility annotation sits between the docblock and :PROCEDURE;
+	// doc extraction must skip it and still attach the docblock.
+	input := `/*
+ * Description: Loads the record.
+;
+/*@private;
+:PROCEDURE Load;
+:ENDPROC;`
+
+	p, root := parseInput(t, input)
+	procedures := p.ExtractProcedures(root)
+	if len(procedures) != 1 {
+		t.Fatalf("expected 1 procedure, got %d", len(procedures))
+	}
+	proc := procedures[0]
+	if !proc.IsPrivate {
+		t.Error("expected IsPrivate for annotated procedure")
+	}
+	if proc.Doc.Description != "Loads the record." {
+		t.Errorf("expected docblock to survive annotation, got %q", proc.Doc.Description)
+	}
+}
+
+// ==================== Top-Level Parameters Tests ====================
+
+func TestParser_ExtractTopLevelParameters(t *testing.T) {
+	input := `/* entry point;
+:PARAMETERS sName, nMode;
+:DECLARE nCount;
+:PROCEDURE Helper;
+:PARAMETERS sInner;
+:ENDPROC;`
+
+	p, root := parseInput(t, input)
+	params, line := p.ExtractTopLevelParameters(root)
+
+	if len(params) != 2 || params[0] != "sName" || params[1] != "nMode" {
+		t.Errorf("expected [sName nMode], got %v", params)
+	}
+	if line != 2 {
+		t.Errorf("expected line 2, got %d", line)
+	}
+}
+
+func TestParser_ExtractTopLevelParameters_NoneBeforeProcedure(t *testing.T) {
+	// A :PARAMETERS inside a procedure is NOT the entry-point signature.
+	input := `:DECLARE nCount;
+:PROCEDURE Helper;
+:PARAMETERS sInner;
+:ENDPROC;`
+
+	p, root := parseInput(t, input)
+	params, line := p.ExtractTopLevelParameters(root)
+
+	if params != nil || line != -1 {
+		t.Errorf("expected (nil, -1), got (%v, %d)", params, line)
+	}
+}
+
+func TestParser_ExtractTopLevelParameters_EmptyScript(t *testing.T) {
+	p, root := parseInput(t, "")
+	params, line := p.ExtractTopLevelParameters(root)
+	if params != nil || line != -1 {
+		t.Errorf("expected (nil, -1), got (%v, %d)", params, line)
+	}
+}
