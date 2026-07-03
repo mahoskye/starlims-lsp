@@ -4,6 +4,7 @@ package providers
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"unicode"
@@ -244,6 +245,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
 	diagnostics = append(diagnostics, checkRegionLegacyWarning(tokens)...)
+	diagnostics = append(diagnostics, checkRegionEndMismatch(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
@@ -5167,6 +5169,47 @@ func checkRegionLegacyWarning(tokens []lexer.Token) []Diagnostic {
 				Source:   "ssl-lsp",
 				Code:     CodeRegionLegacy,
 			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkRegionEndMismatch flags a /* endregion; marker with no open
+// /* region; to close. The canonical closer takes no name (trailing text
+// before the ';' is prose); pairing is innermost-first, mirroring
+// extractRegions (symbols.go). An orphan endregion closes nothing, so
+// without this signal the broken region structure is silent.
+func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*`)
+	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
+
+	openRegions := 0
+	for _, token := range tokens {
+		if token.Type != lexer.TokenComment {
+			continue
+		}
+		text := strings.TrimSpace(strings.TrimSuffix(token.Text, ";"))
+
+		if regionEndPattern.MatchString(text) {
+			if openRegions == 0 {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(token),
+					Message:  "'endregion' has no open '/* region' to close",
+					Source:   "ssl-lsp",
+					Code:     CodeRegionEndMismatch,
+				})
+				continue
+			}
+			openRegions--
+			continue
+		}
+
+		if regionStartPattern.MatchString(text) {
+			openRegions++
 		}
 	}
 

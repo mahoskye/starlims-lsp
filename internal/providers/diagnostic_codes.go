@@ -116,6 +116,7 @@ const (
 	CodeNegativeLogic               = "negative_logic"
 	CodeStepSpacing                 = "step_spacing"
 	CodeRegionLegacy                = "region_legacy"
+	CodeRegionEndMismatch           = "region_end_mismatch"
 	CodeCodeBlockStructure          = "code_block_structure"
 	CodeBuilderDirectiveCase        = "builder_directive_case"
 	CodeIdentifierTooLong           = "identifier_too_long"

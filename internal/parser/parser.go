@@ -409,6 +409,14 @@ func (p *Parser) findProcedureEndLine(parent *Node, procedureStmt *Node) int {
 			return child.EndLine
 		}
 	}
+
+	// No :ENDPROC — the unclosed procedure extends to the end of the file,
+	// like other unclosed blocks (the mistake is reported by unclosed_block).
+	if len(p.tokens) > 0 {
+		if lastLine := p.tokens[len(p.tokens)-1].Line; lastLine > procedureStmt.EndLine {
+			return lastLine
+		}
+	}
 	return procedureStmt.EndLine
 }
 

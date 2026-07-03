@@ -3249,6 +3249,137 @@ func TestGetFoldingRanges_RegionMarkers(t *testing.T) {
 	}
 }
 
+// [spec feature.folding/A4]
+func TestGetFoldingRanges_UnclosedProcedureFoldsToEOF(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE nCount;
+nCount := 1;`
+
+	ranges := GetFoldingRanges(text)
+
+	// A :PROCEDURE with no :ENDPROC extends to the last line of the file,
+	// like other unclosed blocks (starlims-lsp #27).
+	found := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 2 && r.Kind == "region" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected unclosed procedure to fold 0-2, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A5]
+func TestGetFoldingRanges_NestedRegions_LIFOClose(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:DECLARE nCount;
+/* endregion;
+/* endregion;`
+
+	ranges := GetFoldingRanges(text)
+
+	// The canonical closer is a bare '/* endregion;' — no name. The first
+	// closer ends the innermost open region (Inner, lines 1-3); the second
+	// ends Outer (lines 0-4).
+	foundInner, foundOuter := false, false
+	for _, r := range ranges {
+		if r.Kind != "region" {
+			continue
+		}
+		if r.StartLine == 1 && r.EndLine == 3 {
+			foundInner = true
+		}
+		if r.StartLine == 0 && r.EndLine == 4 {
+			foundOuter = true
+		}
+	}
+	if !foundInner || !foundOuter {
+		t.Errorf("expected LIFO region ranges 1-3 (Inner) and 0-4 (Outer), got: %+v", ranges)
+	}
+}
+
+// TestGetFoldingRanges_EndregionTrailingProseIgnored: trailing text before
+// the ';' on an endregion marker is prose — it does not change pairing.
+func TestGetFoldingRanges_EndregionTrailingProseIgnored(t *testing.T) {
+	text := `/* region Helpers;
+:DECLARE nCount;
+/* endregion Helpers;`
+
+	ranges := GetFoldingRanges(text)
+
+	found := false
+	for _, r := range ranges {
+		if r.Kind == "region" && r.StartLine == 0 && r.EndLine == 2 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected region range 0-2 with prose after endregion, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A6]
+func TestGetFoldingRanges_OrphanEndregion_ClosesNothing(t *testing.T) {
+	text := `/* endregion;
+/* region A;
+:DECLARE nCount;
+/* endregion;`
+
+	ranges := GetFoldingRanges(text)
+
+	// The first endregion has no open region — it closes nothing (the
+	// mistake is surfaced by diag.region_end_mismatch). Region A still
+	// pairs with the second endregion.
+	found := false
+	for _, r := range ranges {
+		if r.Kind == "region" && r.StartLine == 1 && r.EndLine == 3 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected region A range 1-3 despite orphan endregion, got: %+v", ranges)
+	}
+}
+
+func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
+	text := `/* endregion;
+:PROCEDURE Helper;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if d.Code == CodeRegionEndMismatch {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected region_end_mismatch for endregion with no open region, got: %+v", diagnostics)
+	}
+}
+
+func TestGetDiagnostics_RegionEndMismatch_BalancedClean(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:DECLARE nCount;
+/* endregion;
+/* endregion Outer is done here;`
+
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeRegionEndMismatch {
+			t.Errorf("balanced markers (trailing prose ignored) must not flag: %+v", d)
+		}
+	}
+}
+
 // ==================== Me Keyword Hover Tests ====================
 
 func TestGetHover_MeKeyword(t *testing.T) {
