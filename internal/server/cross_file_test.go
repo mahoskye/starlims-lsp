@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"starlims-lsp/internal/providers"
+
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 // newResolverIndex builds a WorkspaceIndex over a temp workspace without
@@ -250,5 +252,68 @@ func TestLiveResolver_NilIndexSafe(t *testing.T) {
 	}
 	if res := (liveResolver{s}).ResolveInclude("A.B"); res != nil {
 		t.Errorf("expected nil with no index, got %+v", res)
+	}
+}
+
+// End-to-end: definition request on a dotted ExecFunction target jumps to
+// the procedure in another workspace file. [spec feature.definition/A8]
+func TestHandleDefinition_CrossFileDispatch(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	targetURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	source := `result := ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	result, err := s.handleDefinition(nil, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 30},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	loc, ok := result.(protocol.Location)
+	if !ok {
+		t.Fatalf("expected a single protocol.Location, got %T", result)
+	}
+	if string(loc.URI) != targetURI {
+		t.Errorf("expected location in %s, got %s", targetURI, loc.URI)
+	}
+	if loc.Range.Start.Line != 4 { // :PROCEDURE CalculateTotal, 0-based
+		t.Errorf("expected line 4, got %d", loc.Range.Start.Line)
+	}
+}
+
+// References stay single-file: a dispatch target that resolves cross-file
+// for definition must NOT leak other-file locations into references
+// (feature.references contract preserved).
+func TestHandleReferences_StaySingleFileWithWorkspaceIndex(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	source := `result := ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 45},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, ref := range refs {
+		if string(ref.URI) != testURI {
+			t.Errorf("references must stay single-file, got location in %s", ref.URI)
+		}
 	}
 }
