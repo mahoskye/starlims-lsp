@@ -17,6 +17,13 @@ history:
       (be7a174): script identity derivation, the dispatch/include
       resolution chain, and the open-document overlay. First consumed by
       go-to-definition, hover, and completion in follow-up PRs.
+  - date: 2026-07-03
+    ref: "RunDS navigation PR"
+    note: >-
+      Data-source resolution added for RunDS targets (A15-A17), with the
+      script/data-source partition: dispatch and include resolution no
+      longer return data-source files, and RunDS resolution returns only
+      them.
 issues: []
 ---
 
@@ -63,6 +70,18 @@ Windows-style `/C:/...` paths):
 `Category.Script` uses the category chain, degrading to a basename match;
 bare `Name` is a basename match. Targets resolve to the file (line 0).
 
+**Data-source resolution** (`RunDS` string targets): dotted
+`Category.Name` uses the category chain, degrading to a basename match;
+bare `Name` is a basename match — 1-part RunDS targets DO resolve, unlike
+dispatch targets, because a data source is always a separate file. Targets
+resolve to the data-source file's entry (the file-level `:PARAMETERS` line
+when present, else the first line).
+
+**Script/data-source partition**: dispatch and include resolution consider
+only non-data-source files; data-source resolution considers only
+data-source files (`.ds`/`.ds.txt`). `RunDS` is the only dispatcher that
+reaches data sources, and it reaches nothing else.
+
 **Candidate ordering and cap**: anchored canonical-layout matches order
 before flat matches, path-lexicographic within each group, capped at 10.
 
@@ -91,6 +110,9 @@ buffer drops that candidate entirely.
 - A12: Given a resolution into a document that is open with unsaved edits, when it resolves, then the target line reflects the live buffer, and a procedure no longer present in the buffer is dropped from the candidates.
 - A13: Given a `/*@private;`-annotated procedure, when a dispatch target names it, then it still resolves (navigation is not filtered).
 - A14: Given a 1-part dispatch target, when it resolves, then the cross-file resolver returns nothing.
+- A15: Given a data-source file at `Data Sources/QUERIES/ORDERS.ds`, when the data-source target `QUERIES.ORDERS` resolves, then the result is that file's entry (its file-level `:PARAMETERS` line when present, else line 0).
+- A16: Given a flat-layout data-source file `Orders.ds`, when the 1-part data-source target `Orders` resolves, then the file is returned — 1-part data-source targets resolve by basename.
+- A17: Given a script and a data source sharing a name, when a dispatch or include target names it, then only the script is returned; when a data-source target names it, then only the data source is returned.
 
 ## Rationale
 

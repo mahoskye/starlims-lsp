@@ -872,3 +872,22 @@ func RenderScriptEntryHover(scriptDisplay string, entryParams []string, isClass 
 	}
 	return b.String()
 }
+
+// RenderDataSourceHover renders hover for a RunDS target resolving to a
+// workspace data source (feature.hover A14).
+func RenderDataSourceHover(display string, entryParams []string, extra int) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n*Data source*", display)
+	if len(entryParams) > 0 {
+		b.WriteString("\n\n**Parameters:**")
+		for _, name := range entryParams {
+			fmt.Fprintf(&b, "\n- `%s`", name)
+		}
+	} else {
+		b.WriteString("\n\n*No parameters*")
+	}
+	if extra > 0 {
+		fmt.Fprintf(&b, "\n\n*+%d other match(es) — use go-to-definition to choose*", extra)
+	}
+	return b.String()
+}

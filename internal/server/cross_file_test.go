@@ -547,3 +547,152 @@ func TestDispatchCompletion_FlatScriptDot(t *testing.T) {
 		t.Errorf("private procedures must be excluded, got %v", labels)
 	}
 }
+
+const ordersDataSource = `/* orders query;
+:PARAMETERS sStatus;
+SELECT ORDER_ID FROM ORDERS WHERE STATUS = ?sStatus?;`
+
+// [spec feature.cross_file_resolution/A15]
+// [spec feature.cross_file_resolution/A16]
+func TestResolveDataSource_CategoryAndFlat(t *testing.T) {
+	wi, dir := newResolverIndex(t)
+	anchoredURI := writeAndIndex(t, wi, dir, "Data Sources/QUERIES/ORDERS.ds", ordersDataSource)
+	flatURI := writeAndIndex(t, wi, dir, "lib/Inventory.ds", ordersDataSource)
+
+	res := wi.ResolveDataSourceTarget("QUERIES.ORDERS")
+	if len(res) != 1 || res[0].URI != anchoredURI || !res[0].IsEntry {
+		t.Fatalf("expected anchored data-source entry, got %+v", res)
+	}
+	if res[0].Line != 1 { // file-level :PARAMETERS on 1-based line 2
+		t.Errorf("expected entry line 1 (:PARAMETERS), got %d", res[0].Line)
+	}
+
+	// 1-part data-source targets resolve by basename (unlike dispatch).
+	res = wi.ResolveDataSourceTarget("Inventory")
+	if len(res) != 1 || res[0].URI != flatURI {
+		t.Fatalf("expected flat 1-part basename match, got %+v", res)
+	}
+}
+
+// [spec feature.cross_file_resolution/A17]
+func TestResolveDataSource_PartitionFromScripts(t *testing.T) {
+	wi, dir := newResolverIndex(t)
+	scriptURI := writeAndIndex(t, wi, dir, "Server Scripts/QUERIES/ORDERS.srvscr", helperScript)
+	dsURI := writeAndIndex(t, wi, dir, "Data Sources/QUERIES/ORDERS.ds", ordersDataSource)
+
+	// Dispatch and include resolution return only the script.
+	for _, res := range [][]IndexResolution{
+		wi.ResolveDispatchTarget("QUERIES.ORDERS"),
+		wi.ResolveIncludeTarget("QUERIES.ORDERS"),
+		wi.ResolveIncludeTarget("ORDERS"),
+	} {
+		if len(res) != 1 || res[0].URI != scriptURI {
+			t.Errorf("dispatch/include must return only the script, got %+v", res)
+		}
+	}
+
+	// Data-source resolution returns only the data source.
+	for _, res := range [][]IndexResolution{
+		wi.ResolveDataSourceTarget("QUERIES.ORDERS"),
+		wi.ResolveDataSourceTarget("ORDERS"),
+	} {
+		if len(res) != 1 || res[0].URI != dsURI {
+			t.Errorf("data-source resolution must return only the data source, got %+v", res)
+		}
+	}
+}
+
+// [spec feature.definition/A13]
+func TestHandleDefinition_RunDSTarget(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	dsURI := writeAndIndex(t, wi, dir, "Data Sources/QUERIES/ORDERS.ds", ordersDataSource)
+
+	source := `aRows := RunDS("QUERIES.ORDERS", {sStatus});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	result, err := s.handleDefinition(nil, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	loc, ok := result.(protocol.Location)
+	if !ok {
+		t.Fatalf("expected a single protocol.Location, got %T", result)
+	}
+	if string(loc.URI) != dsURI {
+		t.Errorf("expected location in %s, got %s", dsURI, loc.URI)
+	}
+	if loc.Range.Start.Line != 1 { // entry :PARAMETERS line
+		t.Errorf("expected line 1, got %d", loc.Range.Start.Line)
+	}
+
+	// A RunDS target resolving nowhere is null.
+	s.documents.SetDocument(testURI, `aRows := RunDS("NO.SUCHDS", {});`, 2)
+	s.documentVersion[testURI] = 2
+	result, err = s.handleDefinition(nil, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected null for unresolvable RunDS target, got %+v", result)
+	}
+}
+
+// [spec feature.hover/A14]
+func TestHandleHover_RunDSTarget(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Data Sources/QUERIES/ORDERS.ds", ordersDataSource)
+
+	source := `aRows := RunDS("QUERIES.ORDERS", {sStatus});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected RunDS data-source hover")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	for _, want := range []string{"QUERIES.ORDERS", "Data source", "sStatus"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("hover missing %q:\n%s", want, md)
+		}
+	}
+
+	// Unresolvable RunDS target keeps the string suppression (null).
+	s.documents.SetDocument(testURI, `aRows := RunDS("NO.SUCHDS", {});`, 2)
+	s.documentVersion[testURI] = 2
+	hover, err = s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Errorf("expected null hover for unresolvable RunDS target, got %+v", hover)
+	}
+}

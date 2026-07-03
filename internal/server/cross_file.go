@@ -30,6 +30,13 @@ func (r liveResolver) ResolveInclude(target string) []providers.ResolvedTarget {
 	return r.overlay(r.s.workspaceIndex.ResolveIncludeTarget(target))
 }
 
+func (r liveResolver) ResolveDataSource(target string) []providers.ResolvedTarget {
+	if r.s.workspaceIndex == nil {
+		return nil
+	}
+	return r.overlay(r.s.workspaceIndex.ResolveDataSourceTarget(target))
+}
+
 // overlay converts index resolutions to provider targets, re-deriving
 // positions from the live document cache for URIs that are currently open.
 func (r liveResolver) overlay(resolutions []IndexResolution) []providers.ResolvedTarget {
@@ -98,6 +105,23 @@ func (r liveResolver) dispatchHoverMarkdown(target string) string {
 		return ""
 	}
 	return r.renderResolutionHover(resolutions)
+}
+
+// dataSourceHoverMarkdown renders hover content for a RunDS target, or ""
+// when it does not resolve (feature.hover A14).
+func (r liveResolver) dataSourceHoverMarkdown(target string) string {
+	if r.s.workspaceIndex == nil {
+		return ""
+	}
+	resolutions := r.s.workspaceIndex.ResolveDataSourceTarget(target)
+	if len(resolutions) == 0 {
+		return ""
+	}
+	fs, ok := r.s.workspaceIndex.FileSymbolsFor(resolutions[0].URI)
+	if !ok {
+		return ""
+	}
+	return providers.RenderDataSourceHover(scriptDisplayName(fs), fs.EntryParameters, len(resolutions)-1)
 }
 
 // includeHoverMarkdown renders hover content for an :INCLUDE target, or "".

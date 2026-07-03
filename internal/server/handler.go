@@ -321,6 +321,19 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 				}
 			}
 		}
+		// RunDS target strings show the resolved data-source summary
+		// (feature.hover A14); like dispatch targets, unresolvable ones
+		// fall through to the string suppression.
+		if dst := providers.DataSourceTargetAt(content, line, column); dst != nil {
+			if md := (liveResolver{s}).dataSourceHoverMarkdown(dst.Raw); md != "" {
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
+						Value: md,
+					},
+				}, nil
+			}
+		}
 		// Inside a string - check for SQL placeholder hover
 		hover := providers.GetSQLPlaceholderHoverFromToken(cache.Tokens, line, column)
 		if hover != nil {
