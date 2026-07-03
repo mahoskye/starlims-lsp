@@ -16,6 +16,12 @@ history:
     note: >-
       Part of the original document formatter; tab default matches the
       style guide's tabs-preferred guidance.
+  - date: 2026-07-02
+    ref: "issue #36"
+    note: >-
+      Standalone comments are now indented at the enclosing block depth
+      like statements; previously the indent writer skipped comment tokens,
+      flushing every standalone comment to column 0.
 issues: ["#36"]
 ---
 
@@ -33,11 +39,12 @@ For line-length accounting a tab is counted as `indentSize` columns.
 Continuation lines inside an unclosed `(`/`{`/`[` get one fixed extra level
 (not proportional to nesting depth).
 
-Standalone comments are NOT indented: the formatter writes comment tokens
-without leading indentation, so a comment inside a block lands at column 0
-(actual behavior — see Known gaps). Content *inside* a multi-line comment is
-preserved verbatim (modulo trailing-whitespace trimming, see
-fmt.trim_trailing_whitespace).
+Standalone comments are indented at the enclosing block depth like
+statements. Only the first line of a multi-line comment is indented:
+content *inside* a multi-line comment is preserved verbatim (modulo
+trailing-whitespace trimming, see fmt.trim_trailing_whitespace).
+End-of-line comments stay attached to their statement's line and are not
+separately indented.
 
 ## Examples
 
@@ -67,14 +74,14 @@ sName := "y";
 :ENDPROC;
 ```
 
-A comment inside a procedure is written at column 0 even when the source
-indented it (actual behavior):
+A comment inside a procedure is indented with the code it sits in, even
+when the source left it at column 0:
 
 ### Before
 
 ```ssl
 :PROCEDURE Demo;
-	/* explains the assignment;
+/* explains the assignment;
 	nValue := 1;
 :ENDPROC;
 ```
@@ -83,7 +90,7 @@ indented it (actual behavior):
 
 ```ssl
 :PROCEDURE Demo;
-/* explains the assignment;
+	/* explains the assignment;
 	nValue := 1;
 :ENDPROC;
 ```
@@ -106,28 +113,7 @@ fences above run with the default tab style):
 Tabs-by-default matches the style guide's indentation guidance while
 letting space-standardized teams configure width (style_only). The fixed
 single-level continuation indent follows the schema's
-`continuation_indent: 1`.
-
-## Known gaps
-
-- Standalone comments should be indented with the code they sit in;
-  today `writeIndentIfNeeded` skips comment tokens entirely, flushing every
-  standalone comment to column 0.
-
-### Before
-
-```ssl expect=fail
-:PROCEDURE Demo;
-	/* explains the assignment;
-	nValue := 1;
-:ENDPROC;
-```
-
-### After
-
-```ssl
-:PROCEDURE Demo;
-	/* explains the assignment;
-	nValue := 1;
-:ENDPROC;
-```
+`continuation_indent: 1`. Until issue #36 the indent writer skipped comment
+tokens entirely, flushing standalone comments to column 0; comments
+document the code they sit next to, so they take the same block indent as
+statements.
