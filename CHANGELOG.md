@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-02
+
+The behavior-catalog release: every diagnostic rule, LSP feature
+contract, and formatter decision now has exactly one normative entry
+under `catalog/`, enforced by executable specs in `go test ./...`.
+When code and catalog disagree, the build fails. The full 118-entry
+review surfaced and fixed the issues below (#25-#48).
+
+### Added
+- **Behavior catalog** (`catalog/`): one entry per behavior with
+  machine-checked frontmatter, executable Flags/Does-not-flag fences
+  run through the real diagnostics pipeline, formatter Before/After
+  golden pairs, and feature acceptance criteria traced to Go tests via
+  `[spec <id>/A<n>]` tags. Cross-cutting decisions in
+  `catalog/DECISIONS.md`; generated `docs/reference/DIAGNOSTICS.md`
+  and `docs/STATUS.md` are staleness-checked.
+- **`region_end_mismatch` diagnostic** (warning): flags a
+  `/* endregion;` with no open `/* region;` to close — previously the
+  orphan marker was silently ignored while folding mis-paired.
+- **`ssl.diagnostics.unusedVariables` setting** (#48): the opt-in
+  unused_variable check was only reachable programmatically; it now
+  has a client-facing toggle.
+- **Constructor signature help over LSP** (#40): `Email{` now serves
+  the class's constructor signatures on the wired token-based path;
+  the dead text-based entry point was deleted.
+- **DoProc/ExecFunction array parameter hints** (#46): a lone
+  string-literal first argument resolving to a same-file procedure
+  hints the argument-array elements with that procedure's parameter
+  names — previously documented but stubbed.
+- **Orphaned-prose comment signal** (#25): a terminated `/*` comment
+  followed (no paragraph break) by a line starting with two adjacent
+  bare identifiers — the signature of comment prose stranded as code —
+  now warns, covering both multi-line comments and a `;` on the
+  comment's first line. All settled issue-#6 false-positive guards
+  preserved.
+- **CI workflow** (#29): gofmt, vet, and the full test suite (catalog
+  conformance included) on every push and PR.
+
+### Fixed
+- **Folding** (#26, #27): unclosed `:PROCEDURE` folds to end of file
+  like other unclosed blocks (was a degenerate single-line range);
+  single-line procedures and region pairs produce no range. Region
+  pairing semantics confirmed: the canonical closer `/* endregion;`
+  takes no name and closes the innermost open region (LIFO); trailing
+  text on a closer is prose.
+- **`include_in_procedure` mis-tag** (#30): the in-procedure
+  `:INCLUDE` check emitted `include_early`'s code, making the two
+  situations inseparable in `ssl.diagnostics.rules`.
+- **Member-access false positives** (#32): `oSvc:Email(...)` no longer
+  flags `class_instantiation_curly`; `oObj:Me` no longer flags
+  `me_outside_class` — identifiers preceded by member-access `:` are
+  member names.
+- **Definition** (#41): the scope fallback no longer surfaces another
+  procedure's local for an out-of-scope name.
+- **References** (#42, #43): `includeDeclaration: false` is honored
+  from use sites, not just the declaration line; matches no longer
+  leak into comments or unrelated string literals. DoProc/ExecFunction
+  dispatch strings remain matches (and rename keeps updating them —
+  now normative).
+- **Document symbols** (#44): `selectionRange` covers exactly the
+  procedure name, not the `:PROCEDURE ` keyword prefix.
+- **Workspace symbols** (#45): open `:CLASS` documents report their
+  procedures as Method (6), matching the index's classification.
+- **Formatter** (#33-#39): blank lines between procedures normalize to
+  the configured count instead of accumulating, and land above an
+  attached doc comment instead of detaching it; `builtinFunctionCase`
+  no longer rewrites inside strings and comments; space before a comma
+  is removed; standalone comments indent to block depth instead of
+  column 0; `maxConsecutiveBlankLines: 0` actually preserves source
+  blank runs; the final statement at EOF gets its semicolon;
+  `trimTrailingWhitespace: false` is honored.
+- **Signature help**: commas inside an array-literal argument no
+  longer advance the enclosing call's active parameter index.
+- **`scientific_notation` fix-it** (#47): suggestions no longer
+  reproduce invalid explicit `+` exponent signs (`9E+1` now suggests
+  `9.0E1`).
+
+### Removed
+- **`region_legacy` diagnostic** (#28): its premise was wrong —
+  `:REGION`/`:ENDREGION` are current, supported SSL (GetRegion body
+  capture); the construct the style guide dropped was C#-style
+  `#region`. Any `ssl.diagnostics.rules` override for the slug becomes
+  a harmless no-op.
+- **Three never-implemented diagnostic codes** (#31):
+  `identifier_too_short` (would contradict the style guide's blessing
+  of loop counters), `return_from_constructor` (covered by
+  `constructor_return_value`; bare `:RETURN;` is legal),
+  `inherit_qualified_name` (the schema accepts both base-name forms —
+  nothing to flag). Catalog entries preserved as `status: removed`.
+
 ## [0.7.7] - 2026-05-13
 
 Picks up the ssl-style-guide changes from upstream commit `386d57e`
