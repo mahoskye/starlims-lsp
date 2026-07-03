@@ -863,47 +863,28 @@ comment block ;
 // ==================== Signature Help Tests ====================
 
 func TestGetSignatureHelp_KnownFunction(t *testing.T) {
-	// Test with a function that should be in the signatures
 	text := `result := Len(`
+	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelp(text, 1, 14)
-	// Note: This test depends on Len being in the function signatures
-	if help != nil {
-		if len(help.Signatures) == 0 {
-			t.Error("expected at least one signature")
-		}
-		t.Logf("Signature: %s", help.Signatures[0].Label)
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		t.Fatal("expected signature help for Len(")
+	}
+	if len(help.Signatures) == 0 {
+		t.Error("expected at least one signature")
 	}
 }
 
 func TestGetSignatureHelp_ActiveParameter(t *testing.T) {
-	// Test that active parameter is tracked correctly
 	text := `result := SubStr("hello", 1, `
+	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelp(text, 1, 29)
-	if help != nil {
-		if help.ActiveParameter != 2 { // 0-indexed, third parameter
-			t.Errorf("expected active parameter 2, got %d", help.ActiveParameter)
-		}
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		t.Fatal("expected signature help for SubStr")
 	}
-}
-
-func TestGetSignatureHelp_NestedCalls(t *testing.T) {
-	// Nested function calls - the implementation scans backwards from cursor
-	// so it finds the innermost function at the cursor position
-	text := `result := Len(Trim(`
-
-	help := GetSignatureHelp(text, 1, 19)
-	if help != nil {
-		// The implementation may return either the inner or outer function
-		// depending on how the context scanning works
-		if len(help.Signatures) > 0 {
-			t.Logf("Nested call signature: %s", help.Signatures[0].Label)
-			// Verify we got a valid signature
-			if help.Signatures[0].Label == "" {
-				t.Error("expected non-empty signature label")
-			}
-		}
+	if help.ActiveParameter != 2 { // 0-indexed, third parameter
+		t.Errorf("expected active parameter 2, got %d", help.ActiveParameter)
 	}
 }
 
@@ -1049,6 +1030,49 @@ func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
 	}
 	if help.ActiveParameter != 0 {
 		t.Errorf("expected activeParameter 0, got %d", help.ActiveParameter)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_ConstructorContext: signature help
+// inside `Email{` returns the class's constructor signatures on the wired
+// token-based path (issue #40). [spec feature.signature_help/A8]
+func TestGetSignatureHelpWithProcedures_ConstructorContext(t *testing.T) {
+	text := `oMail := Email{`
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		t.Fatal("expected constructor signature help for Email{")
+	}
+	if len(help.Signatures) == 0 {
+		t.Fatal("expected at least one constructor signature")
+	}
+	for _, sig := range help.Signatures {
+		if !strings.Contains(strings.ToLower(sig.Label), "email") {
+			t.Errorf("expected Email constructor label, got %q", sig.Label)
+		}
+	}
+	if help.ActiveParameter != 0 {
+		t.Errorf("expected activeParameter 0, got %d", help.ActiveParameter)
+	}
+}
+
+// TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount: commas
+// inside an array literal argument belong to the literal, not the enclosing
+// call's parameter index (fixed alongside issue #40's brace handling).
+func TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount(t *testing.T) {
+	// Cursor inside the array literal: the enclosing DoProc is at its
+	// second argument (one top-level comma), not its fourth.
+	text := `DoProc("Calc", {1, 2, `
+	tokens := tokenizeForSignatureHelp(t, text)
+
+	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	if help == nil {
+		// DoProc is a built-in dispatch function with a signature.
+		t.Fatal("expected signature help for DoProc")
+	}
+	if help.ActiveParameter != 1 {
+		t.Errorf("expected activeParameter 1 (array is one argument), got %d", help.ActiveParameter)
 	}
 }
 
