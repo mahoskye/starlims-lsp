@@ -299,6 +299,23 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	// Check if we're inside a string or comment
 	ctx := lexer.GetContextAtPosition(cache.Tokens, line, column)
 	if ctx == lexer.ContextString {
+		// Dispatch-target strings are the second string-hover exception
+		// (after SQL placeholders): a dotted DoProc/ExecFunction target
+		// that resolves cross-file shows the target's signature. A
+		// dispatch string is never an SQL string, so checking first is
+		// safe; unresolvable targets fall through to the suppression.
+		if isDoProcStringContext(cache.Tokens, line, column) {
+			if dt := providers.DispatchTargetAt(content, line, column); dt != nil && len(dt.Parts) >= 2 {
+				if md := (liveResolver{s}).dispatchHoverMarkdown(dt.Raw); md != "" {
+					return &protocol.Hover{
+						Contents: protocol.MarkupContent{
+							Kind:  protocol.MarkupKindMarkdown,
+							Value: md,
+						},
+					}, nil
+				}
+			}
+		}
 		// Inside a string - check for SQL placeholder hover
 		hover := providers.GetSQLPlaceholderHoverFromToken(cache.Tokens, line, column)
 		if hover != nil {
@@ -314,6 +331,18 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	} else if ctx == lexer.ContextComment {
 		// Inside a comment - return no hover
 		return nil, nil
+	}
+
+	// :INCLUDE targets hover with the resolved script's summary.
+	if it := providers.IncludeTargetAt(cache.Tokens, line, column); it != nil {
+		if md := (liveResolver{s}).includeHoverMarkdown(it.Raw); md != "" {
+			return &protocol.Hover{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.MarkupKindMarkdown,
+					Value: md,
+				},
+			}, nil
+		}
 	}
 
 	var hover *providers.Hover

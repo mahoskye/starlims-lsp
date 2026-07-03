@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"starlims-lsp/internal/providers"
@@ -315,5 +316,125 @@ func TestHandleReferences_StaySingleFileWithWorkspaceIndex(t *testing.T) {
 		if string(ref.URI) != testURI {
 			t.Errorf("references must stay single-file, got location in %s", ref.URI)
 		}
+	}
+}
+
+// [spec feature.hover/A10]
+func TestHandleHover_CrossFileDispatchProcedure(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", `/*
+ * Description: Multiplies quantity by price.
+;
+:PROCEDURE CalculateTotal;
+:PARAMETERS nQty, nPrice;
+:ENDPROC;`)
+
+	source := `result := ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 30},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected cross-file dispatch hover")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	for _, want := range []string{"CalculateTotal", "LIMS_UTILS.HELPERS", "Multiplies quantity by price.", "nQty"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("hover missing %q:\n%s", want, md)
+		}
+	}
+}
+
+// [spec feature.hover/A11]
+func TestHandleHover_CrossFileEntryPoint(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	source := `result := ExecFunction("LIMS_UTILS.HELPERS", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 28},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected entry-point hover")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	for _, want := range []string{"LIMS_UTILS.HELPERS", "entry point", "sMode"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("hover missing %q:\n%s", want, md)
+		}
+	}
+}
+
+// [spec feature.hover/A12]
+func TestHandleHover_IncludeTarget(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/SHAREDLIB.srvscr", helperScript)
+
+	source := `:INCLUDE SharedLib;`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 12},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected include hover")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	if !strings.Contains(md, "LIMS_UTILS.SHAREDLIB") {
+		t.Errorf("hover missing script identity:\n%s", md)
+	}
+}
+
+// [spec feature.hover/A13]
+func TestHandleHover_UnresolvableDispatchStaysNull(t *testing.T) {
+	s := NewSSLServer()
+	wi, _ := newResolverIndex(t)
+	s.workspaceIndex = wi
+
+	source := `result := ExecFunction("No.Such.Target", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 28},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Errorf("expected null hover for unresolvable target, got %+v", hover)
 	}
 }

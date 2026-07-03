@@ -34,6 +34,12 @@ history:
     note: Request/Response endpoint ambients get documentation hover in files
       recognized as endpoints (ssl.diagnostics.endpointPatterns or docblock
       Endpoint marker).
+  - date: 2026-07-03
+    ref: "feature.cross_file_resolution"
+    note: >-
+      Cross-file hover added for dispatch-target strings (second
+      string-context exception after SQL placeholders) and :INCLUDE
+      paths. Same-file hover output unchanged.
 issues: []
 ---
 
@@ -54,14 +60,27 @@ issues: []
 - Variable hover MUST show the declaration location and scope.
 - Lookup MUST be case-insensitive (`sqlexecute` resolves to `SQLExecute`).
 - Hover MUST NOT activate inside comments, and MUST NOT activate for general
-  symbols inside string literals. The only string-context hover is SQL
-  placeholders: named `?varName?` (SQLExecute only) shows the parameter name
-  and runtime-substitution note; positional `?` shows its 1-based position.
+  symbols inside string literals. String-context hover has exactly two
+  exceptions: SQL placeholders — named `?varName?` (SQLExecute only) shows
+  the parameter name and runtime-substitution note, positional `?` shows
+  its 1-based position — and dotted DoProc/ExecFunction dispatch targets
+  that resolve through the workspace resolver
+  (feature.cross_file_resolution), which show the target procedure's
+  signature/docblock with a "defined in" origin, or the target script's
+  entry-point summary for 2-part targets. An unresolvable dispatch target
+  falls through to the normal string suppression (null).
 - In endpoint files (matched via `ssl.diagnostics.endpointPatterns` or a
   leading `Endpoint:` docblock marker), `Request` and `Response` MUST hover
   with their ambient documentation; in non-endpoint files they get no
   special hover.
 - When no information exists for the position, the response MUST be null.
+
+- Hovering an `:INCLUDE` statement (keyword or path) shows the resolved
+  script's summary (identity, entry parameters, procedure count) when the
+  workspace resolver finds it; unresolvable includes hover as before
+  (word-based fallthrough or null). Ambiguous resolutions show the first
+  candidate plus a match count — choosing between candidates is
+  go-to-definition's job.
 
 ## Acceptance
 
@@ -74,6 +93,10 @@ issues: []
 - A7: Given `x := "SQLExecute is a function";` or a comment `/* SQLExecute would be here;`, when the user hovers over `SQLExecute` inside the string or comment, then no hover is returned (null) — general symbol hover must not fire in either context.
 - A8: Given a plain undeclared identifier with no known information, when the user hovers over it, then the response is null rather than an empty or fabricated hover.
 - A9: Given a file recognized as an endpoint script, when the user hovers over `Request` or `Response`, then their endpoint-ambient documentation is shown; a file with no endpoint signal is not classified as an endpoint, so the ambients get no special hover there.
+- A10: Given `ExecFunction("Cat.Script.Proc")` where the workspace resolves the procedure, when the user hovers inside the target string, then the hover shows the procedure's signature/docblock and names the defining script.
+- A11: Given `ExecFunction("Cat.Script")` resolving to a script, when the user hovers inside the string, then the hover shows the script's entry-point summary (entry :PARAMETERS).
+- A12: Given `:INCLUDE SharedLib;` resolving to a workspace file, when the user hovers the include path, then the hover shows the resolved script's summary.
+- A13: Given a dispatch-target string that resolves nowhere, when the user hovers inside it, then the response is null — the string suppression (A7) holds.
 
 ## Rationale
 
@@ -96,5 +119,7 @@ scripts, so hover follows the same file classification.
   §4.4). Acceptable under the null-when-unknown rule, but member hover for
   shape-inferred UDObject variables would be consistent with completion's
   shape inference; candidate for the cross-file/index work.
-- `:INCLUDE`d and cross-file procedures get no hover; same-file only until
-  cross-file navigation lands on the workspace index.
+- Cross-file hover covers dispatch strings and `:INCLUDE` paths; a bare
+  identifier that happens to be defined in another workspace file still
+  gets no hover (word-based hover stays same-file — deliberate, to avoid
+  guessing on plain words).

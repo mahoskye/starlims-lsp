@@ -75,3 +75,85 @@ func (r liveResolver) overlay(resolutions []IndexResolution) []providers.Resolve
 	}
 	return out
 }
+
+// scriptDisplayName renders a file's identity for hover panels:
+// "Category.Script" when the category is known, else the bare script name.
+func scriptDisplayName(fs *FileSymbols) string {
+	if fs.Category != "" {
+		return fs.Category + "." + fs.ScriptName
+	}
+	return fs.ScriptName
+}
+
+// dispatchHoverMarkdown renders hover content for a dotted dispatch target,
+// or "" when the target does not resolve (the caller falls through to the
+// normal string-hover suppression). Ambiguity shows the first candidate
+// plus a count — go-to-definition is where multi-candidate UX lives.
+func (r liveResolver) dispatchHoverMarkdown(target string) string {
+	if r.s.workspaceIndex == nil {
+		return ""
+	}
+	resolutions := r.s.workspaceIndex.ResolveDispatchTarget(target)
+	if len(resolutions) == 0 {
+		return ""
+	}
+	return r.renderResolutionHover(resolutions)
+}
+
+// includeHoverMarkdown renders hover content for an :INCLUDE target, or "".
+func (r liveResolver) includeHoverMarkdown(target string) string {
+	if r.s.workspaceIndex == nil {
+		return ""
+	}
+	resolutions := r.s.workspaceIndex.ResolveIncludeTarget(target)
+	if len(resolutions) == 0 {
+		return ""
+	}
+	return r.renderResolutionHover(resolutions)
+}
+
+func (r liveResolver) renderResolutionHover(resolutions []IndexResolution) string {
+	first := resolutions[0]
+	extra := len(resolutions) - 1
+
+	fs, ok := r.s.workspaceIndex.FileSymbolsFor(first.URI)
+	if !ok {
+		return ""
+	}
+	display := scriptDisplayName(fs)
+
+	if first.IsEntry {
+		return providers.RenderScriptEntryHover(display, fs.EntryParameters, fs.IsClass, len(fs.Procedures), extra)
+	}
+
+	// Prefer the live buffer's procedure data for open documents.
+	openURIs := r.s.documents.OpenURIs()
+	if _, open := openURIs[first.URI]; open {
+		cache := r.s.documents.ParseDocument(first.URI, r.s.documentVersion[first.URI])
+		for _, proc := range cache.Procedures {
+			if strings.EqualFold(proc.Name, first.ProcName) {
+				return providers.RenderCrossFileProcedureHover(providers.WorkspaceProcInfo{
+					Name:       proc.Name,
+					Parameters: proc.Parameters,
+					Doc:        proc.Doc,
+					StartLine:  proc.StartLine,
+					EndLine:    proc.EndLine,
+				}, display, extra)
+			}
+		}
+		return ""
+	}
+
+	for _, proc := range fs.Procedures {
+		if strings.EqualFold(proc.Name, first.ProcName) {
+			return providers.RenderCrossFileProcedureHover(providers.WorkspaceProcInfo{
+				Name:       proc.Name,
+				Parameters: proc.Parameters,
+				Doc:        proc.Doc,
+				StartLine:  proc.StartLine,
+				EndLine:    proc.EndLine,
+			}, display, extra)
+		}
+	}
+	return ""
+}
