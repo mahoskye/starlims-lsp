@@ -534,8 +534,14 @@ func getProcedureHover(word string, procedures []parser.ProcedureInfo) *Hover {
 // renderProcedureHover formats a hover panel for a script procedure, weaving
 // in any docblock-derived description / parameter docs / return doc.
 func renderProcedureHover(proc parser.ProcedureInfo) string {
+	return renderProcedureHoverWithOrigin(proc, "*Procedure defined in this file*")
+}
+
+// renderProcedureHoverWithOrigin is renderProcedureHover with the origin
+// line parameterized so cross-file hovers can name the defining script.
+func renderProcedureHoverWithOrigin(proc parser.ProcedureInfo, origin string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "**%s**\n\n*Procedure defined in this file*", proc.Name)
+	fmt.Fprintf(&b, "**%s**\n\n%s", proc.Name, origin)
 
 	if proc.Doc.Description != "" {
 		fmt.Fprintf(&b, "\n\n%s", proc.Doc.Description)
@@ -807,4 +813,62 @@ func getOrdinal(n int) string {
 		}
 	}
 	return fmt.Sprintf("%d%s", n, suffix)
+}
+
+// WorkspaceProcInfo is the provider-side view of an indexed procedure for
+// cross-file hover/completion rendering (providers cannot see the server's
+// index types).
+type WorkspaceProcInfo struct {
+	Name       string
+	Parameters []string
+	Doc        parser.ProcedureDoc
+	StartLine  int
+	EndLine    int
+}
+
+// RenderCrossFileProcedureHover renders hover for a procedure defined in
+// another workspace script. scriptDisplay is "Category.Script" when the
+// category is known, else the bare script name; extra is the count of
+// additional ambiguous matches (0 for a unique resolution).
+func RenderCrossFileProcedureHover(p WorkspaceProcInfo, scriptDisplay string, extra int) string {
+	proc := parser.ProcedureInfo{
+		Name:       p.Name,
+		Parameters: p.Parameters,
+		Doc:        p.Doc,
+		StartLine:  p.StartLine,
+		EndLine:    p.EndLine,
+	}
+	origin := fmt.Sprintf("*Procedure defined in `%s`*", scriptDisplay)
+	out := renderProcedureHoverWithOrigin(proc, origin)
+	if extra > 0 {
+		out += fmt.Sprintf("\n\n*+%d other match(es) — use go-to-definition to choose*", extra)
+	}
+	return out
+}
+
+// RenderScriptEntryHover renders hover for a 2-part dispatch target or an
+// :INCLUDE resolving to a script's entry point.
+func RenderScriptEntryHover(scriptDisplay string, entryParams []string, isClass bool, procCount, extra int) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**\n\n", scriptDisplay)
+	if isClass {
+		b.WriteString("*Class script*")
+	} else {
+		b.WriteString("*Script entry point*")
+	}
+	if len(entryParams) > 0 {
+		b.WriteString("\n\n**Parameters:**")
+		for _, name := range entryParams {
+			fmt.Fprintf(&b, "\n- `%s`", name)
+		}
+	} else {
+		b.WriteString("\n\n*No entry parameters*")
+	}
+	if procCount > 0 {
+		fmt.Fprintf(&b, "\n\n%d procedure(s)", procCount)
+	}
+	if extra > 0 {
+		fmt.Fprintf(&b, "\n\n*+%d other match(es) — use go-to-definition to choose*", extra)
+	}
+	return b.String()
 }
