@@ -144,15 +144,13 @@ sResult := Upper(sInput);
 :ENDPROC;
 ```
 
-Valid runtime dispatch still uses `DoProc("CalcTotal")` or `ExecFunction(...)`, and those string targets are not rewritten by the current rename provider.
+Valid runtime dispatch uses `DoProc("CalcTotal")` or `ExecFunction(...)`, and those first-argument string targets are rewritten too — leaving `DoProc("CalcTotal")` behind would silently break the call. Unrelated strings and comments that merely mention the old name are left untouched.
 
 ## Known Limitations
 
 | Limitation | Description |
 |------------|-------------|
 | Single-file only | Cannot rename across multiple files |
-| String content | May incorrectly rename matching text inside strings (uses text-based search) |
-| DoProc/ExecFunction | String arguments in `DoProc("ProcName")` are not updated |
 | No preview | Some editors show preview; depends on client support |
 
 ## Error Cases

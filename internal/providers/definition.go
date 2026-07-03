@@ -3,6 +3,7 @@ package providers
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -140,11 +141,14 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 	scopeEnd := len(lines)
 	isLocalScope := false
 
+	// Find which procedure contains the cursor position
+	var cursorProc *parser.ProcedureInfo
+	if procedures != nil {
+		cursorProc = parser.FindProcedureAtLine(procedures, line)
+	}
+
 	// Check if this is a local/parameter variable (scoped to a procedure)
 	if procedures != nil && variables != nil {
-		// Find which procedure contains the cursor position
-		cursorProc := parser.FindProcedureAtLine(procedures, line)
-
 		if cursorProc != nil {
 			// Check if this word is a local/parameter variable in this procedure
 			for _, v := range variables {
@@ -169,14 +173,17 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 	// Simple text-based search for the word
 	wordRegex := regexp.MustCompile(`(?i)\b` + escapeRegex(word) + `\b`)
 
-	// Find the declaration position
-	var declarationLine, declarationChar int
-	declarationFound := false
+	// Resolve the declaration position from the parsed symbol info so it can
+	// be excluded under includeDeclaration=false regardless of where the
+	// request originated (issue #42).
+	declarationLine, declarationChar, declarationFound := resolveDeclarationPosition(
+		wordLower, wordRegex, lines, procedures, variables, cursorProc)
 
-	// Check if the cursor position is on a declaration keyword line
-	if line > 0 && line <= len(lines) {
-		cursorLineText := lines[line-1]
-		cursorLineLower := strings.ToLower(cursorLineText)
+	// Fallback: without parsed symbol info (or when the symbol has no known
+	// declaration), keep the original cursor-line heuristic — the declaration
+	// is only detected when the request position sits on it.
+	if !declarationFound && line > 0 && line <= len(lines) {
+		cursorLineLower := strings.ToLower(lines[line-1])
 		// Declaration keywords that indicate this is the definition site
 		if strings.Contains(cursorLineLower, ":declare") ||
 			strings.Contains(cursorLineLower, ":parameters") ||
@@ -186,6 +193,19 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 			declarationChar = column - 1
 			declarationFound = true
 		}
+	}
+
+	// Tokenize once so each text match can be classified: matches inside
+	// comments and non-dispatch strings are not references (issue #43).
+	tokens := lexer.NewLexer(text).Tokenize()
+
+	// Rune offset of the start of each line within text (tokens carry rune
+	// offsets, while regex matches are byte offsets within a line).
+	lineStartOffsets := make([]int, len(lines))
+	runeOffset := 0
+	for i, lineText := range lines {
+		lineStartOffsets[i] = runeOffset
+		runeOffset += utf8.RuneCountInString(lineText) + 1 // +1 for the split '\n'
 	}
 
 	for i, lineText := range lines {
@@ -206,6 +226,14 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 				}
 			}
 
+			// Skip matches inside comments and non-dispatch strings; keep
+			// DoProc/ExecFunction first-argument dispatch targets (issue #43).
+			matchOffset := lineStartOffsets[i] + utf8.RuneCountInString(lineText[:match[0]])
+			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
+			if !isReferenceMatch(tokens, matchOffset, matchLen) {
+				continue
+			}
+
 			locations = append(locations, Location{
 				URI: uri,
 				Range: Range{
@@ -217,6 +245,125 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 	}
 
 	return locations
+}
+
+// resolveDeclarationPosition locates the symbol's declaration from the parsed
+// procedures/variables (0-based line, byte column within the line). Scope
+// precedence mirrors FindDefinition: local/parameter in the cursor's
+// procedure, then public, then any declared variable. Returns found=false
+// when the symbol has no known declaration or no symbol info was provided.
+func resolveDeclarationPosition(wordLower string, wordRegex *regexp.Regexp, lines []string, procedures []parser.ProcedureInfo, variables []parser.VariableInfo, cursorProc *parser.ProcedureInfo) (int, int, bool) {
+	// Procedure declaration: the name on its :PROCEDURE line.
+	for _, proc := range procedures {
+		if strings.ToLower(proc.Name) != wordLower {
+			continue
+		}
+		declLine := proc.StartLine - 1
+		if declLine < 0 || declLine >= len(lines) {
+			return 0, 0, false
+		}
+		if m := wordRegex.FindStringIndex(lines[declLine]); m != nil {
+			return declLine, m[0], true
+		}
+		return declLine, 0, true
+	}
+
+	match := func(v parser.VariableInfo) (int, int, bool) {
+		return v.Line - 1, v.Column - 1, true
+	}
+
+	// Local/parameter variable declared in the cursor's procedure.
+	if cursorProc != nil {
+		for _, v := range variables {
+			if strings.ToLower(v.Name) == wordLower &&
+				(v.Scope == parser.ScopeLocal || v.Scope == parser.ScopeParameter) &&
+				v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine {
+				return match(v)
+			}
+		}
+	}
+
+	// Public variable.
+	for _, v := range variables {
+		if strings.ToLower(v.Name) == wordLower && v.Scope == parser.ScopePublic {
+			return match(v)
+		}
+	}
+
+	// Fallback: any declared variable.
+	for _, v := range variables {
+		if strings.ToLower(v.Name) == wordLower {
+			return match(v)
+		}
+	}
+
+	return 0, 0, false
+}
+
+// isReferenceMatch reports whether a whole-word text match (rune offset and
+// rune length within the document) is a real reference. Matches inside
+// comment tokens never are; matches inside string tokens only count when the
+// string is the first argument of DoProc/ExecFunction and the match spans the
+// entire string content — the dispatch-target case (feature.references/A7).
+// Matches in code (including code blocks) always count. (issue #43)
+func isReferenceMatch(tokens []lexer.Token, matchOffset, matchLen int) bool {
+	for i := range tokens {
+		tok := &tokens[i]
+		if tok.Type == lexer.TokenEOF || tok.Offset > matchOffset {
+			break
+		}
+		if matchOffset >= tok.Offset+utf8.RuneCountInString(tok.Text) {
+			continue
+		}
+		switch tok.Type {
+		case lexer.TokenComment:
+			return false
+		case lexer.TokenString:
+			return isDispatchTargetMatch(tokens, i, matchOffset, matchLen)
+		default:
+			return true
+		}
+	}
+	return true
+}
+
+// isDispatchTargetMatch reports whether the match inside the string token at
+// stringIdx is a DoProc/ExecFunction dispatch target: the string must be the
+// first argument of a DoProc/ExecFunction call and the match must cover the
+// whole string content (a string merely mentioning the name is not a call).
+func isDispatchTargetMatch(tokens []lexer.Token, stringIdx, matchOffset, matchLen int) bool {
+	tok := tokens[stringIdx]
+	runes := []rune(tok.Text)
+
+	// Properly quoted, non-empty string ("..." or '...'); bracket strings are
+	// not legal dispatch syntax.
+	if len(runes) < 3 || (runes[0] != '"' && runes[0] != '\'') || runes[len(runes)-1] != runes[0] {
+		return false
+	}
+
+	// The match must be the entire string content.
+	if matchOffset != tok.Offset+1 || matchLen != len(runes)-2 {
+		return false
+	}
+
+	// Walk back: the string must directly follow "(" which follows a
+	// DoProc/ExecFunction identifier.
+	i := stringIdx - 1
+	for i >= 0 && (tokens[i].Type == lexer.TokenWhitespace || tokens[i].Type == lexer.TokenComment) {
+		i--
+	}
+	if i < 0 || tokens[i].Type != lexer.TokenPunctuation || tokens[i].Text != "(" {
+		return false
+	}
+	i--
+	for i >= 0 && (tokens[i].Type == lexer.TokenWhitespace || tokens[i].Type == lexer.TokenComment) {
+		i--
+	}
+	if i < 0 || tokens[i].Type != lexer.TokenIdentifier {
+		return false
+	}
+	name := strings.ToLower(tokens[i].Text)
+	return name == "doproc" || name == "execfunction"
 }
 
 // escapeRegex escapes special regex characters.
