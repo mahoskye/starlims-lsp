@@ -88,7 +88,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
 | `region_end_mismatch` | Region end marker does not match an open region | warning | tool | planned | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
-| `region_legacy` | REGION keyword flagged as legacy (disputed) | info | tool | active | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
+| `region_legacy` | REGION keyword flagged as legacy (removed — premise was wrong) | info | tool | removed | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
 | `return_from_constructor` | Return from constructor (dead code — never emitted) | warning | tool | draft | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
 | `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |

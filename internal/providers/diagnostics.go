@@ -243,7 +243,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkClassReferenceForms(tokens)...)
 	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
-	diagnostics = append(diagnostics, checkRegionLegacyWarning(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
 
@@ -5070,30 +5069,6 @@ func checkStepSpacing(tokens []lexer.Token) []Diagnostic {
 				Message:  "':STEP' should have a space before it: ':FOR i := 1 :TO 10 :STEP 2;'",
 				Source:   "ssl-lsp",
 				Code:     CodeStepSpacing,
-			})
-		}
-	}
-
-	return diagnostics
-}
-
-// checkRegionLegacyWarning warns when :REGION/:ENDREGION is used (legacy functional construct).
-// Source of truth: ssl_agent_instructions.md gotcha #22.
-func checkRegionLegacyWarning(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-
-	for _, token := range tokens {
-		if token.Type != lexer.TokenKeyword {
-			continue
-		}
-		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-		if normalized == "REGION" || normalized == "ENDREGION" {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("':%s' is a legacy functional construct that captures body text for GetRegion(). For IDE code folding and grouping, prefer '/* region' / '/* endregion' comments instead.", normalized),
-				Source:   "ssl-lsp",
-				Code:     CodeRegionLegacy,
 			})
 		}
 	}

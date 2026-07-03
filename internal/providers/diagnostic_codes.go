@@ -115,7 +115,6 @@ const (
 	CodeNestedIif                   = "nested_iif"
 	CodeNegativeLogic               = "negative_logic"
 	CodeStepSpacing                 = "step_spacing"
-	CodeRegionLegacy                = "region_legacy"
 	CodeCodeBlockStructure          = "code_block_structure"
 	CodeBuilderDirectiveCase        = "builder_directive_case"
 	CodeIdentifierTooLong           = "identifier_too_long"
