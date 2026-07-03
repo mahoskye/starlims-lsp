@@ -324,6 +324,8 @@ func TestParser_ExtractProcedures_NonDocCommentStillAttachesGracefully(t *testin
 }
 
 func TestParser_ExtractProcedures_NoEndproc(t *testing.T) {
+	// An unclosed procedure extends to the end of the file, like other
+	// unclosed blocks (starlims-lsp #27, spec feature.folding/A4).
 	input := `:PROCEDURE Test;
 value := 1;`
 
@@ -334,8 +336,8 @@ value := 1;`
 		t.Fatalf("expected 1 procedure, got %d", len(procedures))
 	}
 	proc := procedures[0]
-	if proc.EndLine != 1 {
-		t.Errorf("expected end line 1 for unclosed procedure, got %d", proc.EndLine)
+	if proc.EndLine != 2 {
+		t.Errorf("expected unclosed procedure to extend to last line 2, got %d", proc.EndLine)
 	}
 }
 

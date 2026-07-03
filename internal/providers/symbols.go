@@ -244,7 +244,7 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 	// Match region comments, handling optional trailing semicolon and whitespace.
 	// SSL comments are: /* comment text ;
 	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
-	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion`)
+	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b\s*(.*?)$`)
 
 	for _, token := range tokens {
 		if token.Type != lexer.TokenEOF && token.Line > lastLine {
@@ -266,8 +266,9 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 				continue
 			}
 
-			if regionEndPattern.MatchString(text) {
-				events = append(events, regionEvent{Line: token.Line, IsStart: false})
+			if matches := regionEndPattern.FindStringSubmatch(text); matches != nil {
+				name := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(matches[1]), ";"))
+				events = append(events, regionEvent{Line: token.Line, Name: name, IsStart: false})
 			}
 		}
 	}
@@ -295,8 +296,26 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 			continue
 		}
 
-		start := regionStack[len(regionStack)-1]
-		regionStack = regionStack[:len(regionStack)-1]
+		// A named endregion closes the innermost open region with a matching
+		// name (case-insensitive); if no open region matches, it closes
+		// nothing (surfaced by diag.region_end_mismatch). A bare endregion
+		// closes the innermost open region.
+		matchIdx := len(regionStack) - 1
+		if event.Name != "" {
+			matchIdx = -1
+			for i := len(regionStack) - 1; i >= 0; i-- {
+				if strings.EqualFold(regionStack[i].name, event.Name) {
+					matchIdx = i
+					break
+				}
+			}
+			if matchIdx == -1 {
+				continue
+			}
+		}
+
+		start := regionStack[matchIdx]
+		regionStack = append(regionStack[:matchIdx], regionStack[matchIdx+1:]...)
 		regions = append(regions, RegionInfo{
 			Name:      start.name,
 			StartLine: start.startLine,
@@ -341,9 +360,12 @@ func GetFoldingRangesFromTokens(tokens []lexer.Token, ast *parser.Node) []Foldin
 func buildFoldingRanges(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []FoldingRange {
 	var ranges []FoldingRange
 
-	// Get procedure ranges
+	// Get procedure ranges (single-line procedures produce no range)
 	procedures := p.ExtractProcedures(ast)
 	for _, proc := range procedures {
+		if proc.StartLine == proc.EndLine {
+			continue
+		}
 		ranges = append(ranges, FoldingRange{
 			StartLine: proc.StartLine - 1,
 			EndLine:   proc.EndLine - 1,
@@ -351,9 +373,12 @@ func buildFoldingRanges(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		})
 	}
 
-	// Get region ranges
+	// Get region ranges (single-line region pairs produce no range)
 	regions := extractRegions(tokens)
 	for _, region := range regions {
+		if region.StartLine == region.EndLine {
+			continue
+		}
 		ranges = append(ranges, FoldingRange{
 			StartLine: region.StartLine - 1,
 			EndLine:   region.EndLine - 1,

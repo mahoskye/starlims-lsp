@@ -3033,6 +3033,118 @@ func TestGetFoldingRanges_RegionMarkers(t *testing.T) {
 	}
 }
 
+// [spec feature.folding/A4]
+func TestGetFoldingRanges_UnclosedProcedureFoldsToEOF(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE nCount;
+nCount := 1;`
+
+	ranges := GetFoldingRanges(text)
+
+	// A :PROCEDURE with no :ENDPROC extends to the last line of the file,
+	// like other unclosed blocks (starlims-lsp #27).
+	found := false
+	for _, r := range ranges {
+		if r.StartLine == 0 && r.EndLine == 2 && r.Kind == "region" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected unclosed procedure to fold 0-2, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A5]
+func TestGetFoldingRanges_NestedNamedRegions_MismatchedCloseOrder(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:DECLARE nCount;
+/* endregion Outer;
+/* endregion Inner;`
+
+	ranges := GetFoldingRanges(text)
+
+	// 'endregion Outer' closes the Outer region by name (lines 0-3), not
+	// the innermost Inner region; 'endregion Inner' then closes Inner
+	// (lines 1-4). Name-blind LIFO pairing would produce 1-3 and 0-4.
+	foundOuter, foundInner := false, false
+	for _, r := range ranges {
+		if r.Kind != "region" {
+			continue
+		}
+		if r.StartLine == 0 && r.EndLine == 3 {
+			foundOuter = true
+		}
+		if r.StartLine == 1 && r.EndLine == 4 {
+			foundInner = true
+		}
+	}
+	if !foundOuter || !foundInner {
+		t.Errorf("expected name-matched region ranges 0-3 (Outer) and 1-4 (Inner), got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A6]
+func TestGetFoldingRanges_EndregionNameMismatch_ClosesNothing(t *testing.T) {
+	text := `/* region A;
+:DECLARE nCount;
+/* endregion B;
+nCount := 1;`
+
+	ranges := GetFoldingRanges(text)
+
+	// 'endregion B' matches no open region, so it closes nothing and
+	// region A stays open to the end of the file (the mismatch itself is
+	// surfaced by diag.region_end_mismatch).
+	found := false
+	for _, r := range ranges {
+		if r.Kind == "region" && r.StartLine == 0 && r.EndLine == 3 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected region A to stay open to EOF (0-3), got: %+v", ranges)
+	}
+}
+
+func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
+	text := `/* region Helpers;
+:PROCEDURE Helper;
+:ENDPROC;
+/* endregion Utils;`
+
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	found := false
+	for _, d := range diagnostics {
+		if d.Code == CodeRegionEndMismatch {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected region_end_mismatch for 'endregion Utils' with only 'Helpers' open, got: %+v", diagnostics)
+	}
+}
+
+func TestGetDiagnostics_RegionEndMismatch_MatchedNamesClean(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:DECLARE nCount;
+/* endregion Outer;
+/* endregion Inner;`
+
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeRegionEndMismatch {
+			t.Errorf("out-of-order named closes each match an open region and must not flag: %+v", d)
+		}
+	}
+}
+
 // ==================== Me Keyword Hover Tests ====================
 
 func TestGetHover_MeKeyword(t *testing.T) {
