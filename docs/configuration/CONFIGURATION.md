@@ -103,6 +103,7 @@ interface SQLFormattingOptions {
 
 interface DiagnosticOptions {
   hungarianNotation: boolean;
+  unusedVariables: boolean;
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
@@ -491,7 +492,21 @@ When enabled, warns on declared variables that do not use an allowed Hungarian n
 :DECLARE badName;  /* Warning: Variable 'badName' should use a Hungarian notation prefix;
 ```
 
-### 5.2 ssl.diagnostics.hungarianPrefixes
+### 5.2 ssl.diagnostics.unusedVariables
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/providers/diagnostics.go:59,84` |
+
+When enabled, reports declared variables that are never used (hint severity, code `unused_variable`). Opt-in per DECISIONS.md D5: usage counting is name-based and deliberately conservative, so the check is off unless requested.
+
+```json
+{ "ssl.diagnostics.unusedVariables": true }
+```
+
+### 5.3 ssl.diagnostics.hungarianPrefixes
 
 | Property | Value |
 |----------|-------|
@@ -523,7 +538,7 @@ List of allowed Hungarian prefixes.
 { "ssl.diagnostics.hungarianPrefixes": ["s", "n", "b"] }
 ```
 
-### 5.3 ssl.diagnostics.globals
+### 5.4 ssl.diagnostics.globals
 
 | Property | Value |
 |----------|-------|
@@ -556,7 +571,7 @@ gCurrentUser := "test";  /* Error: Cannot assign to global variable 'gCurrentUse
 
 When provider-level undeclared-variable or SQL-parameter validation is enabled, these globals are also treated as pre-declared names.
 
-### 5.4 ssl.diagnostics.maxBlockDepth
+### 5.5 ssl.diagnostics.maxBlockDepth
 
 | Property | Value |
 |----------|-------|
@@ -571,7 +586,7 @@ Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `
 { "ssl.diagnostics.maxBlockDepth": 4 }
 ```
 
-### 5.5 ssl.diagnostics.rules
+### 5.6 ssl.diagnostics.rules
 
 | Property | Value |
 |----------|-------|
@@ -596,7 +611,7 @@ their default severity; unknown slugs are ignored. Added in v0.5.0
 }
 ```
 
-### 5.6 ssl.diagnostics.endpointPatterns
+### 5.7 ssl.diagnostics.endpointPatterns
 
 | Property | Value |
 |----------|-------|
@@ -613,7 +628,7 @@ an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
 { "ssl.diagnostics.endpointPatterns": ["**/endpoints/**", "**/*.srvscr"] }
 ```
 
-### 5.7 Suppression comments (in-file)
+### 5.8 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,

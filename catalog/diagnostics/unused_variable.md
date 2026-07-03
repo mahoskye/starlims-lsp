@@ -8,6 +8,8 @@ schema_ref: null
 default_severity: hint
 severity_overridable: true
 suppressible: true
+config:
+  - ssl.diagnostics.unusedVariables
 spec_options:
   check_unused_vars: true
 tests:
@@ -22,6 +24,11 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-07-02
+    ref: "issue #48"
+    note: >-
+      Opt-in exposed to clients as ssl.diagnostics.unusedVariables; the
+      toggle was previously only reachable programmatically.
 issues: ["#48"]
 ---
 
@@ -105,7 +112,7 @@ it follows the D5 policy: off by default, hint severity when on. Every
 suppression above is a deliberate precision trade — counting writes and
 member-name coincidences as uses (fences three and five) means a finding
 is only raised when the name appears exactly once in its scope, which is
-as close to provably-dead as a token scan gets. There is currently no
-configuration key that enables this check in the shipped server; it is
-reachable programmatically via `DiagnosticOptions.CheckUnusedVars` (as the
-spec runner does here).
+as close to provably-dead as a token scan gets. Enable it with
+`ssl.diagnostics.unusedVariables` (issue #48 — the toggle was previously
+only reachable programmatically via `DiagnosticOptions.CheckUnusedVars`,
+as the spec runner uses it here).

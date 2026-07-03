@@ -42,6 +42,7 @@ type SignatureHelpSettings struct {
 // DiagnosticsSettings represents diagnostics settings from the client.
 type DiagnosticsSettings struct {
 	HungarianNotation *bool              `json:"hungarianNotation"`
+	UnusedVariables   *bool              `json:"unusedVariables"`
 	HungarianPrefixes *[]string          `json:"hungarianPrefixes"`
 	Globals           *[]string          `json:"globals"`
 	MaxBlockDepth     *int               `json:"maxBlockDepth"`
@@ -465,6 +466,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 	if clientSettings.SSL.Diagnostics != nil {
 		diagnostics := clientSettings.SSL.Diagnostics
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
+		applyOptional(&s.settings.Diagnostics.CheckUnusedVars, diagnostics.UnusedVariables)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)
