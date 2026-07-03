@@ -64,3 +64,106 @@ Parameters sName;
 		t.Errorf("expected comment_text_after_terminator to fire on stray-semicolon multi-line comment, got %d diags", len(diags))
 	}
 }
+
+// Issue #25: a multi-line comment whose interior line ends in ; strands the
+// remaining prose lines as code. When the prose contains no bare keyword the
+// bare-keyword signal is blind, but the next significant line starting with
+// two consecutive bare identifiers is the signature of orphaned prose and
+// must fire — as a warning, since keyword-less prose is a weaker signal than
+// a keyword match.
+func TestCheckCommentTermination_Issue25_OrphanedProseFires(t *testing.T) {
+	text := `:PROCEDURE Demo;
+/* This header explains the module
+and this line accidentally ends with one;
+so these words are now parsed as code
+;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	diags := checkCommentTermination(tokens)
+
+	found := false
+	for _, d := range diags {
+		if d.Code == CodeCommentTextAfterTerminator {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("orphaned-prose path must be a warning, got severity %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected comment_text_after_terminator to fire on orphaned prose after mid-comment semicolon, got %d diags", len(diags))
+	}
+}
+
+// Issue #25 boundary: a single bare identifier followed by valid code must
+// not fire the orphaned-prose signal — one identifier can legitimately start
+// a statement continued on the next line, so the second identifier must
+// share the first one's line.
+func TestCheckCommentTermination_Issue25_SingleIdentifierDoesNotFire(t *testing.T) {
+	text := `:PROCEDURE Demo;
+/* a multi-line note
+that spans two lines;
+orphan
+nCount := 1;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	diags := checkCommentTermination(tokens)
+
+	for _, d := range diags {
+		if d.Code == CodeCommentTextAfterTerminator {
+			t.Errorf("single bare identifier followed by valid code must not flag, got: line=%d msg=%s",
+				d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+// Issue #25 boundary: prose after a paragraph break (blank line) must not
+// fire the orphaned-prose signal — the issue #6 suppression applies to it
+// exactly as to the bare-keyword signal.
+func TestCheckCommentTermination_Issue25_ParagraphBreakSuppressesProse(t *testing.T) {
+	text := `:PROCEDURE Demo;
+/* a multi-line note
+that spans two lines;
+
+these words follow a paragraph break
+;
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	diags := checkCommentTermination(tokens)
+
+	for _, d := range diags {
+		if d.Code == CodeCommentTextAfterTerminator {
+			t.Errorf("prose after a paragraph break must not flag, got: line=%d msg=%s",
+				d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+// Issue #25 boundary: legitimate code after a multi-line comment (assignment,
+// call) must not fire — an operator or parenthesis after the first identifier
+// means a valid statement, not prose.
+func TestCheckCommentTermination_Issue25_ValidCodeDoesNotFire(t *testing.T) {
+	text := `:PROCEDURE Demo;
+/* a multi-line note
+that spans two lines;
+nCount := 1;
+DoProc("X");
+:ENDPROC;`
+
+	lex := lexer.NewLexer(text)
+	tokens := lex.Tokenize()
+	diags := checkCommentTermination(tokens)
+
+	for _, d := range diags {
+		if d.Code == CodeCommentTextAfterTerminator {
+			t.Errorf("valid code after a terminated multi-line comment must not flag, got: line=%d msg=%s",
+				d.Range.Start.Line, d.Message)
+		}
+	}
+}
