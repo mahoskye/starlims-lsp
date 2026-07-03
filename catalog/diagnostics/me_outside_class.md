@@ -20,6 +20,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-07-02
+    ref: "issue #32"
+    note: >-
+      False positive fixed: identifiers preceded by the ':' member-access
+      punctuation (oObj:Me) are exempt — that Me is a member name, not the
+      self-reference.
 issues: ["#32"]
 ---
 
@@ -43,6 +49,8 @@ It must NOT flag:
 - `Me` appearing as a declaration name (immediately preceded by a
   declaration keyword such as `:DECLARE`, `:PARAMETERS`, `:PROCEDURE`,
   `:DEFAULT`, `:PUBLIC`, `:CLASS`, `:INHERIT`);
+- a member access whose member is named `Me` (`oObj:Me`) — that is a
+  member name, not the self-reference (issue #32);
 - the word "me" inside strings or comments, or as part of a longer
   identifier (`sMessage`).
 
@@ -82,6 +90,12 @@ vResult := Me;
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+vValue := oConfig:Me;
+```
+
 ## Rationale
 
 The style guide lists `Me` among the class-context special forms
@@ -90,19 +104,7 @@ The style guide lists `Me` among the class-context special forms
 this is an error, matching the sibling Base rules introduced in the same
 commit (cdbfee6). The line-based class-range guard trades precision for
 safety: it can never false-positive inside a real class file, at the cost
-of accepting a stray top-level `Me` below the `:CLASS` line.
-
-## Known gaps
-
-- A member access whose member happens to be named `Me` (`oObj:Me`) is
-  flagged in non-class files, even though that `Me` is a member name, not
-  the self-reference. The sibling unqualified_field_assignment check skips
-  identifiers preceded by `:`; this check should apply the same guard.
-  Covered by the expect=fail fence below; fix in a follow-up PR citing this
-  entry.
-
-### Does not flag
-
-```ssl expect=fail
-vValue := oConfig:Me;
-```
+of accepting a stray top-level `Me` below the `:CLASS` line. Identifiers
+preceded by the `:` member-access punctuation are exempt (issue #32), the
+same guard checkUnqualifiedFieldAssignment uses — the last Does-not-flag
+fence pins it.
