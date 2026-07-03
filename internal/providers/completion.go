@@ -930,3 +930,81 @@ func getStandardSnippets() []CompletionItem {
 		},
 	}
 }
+
+// ScriptCompletion is a workspace script offered as a dispatch-target
+// segment (level 1: scripts inside a category).
+type ScriptCompletion struct {
+	Name      string // script name (the insertable segment)
+	Display   string // "Cat.Script" or bare name, for the detail line
+	IsClass   bool
+	ProcCount int
+}
+
+// DispatchCompletionContext carries the per-segment-level candidates the
+// server enumerated from the workspace index. Level 0 = no dot typed yet
+// (same-file procedures + categories only — the deliberate noise floor);
+// level 1 = after "A."; level 2 = after "A.B.". TargetProcs must already
+// exclude /*@private; and /*@protected; procedures.
+type DispatchCompletionContext struct {
+	SameFileProcs []parser.ProcedureInfo
+	Categories    []string
+	Scripts       []ScriptCompletion
+	TargetProcs   []WorkspaceProcInfo
+	ScriptDisplay string // defining script for TargetProcs' documentation
+}
+
+// GetDispatchTargetSegmentCompletions builds the completion list for a
+// DoProc/ExecFunction target string (catalog: feature.completion A7-A10).
+// All items insert plain text — the surrounding call provides scaffolding.
+func GetDispatchTargetSegmentCompletions(ctx DispatchCompletionContext) []CompletionItem {
+	var items []CompletionItem
+
+	items = append(items, GetProcedureNameCompletions(ctx.SameFileProcs)...)
+
+	for _, cat := range ctx.Categories {
+		items = append(items, CompletionItem{
+			Label:            cat,
+			Kind:             CompletionKindModule,
+			Detail:           "STARLIMS category",
+			InsertText:       cat,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+
+	for _, script := range ctx.Scripts {
+		kind := CompletionKindModule
+		detail := fmt.Sprintf("Script (%d procedures)", script.ProcCount)
+		if script.IsClass {
+			kind = CompletionKindClass
+			detail = "Class script"
+		}
+		items = append(items, CompletionItem{
+			Label:            script.Name,
+			Kind:             kind,
+			Detail:           detail,
+			InsertText:       script.Name,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+
+	for _, proc := range ctx.TargetProcs {
+		info := parser.ProcedureInfo{
+			Name:       proc.Name,
+			Parameters: proc.Parameters,
+			Doc:        proc.Doc,
+			StartLine:  proc.StartLine,
+			EndLine:    proc.EndLine,
+		}
+		doc := renderProcedureCompletionDoc(info, fmt.Sprintf("Defined in `%s`.", ctx.ScriptDisplay))
+		items = append(items, CompletionItem{
+			Label:            proc.Name,
+			Kind:             CompletionKindFunction,
+			Detail:           fmt.Sprintf("Procedure in %s", ctx.ScriptDisplay),
+			Documentation:    doc,
+			InsertText:       proc.Name,
+			InsertTextFormat: InsertTextFormatPlainText,
+		})
+	}
+
+	return items
+}

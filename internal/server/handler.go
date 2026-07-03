@@ -26,9 +26,14 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	column := int(params.Position.Character) + 1
 	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
 		// Exception: inside a DoProc("…") / ExecFunction("…") string argument,
-		// offer the procedures defined in this script (vs-code-ssl-formatter#74).
+		// offer dispatch-target completions (vs-code-ssl-formatter#74; the
+		// segment-aware cross-file levels are feature.completion A7-A10):
+		// level 0 = same-file procedures + categories, "Cat." = its
+		// scripts, "Cat.Script."/"Script." = that script's procedures.
 		if isDoProcStringContext(cache.Tokens, line, column) {
-			return toProtocolCompletionItems(providers.GetProcedureNameCompletions(cache.Procedures)), nil
+			prefix := dispatchStringPrefix(cache.Tokens, line, column)
+			ctx := (liveResolver{s}).dispatchCompletionContext(prefix, cache.Procedures)
+			return toProtocolCompletionItems(providers.GetDispatchTargetSegmentCompletions(ctx)), nil
 		}
 		return []protocol.CompletionItem{}, nil
 	}
@@ -930,4 +935,26 @@ func (s *SSLServer) handleInlayHint(context *glsp.Context, params *InlayHintPara
 	}
 
 	return result, nil
+}
+
+// dispatchStringPrefix returns the string content typed before the cursor
+// inside a dispatch-target string literal — the segment prefix that decides
+// the completion level ("" | "Cat." | "Cat.Script.").
+func dispatchStringPrefix(tokens []lexer.Token, line, column int) string {
+	idx := tokenContainingPosition(tokens, line, column)
+	if idx < 0 || tokens[idx].Type != lexer.TokenString {
+		return ""
+	}
+	tok := tokens[idx]
+	// Content starts after the opening quote; the cursor column is 1-based.
+	start := tok.Column + 1
+	if column <= start {
+		return ""
+	}
+	end := column - start
+	content := tok.Text[1:] // strip opening quote
+	if end > len(content) {
+		end = len(content)
+	}
+	return content[:end]
 }
