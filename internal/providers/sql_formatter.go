@@ -743,20 +743,45 @@ func IsSQLString(content string) bool {
 		}
 	}
 
-	if len(nonWSTokens) == 0 {
+	return isSQLStatementTokens(nonWSTokens)
+}
+
+// IsSQLDocument reports whether an entire document's content is a plain SQL
+// statement rather than SSL code — the data-source case
+// (feature.diagnostics_pipeline A10-A12): STARLIMS data sources often hold
+// raw SQL. Unlike IsSQLString it also ignores SQL comments and optimizer
+// hints, which legitimately precede a stored statement. SSL content never
+// classifies: an SSL leading comment (`/* text;`) has no `*/` terminator,
+// so the SQL lexer consumes the rest of the file as one comment token, and
+// SSL keywords/identifiers fail the command-keyword check.
+func IsSQLDocument(content string) bool {
+	lexer := NewSQLLexer(content)
+	tokens := lexer.Tokenize()
+
+	var significant []SQLToken
+	for _, t := range tokens {
+		if t.Type == SQLTokenWhitespace || t.Type == SQLTokenComment || t.Type == SQLTokenHint {
+			continue
+		}
+		significant = append(significant, t)
+	}
+
+	return isSQLStatementTokens(significant)
+}
+
+// isSQLStatementTokens applies the command-keyword and structure validation
+// shared by IsSQLString and IsSQLDocument to a pre-filtered token list.
+func isSQLStatementTokens(tokens []SQLToken) bool {
+	if len(tokens) == 0 {
 		return false
 	}
 
-	// Get the first token and check if it's a SQL command keyword
-	firstToken := nonWSTokens[0]
-	firstUpper := strings.ToUpper(firstToken.Text)
-
+	firstUpper := strings.ToUpper(tokens[0].Text)
 	if !SQLCommandKeywords[firstUpper] {
 		return false
 	}
 
-	// Apply structural validation based on the command
-	return validateSQLStructure(firstUpper, nonWSTokens)
+	return validateSQLStructure(firstUpper, tokens)
 }
 
 // validateSQLStructure validates that tokens form a complete SQL statement.
