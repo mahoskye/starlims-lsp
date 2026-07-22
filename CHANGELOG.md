@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-22
+
+Same-file `DoProc` hover and SQL-mode data sources (spec:
+`catalog/features/hover.md` A17-A18,
+`catalog/features/diagnostics_pipeline.md` A10-A12).
+
+### Added
+- **Same-file dispatch hover.** Hovering the procedure-name string in
+  `DoProc("Proc", {...})` — or a bare 1-part `ExecFunction` target —
+  shows the local procedure's docblock hover (description, parameters,
+  returns, declaration location), matched case-insensitively. Mirrors
+  go-to-definition's same-file semantics for 1-part targets; dotted
+  targets keep the cross-file workspace path (#78).
+
+### Fixed
+- **No SSL diagnostics on plain-SQL data sources.** A `.ds`/`.ds.txt`
+  document whose content is a plain SQL statement now produces zero
+  diagnostics — SQL's `table.column` qualified names were false-flagging
+  `dot_property_access`, with more noise from bare `AND`/`OR` and
+  missing-semicolon checks. Content is classified with the formatter's
+  structural SQL detection (leading SQL comments tolerated); SSL-mode
+  data sources keep their full diagnostic set (#77).
+
 ## [0.11.0] - 2026-07-03
 
 `:` member access on shape-inferred UDObjects (spec:
