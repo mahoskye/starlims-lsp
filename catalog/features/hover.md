@@ -53,6 +53,13 @@ history:
       closing the long-standing "property access after ':' has no
       hover" gap for receivers whose shape completion already infers
       (issues #7/#19). Unshaped receivers keep prior behavior.
+  - date: 2026-07-22
+    ref: "#78"
+    note: >-
+      Bare 1-part DoProc/ExecFunction targets join the dispatch-string
+      hover exception: a target naming a same-file procedure shows that
+      procedure's docblock hover, mirroring go-to-definition's same-file
+      semantics for 1-part targets (A17-A18).
 issues: []
 ---
 
@@ -73,17 +80,19 @@ issues: []
 - Variable hover MUST show the declaration location and scope.
 - Lookup MUST be case-insensitive (`sqlexecute` resolves to `SQLExecute`).
 - Hover MUST NOT activate inside comments, and MUST NOT activate for general
-  symbols inside string literals. String-context hover has exactly two
+  symbols inside string literals. String-context hover has exactly three
   exceptions: SQL placeholders — named `?varName?` (SQLExecute only) shows
   the parameter name and runtime-substitution note, positional `?` shows
-  its 1-based position — dotted DoProc/ExecFunction dispatch targets
-  that resolve through the workspace resolver
-  (feature.cross_file_resolution), which show the target procedure's
+  its 1-based position — DoProc/ExecFunction dispatch targets — dotted
+  targets that resolve through the workspace resolver
+  (feature.cross_file_resolution) show the target procedure's
   signature/docblock with a "defined in" origin, or the target script's
-  entry-point summary for 2-part targets — and RunDS string targets that
-  resolve to a workspace data source, which show the data-source summary
-  (identity and entry parameters). An unresolvable dispatch or RunDS
-  target falls through to the normal string suppression (null).
+  entry-point summary for 2-part targets, while bare 1-part targets keep
+  same-file semantics (mirroring go-to-definition) and show the matching
+  local procedure's hover, case-insensitively — and RunDS string targets
+  that resolve to a workspace data source, which show the data-source
+  summary (identity and entry parameters). An unresolvable dispatch or
+  RunDS target falls through to the normal string suppression (null).
 - In endpoint files (matched via `ssl.diagnostics.endpointPatterns` or a
   leading `Endpoint:` docblock marker), `Request` and `Response` MUST hover
   with their ambient documentation; in non-endpoint files they get no
@@ -124,6 +133,8 @@ issues: []
 - A14: Given `RunDS("QUERIES.ORDERS")` resolving to a workspace data source, when the user hovers inside the string, then the hover shows the data-source summary (identity and entry parameters); a RunDS target resolving nowhere hovers as null.
 - A15: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;`, when the user hovers `Name` or `Total` after `oObj:`, then the hover shows the property with its inferred type and definition line.
 - A16: Given the same shaped `oObj` and a hover on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
+- A17: Given `oResult := DoProc("BuildShell", {oContext});` and a same-file `:PROCEDURE BuildShell;` preceded by a docblock, when the user hovers inside the target string, then the hover shows the procedure's docblock hover (description, parameters, returns, declaration location), matching the name case-insensitively.
+- A18: Given `DoProc("NoSuchProc", {})` naming no procedure in the current file, when the user hovers inside the string, then the response is null — 1-part targets never resolve cross-file, and the string suppression (A7) holds.
 
 ## Rationale
 

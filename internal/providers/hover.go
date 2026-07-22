@@ -537,6 +537,17 @@ func renderProcedureHover(proc parser.ProcedureInfo) string {
 	return renderProcedureHoverWithOrigin(proc, "*Procedure defined in this file*")
 }
 
+// ProcedureHoverMarkdown renders the same-file procedure hover for name, or
+// "" when no procedure matches (case-insensitive). Bare 1-part dispatch
+// targets keep same-file semantics, so the server routes them here
+// (feature.hover A17-A18).
+func ProcedureHoverMarkdown(name string, procedures []parser.ProcedureInfo) string {
+	if hover := getProcedureHover(name, procedures); hover != nil {
+		return hover.Contents
+	}
+	return ""
+}
+
 // renderProcedureHoverWithOrigin is renderProcedureHover with the origin
 // line parameterized so cross-file hovers can name the defining script.
 func renderProcedureHoverWithOrigin(proc parser.ProcedureInfo, origin string) string {

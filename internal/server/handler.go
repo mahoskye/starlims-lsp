@@ -306,12 +306,21 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	if ctx == lexer.ContextString {
 		// Dispatch-target strings are the second string-hover exception
 		// (after SQL placeholders): a dotted DoProc/ExecFunction target
-		// that resolves cross-file shows the target's signature. A
-		// dispatch string is never an SQL string, so checking first is
-		// safe; unresolvable targets fall through to the suppression.
+		// that resolves cross-file shows the target's signature, and a
+		// bare 1-part target keeps same-file semantics — mirroring
+		// go-to-definition — showing the local procedure's hover
+		// (feature.hover A17). A dispatch string is never an SQL string,
+		// so checking first is safe; unresolvable targets fall through
+		// to the suppression.
 		if isDoProcStringContext(cache.Tokens, line, column) {
-			if dt := providers.DispatchTargetAt(content, line, column); dt != nil && len(dt.Parts) >= 2 {
-				if md := (liveResolver{s}).dispatchHoverMarkdown(dt.Raw); md != "" {
+			if dt := providers.DispatchTargetAt(content, line, column); dt != nil {
+				var md string
+				if len(dt.Parts) >= 2 {
+					md = (liveResolver{s}).dispatchHoverMarkdown(dt.Raw)
+				} else {
+					md = providers.ProcedureHoverMarkdown(dt.Raw, cache.Procedures)
+				}
+				if md != "" {
 					return &protocol.Hover{
 						Contents: protocol.MarkupContent{
 							Kind:  protocol.MarkupKindMarkdown,
