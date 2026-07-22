@@ -24,6 +24,13 @@ history:
     note: >-
       False positive fixed: dots inside :INCLUDE module paths (which can be
       deep, e.g. :INCLUDE A.B.C.D;) are path separators, not property access.
+  - date: 2026-07-22
+    ref: "issue #77"
+    note: >-
+      No longer runs in SQL-mode data-source documents: `table.column`
+      qualified names in plain-SQL .ds files were the reported false
+      positive. Suppression happens at the pipeline level
+      (feature.diagnostics_pipeline A10-A12), not in this check.
 issues: []
 ---
 
@@ -45,6 +52,11 @@ It must NOT flag:
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
 - a leading `.name` with no preceding identifier.
+
+Like every SSL check, it does not run at all in SQL-mode data-source
+documents — plain-SQL `.ds` files are suppressed at the pipeline level
+(feature.diagnostics_pipeline, issue #77), so `table.column` qualified
+names there never reach this check.
 
 ## Examples
 

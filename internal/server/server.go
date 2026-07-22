@@ -562,13 +562,20 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
+	content, _ := s.documents.GetDocument(uri)
 	opts := s.settings.Diagnostics
 	opts.IsDataSourceFile = isDataSourceURI(uri)
-	if content, ok := s.documents.GetDocument(uri); ok {
-		opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
-	}
+	opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
 	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
-	diagnostics := providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
+
+	// SQL-mode data source: plain-SQL content gets no SSL diagnostics
+	// (feature.diagnostics_pipeline A10, issue #77). Still publish the
+	// empty set so previously published diagnostics are cleared. This
+	// mirrors the guard in providers.GetDiagnostics for the text path.
+	var diagnostics []providers.Diagnostic
+	if !opts.IsDataSourceFile || !providers.IsSQLDocument(content) {
+		diagnostics = providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
+	}
 
 	// Convert to protocol diagnostics
 	protocolDiags := make([]protocol.Diagnostic, 0, len(diagnostics))

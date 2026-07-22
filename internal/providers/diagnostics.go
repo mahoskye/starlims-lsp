@@ -99,6 +99,15 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 
 // GetDiagnostics returns all diagnostics for a document.
 func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
+	// A data-source document whose content is plain SQL gets no SSL
+	// diagnostics at all — every SSL check would false-flag SQL syntax
+	// such as dot-qualified column names (feature.diagnostics_pipeline
+	// A10-A12, issue #77). The server mirrors this guard on its
+	// cached-token path in validateDocument.
+	if opts.IsDataSourceFile && IsSQLDocument(text) {
+		return nil
+	}
+
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
