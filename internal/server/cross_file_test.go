@@ -439,6 +439,66 @@ func TestHandleHover_UnresolvableDispatchStaysNull(t *testing.T) {
 	}
 }
 
+// Bare 1-part dispatch targets hover with the same-file procedure's
+// docblock, matched case-insensitively. [spec feature.hover/A17]
+func TestHandleHover_SameFileDispatchProcedure(t *testing.T) {
+	s := NewSSLServer()
+	source := `/*
+ * Description: Builds the shell object.
+ * Parameters:
+ *   oContext - context object
+ * Returns: initialized shell object
+;
+:PROCEDURE BuildShell;
+:PARAMETERS oContext;
+:ENDPROC;
+
+oResult := DoProc("buildshell", {oContext});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 10, Character: 22},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected same-file dispatch hover")
+	}
+	md := hover.Contents.(protocol.MarkupContent).Value
+	for _, want := range []string{"BuildShell", "Builds the shell object.", "oContext", "initialized shell object"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("hover missing %q:\n%s", want, md)
+		}
+	}
+}
+
+// A 1-part target naming no same-file procedure keeps the string
+// suppression — it never resolves cross-file. [spec feature.hover/A18]
+func TestHandleHover_SameFileDispatchNoMatchStaysNull(t *testing.T) {
+	s := NewSSLServer()
+	source := `oResult := DoProc("NoSuchProc", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 22},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Errorf("expected null hover for unmatched 1-part target, got %+v", hover)
+	}
+}
+
 func dispatchCompletionLabels(t *testing.T, s *SSLServer, source string, character uint32) []string {
 	t.Helper()
 	s.documents.SetDocument(testURI, source, 1)
