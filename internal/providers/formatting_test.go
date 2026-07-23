@@ -2220,6 +2220,69 @@ func TestFormat_TrimTrailingWhitespaceDisabled_PreservesCommentInterior(t *testi
 	}
 }
 
+// Issue #82: over-90-col English message strings must be byte-preserved
+// even though they contain SQL trigger words. [spec fmt.sql_in_strings]
+func TestFormatDocument_EnglishStringsNotRewrittenAsSQL(t *testing.T) {
+	input := ":PROCEDURE Messages;\n" +
+		":DECLARE sMsgA, sMsgB, sMsgC;\n" +
+		"sMsgA := \"Select the samples from the rack and update the status column before continuing with the run\";\n" +
+		"sMsgB := \"Update your password and set a reminder so that it does not expire while you are away on leave\";\n" +
+		"sMsgC := \"Delete old records from the archive folder after you have exported them to the backup share\";\n" +
+		":RETURN .T.;\n" +
+		":ENDPROC;\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	for _, want := range []string{
+		`"Select the samples from the rack and update the status column before continuing with the run"`,
+		`"Update your password and set a reminder so that it does not expire while you are away on leave"`,
+		`"Delete old records from the archive folder after you have exported them to the backup share"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("message string was rewritten; want byte-preserved %s\ngot:\n%s", want, out)
+		}
+	}
+}
+
+// Issue #82: only argument 0 of a SQL function is a SQL candidate — the
+// LSearch default value (argument 1) must never be reformatted, while the
+// SQL argument still is.
+func TestFormatDocument_SQLFunctionNonFirstArgPreserved(t *testing.T) {
+	input := ":PROCEDURE ArgTest;\n" +
+		":DECLARE sRes;\n" +
+		"sRes := LSearch(\"SELECT name FROM samples WHERE id = ?\", \"Select a valid sample from the list and update your filter settings before retrying the search\", \"\", {nId});\n" +
+		":RETURN sRes;\n" +
+		":ENDPROC;\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(out, `"Select a valid sample from the list and update your filter settings before retrying the search"`) {
+		t.Errorf("LSearch default value was rewritten:\n%s", out)
+	}
+
+	// Argument 0 still reflows when it overflows.
+	input2 := ":PROCEDURE SqlTest;\n" +
+		":DECLARE aRes;\n" +
+		"aRes := SQLExecute(\"SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id\");\n" +
+		":RETURN aRes;\n" +
+		":ENDPROC;\n"
+	out2 := FormatDocument(input2, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(out2, "\n\t    SELECT sample_id, sample_name, sample_status\n") {
+		t.Errorf("SQL argument 0 should still reflow:\n%s", out2)
+	}
+}
+
+// Issue #82: a nested call inside a SQL function's argument list must not
+// end the SQL-function state early — the argument counter has to survive
+// `Left(sX, 3)` appearing as argument 1.
+func TestFormatDocument_SQLFunctionStateSurvivesNestedCalls(t *testing.T) {
+	input := ":PROCEDURE Nested;\n" +
+		":DECLARE sRes;\n" +
+		"sRes := LSearch(\"SELECT name FROM samples WHERE id = ?\", Left(sFallbackValueName, 3), \"\", {\"Select one from the list and update it before you retry the whole search once more please\"});\n" +
+		":RETURN sRes;\n" +
+		":ENDPROC;\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(out, "Select one from the list and update it") {
+		t.Errorf("string inside argument array was altered:\n%s", out)
+	}
+}
+
 // Issue #81: a bracket-quoted SQL string that overflows the line reflows with
 // a ']' closer and formats idempotently — the second pass must not swallow the
 // remainder of the document into the string.

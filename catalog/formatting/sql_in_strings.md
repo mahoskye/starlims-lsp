@@ -37,7 +37,14 @@ history:
       Bracket-quoted strings reflow with a ']' closer. The reflow used to
       write the opening delimiter at both ends, leaving an unterminated
       bracket string that swallowed the rest of the file on the next pass.
-issues: ["#81"]
+  - date: 2026-07-22
+    ref: "issue #82"
+    note: >-
+      Detection hardened against English prose: runs of three or more
+      bare words, prose-shaped SELECT lists, and SET/target clauses
+      without SQL shape are rejected; only argument 0 of a known SQL
+      function is a SQL candidate.
+issues: ["#81", "#82"]
 ---
 
 ## Behavior
@@ -62,6 +69,14 @@ are considered. Within the exception:
   the closing quote lands on its own line at the base indent, glued to the
   trailing punctuation (rule E).
 - Strings not detected as SQL are byte-preserved regardless of settings.
+  Detection is structural and rejects English prose even when it contains
+  SQL trigger words: a run of three or more consecutive bare words, a
+  SELECT list that is not `*` / a single expression / comma-separated, a
+  SET clause with no `ident =` shape, or a FROM/INTO target followed by
+  more prose all disqualify the string (issue #82).
+- Within a known SQL function call, only the SQL argument (position 0) is
+  ever a candidate — friendly names, LSearch default values, and parameter
+  arrays are byte-preserved even when they look like SQL (issue #82).
 - SQL parameter placeholders (`?param?`) are preserved verbatim.
 
 ## Examples
@@ -74,6 +89,21 @@ are always untouched:
 ```ssl
 sSql := "select * from users where id = ?id?";
 sMsg := "sample not found for the given identifier";
+```
+
+Multi-line English strings containing SQL trigger words are byte-preserved
+— under the pre-#82 detector these were rewritten as SQL regardless of
+length (single-line over-long cases and SQL-function default-value
+arguments are pinned by Go tests; their fences wait on the #85/#89 wrap
+fixes for stable layout):
+
+### Idempotent
+
+```ssl
+sMsg := "Select the samples from the rack
+and update the status column";
+sBackup := "Delete old records from the archive
+after exporting them safely";
 ```
 
 A single-line SQL string that overflows 90 columns is reflowed by the SQL
