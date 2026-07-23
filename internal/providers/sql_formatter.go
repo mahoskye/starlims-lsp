@@ -100,8 +100,17 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 	// DECODE function tracking (Gap 7)
 	inDecodeCall := false
+	decodeBreaks := false
 	decodeParenDepth := 0
 	decodeArgCount := 0
+
+	// Block-style parens: INSERT column lists and VALUES lists open on
+	// their keyword's line, indent their content one level, and close at
+	// the parent indent (S34/S35/S46 — issue #93).
+	blockParens := make(map[int]bool)
+	// Column where a MERGE UPDATE SET's first assignment starts, for
+	// aligning subsequent assignments (S43 — issue #95).
+	mergeSetCol := -1
 
 	for i := 0; i < len(nonWSTokens); i++ {
 		t := nonWSTokens[i]
@@ -171,11 +180,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			inOverClause = false
 		}
 
-		// Track DECODE function (Gap 7)
+		// Track DECODE function (Gap 7). Pair-per-line layout applies only
+		// when the call holds more than one search/result mapping (S68);
+		// a short DECODE stays inline.
 		if upperText == "DECODE" && t.Type == SQLTokenFunction {
 			inDecodeCall = true
 			decodeParenDepth = parenDepth + 1
 			decodeArgCount = 0
+			decodeBreaks = decodeCommaCount(nonWSTokens, i) >= 4
 		}
 		if t.Text == ")" && inDecodeCall && parenDepth == decodeParenDepth-1 {
 			inDecodeCall = false
@@ -236,6 +248,18 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else {
 					needsBreak = true
 					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
+					// Inside a non-subquery paren group (a MERGE ON
+					// condition list, a parenthesized predicate group),
+					// AND/OR align under the first condition after the
+					// '(' (S45, issue #95).
+					if (upperText == "AND" || upperText == "OR") && parenDepth > 0 &&
+						!subqueryParenDepths[parenDepth] && len(parenOpenCols) > 0 {
+						spaces := parenOpenCols[len(parenOpenCols)-1] - len(baseIndent) - len(f.indentString)*parenDepth
+						if spaces < 0 {
+							spaces = 0
+						}
+						extraIndent = strings.Repeat(" ", spaces)
+					}
 				}
 			}
 
@@ -248,8 +272,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				}
 			}
 
-			// SET clause formatting
-			if style != "compact" && prev != nil && prevUpper == "SET" && parenDepth == 0 {
+			// SET clause formatting. Plain UPDATE breaks every assignment to
+			// its own line (S38); MERGE keeps the first assignment on the
+			// UPDATE SET line and aligns the rest under it (S43, issue #95).
+			if style != "compact" && prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
@@ -259,14 +285,32 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
+					if rootCommand == "MERGE" && mergeSetCol >= 0 {
+						spaces := mergeSetCol - len(baseIndent)
+						if spaces < 0 {
+							spaces = 0
+						}
+						extraIndent = strings.Repeat(" ", spaces)
+					}
 				}
 			}
 
-			// VALUES paren — opening paren stays on VALUES line, content indented inside
-			if style != "compact" && t.Text == "(" && prevUpper == "VALUES" {
-				// Don't break before the paren; it stays on the VALUES line.
-				// The content inside gets indented via parenDepth.
+			// VALUES paren and INSERT column-list paren — block style
+			// (S34/S35, issue #93): the '(' stays on its keyword's line,
+			// the list starts on the next line indented one level, and the
+			// ')' closes on its own line at the parent indent.
+			if style != "compact" && rootCommand != "MERGE" && t.Text == "(" &&
+				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
 				subqueryParenDepths[parenDepth] = true
+				blockParens[parenDepth] = true
+			}
+
+			// Content of a block paren starts on its own line.
+			if style != "compact" && prev != nil && prev.Text == "(" && blockParens[parenDepth] && t.Text != ")" {
+				needsBreak = true
+				if rootCommand == "MERGE" {
+					extraIndent = f.indentString
+				}
 			}
 
 			// Subquery SELECT — parenDepth already provides one level of indent
@@ -308,6 +352,22 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					(t.Type == SQLTokenKeyword || t.Type == SQLTokenIdentifier) &&
 						prev.Text != "."
 
+				// '||' leads its continuation line (S72, issue #97): break
+				// before the operator, never after it. The overflow check
+				// looks ahead through the segment this '||' starts —
+				// otherwise the overflow surfaces at the AS alias, where
+				// breaks are blocked, and the chain never wraps.
+				if t.Text == "||" {
+					canBreak = true
+					segLen := concatSegmentLen(nonWSTokens, i)
+					if currentLineLen+spaceLen+segLen > f.opts.MaxLineLength {
+						projectedLen = f.opts.MaxLineLength + 1
+					}
+				}
+				if prev.Text == "||" {
+					canBreak = false
+				}
+
 				// Rule C: never split a projection from its AS alias. Block
 				// wrapping immediately before AS, and immediately after AS
 				// (the alias identifier must stay attached).
@@ -326,7 +386,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] {
 						hangCol = parenOpenCols[len(parenOpenCols)-1]
 					}
-					if hangCol >= 0 {
+					if blockParens[parenDepth] {
+						extraIndent = ""
+						if rootCommand == "MERGE" {
+							extraIndent = f.indentString
+						}
+					} else if hangCol >= 0 {
 						baseLen := len(baseIndent)
 						parenIndentLen := len(f.indentString) * parenDepth
 						spaces := hangCol - baseLen - parenIndentLen
@@ -340,6 +405,20 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 						extraIndent = f.indentString
 					}
 				}
+			}
+		}
+
+		// Chained CTEs (S31, issue #96): after a CTE body closes at depth 0,
+		// the next CTE name (following the comma) and the main statement
+		// (directly following the ')') each start at column 0.
+		if !needsBreak && rootCommand == "WITH" && parenDepth == 0 && prev != nil {
+			if prev.Text == "," && prevPrevToken != nil && prevPrevToken.Text == ")" && t.Type == SQLTokenIdentifier {
+				needsBreak = true
+				extraIndent = ""
+			}
+			if prev.Text == ")" && t.Type == SQLTokenKeyword && SQLCommandKeywords[upperText] {
+				needsBreak = true
+				extraIndent = ""
 			}
 		}
 
@@ -386,22 +465,35 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			extraIndent = strings.Repeat(" ", 7)
 		}
 
-		// DECODE argument alignment: break after first value pair when many args (Gap 7)
+		// DECODE argument alignment (S68, issue #94): the selector stays on
+		// the DECODE( line; each search/result pair — and the trailing
+		// default — starts its own line aligned under the first argument.
 		if inDecodeCall && parenDepth == decodeParenDepth {
 			if prev != nil && prev.Text == "," {
 				decodeArgCount++
-			}
-			// Break after the first value pair (arg index 3+) when there are many args
-			if prev != nil && prev.Text == "," && decodeArgCount >= 3 {
-				needsBreak = true
-				extraIndent = strings.Repeat(" ", 14) // align after "DECODE("
+				// Odd comma indices separate pairs (selector | v1,r1 | v2,r2 | default).
+				if decodeBreaks && decodeArgCount%2 == 1 {
+					needsBreak = true
+					extraIndent = ""
+					if len(parenOpenCols) > 0 {
+						spaces := parenOpenCols[len(parenOpenCols)-1] - len(baseIndent) - len(f.indentString)*parenDepth
+						if spaces < 0 {
+							spaces = 0
+						}
+						extraIndent = strings.Repeat(" ", spaces)
+					}
+				}
 			}
 		}
 
-		// Closing paren on its own line for subqueries/VALUES blocks
+		// Closing paren on its own line for subqueries/VALUES/column blocks
 		if t.Text == ")" && subqueryParenDepths[parenDepth+1] {
 			needsBreak = true
+			if blockParens[parenDepth+1] && rootCommand == "MERGE" {
+				extraIndent = f.indentString // stays inside the WHEN branch (S46)
+			}
 			delete(subqueryParenDepths, parenDepth+1)
+			delete(blockParens, parenDepth+1)
 		}
 
 		// Blank line before set operations (sql-canonical-compact-reference §2.8)
@@ -443,6 +535,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			currentLineLen++
 		}
 
+		if rootCommand == "MERGE" && prev != nil && strings.ToUpper(prev.Text) == "SET" && parenDepth == 0 {
+			mergeSetCol = currentLineLen
+		}
+		// S34: 'INSERT INTO table (' — a space separates the table name from
+		// its column-list paren (issue #93); call-style parens stay glued.
+		if !needsBreak && t.Text == "(" && blockParens[parenDepth] && prev != nil && prev.Type == SQLTokenIdentifier {
+			result.WriteString(" ")
+			currentLineLen++
+		}
 		result.WriteString(tokenText)
 		currentLineLen += len(tokenText)
 		isFirstToken = false
@@ -1005,4 +1106,60 @@ func containsDDLObject(tokens []SQLToken) bool {
 		}
 	}
 	return false
+}
+
+// concatSegmentLen returns the rendered length of the '||' segment starting
+// at tokens[start] (which is a '||'): the operator and everything through the
+// token before the next same-depth '||', comma, or clause keyword (issue #97).
+func concatSegmentLen(tokens []SQLToken, start int) int {
+	length := 0
+	depth := 0
+	for j := start; j < len(tokens); j++ {
+		t := tokens[j]
+		switch t.Text {
+		case "(":
+			depth++
+		case ")":
+			depth--
+			if depth < 0 {
+				return length
+			}
+		}
+		if j > start && depth == 0 {
+			if t.Text == "||" || t.Text == "," {
+				return length
+			}
+			if t.Type == SQLTokenKeyword && SQLBreakBeforeKeywords[strings.ToUpper(t.Text)] {
+				return length
+			}
+		}
+		if j > start {
+			length++ // separating space (approximation)
+		}
+		length += len(t.Text)
+	}
+	return length
+}
+
+// decodeCommaCount counts the top-level commas of the DECODE call whose
+// function token sits at tokens[start].
+func decodeCommaCount(tokens []SQLToken, start int) int {
+	depth := 0
+	commas := 0
+	for j := start + 1; j < len(tokens); j++ {
+		switch tokens[j].Text {
+		case "(":
+			depth++
+		case ")":
+			depth--
+			if depth == 0 {
+				return commas
+			}
+		case ",":
+			if depth == 1 {
+				commas++
+			}
+		}
+	}
+	return commas
 }
