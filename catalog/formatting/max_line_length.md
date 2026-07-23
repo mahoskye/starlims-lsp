@@ -17,6 +17,15 @@ history:
     ref: "PR #20 (v0.7.6), issue #16"
     note: Member-access chains excluded as wrap points (fmt.atomic_property_chains).
   - date: 2026-07-22
+    ref: "issue #89"
+    note: >-
+      Wrapping rebuilt as a whole-line post-format pass: greedy
+      latest-fitting packing with the conformance guarantee, subscript
+      atomicity, and no breaks on lines touched by multi-line tokens.
+      Replaces the token-streaming wrap that could only react at the
+      overflowing token (post-wrap lines used to land at 92-107 columns,
+      split subscripts, and break inside nested calls).
+  - date: 2026-07-22
     ref: "issue #85"
     note: >-
       No-gain guard: a wrap only happens when the token actually fits on
@@ -28,27 +37,32 @@ issues: ["#85"]
 
 ## Behavior
 
-When a token would push the current line past `ssl.format.maxLineLength`
-(default 90; 0 disables wrapping), the formatter breaks the line at the
-nearest legal wrap point and indents the continuation exactly one level
-past the statement (fixed, not proportional to paren depth; a tab counts as
-`indentSize` columns). Legal wrap points:
+Wrapping is a post-format pass over whole physical lines (issue #89): a
+line wider than `ssl.format.maxLineLength` (default 90; 0 disables; a tab
+counts as `indentSize` columns) is re-flowed at its legal break points:
 
-- after a comma;
+- after a comma (the comma trails its line);
 - after `:=`;
-- before an identifier or keyword inside parentheses/braces/brackets;
-- before the logical operators `.AND.` / `.OR.` / `.NOT.`, arithmetic
-  operators, compound assignments, and `$`.
+- before a binary operator — `.AND.` / `.OR.` / `.NOT.`, arithmetic,
+  compound assignments, and `$` — the operator leads its continuation
+  line.
 
-Wrapping never happens: immediately before or after a member-access `:`
-(fmt.atomic_property_chains); before comparison operators (they bind to
-their operands); or inside a string literal or comment — string tokens are
-atomic, so a single long string argument leaves the line over-long rather
-than being split or moved — a wrap that would not bring the token within
-the limit is not taken at all, and a line holding only indentation is
-never wrapped (issue #85). A string about to be reflowed as multi-line SQL
-(fmt.sql_in_strings) is also not wrapped before — the SQL engine manages
-its own line breaks.
+Packing is greedy latest-fitting: each output line keeps as much as fits,
+and continuation lines sit exactly one indent level past the original line
+(fixed, not proportional to paren depth — fmt.indent_style). A break is
+only taken when the following segment actually fits within the limit on
+its continuation line (the issue-#85 no-gain guard), so an over-long
+atomic token — typically a long string — leaves its line over-long rather
+than being split or moved.
+
+Wrapping never happens: inside `[...]` subscripts (the index binds to its
+array, the sibling rule to fmt.atomic_property_chains' member-access `:`);
+before comparison operators (they bind to their operands); or on any line
+touched by a multi-line token — multi-line strings, SQL reflowed by
+fmt.sql_in_strings, and multi-line comments manage their own layout.
+
+Guarantee: a line stays over the limit only when a single atomic token
+exceeds the budget — never because a legal break sequence was missed.
 
 ## Examples
 
@@ -75,6 +89,49 @@ A single long string argument has no legal wrap point and is left over-long
 
 ```ssl
 DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNinetyColumns");
+```
+
+A subscript is never split — the break moves to the comma before the
+argument group; a nested call stays whole when an outer-list break exists;
+a binary operator leads its continuation:
+
+### Before
+
+```ssl
+vRes := CreateUdObject("MyNamespace.MyClassName", {oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+```
+
+### After
+
+```ssl
+vRes := CreateUdObject("MyNamespace.MyClassName",
+	{oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+```
+
+### Before
+
+```ssl
+vRes := DoProc("Wrapper", {DoProc("InnerOne", {sArgumentOne, sArgumentTwo}), DoProc("InnerTwo", {sArgumentThree})});
+```
+
+### After
+
+```ssl
+vRes := DoProc("Wrapper", {DoProc("InnerOne", {sArgumentOne, sArgumentTwo}),
+	DoProc("InnerTwo", {sArgumentThree})});
+```
+
+### Before
+
+```ssl
+oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyName + nAdjustmentValue;
+```
+
+### After
+
+```ssl
+oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyName
+	+ nAdjustmentValue;
 ```
 
 ## Rationale

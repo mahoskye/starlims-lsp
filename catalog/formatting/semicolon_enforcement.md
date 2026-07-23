@@ -23,7 +23,13 @@ history:
     note: >-
       Enforcement now also runs at end-of-file, so a final statement with
       no trailing newline gets its semicolon.
-issues: ["#38"]
+  - date: 2026-07-22
+    ref: "issue #89"
+    note: >-
+      Continuation lines after a trailing operator now take one level of
+      continuation indent (see fmt.indent_style); the example here shows
+      the indented form.
+issues: ["#38", "#89"]
 ---
 
 ## Behavior
@@ -69,13 +75,21 @@ nValue := 1;
 ```
 
 An expression continuing across lines (trailing `.AND.`, unclosed brace)
-gets no mid-expression semicolon:
+gets no mid-expression semicolon; the continuation line takes one level of
+continuation indent (fmt.indent_style, issue #89):
 
-### Idempotent
+### Before
 
 ```ssl
 bResult := bFirst .AND.
 bSecond;
+```
+
+### After
+
+```ssl
+bResult := bFirst .AND.
+	bSecond;
 ```
 
 ### Before
