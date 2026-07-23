@@ -41,6 +41,14 @@ history:
       all — SSL checks were false-flagging SQL syntax (dot-qualified
       column names hitting dot_property_access, bare AND/OR, missing
       semicolons).
+  - date: 2026-07-22
+    ref: "issue #104"
+    note: >-
+      Hybrid sql_data_source shape (builder directives / :PARAMETERS
+      header followed by raw SQL) recognized: the header keeps SSL and
+      data-source diagnostics, the SQL body is suppressed. Previously the
+      leading directive line classified the whole file as SSL and every
+      SSL check fired on the SQL body.
 issues: []
 ---
 
@@ -112,6 +120,7 @@ rules (those are `diag.*` entries).
 - A10: Given a data-source document containing only a SQL statement (optionally preceded by `--` or `/* */` SQL comments), when diagnostics are collected, then the result is empty — no SSL diagnostic (dot_property_access or otherwise) fires on SQL syntax.
 - A11: Given a data-source document containing SSL code, when diagnostics are collected, then SSL and data-source diagnostics are produced exactly as before — SQL mode only activates on SQL content.
 - A12: Given a non-data-source document whose content is a SQL statement, when diagnostics are collected, then SSL diagnostics still run — SQL-mode classification is scoped to data-source files.
+- A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or an inline-defaults `:PARAMETERS` statement followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
 
 ## Rationale
 

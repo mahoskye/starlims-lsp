@@ -568,12 +568,16 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
 	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
 
-	// SQL-mode data source: plain-SQL content gets no SSL diagnostics
-	// (feature.diagnostics_pipeline A10, issue #77). Still publish the
-	// empty set so previously published diagnostics are cleared. This
-	// mirrors the guard in providers.GetDiagnostics for the text path.
+	// Data-source documents route through the text path, which owns the
+	// SQL-mode handling: plain SQL gets no SSL diagnostics at all
+	// (feature.diagnostics_pipeline A10, issue #77), and the hybrid
+	// directives-then-SQL shape keeps diagnostics on its header only
+	// (issue #104). Publishing continues either way so previously
+	// published diagnostics are cleared.
 	var diagnostics []providers.Diagnostic
-	if !opts.IsDataSourceFile || !providers.IsSQLDocument(content) {
+	if opts.IsDataSourceFile {
+		diagnostics = providers.GetDiagnostics(content, opts)
+	} else {
 		diagnostics = providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 	}
 
