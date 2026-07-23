@@ -43,6 +43,12 @@ history:
       sibling-block blank lines, built-in casing) layered on the token
       formatter as configurable options.
   - date: 2026-07-22
+    ref: "issue #87"
+    note: >-
+      Unterminated final string literals make the document unformattable:
+      both requests return no edits instead of appending a stray
+      semicolon on every pass.
+  - date: 2026-07-22
     ref: "issues #84/#104"
     note: >-
       SQL-mode data sources (plain SQL, or builder directives followed by
@@ -86,7 +92,10 @@ not restate them.
   the same options produces identical text. Deviations are bugs to be
   recorded as `## Known gaps` on the relevant `fmt.*` entry.
 - A formatting failure MUST NOT corrupt the document; when the formatter
-  cannot proceed it leaves the text unchanged.
+  cannot proceed it leaves the text unchanged. A document ending in an
+  unterminated string literal is one such case: the string has swallowed
+  the rest of the file, so both formatting requests return no edits
+  (issue #87 — enforcement used to append a semicolon per pass).
 - Data-source documents whose content is in SQL mode — plain SQL, or a
   builder-directive / inline-defaults `:PARAMETERS` header followed by SQL
   (the classifier shared with feature.diagnostics_pipeline A10/A13) — get

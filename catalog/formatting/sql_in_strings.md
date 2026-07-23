@@ -91,19 +91,17 @@ sSql := "select * from users where id = ?id?";
 sMsg := "sample not found for the given identifier";
 ```
 
-Multi-line English strings containing SQL trigger words are byte-preserved
-— under the pre-#82 detector these were rewritten as SQL regardless of
-length (single-line over-long cases and SQL-function default-value
-arguments are pinned by Go tests; their fences wait on the #85/#89 wrap
-fixes for stable layout):
+English strings containing SQL trigger words are byte-preserved whether
+multi-line or over-long single-line — under the pre-#82 detector these
+were rewritten as SQL (the over-long fence also relies on the #85 no-gain
+wrap guard; SQL-function default-value arguments are pinned by Go tests):
 
 ### Idempotent
 
 ```ssl
 sMsg := "Select the samples from the rack
 and update the status column";
-sBackup := "Delete old records from the archive
-after exporting them safely";
+sMsgA := "Select the samples from the rack and update the status column before continuing with the run";
 ```
 
 A single-line SQL string that overflows 90 columns is reflowed by the SQL

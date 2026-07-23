@@ -13,15 +13,9 @@ import (
 // idempotent fails the build until its entry is removed — the same
 // force-promotion mechanic as the catalog's expect=fail fences (issue #103).
 var knownNonIdempotent = map[string]string{
-	"known_85_overlong_string_wrap.ssl":       "#85",
-	"known_85_english_overlong_strings.ssl":   "#85",
-	"known_85_sql_function_default_arg.ssl":   "#85",
-	"known_86_operator_wrap_continuation.ssl": "#86",
-	"known_86_wrap_if_condition.ssl":          "#86",
-	"known_86_wrap_concat.ssl":                "#86",
-	"known_86_wrap_boolean.ssl":               "#86",
-	"known_87_unclosed_string.ssl":            "#87",
-	"known_88_glued_operator_spacing.ssl":     "#88",
+	// (empty — every fixture is currently idempotent; add entries here with
+	// their tracking issue when a change legitimately introduces a known
+	// non-idempotent case)
 }
 
 // TestFormatIdempotenceCorpus formats every corpus fixture twice under the
