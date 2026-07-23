@@ -30,8 +30,9 @@ type FormattingOptions struct {
 	// this threshold. 0 disables the cap.
 	MaxConsecutiveBlankLines int
 	// BuiltinFunctionCase controls casing of built-in function names.
-	// "preserve" (default) keeps the user's casing; "PascalCase" rewrites
-	// each call site to the canonical inventory casing.
+	// "PascalCase" (default — the style guide's exact documented casing is
+	// authoritative, issue #92) rewrites each call site to the canonical
+	// inventory casing; "preserve" keeps the user's casing.
 	BuiltinFunctionCase string
 	SQL                 SQLFormattingOptions
 }
@@ -49,7 +50,7 @@ func DefaultFormattingOptions() FormattingOptions {
 		BlankLineBetweenBlocks:   true,
 		TrimTrailingWhitespace:   true,
 		MaxConsecutiveBlankLines: 0,
-		BuiltinFunctionCase:      "preserve",
+		BuiltinFunctionCase:      "PascalCase",
 		SQL:                      DefaultSQLFormattingOptions(),
 	}
 }
@@ -827,6 +828,12 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				// casing (issue #90, schema R41).
 				state.builder.WriteString(canonical)
 				state.currentLineLen += len(canonical)
+			} else if token.Type == lexer.TokenCodeBlock {
+				// Code-block literals canonicalize to `{|params| expr}`
+				// (schema R42, issue #91).
+				normalized := normalizeCodeBlockLiteral(token.Text, opts)
+				state.builder.WriteString(normalized)
+				state.currentLineLen += len(normalized)
 			} else {
 				state.builder.WriteString(token.Text)
 				state.currentLineLen += len(token.Text)

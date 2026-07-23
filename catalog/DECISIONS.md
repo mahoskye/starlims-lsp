@@ -4,6 +4,17 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D12 — Schema-canonical forms normalize by default (2026-07-23, issues #91/#92)
+
+Where the style-guide schema names one canonical spelling, the formatter
+applies it without opt-in: keyword and literal casing (fmt.keyword_case),
+built-in function casing (fmt.builtin_function_case — default flipped
+from "preserve" to "PascalCase", schema R45), and code-block literal
+shape `{|params| expression}` (fmt.code_block_literals, schema R42).
+Normalization is bounded by D7: string and comment content is never
+touched, and a code block that cannot be normalized safely (nested,
+multi-line, malformed) passes through verbatim.
+
 ## D11 — The formatter reflows, it does not rewrite (2026-07-23, issue #102)
 
 The formatter changes layout and applies authoritative canonicalizations
