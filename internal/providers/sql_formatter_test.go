@@ -2487,3 +2487,99 @@ func TestIsSQLDocument_Classification(t *testing.T) {
 		}
 	}
 }
+
+// Issue #93 (S34/S35): INSERT column lists and VALUES use block style —
+// '(' on the keyword line with a space after the table name, list indented
+// one level, ')' on its own line at column 0.
+func TestSQLFormatter_InsertValuesBlockStyle(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("INSERT INTO sample_audit_log (sample_id, event_type, event_description, created_by, created_on) VALUES (?, ?, ?, ?, ?)", "")
+	want := "INSERT INTO sample_audit_log (\n" +
+		"    sample_id, event_type, event_description, created_by, created_on\n" +
+		")\n" +
+		"VALUES (\n" +
+		"    ?, ?, ?, ?, ?\n" +
+		")"
+	if got != want {
+		t.Errorf("INSERT block style:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// Issue #94 (S68): DECODE with multiple mappings puts each search/result
+// pair on its own line aligned under the first argument; the default gets
+// its own line; a single-mapping DECODE stays inline.
+func TestSQLFormatter_DecodePairAlignment(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("SELECT DECODE(status, 'L', 'Logged', 'C', 'Complete', 'Unknown') AS status_desc FROM ordtask WHERE ordno = ? ORDER BY ordno", "")
+	want := "SELECT DECODE(status,\n" +
+		"              'L', 'Logged',\n" +
+		"              'C', 'Complete',\n" +
+		"              'Unknown') AS status_desc\n" +
+		"FROM ordtask\n" +
+		"WHERE ordno = ?\n" +
+		"ORDER BY ordno"
+	if got != want {
+		t.Errorf("DECODE pair layout:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+
+	short := f.FormatSQL("SELECT DECODE(status, 'A', 'Active') AS lbl FROM ordtask WHERE ordno = ? ORDER BY ordno", "")
+	if !strings.Contains(short, "DECODE(status, 'A', 'Active')") {
+		t.Errorf("single-mapping DECODE must stay inline:\n%s", short)
+	}
+}
+
+// Issue #95 (S43/S45): MERGE multi-line ON conditions align under the first
+// condition with leading AND; UPDATE SET keeps its first assignment inline
+// and aligns the rest under it.
+func TestSQLFormatter_MergeOnAndSetAlignment(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("MERGE INTO samples_target t USING samples_source s ON (t.sample_id = s.sample_id AND t.site_code = s.site_code) WHEN MATCHED THEN UPDATE SET t.sample_status = s.sample_status, t.modified_on = s.modified_on", "")
+	want := "MERGE INTO samples_target t\n" +
+		"USING samples_source s\n" +
+		"ON (t.sample_id = s.sample_id\n" +
+		"    AND t.site_code = s.site_code)\n" +
+		"WHEN MATCHED THEN\n" +
+		"    UPDATE SET t.sample_status = s.sample_status,\n" +
+		"               t.modified_on = s.modified_on"
+	if got != want {
+		t.Errorf("MERGE alignment:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// Issue #96 (S31): chained CTEs — each `name AS (` starts at column 0 after
+// the previous `),`, and the main statement starts at column 0 after the
+// final `)`.
+func TestSQLFormatter_ChainedCTEBreaks(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("WITH task_counts AS (SELECT ordno, COUNT(*) AS cnt FROM ordtask GROUP BY ordno), flagged AS (SELECT ordno FROM task_counts WHERE cnt > 10) SELECT o.ordno FROM orders o INNER JOIN flagged f ON f.ordno = o.ordno", "")
+	want := "WITH task_counts AS (\n" +
+		"    SELECT ordno, COUNT(*) AS cnt\n" +
+		"    FROM ordtask\n" +
+		"    GROUP BY ordno\n" +
+		"),\n" +
+		"flagged AS (\n" +
+		"    SELECT ordno\n" +
+		"    FROM task_counts\n" +
+		"    WHERE cnt > 10\n" +
+		")\n" +
+		"SELECT o.ordno\n" +
+		"FROM orders o\n" +
+		"INNER JOIN flagged f\n" +
+		"  ON f.ordno = o.ordno"
+	if got != want {
+		t.Errorf("chained CTE layout:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// Issue #97 (S72): a long '||' concatenation breaks with the operator
+// leading its continuation line at the SELECT-list column.
+func TestSQLFormatter_ConcatLeadingOperator(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("SELECT sample_id || ?sSep? || sample_name || ?sSep? || sample_status || ?sSep? || sample_type AS composite_key FROM samples WHERE sample_status = ?s?", "")
+	if !strings.Contains(got, "\n       || sample_type AS composite_key") {
+		t.Errorf("expected leading '||' continuation at col 7:\n%s", got)
+	}
+	if strings.Contains(got, "||\n") {
+		t.Errorf("'||' must never trail a line:\n%s", got)
+	}
+}
