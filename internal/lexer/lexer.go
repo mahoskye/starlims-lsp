@@ -305,7 +305,11 @@ func (l *Lexer) readNumber() Token {
 				digitsBeforeDecimal++
 			}
 			l.advance()
-		} else if char == '.' {
+		} else if char == '.' && l.isDigit(l.peek(1)) {
+			// Only consume '.' as a decimal point when a digit follows.
+			// `10.AND.x` must lex as Number(10) + Operator(.AND.) — an
+			// unconditional consume turned the dot-operator into garbage
+			// that corrupted later tokens on the line (issue #83).
 			text.WriteRune(char)
 			seenDecimal = true
 			l.advance()
@@ -391,14 +395,19 @@ func (l *Lexer) readDotOperatorOrBoolean() Token {
 
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
-		text.WriteRune(char)
-		l.advance()
 		if char == '.' {
+			text.WriteRune(char)
+			l.advance()
 			break
 		}
+		// Stop BEFORE a non-alpha char: consuming it swallowed operator
+		// characters into the Unknown token (`.nB<` ate the '<' of '<=',
+		// corrupting the rest of the line — issue #83).
 		if !l.isAlpha(char) {
 			break
 		}
+		text.WriteRune(char)
+		l.advance()
 	}
 
 	str := text.String()
