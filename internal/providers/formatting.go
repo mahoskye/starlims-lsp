@@ -162,6 +162,7 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	}
 
 	reindentedText := strings.Join(reindentedLines, "\n")
+	reindentedText = wrapLongLines(reindentedText, opts)
 
 	return []TextEdit{
 		{
@@ -250,7 +251,7 @@ type formatState struct {
 	afterEndProc          bool
 	afterEndRegion        bool
 	currentLineLen        int
-	lineHasContent        bool // non-indent content written on the current line
+	lastLineIndent        int // indent level of the last non-continuation line
 	parenDepth            int
 	continuationIndent    int // Additional indent for continuation lines inside parens
 	inSQLFunction         bool
@@ -399,7 +400,6 @@ func (s *formatState) normalizeProcBoundary() {
 	if strings.HasSuffix(rebuilt, "\n") {
 		s.lineStart = true
 		s.currentLineLen = 0
-		s.lineHasContent = false
 	}
 }
 
@@ -422,22 +422,28 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 	// is indented — its interior lines are part of the token text and stay
 	// verbatim.
 	if s.lineStart && token.Type != lexer.TokenWhitespace {
-		// Calculate continuation indent for lines inside parens
-		contIndent := s.continuationIndent
-		// If the first token on this line is a closing paren/bracket, dedent by one
-		// since it should align with the opening paren's level
-		if isCloseParen(token) && contIndent > 0 {
-			contIndent--
+		// Issues #86/#89: every expression continuation — inside an open
+		// delimiter, starting with a binary operator, or following a line
+		// that ended in ':=' or a binary operator — sits exactly one level
+		// past the line that opened the statement (lexical, not block
+		// depth: an :IF has already incremented s.indent for its body, but
+		// its condition's continuation belongs one past the :IF line).
+		isContinuation := s.continuationIndent > 0 ||
+			isContinuationOperator(token) ||
+			s.lastNonWSToken.Text == ":=" ||
+			isContinuationOperator(s.lastNonWSToken)
+		var totalIndent int
+		if isContinuation {
+			totalIndent = s.lastLineIndent + 1
+			// A closing paren/bracket leading the line aligns with the
+			// statement line instead.
+			if isCloseParen(token) {
+				totalIndent--
+			}
+		} else {
+			totalIndent = s.indent
+			s.lastLineIndent = totalIndent
 		}
-		// Issue #86: a line that starts with a binary operator continues the
-		// previous expression, so it takes the same one-level continuation
-		// indent the line wrapper produces — otherwise wrapped output loses
-		// an indent level on every re-format.
-		if contIndent == 0 && isContinuationOperator(token) {
-			contIndent = 1
-		}
-		// Calculate total indent: base indent + continuation indent
-		totalIndent := s.indent + contIndent
 		s.currentLineLen = writeIndentLen(s.builder, totalIndent, s.opts)
 		s.lineStart = false
 	}
@@ -457,7 +463,6 @@ func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
 	s.builder.WriteString("\n")
 	s.lineStart = true
 	s.currentLineLen = 0
-	s.lineHasContent = false
 	s.pendingStatementBreak = false
 }
 
@@ -497,7 +502,6 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		s.lineStart = true
 		s.currentLineLen = 0
-		s.lineHasContent = false
 		s.pendingStatementBreak = false
 
 		// Set continuation indent for lines inside parentheses.
@@ -569,52 +573,6 @@ func findNextNonWS(tokens []lexer.Token, startIdx int) *lexer.Token {
 	return nil
 }
 
-func (s *formatState) applyLineWrap(token lexer.Token) {
-	if s.opts.MaxLineLength <= 0 || s.lineStart {
-		return
-	}
-
-	tokenLen := len(token.Text)
-	if s.currentLineLen+tokenLen <= s.opts.MaxLineLength {
-		return
-	}
-
-	if !canWrapBefore(token, s.lastNonWSToken, s.parenDepth) {
-		return
-	}
-
-	// Issue #85: wrapping must actually help. If the token still exceeds the
-	// limit on its continuation line (an over-long atomic string, or a
-	// multi-line token whose total length is meaningless for wrapping), the
-	// line stays long — fmt.max_line_length: atomic tokens are never split
-	// or moved.
-	contWidth := (s.indent + 1) * s.opts.IndentSize
-	if contWidth+tokenLen > s.opts.MaxLineLength {
-		return
-	}
-
-	// Issue #85: never wrap when the line holds nothing but indentation —
-	// re-formatting already-wrapped output would insert a blank line and
-	// grow the file on every pass.
-	if !s.lineHasContent {
-		return
-	}
-
-	// Rule F: when the next token is a string that will be reflowed as
-	// multi-line SQL, don't wrap before it. The SQL formatter handles its
-	// own line breaks, and the opening '"' should stay on the previous
-	// line (attached to ':=', a named-arg, etc.).
-	if s.willFormatAsMultilineSQL(token) {
-		return
-	}
-
-	s.builder.WriteString("\n")
-	contIndent := s.indent + 1 // Fixed 1-level continuation indent per schema
-	s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
-	s.lineStart = false
-	s.lineHasContent = false
-}
-
 func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Token, index int) bool {
 	if s.opts.OperatorSpacing && isOperator(token) {
 		// Detect unary minus/plus: no space between operator and operand
@@ -653,23 +611,9 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 		if index+1 < len(tokens) && tokens[index+1].Text == "," {
 			return true
 		}
-		if s.opts.MaxLineLength > 0 && index+1 < len(tokens) {
+		if index+1 < len(tokens) {
 			next := tokens[index+1]
-			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF {
-				remainingLen := estimateRemainingLineLen(tokens, index+1)
-				if s.currentLineLen+1+remainingLen > s.opts.MaxLineLength && s.parenDepth > 0 {
-					s.builder.WriteString("\n")
-					contIndent := s.indent + 1 // Fixed 1-level continuation indent
-					s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
-					s.lineStart = false
-				} else {
-					s.builder.WriteString(" ")
-					s.currentLineLen++
-				}
-			}
-		} else if index+1 < len(tokens) {
-			next := tokens[index+1]
-			if next.Type != lexer.TokenWhitespace && next.Text != "," {
+			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF && next.Text != "," {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
@@ -707,29 +651,6 @@ func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 	case token.Text == "," && s.parenDepth == s.sqlFunctionParenDepth:
 		s.sqlArgCount++
 	}
-}
-
-// willFormatAsMultilineSQL returns true if writeTokenWithSQLFormatting will
-// format this token as multi-line SQL. Used by applyLineWrap to suppress a
-// pre-string newline so the opening quote stays on the prior line.
-func (s *formatState) willFormatAsMultilineSQL(token lexer.Token) bool {
-	if token.Type != lexer.TokenString || !s.opts.SQL.Enabled {
-		return false
-	}
-	if len(token.Text) < 2 {
-		return false
-	}
-	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
-		return false
-	}
-	// Only the SQL argument (position 0) of a known SQL function is a
-	// candidate — later arguments are friendly names, default values, and
-	// parameter arrays, never SQL (issue #82).
-	if s.inSQLFunction && s.sqlArgCount > 0 {
-		return false
-	}
-	inner := token.Text[1 : len(token.Text)-1]
-	return IsSQLString(inner)
 }
 
 func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
@@ -826,7 +747,6 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 
 	s.prevToken = token
 	s.lastNonWSToken = token
-	s.lineHasContent = true
 }
 
 // formatTokens formats tokens according to options.
@@ -868,7 +788,6 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		}
 
 		state.updateSQLFunctionState(token)
-		state.applyLineWrap(token)
 		tokenWritten := state.writeOperatorOrComma(token, tokens, i)
 		if !tokenWritten {
 			tokenWritten = state.writeTokenWithSQLFormatting(token)
@@ -965,53 +884,6 @@ func writeIndentLen(b *strings.Builder, level int, opts FormattingOptions) int {
 	b.WriteString(tabs)
 	// Assume tab width equals IndentSize for length calculation
 	return opts.IndentSize * level
-}
-
-// canWrapBefore checks if we can wrap before a token.
-func canWrapBefore(token, prevToken lexer.Token, parenDepth int) bool {
-	// Don't wrap at the very start
-	if prevToken.Type == 0 {
-		return false
-	}
-	// Never split a member-access chain `oVar:property` — the ':' (TokenPunctuation)
-	// binds the identifier to its receiver. Wrapping after the colon produces
-	// "oVar:\n    property" which is unreadable; wrapping before it strands the
-	// receiver on its own line. See vs-code-ssl-formatter#76.
-	if prevToken.Type == lexer.TokenPunctuation && prevToken.Text == ":" {
-		return false
-	}
-	if token.Type == lexer.TokenPunctuation && token.Text == ":" {
-		return false
-	}
-	// Good wrap points: after comma, after assignment, inside parens
-	if prevToken.Text == "," {
-		return true
-	}
-	if prevToken.Text == ":=" {
-		return true
-	}
-	// Wrap before identifiers/keywords inside parentheses
-	if parenDepth > 0 && (token.Type == lexer.TokenIdentifier || token.Type == lexer.TokenKeyword) {
-		return true
-	}
-	// Schema: wrap_long_lines.break_on includes "before_operator".
-	// Only wrap before operators that are natural statement-level break points.
-	// Comparison operators (=, ==, !=, <, >, <=, >=, <>) bind tightly to their
-	// operands (e.g. "a = 1") and should not be separated from them.
-	if token.Type == lexer.TokenOperator {
-		upper := strings.ToUpper(token.Text)
-		switch upper {
-		case ".AND.", ".OR.", ".NOT.":
-			return true
-		case "+", "-", "*", "/", "%", "^", "**":
-			return true
-		case "+=", "-=", "*=", "/=", "%=", "^=":
-			return true
-		case "$":
-			return true
-		}
-	}
-	return false
 }
 
 // needsSemicolonAtLineEnd checks if a semicolon should be added at the end of a line.
@@ -1132,30 +1004,6 @@ func isStatementContent(token lexer.Token) bool {
 	return false
 }
 
-// estimateRemainingLineLen estimates length until next newline or semicolon.
-func estimateRemainingLineLen(tokens []lexer.Token, startIdx int) int {
-	length := 0
-	for i := startIdx; i < len(tokens); i++ {
-		tok := tokens[i]
-		if tok.Type == lexer.TokenEOF {
-			break
-		}
-		if tok.Type == lexer.TokenWhitespace && strings.Contains(tok.Text, "\n") {
-			break
-		}
-		if tok.Text == ";" || tok.Text == ")" {
-			length += len(tok.Text)
-			break
-		}
-		if tok.Type == lexer.TokenWhitespace {
-			length++ // Single space
-		} else {
-			length += len(tok.Text)
-		}
-	}
-	return length
-}
-
 // isUnaryContext returns true if the previous token context indicates that
 // a - or + is unary (sign) rather than binary (subtraction/addition).
 func isUnaryContext(lastNonWS lexer.Token, lineStart bool) bool {
@@ -1229,6 +1077,7 @@ func isCloseParen(token lexer.Token) bool {
 // output. These are line-oriented passes that don't need token information,
 // so they're easier to express here than inside the token-stream formatter.
 func applyPostFormatPasses(text string, opts FormattingOptions) string {
+	text = wrapLongLines(text, opts)
 	if opts.BuiltinFunctionCase == "PascalCase" {
 		text = canonicalizeBuiltinCasing(text)
 	}

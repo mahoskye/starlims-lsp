@@ -23,6 +23,12 @@ history:
       like statements; previously the indent writer skipped comment tokens,
       flushing every standalone comment to column 0.
   - date: 2026-07-22
+    ref: "issue #89"
+    note: >-
+      Continuation anchoring unified as lexical (statement line + 1) for
+      all continuation forms, including lines following a trailing ':='
+      or binary operator.
+  - date: 2026-07-22
     ref: "issue #86"
     note: >-
       Expression continuations that begin with a binary operator take the
@@ -42,13 +48,14 @@ default `ssl.format.indentStyle: "tab"` each level is one tab character;
 with `"space"` each level is `ssl.format.indentSize` spaces (default 4).
 For line-length accounting a tab is counted as `indentSize` columns.
 
-Continuation lines inside an unclosed `(`/`{`/`[` get one fixed extra level
-(not proportional to nesting depth). A line that begins with a binary
-operator (`.AND.`/`.OR.`/`.NOT.`, arithmetic, compound assignment, `$`)
-continues the previous expression and takes the same one extra level —
-matching what the line wrapper emits, so wrapped output is idempotent
-(issue #86). Continuation lines led by any other token (e.g. an identifier
-after a trailing `.AND.`) keep the statement indent as written.
+Continuation lines — inside an unclosed `(`/`{`/`[`, beginning with a
+binary operator, or following a line that ended in `:=` or a binary
+operator — sit exactly one level past the line that opened the statement
+(issues #86/#89). The anchor is lexical, not block depth: an `:IF`
+condition's continuation indents one level past the `:IF` line even though
+the body will indent further. The extra level is fixed, never proportional
+to nesting depth, and a closing delimiter that leads a line aligns with
+the statement line itself.
 
 Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:

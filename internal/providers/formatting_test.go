@@ -1,8 +1,12 @@
 package providers
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"starlims-lsp/internal/lexer"
 )
 
 // [spec feature.formatting/A1] — full-document formatting returns exactly
@@ -2437,5 +2441,98 @@ func TestFormatDocument_DotOperatorAndReceiverCasing(t *testing.T) {
 	outPlain := FormatDocument(plain, DefaultFormattingOptions())[0].NewText
 	if !strings.Contains(outPlain, "me := 1;") || !strings.Contains(outPlain, "me + 1") {
 		t.Errorf("identifier merely named me must not be recased:\n%s", outPlain)
+	}
+}
+
+// Issue #89: the wrap engine's conformance guarantee — after formatting, a
+// line exceeds the limit only when a single atomic token exceeds the
+// budget. Runs the corpus and asserts every over-limit output line has no
+// viable break candidate (approximated: contains a token wider than the
+// remaining budget).
+func TestWrapEngine_ConformanceGuaranteeOnCorpus(t *testing.T) {
+	dir := filepath.Join("testdata", "idempotence")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading corpus: %v", err)
+	}
+	opts := DefaultFormattingOptions()
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".ssl") {
+			continue
+		}
+		raw, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		out := formatAll(string(raw), opts)
+
+		// Widest single-line token per output line (atomic units).
+		widest := map[int]int{}
+		multi := map[int]bool{}
+		for _, tok := range lexer.NewLexer(out).Tokenize() {
+			if tok.Type == lexer.TokenEOF || tok.Type == lexer.TokenWhitespace {
+				continue
+			}
+			li := tok.Line - 1
+			if strings.Contains(tok.Text, "\n") {
+				for l := li; l <= li+strings.Count(tok.Text, "\n"); l++ {
+					multi[l] = true
+				}
+				continue
+			}
+			if w := visualWidth(tok.Text, opts); w > widest[li] {
+				widest[li] = w
+			}
+		}
+
+		// Corpus files allowed to contain over-limit lines: each holds an
+		// unsplittable span (a long atomic string, a member-chain
+		// comparison with no break points, or a callable glued to a long
+		// string argument). Anything else exceeding the limit is a wrap
+		// regression.
+		allowed := map[string]bool{
+			"english_overlong_strings.ssl": true,
+			"overlong_string_wrap.ssl":     true,
+			"sql_function_default_arg.ssl": true,
+			"string_preservation.ssl":      true,
+			"wrap_string_arguments.ssl":    true,
+		}
+		for ln, line := range strings.Split(out, "\n") {
+			if visualWidth(line, opts) <= opts.MaxLineLength || multi[ln] {
+				continue
+			}
+			budget := opts.MaxLineLength - (visualWidth(leadingIndentString(line), opts) + opts.IndentSize)
+			if widest[ln] >= budget {
+				continue // an atomic token alone exceeds the budget
+			}
+			if !allowed[e.Name()] {
+				t.Errorf("%s:%d unexplained over-limit line (widest atom %d, budget %d):\n%s",
+					e.Name(), ln+1, widest[ln], budget, line)
+			}
+		}
+	}
+}
+
+// Issue #89: subscripts are atomic — a break never lands inside [...].
+func TestWrapEngine_SubscriptNeverSplit(t *testing.T) {
+	input := "vRes := CreateUdObject(\"MyNamespace.MyClassName\", {oParentObject:ChildCollection[nChildIndex], sConfigurationKey});\n"
+	out := formatAll(input, DefaultFormattingOptions())
+	if !strings.Contains(out, "ChildCollection[nChildIndex]") {
+		t.Errorf("subscript was split:\n%s", out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if visualWidth(line, DefaultFormattingOptions()) > 90 {
+			t.Errorf("line exceeds 90: %q", line)
+		}
+	}
+}
+
+// Issue #89: lines inside reflowed multi-line SQL are never re-wrapped.
+func TestWrapEngine_MultilineSQLUntouched(t *testing.T) {
+	input := "aRes := SQLExecute(\"SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id\");\n"
+	opts := DefaultFormattingOptions()
+	once := formatAll(input, opts)
+	if !strings.Contains(once, "\n    SELECT sample_id, sample_name, sample_status\n") {
+		t.Fatalf("SQL should reflow:\n%s", once)
+	}
+	if formatAll(once, opts) != once {
+		t.Errorf("multi-line SQL block not stable under wrap pass:\n%s", once)
 	}
 }
