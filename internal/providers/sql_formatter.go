@@ -105,9 +105,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	decodeArgCount := 0
 
 	// Block-style parens: INSERT column lists and VALUES lists open on
-	// their keyword's line, indent their content one level, and close at
-	// the parent indent (S34/S35/S46 — issue #93).
-	blockParens := make(map[int]bool)
+	// their keyword's line, indent their content one level past the stored
+	// closer indent, and close at the stored indent (S34/S35/S37 — issues
+	// #93/#118). The value is the closer's extra indent ("" for a plain
+	// INSERT at column 0; deeper inside INSERT ALL branches).
+	blockParens := make(map[int]string)
+	// INSERT ALL branch layout (S37 — issue #118).
+	insertAll := false
+	// WITHIN GROUP (...) suppression (S51/S52 — issue #119).
+	inWithinGroup := false
+	withinGroupParenDepth := 0
 	// Column where a MERGE UPDATE SET's first assignment starts, for
 	// aligning subsequent assignments (S43 — issue #95).
 	mergeSetCol := -1
@@ -115,6 +122,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	for i := 0; i < len(nonWSTokens); i++ {
 		t := nonWSTokens[i]
 		upperText := strings.ToUpper(t.Text)
+
+		prevCommand := ""
+		if p := getPrevNonWS(nonWSTokens, i); p != nil {
+			prevCommand = strings.ToUpper(p.Text)
+		}
 
 		// Track state
 		if t.Type == SQLTokenKeyword {
@@ -129,6 +141,17 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				currentClause = "UPDATE"
 			case "INSERT":
 				currentClause = "INSERT"
+			case "ALL":
+				if rootCommand == "INSERT" && prevCommand == "INSERT" {
+					insertAll = true
+				}
+			case "INTO":
+				// Each INSERT ALL branch re-enters the column-list context;
+				// RETURNING ... INTO keeps its own clause (its INTO stays
+				// inline and takes no column-list block).
+				if rootCommand == "INSERT" && currentClause != "RETURNING" {
+					currentClause = "INSERT"
+				}
 			case "MERGE":
 				currentClause = "MERGE"
 			case "FROM":
@@ -169,6 +192,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				caseInSelectColumns = true
 			}
 			caseDepth++
+		}
+
+		// Track WITHIN GROUP (...) — the compound stays glued and its paren
+		// contents stay inline (S51/S52, issue #119).
+		if upperText == "GROUP" && t.Type == SQLTokenKeyword && prevCommand == "WITHIN" {
+			inWithinGroup = true
+			withinGroupParenDepth = parenDepth + 1
+		}
+		if t.Text == ")" && inWithinGroup && parenDepth == withinGroupParenDepth-1 {
+			inWithinGroup = false
 		}
 
 		// Track OVER() clause (Gap 8)
@@ -230,12 +263,31 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else if upperText == "UPDATE" && prevUpper == "FOR" {
 					// FOR UPDATE is a compound clause — stays on one line
 					needsBreak = false
+				} else if upperText == "GROUP" && prevUpper == "WITHIN" {
+					// WITHIN GROUP is a compound clause (issue #119)
+					needsBreak = false
+				} else if upperText == "ON" && i+1 < len(nonWSTokens) &&
+					strings.ToUpper(nonWSTokens[i+1].Text) == "OVERFLOW" {
+					// LISTAGG's `ON OVERFLOW` is not a join ON (issue #119)
+					needsBreak = false
+				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
+					// ORDER BY etc. inside WITHIN GROUP (...) stays inline
+					needsBreak = false
 				} else if upperText == "CASE" && prev != nil && prev.Type == SQLTokenOperator {
 					// CASE after = in SET clause stays inline: fldsts = CASE WHEN ...
 					needsBreak = false
 				} else {
 					needsBreak = true
 					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
+					if insertAll {
+						// S37 branch layout (issue #118).
+						switch upperText {
+						case "WHEN":
+							extraIndent = f.indentString
+						case "INTO", "VALUES":
+							extraIndent = strings.Repeat(f.indentString, 2)
+						}
+					}
 				}
 			}
 
@@ -245,6 +297,18 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				// Suppress line break for AND that is part of BETWEEN...AND
 				if upperText == "AND" && afterBetween {
 					afterBetween = false
+				} else if upperText == "ON" && i+1 < len(nonWSTokens) &&
+					strings.ToUpper(nonWSTokens[i+1].Text) == "OVERFLOW" {
+					// LISTAGG's `ON OVERFLOW` is not a join ON (issue #119).
+					needsBreak = false
+				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
+					// contents of WITHIN GROUP (...) stay inline (issue #119)
+					needsBreak = false
+				} else if insertAll && upperText == "WHEN" {
+					// keep the S37 branch indent set by the major-clause
+					// chain (issue #118) — WHEN is both a break-before and
+					// an indented keyword, and this branch runs second.
+					needsBreak = true
 				} else {
 					needsBreak = true
 					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
@@ -302,14 +366,19 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			if style != "compact" && rootCommand != "MERGE" && t.Text == "(" &&
 				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
 				subqueryParenDepths[parenDepth] = true
-				blockParens[parenDepth] = true
+				closerIndent := ""
+				if insertAll {
+					closerIndent = strings.Repeat(f.indentString, 2) // S37: ')' at 8
+				}
+				blockParens[parenDepth] = closerIndent
 			}
 
-			// Content of a block paren starts on its own line.
-			if style != "compact" && prev != nil && prev.Text == "(" && blockParens[parenDepth] && t.Text != ")" {
-				needsBreak = true
-				if rootCommand == "MERGE" {
-					extraIndent = f.indentString
+			// Content of a block paren starts on its own line, one level past
+			// the closer's indent.
+			if style != "compact" && prev != nil && prev.Text == "(" && t.Text != ")" {
+				if closerIndent, ok := blockParens[parenDepth]; ok {
+					needsBreak = true
+					extraIndent = closerIndent
 				}
 			}
 
@@ -386,11 +455,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] {
 						hangCol = parenOpenCols[len(parenOpenCols)-1]
 					}
-					if blockParens[parenDepth] {
-						extraIndent = ""
-						if rootCommand == "MERGE" {
-							extraIndent = f.indentString
-						}
+					if closerIndent, ok := blockParens[parenDepth]; ok {
+						extraIndent = closerIndent
 					} else if hangCol >= 0 {
 						baseLen := len(baseIndent)
 						parenIndentLen := len(f.indentString) * parenDepth
@@ -406,6 +472,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					}
 				}
 			}
+		}
+
+		// INSERT ... SELECT and INSERT ALL ... SELECT: the source statement
+		// starts at column 0 after a closing ')' (S36/S37, issues #93/#118).
+		if !needsBreak && rootCommand == "INSERT" && parenDepth == 0 && prev != nil &&
+			prev.Text == ")" && t.Type == SQLTokenKeyword && upperText == "SELECT" {
+			needsBreak = true
+			extraIndent = ""
 		}
 
 		// Chained CTEs (S31, issue #96): after a CTE body closes at depth 0,
@@ -452,6 +526,19 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			extraIndent = strings.Repeat(" ", 11) + f.indentString
 		}
 
+		// A long LISTAGG projection wraps before WITHIN, keeping the whole
+		// `WITHIN GROUP (...) AS alias` tail together on the continuation
+		// line at the SELECT-list column (S52, issue #119).
+		if upperText == "WITHIN" && t.Type == SQLTokenKeyword && inSelectColumns &&
+			f.opts.MaxLineLength > 0 {
+			end := f.projectionEndIndex(nonWSTokens, i)
+			tailLen := f.projectionRenderLen(nonWSTokens, i, end)
+			if currentLineLen+1+tailLen > f.opts.MaxLineLength {
+				needsBreak = true
+				extraIndent = strings.Repeat(" ", 7)
+			}
+		}
+
 		// OVER() internal formatting: PARTITION BY / ORDER BY on their own lines (Gap 8)
 		if inOverClause && parenDepth >= overParenDepth && t.Type == SQLTokenKeyword {
 			if upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE" {
@@ -489,8 +576,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// Closing paren on its own line for subqueries/VALUES/column blocks
 		if t.Text == ")" && subqueryParenDepths[parenDepth+1] {
 			needsBreak = true
-			if blockParens[parenDepth+1] && rootCommand == "MERGE" {
-				extraIndent = f.indentString // stays inside the WHEN branch (S46)
+			if closerIndent, ok := blockParens[parenDepth+1]; ok {
+				extraIndent = closerIndent
 			}
 			delete(subqueryParenDepths, parenDepth+1)
 			delete(blockParens, parenDepth+1)
@@ -540,7 +627,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		}
 		// S34: 'INSERT INTO table (' — a space separates the table name from
 		// its column-list paren (issue #93); call-style parens stay glued.
-		if !needsBreak && t.Text == "(" && blockParens[parenDepth] && prev != nil && prev.Type == SQLTokenIdentifier {
+		if _, isBlock := blockParens[parenDepth]; !needsBreak && t.Text == "(" && isBlock && prev != nil && prev.Type == SQLTokenIdentifier {
 			result.WriteString(" ")
 			currentLineLen++
 		}

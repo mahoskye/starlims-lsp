@@ -1263,47 +1263,36 @@ func TestSQLFormatter_MergeDeleteWhere(t *testing.T) {
 // --- LISTAGG WITHIN GROUP ---
 
 func TestSQLFormatter_ListaggWithinGroup(t *testing.T) {
-	// sql-canonical-compact-reference §3.4: LISTAGG ... WITHIN GROUP (ORDER BY ...)
-	// NOTE: intentionally NOT pinned to exact layout (issue #119) — the current formatter
-	// splits the compound "WITHIN GROUP" across lines and treats "GROUP (" as
-	// a clause break, which does not conform to §3.4. Only casing is asserted
-	// until that layout bug is fixed (issue #103 follow-up).
-	opts := DefaultSQLFormattingOptions()
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT department, listagg(name, ', ') within group (order by name) as members FROM employees GROUP BY department"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "LISTAGG(") {
-		t.Errorf("expected LISTAGG uppercased, got:\n%s", result)
-	}
-	if !strings.Contains(result, "WITHIN") {
-		t.Errorf("expected WITHIN uppercased, got:\n%s", result)
-	}
-	t.Logf("Formatted LISTAGG WITHIN GROUP:\n%s", result)
+	// sql-canonical-compact-reference §3.4 (S51, issue #119): the compound
+	// WITHIN GROUP stays glued and a short form stays fully inline.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "short_inline",
+			input: "SELECT testcode, LISTAGG(name, ', ') WITHIN GROUP (ORDER BY name) AS name_list FROM ordtask GROUP BY testcode",
+			want: "SELECT testcode, LISTAGG(name, ', ') WITHIN GROUP (ORDER BY name) AS name_list\n" +
+				"FROM ordtask\n" +
+				"GROUP BY testcode",
+		},
+	})
 }
 
 // --- LISTAGG ON OVERFLOW ---
 
 func TestSQLFormatter_ListaggOnOverflow(t *testing.T) {
-	// sql-canonical-compact-reference §3.4: ON OVERFLOW TRUNCATE
-	// NOTE: intentionally NOT pinned to exact layout (issue #119) — same "WITHIN GROUP"
-	// split bug as TestSQLFormatter_ListaggWithinGroup; only casing asserted.
-	opts := DefaultSQLFormattingOptions()
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT listagg(testcode, ', ' on overflow truncate '...') within group (order by testcode) FROM ordtask"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "OVERFLOW") {
-		t.Errorf("expected OVERFLOW uppercased, got:\n%s", result)
-	}
-	if !strings.Contains(result, "TRUNCATE") {
-		t.Errorf("expected TRUNCATE uppercased, got:\n%s", result)
-	}
-	t.Logf("Formatted LISTAGG ON OVERFLOW:\n%s", result)
+	// §3.4 (S52, issue #119): ON OVERFLOW stays inside the argument list —
+	// never treated as a join ON — and a long projection wraps before
+	// WITHIN, keeping the WITHIN GROUP (...) AS alias tail together at the
+	// SELECT-list column.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "overflow_wraps_before_within",
+			input: "SELECT LISTAGG(testcode, ', ' ON OVERFLOW TRUNCATE '...') WITHIN GROUP (ORDER BY testcode) AS test_list FROM ordtask WHERE status = ?",
+			want: "SELECT LISTAGG(testcode, ', ' ON OVERFLOW TRUNCATE '...')\n" +
+				"       WITHIN GROUP (ORDER BY testcode) AS test_list\n" +
+				"FROM ordtask\n" +
+				"WHERE status = ?",
+		},
+	})
 }
 
 // --- MERGE multi-line ON ---
@@ -1514,25 +1503,32 @@ func TestSQLFormatter_ScalarSubqueryInSelect(t *testing.T) {
 // --- D25: INSERT ALL / multi-table INSERT ---
 
 func TestSQLFormatter_InsertAll(t *testing.T) {
-	// NOTE: intentionally NOT pinned to exact layout (issue #118) — the current output is
-	// internally inconsistent (first INTO gets block-style parens, second stays
-	// inline; the trailing SELECT is glued to the closing ')'), which does not
-	// conform to the canonical-compact reference. Only keyword handling is
-	// asserted until that layout bug is fixed (issue #103 follow-up).
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "insert all when status = 'A' then into active_orders(ordno) values(ordno) when status = 'C' then into closed_orders(ordno) values(ordno) select ordno, status from orders"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "INSERT") {
-		t.Errorf("expected INSERT keyword uppercased, got:\n%s", result)
-	}
-	if !strings.Contains(result, "ALL") || !strings.Contains(result, "WHEN") {
-		t.Errorf("expected ALL and WHEN keywords, got:\n%s", result)
-	}
+	// S37 (issue #118): WHEN branches at 4, INTO/VALUES at 8 with
+	// block-style parens (columns at 12, closers at 8), source SELECT at
+	// column 0.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "multi_branch",
+			input: "INSERT ALL WHEN status = 'Complete' THEN INTO completed_tasks (ordno, testcode, completed_date) VALUES (ordno, testcode, SYSDATE) WHEN status = 'Cancelled' THEN INTO cancelled_tasks (ordno, testcode) VALUES (ordno, testcode) SELECT ordno, testcode, status FROM ordtask",
+			want: "INSERT ALL\n" +
+				"    WHEN status = 'Complete' THEN\n" +
+				"        INTO completed_tasks (\n" +
+				"            ordno, testcode, completed_date\n" +
+				"        )\n" +
+				"        VALUES (\n" +
+				"            ordno, testcode, SYSDATE\n" +
+				"        )\n" +
+				"    WHEN status = 'Cancelled' THEN\n" +
+				"        INTO cancelled_tasks (\n" +
+				"            ordno, testcode\n" +
+				"        )\n" +
+				"        VALUES (\n" +
+				"            ordno, testcode\n" +
+				"        )\n" +
+				"SELECT ordno, testcode, status\n" +
+				"FROM ordtask",
+		},
+	})
 }
 
 // --- SQL: EXISTS keyword formatting ---
