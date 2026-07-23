@@ -121,6 +121,14 @@ func formatFromFile(filePath string) bool {
 }
 
 func formatContent(content string) string {
+	// The CLI has no file-type context, so it gates on content alone: a
+	// document that classifies as SQL-mode data-source content (plain SQL,
+	// or builder directives followed by SQL) passes through unchanged —
+	// the SSL formatter would corrupt it (issues #84/#104).
+	if providers.IsSQLModeDataSource(content) {
+		return content
+	}
+
 	opts := providers.DefaultFormattingOptions()
 	edits := providers.FormatDocument(content, opts)
 

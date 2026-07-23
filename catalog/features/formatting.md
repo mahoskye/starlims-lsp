@@ -42,6 +42,14 @@ history:
     note: Post-format passes (trailing-whitespace trim, blank-line cap,
       sibling-block blank lines, built-in casing) layered on the token
       formatter as configurable options.
+  - date: 2026-07-22
+    ref: "issues #84/#104"
+    note: >-
+      SQL-mode data sources (plain SQL, or builder directives followed by
+      SQL) are excluded from formatting: the SSL formatter injected
+      semicolons into SQL and re-cased bind variables. Formatting them
+      with the SQL engine is deferred until the SQL lexer understands
+      Oracle-style :bind variables.
 issues: []
 ---
 
@@ -79,6 +87,13 @@ not restate them.
   recorded as `## Known gaps` on the relevant `fmt.*` entry.
 - A formatting failure MUST NOT corrupt the document; when the formatter
   cannot proceed it leaves the text unchanged.
+- Data-source documents whose content is in SQL mode — plain SQL, or a
+  builder-directive / inline-defaults `:PARAMETERS` header followed by SQL
+  (the classifier shared with feature.diagnostics_pipeline A10/A13) — get
+  no edits from either formatting request: the SSL formatter would inject
+  statement semicolons into SQL and re-case `:bind` variables. The CLI,
+  which has no file-type context, applies the same content classifier to
+  every input. SSL-mode data sources format normally.
 
 ## Acceptance
 
@@ -90,6 +105,7 @@ not restate them.
 - A6: Given the output of a previous format run under the same options, when formatted again, then the result is byte-identical.
 - A7: Given `ssl.format.sql.detectSQLStrings: false`, when formatted, then standalone SQL-looking strings pass through unchanged while the SQL argument of a known SQL function is still formatted.
 - A8: Given different `ssl.format.*` option values (e.g. indentStyle tab vs space), when the same document is formatted under each, then the outputs differ accordingly — the configured options are honored.
+- A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
 
 ## Rationale
 

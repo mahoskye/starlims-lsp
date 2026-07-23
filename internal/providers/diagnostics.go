@@ -102,10 +102,19 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// A data-source document whose content is plain SQL gets no SSL
 	// diagnostics at all — every SSL check would false-flag SQL syntax
 	// such as dot-qualified column names (feature.diagnostics_pipeline
-	// A10-A12, issue #77). The server mirrors this guard on its
-	// cached-token path in validateDocument.
-	if opts.IsDataSourceFile && IsSQLDocument(text) {
-		return nil
+	// A10-A12, issue #77). The server routes data-source documents through
+	// this text path in validateDocument.
+	if opts.IsDataSourceFile {
+		if IsSQLDocument(text) {
+			return nil
+		}
+		// Hybrid sql_data_source shape: builder directives / :PARAMETERS
+		// header followed by raw SQL (issue #104). The header keeps its SSL
+		// and data-source checks; the SQL body is suppressed. The header is
+		// a prefix of the document, so diagnostic ranges line up unchanged.
+		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && IsSQLDocument(body) {
+			text = header
+		}
 	}
 
 	lex := lexer.NewLexer(text)

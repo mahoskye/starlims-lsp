@@ -819,6 +819,13 @@ func (s *SSLServer) handleFormatting(context *glsp.Context, params *protocol.Doc
 		return nil, nil
 	}
 
+	// SQL-mode data source (plain SQL or directives-then-SQL): the SSL
+	// formatter would inject semicolons and re-case bind variables, so
+	// return no edits (feature.formatting A9, issues #84/#104).
+	if isDataSourceURI(uri) && providers.IsSQLModeDataSource(content) {
+		return nil, nil
+	}
+
 	// Get formatting edits
 	edits := providers.FormatDocument(content, s.settings.Formatting)
 
@@ -837,6 +844,11 @@ func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protoco
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
+		return nil, nil
+	}
+
+	// Same SQL-mode gate as handleFormatting (feature.formatting A9).
+	if isDataSourceURI(uri) && providers.IsSQLModeDataSource(content) {
 		return nil, nil
 	}
 
