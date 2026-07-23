@@ -2568,3 +2568,40 @@ func TestFormatDocument_CommentThenCodeSplits(t *testing.T) {
 		t.Errorf("not idempotent:\n%s", out)
 	}
 }
+
+// Issue #91 (schema R42): code-block literals canonicalize to
+// `{|params| expression}` — comma-space params, one space after the closing
+// '|', configured spacing in the body. Unary signs stay glued; malformed or
+// multi-line blocks pass through verbatim. [spec fmt.code_block_literals]
+func TestFormatDocument_CodeBlockLiteralNormalized(t *testing.T) {
+	opts := DefaultFormattingOptions()
+	input := "fnAdd := {|a,b|a+b};\nfnT := {|x| x * 2};\nfnNeg := {|n| -n};\nfnStr := {|s| s + \"a,b  glued\"};\n"
+	out := FormatDocument(input, opts)[0].NewText
+	for _, want := range []string{
+		"fnAdd := {|a, b| a + b};",
+		"fnT := {|x| x * 2};",
+		"fnNeg := {|n| -n};",
+		"fnStr := {|s| s + \"a,b  glued\"};",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent:\n%s", out)
+	}
+}
+
+// Issue #92: builtinFunctionCase defaults to PascalCase — call sites take
+// the canonical inventory casing out of the box; strings and comments stay
+// untouched (issue #34 fences). [spec fmt.builtin_function_case]
+func TestFormatDocument_BuiltinCasingDefaultPascalCase(t *testing.T) {
+	input := "x := iif(bFlag, alltrim(sName), 2);\ns := \"call alltrim(x) here\";  /* alltrim(y);\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(out, "IIf(bFlag, AllTrim(sName), 2)") {
+		t.Errorf("builtins should canonicalize by default:\n%s", out)
+	}
+	if !strings.Contains(out, `"call alltrim(x) here"`) || !strings.Contains(out, "/* alltrim(y);") {
+		t.Errorf("strings/comments must stay untouched:\n%s", out)
+	}
+}

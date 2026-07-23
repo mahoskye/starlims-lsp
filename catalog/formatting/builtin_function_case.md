@@ -3,12 +3,10 @@ id: fmt.builtin_function_case
 title: Built-in function name casing
 kind: formatter
 status: active
-authority: style_only
+authority: authoritative
 schema_ref: null
 config:
   - ssl.format.builtinFunctionCase
-spec_options:
-  builtin_function_case: "PascalCase"
 tests:
   - internal/providers/formatting_test.go
 history:
@@ -23,18 +21,24 @@ history:
       The pass now re-lexes the formatted text and only rewrites identifier
       tokens, so built-in names inside string literals and comments are
       never re-cased.
-issues: ["#34"]
+  - date: 2026-07-23
+    ref: "issue #92"
+    note: >-
+      Default flipped to "PascalCase": the style guide mandates the exact
+      documented casing (schema naming rule R45), making canonicalization
+      authoritative rather than opt-in. "preserve" remains available.
+issues: ["#34", "#92"]
 ---
 
 ## Behavior
 
-With `ssl.format.builtinFunctionCase: "preserve"` (default), built-in
-function names keep the author's casing. With `"PascalCase"` (the setting
-exercised by the fences below, via `spec_options`), a post-format pass
-rewrites every call site — an identifier immediately followed by `(`,
+With `ssl.format.builtinFunctionCase: "PascalCase"` (default — the style
+guide's exact documented casing is authoritative, schema R45; issue #92),
+a post-format pass rewrites every call site — an identifier immediately followed by `(`,
 optionally with intervening spaces/tabs — whose lowercased name matches the
 published built-in inventory to the inventory's canonical casing (e.g.
-`len(` → `Len(`, `sqlexecute(` → `SQLExecute(`).
+`len(` → `Len(`, `sqlexecute(` → `SQLExecute(`). Setting `"preserve"`
+keeps the author's casing.
 
 Identifiers not in the inventory (user procedures, variables) are never
 re-cased, and neither are non-call uses of a built-in name (no following
