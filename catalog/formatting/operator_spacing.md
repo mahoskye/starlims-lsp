@@ -75,7 +75,9 @@ nCount := 0;
 :ENDIF;
 ```
 
-Operators glued to a preceding operator get exactly one space (issue #88):
+Operators glued to a preceding operator get exactly one space, and the
+dot-wrapped logical operators take their canonical uppercase form
+(issues #88/#90):
 
 ### Before
 
@@ -86,7 +88,7 @@ bFlag:=.not.bFlag;
 ### After
 
 ```ssl
-bFlag := .not. bFlag;
+bFlag := .NOT. bFlag;
 ```
 
 A dot operator glued to a numeric literal is recognized and spaced —

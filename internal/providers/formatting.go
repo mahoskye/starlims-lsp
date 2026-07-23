@@ -175,8 +175,12 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 }
 
 // detectBaseIndent detects the common base indentation of the given lines.
+// When the lines mix tabs and spaces the common byte prefix collapses to ""
+// and the whole selection used to be re-anchored at column 0 (issue #98);
+// the first non-blank line's indent is the fallback anchor so the block
+// stays where it sits (feature.formatting A2).
 func detectBaseIndent(lines []string) string {
-	var baseIndent string
+	var baseIndent, firstIndent string
 	first := true
 
 	for _, line := range lines {
@@ -197,6 +201,7 @@ func detectBaseIndent(lines []string) string {
 
 		if first {
 			baseIndent = indent
+			firstIndent = indent
 			first = false
 		} else {
 			// Find common prefix
@@ -204,6 +209,9 @@ func detectBaseIndent(lines []string) string {
 		}
 	}
 
+	if baseIndent == "" {
+		return firstIndent
+	}
 	return baseIndent
 }
 
@@ -625,8 +633,9 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			s.builder.WriteString(" ")
 			s.currentLineLen++
 		}
-		s.builder.WriteString(token.Text)
-		s.currentLineLen += len(token.Text)
+		opText := canonicalDotOperator(token.Text)
+		s.builder.WriteString(opText)
+		s.currentLineLen += len(opText)
 		if index+1 < len(tokens) {
 			next := tokens[index+1]
 			if next.Type != lexer.TokenWhitespace && !isCloseParen(next) && next.Text != ";" {
@@ -886,6 +895,11 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				normalized := ":" + strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
+			} else if canonical, ok := canonicalReceiver(token, tokens, i); ok {
+				// Me/Base as member-access receivers take their canonical
+				// casing (issue #90, schema R41).
+				state.builder.WriteString(canonical)
+				state.currentLineLen += len(canonical)
 			} else {
 				state.builder.WriteString(token.Text)
 				state.currentLineLen += len(token.Text)
@@ -1017,8 +1031,12 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 		return false
 	}
 
-	// Don't add after operators (incomplete expression)
-	if lastToken.Type == lexer.TokenOperator || lastToken.Text == ":=" {
+	// Don't add after operators (incomplete expression) — except postfix
+	// increment/decrement, which end a complete statement (issue #99).
+	if lastToken.Type == lexer.TokenOperator && lastToken.Text != "++" && lastToken.Text != "--" {
+		return false
+	}
+	if lastToken.Text == ":=" {
 		return false
 	}
 
@@ -1101,6 +1119,10 @@ func isStatementContent(token lexer.Token) bool {
 		return true
 	}
 	if isCloseParen(token) {
+		return true
+	}
+	// Postfix increment/decrement end a statement (issue #99).
+	if token.Text == "++" || token.Text == "--" {
 		return true
 	}
 	// Keywords that end statements
@@ -1441,4 +1463,41 @@ func hasUnterminatedString(tokens []lexer.Token) bool {
 		return t.Text[len(t.Text)-1] != close
 	}
 	return false
+}
+
+// canonicalDotOperator uppercases the dot-wrapped logical operators
+// (.and. -> .AND.), which lex as TokenOperator and so never reached the
+// keyword-casing branch (issue #90, schema R38). Other operators are
+// returned unchanged.
+func canonicalDotOperator(text string) string {
+	switch strings.ToUpper(text) {
+	case ".AND.", ".OR.", ".NOT.":
+		return strings.ToUpper(text)
+	}
+	return text
+}
+
+// canonicalReceiver returns the canonical casing for the special receivers
+// Me and Base when the identifier is immediately followed by a member-access
+// ':' (issue #90). Ordinary identifiers — including variables that merely
+// share the name — are only rewritten in receiver position, where the names
+// are reserved.
+func canonicalReceiver(token lexer.Token, tokens []lexer.Token, i int) (string, bool) {
+	if token.Type != lexer.TokenIdentifier {
+		return "", false
+	}
+	var canonical string
+	switch strings.ToLower(token.Text) {
+	case "me":
+		canonical = "Me"
+	case "base":
+		canonical = "Base"
+	default:
+		return "", false
+	}
+	next := findNextNonWS(tokens, i)
+	if next == nil || next.Type != lexer.TokenPunctuation || next.Text != ":" {
+		return "", false
+	}
+	return canonical, true
 }
