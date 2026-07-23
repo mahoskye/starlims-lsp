@@ -740,6 +740,14 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		s.prevKeyword = ""
 	}
 
+	// A statement following a standalone comment on the same source line
+	// moves to its own line — code must not hide behind a comment
+	// (one_statement_per_line, issue #101). End-of-line comments never
+	// reach finalizeToken (they ride the pendingComment path).
+	if token.Type == lexer.TokenComment {
+		s.pendingStatementBreak = true
+	}
+
 	// Any non-comment content ends the current standalone-comment block.
 	if token.Type != lexer.TokenComment {
 		s.commentBlockStart = -1
