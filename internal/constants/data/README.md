@@ -2,7 +2,8 @@
 
 `ssl-element-reference.json` is a vendored snapshot of the canonical SSL
 element inventory generated from
-[`ssl-docs`](https://github.com/mahoskye/ssl-docs) by the
+[`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference)
+(checked out locally as `ssl-docs`) by the
 [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) repo.
 
 Source path in the style-guide repo:
