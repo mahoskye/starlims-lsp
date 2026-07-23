@@ -40,29 +40,6 @@ func TestFormatDocument_BasicIndentation(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
-func TestFormatDocument_SpaceIndentation(t *testing.T) {
-	input := `:PROCEDURE Test;:DECLARE x;:ENDPROC;`
-
-	opts := DefaultFormattingOptions()
-	opts.IndentStyle = "space"
-	opts.IndentSize = 4
-
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	// Check that spaces are used instead of tabs
-	if strings.Contains(formatted, "\t") {
-		t.Error("formatted output should not contain tabs when using space indentation")
-	}
-
-	// Check that spaces are present for indentation
-	if !strings.Contains(formatted, "    ") {
-		t.Error("formatted output should contain 4 spaces for indentation")
-	}
-
-	t.Logf("Formatted output:\n%s", formatted)
-}
-
 func TestFormatDocument_OperatorSpacing(t *testing.T) {
 	input := `x:=1;y:=x+2;`
 
@@ -146,11 +123,11 @@ func TestFormatDocument_LineLengthWrap(t *testing.T) {
 		t.Error("expected line wrapping for long function call")
 	}
 
-	// Check that no line exceeds the max length significantly
+	// The wrap engine guarantees the limit (tabs counted as IndentSize
+	// columns) except for atomic tokens; this fixture has none over budget.
 	for i, line := range lines {
-		// Allow some tolerance for continuation indent
-		if len(line) > opts.MaxLineLength+10 && strings.TrimSpace(line) != "" {
-			t.Errorf("line %d exceeds max length: %d chars (max %d): %s", i, len(line), opts.MaxLineLength, line)
+		if w := visualWidth(line, opts); w > opts.MaxLineLength {
+			t.Errorf("line %d exceeds max length: %d columns (max %d): %s", i, w, opts.MaxLineLength, line)
 		}
 	}
 
@@ -241,7 +218,9 @@ x := 1
 // [spec feature.formatting/A4] — SQL function arguments are delegated to
 // the SQL formatter.
 func TestFormatDocument_SQLStringFormatting(t *testing.T) {
-	// SSL code with SQL string in SQLExecute function
+	// SSL code with SQL string in SQLExecute function. The query fits
+	// within MaxLineLength, so per issue #64 the SQL formatter leaves the
+	// already-uppercase single-line query byte-identical.
 	input := `ds := SQLExecute("SELECT id, name FROM users WHERE status = 'active' AND role = 'admin'");`
 
 	opts := DefaultFormattingOptions()
@@ -250,17 +229,10 @@ func TestFormatDocument_SQLStringFormatting(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// SQL should be formatted with keywords uppercase and proper structure
-	if !strings.Contains(formatted, "SELECT") {
-		t.Error("SQL SELECT should be uppercase")
+	want := "ds := SQLExecute(\"SELECT id, name FROM users WHERE status = 'active' AND role = 'admin'\");\n"
+	if formatted != want {
+		t.Errorf("fitting single-line SQL should pass through unchanged\n got: %q\nwant: %q", formatted, want)
 	}
-
-	// Complex SQL should have line breaks
-	if !strings.Contains(formatted, "\n") {
-		t.Log("Note: SQL formatting may not produce line breaks for simple queries")
-	}
-
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 // [spec feature.formatting/A5]
@@ -468,6 +440,8 @@ func TestFormattingOptions_AllDefaults(t *testing.T) {
 }
 
 func TestFormattingOptions_CustomIndentSize(t *testing.T) {
+	// Document-level space indentation: exact output proves the configured
+	// size (2 spaces) is used and no tabs appear anywhere.
 	input := `:PROCEDURE Test;:DECLARE x;:ENDPROC;`
 
 	opts := DefaultFormattingOptions()
@@ -477,19 +451,17 @@ func TestFormattingOptions_CustomIndentSize(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// Check that 2 spaces are used for indentation
-	if !strings.Contains(formatted, "  :DECLARE") {
-		t.Error("expected 2-space indentation")
+	want := ":PROCEDURE Test;\n  :DECLARE x;\n:ENDPROC;\n"
+	if formatted != want {
+		t.Errorf("2-space indentation output mismatch\n got: %q\nwant: %q", formatted, want)
 	}
-	if strings.Contains(formatted, "    :DECLARE") {
-		t.Error("should not have 4-space indentation")
-	}
-
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 func TestFormattingOptions_NoOperatorSpacing(t *testing.T) {
-	input := `x := 1 + 2;`
+	// Glued input: with OperatorSpacing=false the formatter must not
+	// introduce spaces around := or + — the statement passes through
+	// byte-identical (plus the trailing newline).
+	input := `x:=1+2;`
 
 	opts := DefaultFormattingOptions()
 	opts.OperatorSpacing = false
@@ -497,14 +469,10 @@ func TestFormattingOptions_NoOperatorSpacing(t *testing.T) {
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
 
-	// With operator spacing disabled, the formatter should not add or normalize
-	// spaces around operators. Verify the output contains the assignment.
-	if !strings.Contains(formatted, ":=") {
-		t.Error("formatted output should contain assignment operator")
+	want := "x:=1+2;\n"
+	if formatted != want {
+		t.Errorf("OperatorSpacing=false must not introduce operator spacing\n got: %q\nwant: %q", formatted, want)
 	}
-	// The formatter should not add extra spacing when disabled
-	// Note: existing spaces in input may be preserved, but no new spacing should be enforced
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 func TestFormattingOptions_NoCommaSpacing(t *testing.T) {
@@ -1424,13 +1392,15 @@ func TestFormatDocument_WrapBeforeAndOr(t *testing.T) {
 	opts.MaxLineLength = 50
 	edits := FormatDocument(input, opts)
 	formatted := edits[0].NewText
-	// With before_operator wrapping, any operator (=, .AND., .OR.) is a valid wrap point.
-	// The formatter wraps before the first operator that would cause overflow.
-	lines := strings.Split(formatted, "\n")
-	if len(lines) < 3 {
-		t.Errorf("expected at least 3 lines from wrapping long condition, got %d:\n%s", len(lines), formatted)
+	// With before_operator wrapping, the line breaks before .AND. / .OR.
+	// and each continuation gets one extra level of indent.
+	want := ":IF longConditionVariableA = 1\n" +
+		"\t.AND. longConditionVariableB = 2\n" +
+		"\t.OR. longConditionVariableC = 3;\n" +
+		":ENDIF;\n"
+	if formatted != want {
+		t.Errorf("wrapped condition mismatch\n got: %q\nwant: %q", formatted, want)
 	}
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 func TestFormatDocument_WrapBeforeStringConcatOperator(t *testing.T) {
@@ -1599,23 +1569,6 @@ func TestFormatDocument_KeywordCasingNormalized(t *testing.T) {
 	t.Logf("Formatted output:\n%s", formatted)
 }
 
-// --- Trailing whitespace trimming ---
-
-func TestFormatDocument_TrailingWhitespaceTrimmed(t *testing.T) {
-	input := "x := 1;   \ny := 2;\t\t\n"
-
-	opts := DefaultFormattingOptions()
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	lines := strings.Split(formatted, "\n")
-	for i, line := range lines {
-		if line != strings.TrimRight(line, " \t") {
-			t.Errorf("line %d has trailing whitespace: %q", i+1, line)
-		}
-	}
-}
-
 // --- Space inside parens stripped ---
 
 func TestFormatDocument_SpaceInsideParensStripped(t *testing.T) {
@@ -1718,83 +1671,78 @@ func TestFormat_TrimTrailingWhitespace(t *testing.T) {
 	}
 }
 
-func TestFormat_MaxConsecutiveBlankLines(t *testing.T) {
-	src := "a\n\n\n\n\nb\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxConsecutiveBlankLines = 2
-	out := applyPostFormatPasses(src, opts)
-	want := "a\n\n\nb\n" // a + 2 blank lines + b + trailing newline
-	if out != want {
-		t.Errorf("got %q, want %q", out, want)
+func TestFormat_MemberAccessNeverSplitOnWrap(t *testing.T) {
+	// vs-code-ssl-formatter#76 — wrapping a long line must keep member
+	// access glued: `oVar:property`, chained `a:b:c`, assignment-LHS
+	// receivers, and `oVar:method(args)` never break before or after the
+	// member-access colon — while wrapping itself stays active at
+	// legitimate break points.
+	cases := []struct {
+		name     string
+		src      string
+		maxLine  int
+		glued    string // member-access span that must survive intact
+		wantWrap bool   // output must still wrap at some other break point
+	}{
+		{
+			name:    "call argument",
+			src:     "DoSomething(a, b, c, oCurrentRequest:somewhatLongPropertyName, d);\n",
+			maxLine: 50,
+			glued:   "oCurrentRequest:somewhatLongPropertyName",
+		},
+		{
+			name:    "chained member access",
+			src:     "DoSomething(arg1, arg2, oRoot:childObject:deeplyNamedField, arg3);\n",
+			maxLine: 40,
+			glued:   "oRoot:childObject:deeplyNamedField",
+		},
+		{
+			name:    "assignment LHS",
+			src:     "oReceiverWithVeryLongName:propertyName := DoSomething(a, b, c);\n",
+			maxLine: 30,
+			glued:   "oReceiverWithVeryLongName:propertyName",
+		},
+		{
+			// The fix must not silently disable wrapping — if there's a
+			// valid break point elsewhere, the formatter still uses it.
+			name:     "wrapping still active elsewhere",
+			src:      "DoSomething(firstArg, secondArg, oVar:prop, thirdArg, fourthArg);\n",
+			maxLine:  30,
+			glued:    "oVar:prop",
+			wantWrap: true,
+		},
+		{
+			name:    "method call",
+			src:     "DoSomething(arg1, arg2, oReceiver:doVeryLongMethodName(x), arg3);\n",
+			maxLine: 50,
+			glued:   "oReceiver:doVeryLongMethodName",
+		},
 	}
-}
-
-func TestFormat_DoesNotSplitMemberAccessAcrossLines(t *testing.T) {
-	// vs-code-ssl-formatter#76 — wrapping a long line must keep `oVar:property`
-	// together; never break before or after the member-access colon.
-	src := "DoSomething(a, b, c, oCurrentRequest:somewhatLongPropertyName, d);\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxLineLength = 50
-	out := FormatDocument(src, opts)[0].NewText
-	for _, line := range strings.Split(out, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasSuffix(trimmed, ":") {
-			t.Errorf("line ends with member-access colon (split member access): %q\nfull output:\n%s", line, out)
-		}
-		if strings.HasPrefix(trimmed, ":") {
-			// Must be a keyword (:IF, :ENDIF, etc.) — keywords are uppercase letters.
-			rest := trimmed[1:]
-			if rest == "" || !(rest[0] >= 'A' && rest[0] <= 'Z') {
-				t.Errorf("line starts with non-keyword colon (split member access): %q\nfull output:\n%s", line, out)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opts := DefaultFormattingOptions()
+			opts.MaxLineLength = c.maxLine
+			out := FormatDocument(c.src, opts)[0].NewText
+			if !strings.Contains(out, c.glued) {
+				t.Errorf("member access %q was split:\n%s", c.glued, out)
 			}
-		}
-	}
-}
-
-func TestFormat_DoesNotSplitChainedMemberAccess(t *testing.T) {
-	// `a:b:c` must remain intact when the line is too long.
-	src := "DoSomething(arg1, arg2, oRoot:childObject:deeplyNamedField, arg3);\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxLineLength = 40
-	out := FormatDocument(src, opts)[0].NewText
-	if !strings.Contains(out, "oRoot:childObject:deeplyNamedField") {
-		t.Errorf("expected chained member access to stay together:\n%s", out)
-	}
-}
-
-func TestFormat_DoesNotSplitMemberAccess_AssignmentLHS(t *testing.T) {
-	// Even when `oVar:property` is the assignment target, it must not be
-	// split.
-	src := "oReceiverWithVeryLongName:propertyName := DoSomething(a, b, c);\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxLineLength = 30
-	out := FormatDocument(src, opts)[0].NewText
-	if !strings.Contains(out, "oReceiverWithVeryLongName:propertyName") {
-		t.Errorf("expected LHS member access to stay together:\n%s", out)
-	}
-}
-
-func TestFormat_StillWrapsLongLinesWithMemberAccess(t *testing.T) {
-	// The fix must not silently disable wrapping — if there's a valid
-	// break point elsewhere, the formatter should still use it.
-	src := "DoSomething(firstArg, secondArg, oVar:prop, thirdArg, fourthArg);\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxLineLength = 30
-	out := FormatDocument(src, opts)[0].NewText
-	if strings.Count(out, "\n") < 2 {
-		t.Errorf("expected the long line to wrap at SOME comma boundary:\n%s", out)
-	}
-}
-
-func TestFormat_DoesNotSplitMethodCall(t *testing.T) {
-	// `oVar:method(args)` uses the same member-access colon. The wrap
-	// rule must keep the receiver, colon, and method name together.
-	src := "DoSomething(arg1, arg2, oReceiver:doVeryLongMethodName(x), arg3);\n"
-	opts := DefaultFormattingOptions()
-	opts.MaxLineLength = 50
-	out := FormatDocument(src, opts)[0].NewText
-	if !strings.Contains(out, "oReceiver:doVeryLongMethodName") {
-		t.Errorf("expected method call to stay glued:\n%s", out)
+			if c.wantWrap && strings.Count(out, "\n") < 2 {
+				t.Errorf("expected the long line to wrap at SOME other break point:\n%s", out)
+			}
+			for _, line := range strings.Split(out, "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasSuffix(trimmed, ":") {
+					t.Errorf("line ends with member-access colon (split member access): %q\nfull output:\n%s", line, out)
+				}
+				if strings.HasPrefix(trimmed, ":") {
+					// Must be a keyword (:IF, :ENDIF, etc.) — keywords are uppercase letters.
+					rest := trimmed[1:]
+					if rest == "" || !(rest[0] >= 'A' && rest[0] <= 'Z') {
+						t.Errorf("line starts with non-keyword colon (split member access): %q\nfull output:\n%s", line, out)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -2589,6 +2537,44 @@ func TestFormatDocument_CodeBlockLiteralNormalized(t *testing.T) {
 	}
 	if FormatDocument(out, opts)[0].NewText != out {
 		t.Errorf("not idempotent:\n%s", out)
+	}
+}
+
+// BlankLinesBetweenProcs=0 disables proc-boundary normalization entirely:
+// blank runs between procedures are preserved exactly as written, and no
+// separator is inserted where none exists.
+func TestFormat_BlankLinesBetweenProcs_ZeroDisablesNormalization(t *testing.T) {
+	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenProcs = 0
+
+	withBlanks := ":PROCEDURE First;\n:ENDPROC;\n\n\n\n:PROCEDURE Second;\n:ENDPROC;\n"
+	out := FormatDocument(withBlanks, opts)[0].NewText
+	if out != withBlanks {
+		t.Errorf("blank run between procs should be preserved as written\n got: %q\nwant: %q", out, withBlanks)
+	}
+
+	packed := ":PROCEDURE First;\n:ENDPROC;\n:PROCEDURE Second;\n:ENDPROC;\n"
+	outPacked := FormatDocument(packed, opts)[0].NewText
+	if outPacked != packed {
+		t.Errorf("no separator should be inserted between packed procs\n got: %q\nwant: %q", outPacked, packed)
+	}
+}
+
+// Range-formatting a multi-line selection nested two levels deep: the
+// selection keeps its two-tab anchor while statements are split one per
+// line and operator spacing is normalized.
+func TestFormatDocumentRange_NestedBlockMultiLine(t *testing.T) {
+	doc := ":PROCEDURE Test;\n\t:IF bGo;\n\t\tx:=1;y:=2;\n\t\tz   :=3;\n\t:ENDIF;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+
+	edits := FormatDocumentRange(doc, 2, 0, 3, 12, opts)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	want := "\t\tx := 1;\n\t\ty := 2;\n\t\tz := 3;"
+	if got := edits[0].NewText; got != want {
+		t.Errorf("nested range output mismatch\n got: %q\nwant: %q", got, want)
 	}
 }
 

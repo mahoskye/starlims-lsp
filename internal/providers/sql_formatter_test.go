@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+// runSQLLayoutCases formats each input with DefaultSQLFormattingOptions
+// (canonicalCompact, upper) and requires exact equality with the expected
+// layout. Expected strings are captured from actual formatter output after
+// the sql-canonical-compact-reference conformance review (issues #93-#97).
+func runSQLLayoutCases(t *testing.T, cases []struct{ name, input, want string }) {
+	t.Helper()
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := f.FormatSQL(tc.input, "")
+			if got != tc.want {
+				t.Errorf("layout mismatch (%s):\n--- got ---\n%s\n--- want ---\n%s", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSQLLexer_SimpleSelect(t *testing.T) {
 	input := "SELECT id, name FROM users WHERE id = 1"
 	lexer := NewSQLLexer(input)
@@ -790,66 +807,36 @@ func TestSQLFormatter_OracleSpecificBreaks(t *testing.T) {
 	}
 }
 
-func TestSQLFormatter_SetOperationBreaks(t *testing.T) {
-	// sql-canonical-compact-reference section 2.8: Set operations on own line
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 UNION ALL SELECT a FROM t2 INTERSECT SELECT a FROM t3"
-	result := f.FormatSQL(input, "")
-	if !strings.Contains(result, "\nUNION") {
-		t.Errorf("expected UNION on its own line, got:\n%s", result)
-	}
-	if !strings.Contains(result, "\nINTERSECT") {
-		t.Errorf("expected INTERSECT on its own line, got:\n%s", result)
-	}
+// sql-canonical-compact-reference §2.8: set operators sit on their own line,
+// surrounded by blank lines, with the next SELECT starting at column 0.
+func TestSQLFormatter_SetOperations(t *testing.T) {
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "union all",
+			input: "SELECT a FROM t1 UNION ALL SELECT a FROM t2",
+			want: "SELECT a\n" +
+				"FROM t1\n" +
+				"\n" +
+				"UNION ALL\n" +
+				"\n" +
+				"SELECT a\n" +
+				"FROM t2",
+		},
+		{
+			name:  "minus",
+			input: "SELECT a FROM t1 MINUS SELECT a FROM t2",
+			want: "SELECT a\n" +
+				"FROM t1\n" +
+				"\n" +
+				"MINUS\n" +
+				"\n" +
+				"SELECT a\n" +
+				"FROM t2",
+		},
+	})
 }
 
 // ==================== Missing Test Coverage ====================
-
-// --- Blank lines around set operations ---
-
-func TestSQLFormatter_SetOperationBlankLines(t *testing.T) {
-	// sql-canonical-compact-reference §2.8: set operations surrounded by blank lines
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 UNION ALL SELECT a FROM t2"
-	result := f.FormatSQL(input, "")
-
-	// Should have a blank line before UNION (two consecutive newlines)
-	if !strings.Contains(result, "\n\nUNION") {
-		t.Errorf("expected blank line before UNION, got:\n%s", result)
-	}
-}
-
-func TestSQLFormatter_SetOperationBlankLines_Intersect(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 INTERSECT SELECT a FROM t2"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "\n\nINTERSECT") {
-		t.Errorf("expected blank line before INTERSECT, got:\n%s", result)
-	}
-}
-
-func TestSQLFormatter_SetOperationBlankLines_Minus(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 MINUS SELECT a FROM t2"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "\n\nMINUS") {
-		t.Errorf("expected blank line before MINUS, got:\n%s", result)
-	}
-}
 
 // --- CASE/WHEN/ELSE indentation ---
 
@@ -901,26 +888,19 @@ func TestSQLFormatter_UpdateSetFormatting(t *testing.T) {
 // --- Subquery indentation ---
 
 func TestSQLFormatter_SubqueryIndentation(t *testing.T) {
-	// sql-canonical-compact-reference §1.28: subqueries indented inside parens
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT name FROM users WHERE id IN (SELECT user_id FROM orders WHERE status = 'Active')"
-	result := f.FormatSQL(input, "")
-
-	// The inner SELECT should be indented at single level (4 spaces from parenDepth)
-	if !strings.Contains(result, "\n    SELECT user_id") {
-		t.Errorf("expected subquery SELECT at single indent level, got:\n%s", result)
-	}
-	// The subquery should start on a new line after (
-	if !strings.Contains(result, "(\n") {
-		t.Errorf("expected subquery to start on new line after opening paren, got:\n%s", result)
-	}
-	// Closing ) should be on its own line
-	if !strings.Contains(result, "\n)") {
-		t.Errorf("expected closing ) on its own line, got:\n%s", result)
-	}
+	// sql-canonical-compact-reference §1.28: subquery starts on a new line
+	// after '(', body indented one level (4 spaces), ')' on its own line.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "IN subquery single-level indent",
+		input: "SELECT name FROM users WHERE id IN (SELECT user_id FROM orders WHERE status = 'Active')",
+		want: "SELECT name\n" +
+			"FROM users\n" +
+			"WHERE id IN (\n" +
+			"    SELECT user_id\n" +
+			"    FROM orders\n" +
+			"    WHERE status = 'Active'\n" +
+			")",
+	}})
 }
 
 // --- HAVING indentation ---
@@ -1150,19 +1130,19 @@ func TestSQLFormatter_CorrelatedSubquery(t *testing.T) {
 // --- CTE formatting ---
 
 func TestSQLFormatter_CTEFormatting(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "WITH active_orders AS (SELECT ordno, status FROM orders WHERE status = 'Active') SELECT ordno FROM active_orders"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "WITH") {
-		t.Errorf("expected WITH keyword, got:\n%s", result)
-	}
-	if !strings.Contains(result, "SELECT ordno") {
-		t.Errorf("expected final SELECT, got:\n%s", result)
-	}
+	// Single CTE: body indented one level inside parens, ')' and the main
+	// SELECT at column 0 (chained CTEs are covered by _ChainedCTEBreaks).
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "single CTE layout",
+		input: "WITH active_orders AS (SELECT ordno, status FROM orders WHERE status = 'Active') SELECT ordno FROM active_orders",
+		want: "WITH active_orders AS (\n" +
+			"    SELECT ordno, status\n" +
+			"    FROM orders\n" +
+			"    WHERE status = 'Active'\n" +
+			")\n" +
+			"SELECT ordno\n" +
+			"FROM active_orders",
+	}})
 }
 
 // --- CASE WHEN indent with nested context ---
@@ -1181,86 +1161,22 @@ func TestSQLFormatter_CaseWhenInWhere(t *testing.T) {
 	}
 }
 
-// --- Fix 1: Subquery SELECT single-level indent (not double) ---
-
-func TestSQLFormatter_SubquerySingleLevelIndent(t *testing.T) {
-	// Subquery SELECT should be at one indent level (4 spaces from parenDepth),
-	// not double-indented (8 spaces).
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT name FROM users WHERE id IN (SELECT user_id FROM orders WHERE status = 'Active')"
-	result := f.FormatSQL(input, "")
-
-	// Should have 4 spaces before inner SELECT (one indent from parenDepth)
-	if !strings.Contains(result, "\n    SELECT user_id") {
-		t.Errorf("expected subquery SELECT at 4-space indent (single level), got:\n%s", result)
-	}
-	// Should NOT have 8 spaces (double indent)
-	if strings.Contains(result, "\n        SELECT user_id") {
-		t.Errorf("subquery SELECT should NOT be double-indented, got:\n%s", result)
-	}
-}
-
-// --- Fix 2: Set operations — blank line AFTER and SELECT on new line ---
-
-func TestSQLFormatter_SetOpBlankLineAfterAndSelectNewLine(t *testing.T) {
-	// §2.8: blank line before AND after set operator, SELECT on its own line
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 UNION ALL SELECT a FROM t2"
-	result := f.FormatSQL(input, "")
-
-	// Blank line before UNION
-	if !strings.Contains(result, "\n\nUNION ALL") {
-		t.Errorf("expected blank line before UNION ALL, got:\n%s", result)
-	}
-	// Blank line after UNION ALL (before SELECT)
-	if !strings.Contains(result, "UNION ALL\n\nSELECT") {
-		t.Errorf("expected blank line after UNION ALL before SELECT, got:\n%s", result)
-	}
-	// SELECT should be on its own line (not same line as ALL)
-	if strings.Contains(result, "ALL SELECT") {
-		t.Errorf("SELECT should not be on same line as ALL, got:\n%s", result)
-	}
-}
-
-func TestSQLFormatter_SetOpIntersectBlankLines(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a FROM t1 INTERSECT SELECT a FROM t2"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "\n\nINTERSECT") {
-		t.Errorf("expected blank line before INTERSECT, got:\n%s", result)
-	}
-	if !strings.Contains(result, "INTERSECT\n\nSELECT") {
-		t.Errorf("expected blank line after INTERSECT before SELECT, got:\n%s", result)
-	}
-}
-
 // --- Fix 3: CASE in SELECT list stays inline ---
 
 func TestSQLFormatter_CaseInSelectListAligned(t *testing.T) {
-	// CASE in SELECT list should align at col 7 (SELECT column position)
-	// WHEN/ELSE at col 11, END at col 7
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno, CASE status WHEN 'L' THEN 'Logged' WHEN 'C' THEN 'Complete' ELSE 'Unknown' END AS label FROM orders"
-	result := f.FormatSQL(input, "")
-
-	// CASE should be at col 7 (not col 0)
-	if strings.Contains(result, "\nCASE") && !strings.Contains(result, "       CASE") {
-		t.Errorf("CASE should be at col 7 in SELECT list, got:\n%s", result)
-	}
-	t.Logf("Formatted:\n%s", result)
+	// Simple CASE in SELECT list: CASE at col 7 (SELECT column position),
+	// WHEN/ELSE at col 11, END at col 7 (sql-canonical-compact-reference §5.1-5.2).
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "simple CASE aligned in select list",
+		input: "SELECT ordno, CASE status WHEN 'L' THEN 'Logged' WHEN 'C' THEN 'Complete' ELSE 'Unknown' END AS label FROM orders",
+		want: "SELECT ordno,\n" +
+			"       CASE status\n" +
+			"           WHEN 'L' THEN 'Logged'\n" +
+			"           WHEN 'C' THEN 'Complete'\n" +
+			"           ELSE 'Unknown'\n" +
+			"       END AS label\n" +
+			"FROM orders",
+	}})
 }
 
 // --- Fix 4: Closing ) on its own line for subqueries ---
@@ -1298,16 +1214,15 @@ func TestSQLFormatter_FunctionParenNotOnOwnLine(t *testing.T) {
 // --- FOR UPDATE on its own line ---
 
 func TestSQLFormatter_ForUpdateOwnLine(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno, status FROM orders WHERE status = 'Active' FOR UPDATE"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "\nFOR UPDATE") {
-		t.Errorf("expected FOR UPDATE on its own line, got:\n%s", result)
-	}
+	// FOR UPDATE is a compound keyword: never split, on its own line at col 0.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "for update own line",
+		input: "SELECT ordno, status FROM orders WHERE status = 'Active' FOR UPDATE",
+		want: "SELECT ordno, status\n" +
+			"FROM orders\n" +
+			"WHERE status = 'Active'\n" +
+			"FOR UPDATE",
+	}})
 }
 
 // --- Col-7 wrapping for long SELECT lists ---
@@ -1349,6 +1264,10 @@ func TestSQLFormatter_MergeDeleteWhere(t *testing.T) {
 
 func TestSQLFormatter_ListaggWithinGroup(t *testing.T) {
 	// sql-canonical-compact-reference §3.4: LISTAGG ... WITHIN GROUP (ORDER BY ...)
+	// NOTE: intentionally NOT pinned to exact layout (issue #119) — the current formatter
+	// splits the compound "WITHIN GROUP" across lines and treats "GROUP (" as
+	// a clause break, which does not conform to §3.4. Only casing is asserted
+	// until that layout bug is fixed (issue #103 follow-up).
 	opts := DefaultSQLFormattingOptions()
 	opts.KeywordCase = "upper"
 	f := NewSQLFormatter(opts)
@@ -1369,6 +1288,8 @@ func TestSQLFormatter_ListaggWithinGroup(t *testing.T) {
 
 func TestSQLFormatter_ListaggOnOverflow(t *testing.T) {
 	// sql-canonical-compact-reference §3.4: ON OVERFLOW TRUNCATE
+	// NOTE: intentionally NOT pinned to exact layout (issue #119) — same "WITHIN GROUP"
+	// split bug as TestSQLFormatter_ListaggWithinGroup; only casing asserted.
 	opts := DefaultSQLFormattingOptions()
 	opts.KeywordCase = "upper"
 	f := NewSQLFormatter(opts)
@@ -1406,34 +1327,31 @@ func TestSQLFormatter_MergeMultilineOn(t *testing.T) {
 // --- MERGE INTO stays on one line ---
 
 func TestSQLFormatter_MergeIntoOnOneLine(t *testing.T) {
-	// sql-canonical-compact-reference: MERGE INTO target t on one line
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "MERGE INTO ordtask_summary tgt USING source src ON tgt.id = src.id WHEN MATCHED THEN UPDATE SET tgt.status = src.status"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "MERGE INTO") {
-		t.Errorf("expected MERGE INTO on one line, got:\n%s", result)
-	}
+	// sql-canonical-compact-reference §2.12: MERGE INTO target on one line,
+	// USING/ON/WHEN at column 0, sub-statement indented 4 under WHEN.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "merge into single condition",
+		input: "MERGE INTO ordtask_summary tgt USING source src ON tgt.id = src.id WHEN MATCHED THEN UPDATE SET tgt.status = src.status",
+		want: "MERGE INTO ordtask_summary tgt\n" +
+			"USING source src\n" +
+			"ON tgt.id = src.id\n" +
+			"WHEN MATCHED THEN\n" +
+			"    UPDATE SET tgt.status = src.status",
+	}})
 }
 
 // --- DELETE FROM stays on one line ---
 
 func TestSQLFormatter_DeleteFromOnOneLine(t *testing.T) {
-	// sql-canonical-compact-reference: DELETE FROM on one line
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "DELETE FROM audit_log WHERE logdate < TO_DATE('2024-01-01', 'YYYY-MM-DD') AND status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "DELETE FROM") {
-		t.Errorf("expected DELETE FROM on one line, got:\n%s", result)
-	}
-	t.Logf("Formatted DELETE FROM:\n%s", result)
+	// sql-canonical-compact-reference: DELETE FROM stays on one line;
+	// WHERE at column 0 with AND at the 2-space clause indent.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "delete from with where/and",
+		input: "DELETE FROM audit_log WHERE logdate < TO_DATE('2024-01-01', 'YYYY-MM-DD') AND status = 'A'",
+		want: "DELETE FROM audit_log\n" +
+			"WHERE logdate < TO_DATE('2024-01-01', 'YYYY-MM-DD')\n" +
+			"  AND status = 'A'",
+	}})
 }
 
 // --- RETURNING clause on own line ---
@@ -1524,19 +1442,15 @@ func TestSQLFormatter_EndInlineInSelectCase(t *testing.T) {
 // --- Hierarchical query functions ---
 
 func TestSQLFormatter_HierarchicalFunctionCasing(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT level, sys_connect_by_path(name, '/') FROM org START WITH parent_id IS NULL CONNECT BY PRIOR id = parent_id"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "LEVEL") {
-		t.Errorf("expected LEVEL uppercased, got:\n%s", result)
-	}
-	if !strings.Contains(result, "SYS_CONNECT_BY_PATH") {
-		t.Errorf("expected SYS_CONNECT_BY_PATH uppercased, got:\n%s", result)
-	}
+	// LEVEL/SYS_CONNECT_BY_PATH uppercased; START WITH and CONNECT BY at col 0.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "hierarchical query casing and breaks",
+		input: "SELECT level, sys_connect_by_path(name, '/') FROM org START WITH parent_id IS NULL CONNECT BY PRIOR id = parent_id",
+		want: "SELECT LEVEL, SYS_CONNECT_BY_PATH(name, '/')\n" +
+			"FROM org\n" +
+			"START WITH parent_id IS NULL\n" +
+			"CONNECT BY PRIOR id = parent_id",
+	}})
 }
 
 // --- ADD_MONTHS function casing ---
@@ -1554,85 +1468,57 @@ func TestSQLFormatter_AddMonthsFunctionCasing(t *testing.T) {
 	}
 }
 
-// --- D21: BETWEEN formatting ---
-
-func TestSQLFormatter_BetweenFormatting(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno, status FROM orders WHERE logdate BETWEEN '2024-01-01' AND '2024-12-31' AND status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	// BETWEEN and AND should be present, WHERE clause should be formatted
-	if !strings.Contains(result, "BETWEEN") {
-		t.Errorf("expected BETWEEN keyword preserved, got:\n%s", result)
-	}
-	if !strings.Contains(result, "AND") {
-		t.Errorf("expected AND keyword preserved, got:\n%s", result)
-	}
-}
-
 // --- D22: IN clause with subquery ---
 
 func TestSQLFormatter_InSubquery(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno FROM orders WHERE status IN (SELECT status FROM valid_statuses WHERE active = 'Y')"
-	result := f.FormatSQL(input, "")
-
-	// Subquery should be indented inside parentheses
-	if !strings.Contains(result, "IN") {
-		t.Errorf("expected IN keyword, got:\n%s", result)
-	}
-	if !strings.Contains(result, "SELECT") {
-		t.Errorf("expected subquery SELECT, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "IN with subquery",
+		input: "SELECT ordno FROM orders WHERE status IN (SELECT status FROM valid_statuses WHERE active = 'Y')",
+		want: "SELECT ordno\n" +
+			"FROM orders\n" +
+			"WHERE status IN (\n" +
+			"    SELECT status\n" +
+			"    FROM valid_statuses\n" +
+			"    WHERE active = 'Y'\n" +
+			")",
+	}})
 }
 
 // --- D23: DISTINCT keyword ---
 
 func TestSQLFormatter_DistinctKeyword(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "select distinct ordno, status from orders where status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "DISTINCT") {
-		t.Errorf("expected DISTINCT uppercased, got:\n%s", result)
-	}
-	if !strings.Contains(result, "SELECT") {
-		t.Errorf("expected SELECT uppercased, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "distinct stays on select line, keywords uppercased",
+		input: "select distinct ordno, status from orders where status = 'A'",
+		want: "SELECT DISTINCT ordno, status\n" +
+			"FROM orders\n" +
+			"WHERE status = 'A'",
+	}})
 }
 
 // --- D24: Scalar subquery in SELECT list ---
 
 func TestSQLFormatter_ScalarSubqueryInSelect(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno, (SELECT name FROM users WHERE users.id = orders.userid) AS username FROM orders"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "SELECT") {
-		t.Errorf("expected SELECT keyword, got:\n%s", result)
-	}
-	// Should not crash and should produce formatted output
-	if len(result) == 0 {
-		t.Error("expected non-empty formatted output for scalar subquery")
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "scalar subquery in select list",
+		input: "SELECT ordno, (SELECT name FROM users WHERE users.id = orders.userid) AS username FROM orders",
+		want: "SELECT ordno, (\n" +
+			"    SELECT name\n" +
+			"    FROM users\n" +
+			"    WHERE users.id = orders.userid\n" +
+			") AS username\n" +
+			"FROM orders",
+	}})
 }
 
 // --- D25: INSERT ALL / multi-table INSERT ---
 
 func TestSQLFormatter_InsertAll(t *testing.T) {
+	// NOTE: intentionally NOT pinned to exact layout (issue #118) — the current output is
+	// internally inconsistent (first INTO gets block-style parens, second stays
+	// inline; the trailing SELECT is glued to the closing ')'), which does not
+	// conform to the canonical-compact reference. Only keyword handling is
+	// asserted until that layout bug is fixed (issue #103 follow-up).
 	opts := DefaultSQLFormattingOptions()
 	opts.Style = "canonicalCompact"
 	opts.KeywordCase = "upper"
@@ -1652,49 +1538,43 @@ func TestSQLFormatter_InsertAll(t *testing.T) {
 // --- SQL: EXISTS keyword formatting ---
 
 func TestSQLFormatter_ExistsSubquery(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno FROM orders o WHERE EXISTS (SELECT 1 FROM details d WHERE d.ordno = o.ordno)"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "EXISTS") {
-		t.Errorf("expected EXISTS keyword, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "exists subquery",
+		input: "SELECT ordno FROM orders o WHERE EXISTS (SELECT 1 FROM details d WHERE d.ordno = o.ordno)",
+		want: "SELECT ordno\n" +
+			"FROM orders o\n" +
+			"WHERE EXISTS (\n" +
+			"    SELECT 1\n" +
+			"    FROM details d\n" +
+			"    WHERE d.ordno = o.ordno\n" +
+			")",
+	}})
 }
 
 // --- SQL: NOT IN formatting ---
 
 func TestSQLFormatter_NotInClause(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno FROM orders WHERE status NOT IN ('X', 'D', 'R')"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "NOT IN") {
-		t.Errorf("expected NOT IN, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "not in literal list stays inline",
+		input: "SELECT ordno FROM orders WHERE status NOT IN ('X', 'D', 'R')",
+		want: "SELECT ordno\n" +
+			"FROM orders\n" +
+			"WHERE status NOT IN ('X', 'D', 'R')",
+	}})
 }
 
 // --- Pass 2: LEFT OUTER JOIN ---
 
 func TestSQLFormatter_LeftOuterJoin(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT o.ordno, r.result_value FROM orders o LEFT OUTER JOIN ordresult r ON r.ordno = o.ordno WHERE o.status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "LEFT OUTER JOIN") {
-		t.Errorf("expected LEFT OUTER JOIN preserved, got:\n%s", result)
-	}
-	if !strings.Contains(result, "\n") {
-		t.Error("expected multi-line output for JOIN query")
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "left outer join with ON indented",
+		input: "SELECT o.ordno, r.result_value FROM orders o LEFT OUTER JOIN ordresult r ON r.ordno = o.ordno WHERE o.status = 'A'",
+		want: "SELECT o.ordno, r.result_value\n" +
+			"FROM orders o\n" +
+			"LEFT OUTER JOIN ordresult r\n" +
+			"  ON r.ordno = o.ordno\n" +
+			"WHERE o.status = 'A'",
+	}})
 }
 
 // --- Pass 2: Window function ROW_NUMBER ---
@@ -1719,53 +1599,16 @@ func TestSQLFormatter_WindowFunction_RowNumber(t *testing.T) {
 	}
 }
 
-// --- Pass 2: CTE with multiple CTEs ---
-
-func TestSQLFormatter_MultipleCTEs(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "WITH active AS (SELECT ordno FROM orders WHERE status = 'A'), tasks AS (SELECT ordno, testcode FROM ordtask) SELECT a.ordno, t.testcode FROM active a INNER JOIN tasks t ON t.ordno = a.ordno"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "WITH") {
-		t.Errorf("expected WITH keyword, got:\n%s", result)
-	}
-	if !strings.Contains(result, "active") && !strings.Contains(result, "ACTIVE") {
-		t.Errorf("expected CTE name 'active', got:\n%s", result)
-	}
-}
-
 // --- Pass 2: String concatenation operator ---
+// (long-concat line breaking is covered by _ConcatLeadingOperator, issue #97)
 
 func TestSQLFormatter_StringConcatenation(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno || ' - ' || testcode || ' - ' || status AS display_name FROM orders"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "||") {
-		t.Errorf("expected || concatenation preserved, got:\n%s", result)
-	}
-}
-
-// --- Pass 2: DECODE function (Oracle) ---
-
-func TestSQLFormatter_DecodeFunction(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	opts.KeywordCase = "upper"
-	f := NewSQLFormatter(opts)
-
-	input := "select decode(status, 'L', 'Logged', 'C', 'Complete', 'Unknown') as display_status from orders"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "DECODE") {
-		t.Errorf("expected DECODE uppercased, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "short concatenation stays inline",
+		input: "SELECT ordno || ' - ' || testcode || ' - ' || status AS display_name FROM orders",
+		want: "SELECT ordno || ' - ' || testcode || ' - ' || status AS display_name\n" +
+			"FROM orders",
+	}})
 }
 
 // --- Pass 2: Optimizer hint preservation ---
@@ -1860,57 +1703,32 @@ func TestSQLFormatter_InsertBlockStyleColumnIndent(t *testing.T) {
 // --- Pass 2: CROSS JOIN ---
 
 func TestSQLFormatter_CrossJoin(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT a.col1, b.col2 FROM table_a a CROSS JOIN table_b b WHERE a.status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "CROSS JOIN") {
-		t.Errorf("expected CROSS JOIN preserved, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "cross join on its own line",
+		input: "SELECT a.col1, b.col2 FROM table_a a CROSS JOIN table_b b WHERE a.status = 'A'",
+		want: "SELECT a.col1, b.col2\n" +
+			"FROM table_a a\n" +
+			"CROSS JOIN table_b b\n" +
+			"WHERE a.status = 'A'",
+	}})
 }
 
 // --- Pass 2: GROUP BY with multiple columns ---
 
 // --- TestSQLFormatter_BetweenAndStaysInline ---
+// (merged with the former TestSQLFormatter_BetweenFormatting duplicate)
 
 func TestSQLFormatter_BetweenAndStaysInline(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT * FROM t WHERE col BETWEEN '2024-01-01' AND '2024-12-31' AND status = 'A'"
-	result := f.FormatSQL(input, "")
-
-	// The first AND is part of BETWEEN..AND, should stay inline
-	if !strings.Contains(result, "BETWEEN") {
-		t.Errorf("expected BETWEEN to be present, got:\n%s", result)
-	}
-
-	// Find the line with BETWEEN - it should also contain the first AND
-	lines := strings.Split(result, "\n")
-	betweenLine := ""
-	for _, line := range lines {
-		if strings.Contains(line, "BETWEEN") {
-			betweenLine = line
-			break
-		}
-	}
-	if betweenLine == "" {
-		t.Fatal("no line contains BETWEEN")
-	}
-	if !strings.Contains(betweenLine, "AND") {
-		t.Errorf("BETWEEN..AND should be on the same line, got BETWEEN line: %q", betweenLine)
-	}
-
-	// The second AND (status = 'A') should be on a separate line
-	if !strings.Contains(result, "AND status") && !strings.Contains(result, "AND\n") {
-		t.Logf("Second AND formatting (may vary by style):\n%s", result)
-	}
-
-	t.Logf("Formatted SQL:\n%s", result)
+	// The BETWEEN..AND pair stays inline; the following boolean AND breaks
+	// onto its own line at the 2-space clause indent.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "between-and inline, boolean and breaks",
+		input: "SELECT ordno, status FROM orders WHERE logdate BETWEEN '2024-01-01' AND '2024-12-31' AND status = 'A'",
+		want: "SELECT ordno, status\n" +
+			"FROM orders\n" +
+			"WHERE logdate BETWEEN '2024-01-01' AND '2024-12-31'\n" +
+			"  AND status = 'A'",
+	}})
 }
 
 // --- TestSQLFormatter_LeftRightAsFunctionNoParen ---
@@ -1982,19 +1800,14 @@ func TestSQLFormatter_MonthsBetweenCasing(t *testing.T) {
 }
 
 func TestSQLFormatter_GroupByMultipleColumns(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status, ordno ORDER BY cnt DESC"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "GROUP BY") {
-		t.Errorf("expected GROUP BY, got:\n%s", result)
-	}
-	if !strings.Contains(result, "ORDER BY") {
-		t.Errorf("expected ORDER BY, got:\n%s", result)
-	}
+	runSQLLayoutCases(t, []struct{ name, input, want string }{{
+		name:  "group by and order by each on own line",
+		input: "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status, ordno ORDER BY cnt DESC",
+		want: "SELECT status, COUNT(*) AS cnt\n" +
+			"FROM orders\n" +
+			"GROUP BY status, ordno\n" +
+			"ORDER BY cnt DESC",
+	}})
 }
 
 // --- Gap 6: CASE WHEN alignment in SELECT ---
@@ -2105,51 +1918,6 @@ func TestSQLFormatter_DoubleQuotedIdentifierCasingPreserved(t *testing.T) {
 	// Unquoted identifiers should still be lowercased
 	if strings.Contains(result, "Status") {
 		t.Errorf("expected unquoted identifier to be lowercased, got:\n%s", result)
-	}
-	t.Logf("Formatted SQL:\n%s", result)
-}
-
-// --- FOR UPDATE compound keyword ---
-
-func TestSQLFormatter_ForUpdateCompoundKeyword(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno FROM orders WHERE status = 'L' FOR UPDATE"
-	result := f.FormatSQL(input, "")
-
-	// FOR UPDATE should stay on one line (not split as FOR\nUPDATE)
-	if strings.Contains(result, "FOR\nUPDATE") {
-		t.Errorf("expected FOR UPDATE to stay on one line, got:\n%s", result)
-	}
-	if !strings.Contains(result, "FOR UPDATE") {
-		t.Errorf("expected 'FOR UPDATE' compound clause, got:\n%s", result)
-	}
-	t.Logf("Formatted SQL:\n%s", result)
-}
-
-// --- MERGE ON AND indent ---
-
-func TestSQLFormatter_MergeOnAndIndent(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
-	input := "MERGE INTO target tgt USING source src ON tgt.id = src.id AND tgt.code = src.code WHEN MATCHED THEN UPDATE SET tgt.val = src.val"
-	result := f.FormatSQL(input, "")
-
-	// AND in MERGE ON should be indented 4 spaces (not 2)
-	lines := strings.Split(result, "\n")
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "AND") && strings.Contains(result, "MERGE") {
-			// Check that the AND line has 4-space indent (the indentString)
-			leadingSpaces := len(line) - len(strings.TrimLeft(line, " "))
-			if leadingSpaces < 4 {
-				t.Errorf("expected AND in MERGE ON to have 4-space indent, got %d: %q", leadingSpaces, line)
-			}
-		}
 	}
 	t.Logf("Formatted SQL:\n%s", result)
 }
