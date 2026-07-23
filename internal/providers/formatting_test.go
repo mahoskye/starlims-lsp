@@ -2537,6 +2537,7 @@ func TestWrapEngine_MultilineSQLUntouched(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // CRLF input normalizes to LF-only output, stable on the second pass
 // (schema files.line_endings). [spec feature.formatting/A10]
 func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
@@ -2548,5 +2549,22 @@ func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
 	}
 	if FormatDocument(out, opts)[0].NewText != out {
 		t.Errorf("not idempotent after CRLF normalization")
+=======
+// Issue #101: a statement following a standalone comment on the same source
+// line moves to its own line (one_statement_per_line) — it must not hide
+// behind the comment. End-of-line comments after code stay attached.
+func TestFormatDocument_CommentThenCodeSplits(t *testing.T) {
+	input := ":PROCEDURE MixedLine;\n/* leading; nX := 1;\nnY := 2;  /* trailing;\n:RETURN nY;\n:ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(out, "/* leading;\n\tnX := 1;") {
+		t.Errorf("statement after standalone comment should move to its own line:\n%s", out)
+	}
+	if !strings.Contains(out, "nY := 2;  /* trailing;") {
+		t.Errorf("end-of-line comment must stay attached to its statement:\n%s", out)
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent:\n%s", out)
+>>>>>>> origin/main
 	}
 }

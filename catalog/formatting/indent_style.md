@@ -22,6 +22,11 @@ history:
       Standalone comments are now indented at the enclosing block depth
       like statements; previously the indent writer skipped comment tokens,
       flushing every standalone comment to column 0.
+  - date: 2026-07-23
+    ref: "issue #101"
+    note: >-
+      A statement following a standalone comment on its line is split to
+      its own line; previously it stayed glued after the comment text.
   - date: 2026-07-22
     ref: "issue #89"
     note: >-
@@ -34,7 +39,7 @@ history:
       Expression continuations that begin with a binary operator take the
       same one-level extra indent the line wrapper emits; previously the
       wrapped form lost its indent level on the next format pass.
-issues: ["#36", "#86"]
+issues: ["#36", "#86", "#101"]
 ---
 
 ## Behavior
@@ -61,9 +66,16 @@ Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:
 content *inside* a multi-line comment is preserved verbatim (modulo
 trailing-whitespace trimming, see fmt.trim_trailing_whitespace).
+<<<<<<< HEAD
 End-of-line comments stay attached to their statement's line, separated
 by exactly two spaces regardless of the source spacing, and are not
 separately indented.
+=======
+End-of-line comments stay attached to their statement's line and are not
+separately indented. A statement written on the same line *after* a
+standalone comment moves to its own line — code must not hide behind a
+comment (issue #101).
+>>>>>>> origin/main
 
 ## Examples
 
