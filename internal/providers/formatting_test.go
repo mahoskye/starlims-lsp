@@ -2381,7 +2381,7 @@ func TestFormatDocument_GluedOperatorsSingleSpace(t *testing.T) {
 	if strings.Contains(out, "  ") {
 		t.Errorf("double space in operator output:\n%q", out)
 	}
-	if !strings.Contains(out, "bFlag := .not. bFlag;") {
+	if !strings.Contains(out, "bFlag := .NOT. bFlag;") {
 		t.Errorf("expected single-spaced glued operators:\n%s", out)
 	}
 	if !strings.Contains(out, "nB := nA - -3;") {
@@ -2389,5 +2389,53 @@ func TestFormatDocument_GluedOperatorsSingleSpace(t *testing.T) {
 	}
 	if FormatDocument(out, opts)[0].NewText != out {
 		t.Errorf("not idempotent:\n%s", out)
+	}
+}
+
+// Issue #98: a range selection whose lines mix tab and space indentation
+// keeps its anchor — the base indent falls back to the first non-blank
+// line's indent instead of collapsing to column 0. [spec feature.formatting/A2]
+func TestFormatDocumentRange_MixedIndentKeepsAnchor(t *testing.T) {
+	doc := ":PROCEDURE P;\n    :IF bGo;\n\tnX:=1;\n    :ENDIF;\n:ENDPROC;\n"
+	edits := FormatDocumentRange(doc, 1, 0, 3, 0, DefaultFormattingOptions())
+	if len(edits) != 1 {
+		t.Fatalf("expected one edit, got %d", len(edits))
+	}
+	got := edits[0].NewText
+	if !strings.HasPrefix(got, "    :IF bGo;") {
+		t.Errorf("selection lost its 4-space anchor:\n%q", got)
+	}
+	if strings.Contains(got, "\n:") {
+		t.Errorf("a line was dedented to column 0:\n%q", got)
+	}
+}
+
+// Issue #99: postfix increment/decrement end a complete statement and get
+// semicolon enforcement.
+func TestFormatDocument_IncrementDecrementSemicolonEnforced(t *testing.T) {
+	input := ":PROCEDURE Inc;\n:DECLARE nX;\nnX++\nnX--\n:RETURN nX;\n:ENDPROC;\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(out, "nX++;") || !strings.Contains(out, "nX--;") {
+		t.Errorf("expected semicolons on postfix inc/dec statements:\n%s", out)
+	}
+}
+
+// Issue #90: dot logical operators are canonicalized to uppercase, and
+// Me/Base receivers take canonical casing; a plain variable named me is
+// left alone. [spec fmt.keyword_case]
+func TestFormatDocument_DotOperatorAndReceiverCasing(t *testing.T) {
+	input := ":CLASS C;\n:PROCEDURE M;\n:DECLARE bA;\nbA := bX .and. bY .or. .not. bZ;\nme:Helper();\nnT := base:Compute(1);\n:RETURN bA;\n:ENDPROC;\n"
+	out := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	for _, want := range []string{".AND.", ".OR.", ".NOT.", "Me:Helper()", "Base:Compute(1)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing canonical form %q in:\n%s", want, out)
+		}
+	}
+
+	// Not receivers — untouched.
+	plain := "me := 1;\nnX := me + 1;\n"
+	outPlain := FormatDocument(plain, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(outPlain, "me := 1;") || !strings.Contains(outPlain, "me + 1") {
+		t.Errorf("identifier merely named me must not be recased:\n%s", outPlain)
 	}
 }

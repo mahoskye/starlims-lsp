@@ -37,6 +37,7 @@ dropped (entry retains the history).
 | [fmt.builtin_function_case](../catalog/formatting/builtin_function_case.md) | Built-in function name casing | active |
 | [fmt.comma_spacing](../catalog/formatting/comma_spacing.md) | Space after commas | active |
 | [fmt.indent_style](../catalog/formatting/indent_style.md) | Indentation style and width | active |
+| [fmt.keyword_case](../catalog/formatting/keyword_case.md) | Keyword and canonical-form casing | active |
 | [fmt.max_consecutive_blank_lines](../catalog/formatting/max_consecutive_blank_lines.md) | Cap consecutive blank lines | active |
 | [fmt.max_line_length](../catalog/formatting/max_line_length.md) | Maximum line length and wrapping | active |
 | [fmt.operator_spacing](../catalog/formatting/operator_spacing.md) | Spacing around operators | active |
