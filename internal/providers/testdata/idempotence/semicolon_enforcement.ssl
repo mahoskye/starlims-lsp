@@ -1,0 +1,10 @@
+:PROCEDURE SemiTest;
+:DECLARE nValue, bResult
+nValue := 1
+nValue++
+bResult := bFirst .AND.
+bSecond
+aList := {1,
+2}
+:RETURN nValue
+:ENDPROC;

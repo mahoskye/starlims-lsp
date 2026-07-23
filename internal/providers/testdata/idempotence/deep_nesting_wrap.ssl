@@ -1,0 +1,13 @@
+:PROCEDURE DeepNest;
+:DECLARE i, j, nSum;
+:IF bOuter;
+:WHILE bLoop;
+:FOR i := 1 :TO 10;
+:IF nSum > 100 .AND. bReady;
+nSum := DoProc("AccumulateValues", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue});
+:ENDIF;
+:NEXT;
+:ENDWHILE;
+:ENDIF;
+:RETURN nSum;
+:ENDPROC;

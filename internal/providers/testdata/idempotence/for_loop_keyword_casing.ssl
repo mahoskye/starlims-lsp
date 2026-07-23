@@ -1,0 +1,11 @@
+:procedure LoopTest;
+:declare i, nSum;
+:for i := 1 :to 10 :step 2;
+nSum += i;
+:next;
+:for i := 1 :to
+10;
+nSum += i;
+:next;
+:return nSum;
+:endproc;

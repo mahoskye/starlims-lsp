@@ -1,0 +1,16 @@
+:CLASS InvoiceManager;
+:INHERIT Framework.BaseManager;
+:DECLARE nTotal;
+:PROCEDURE Calculate;
+:PARAMETERS nAmount;
+Me:Validate(nAmount);
+nTotal := Base:Compute(nAmount);
+:RETURN nTotal;
+:ENDPROC;
+:PROCEDURE Validate;
+:PARAMETERS nAmount;
+:IF nAmount < 0;
+RaiseError("negative");
+:ENDIF;
+:RETURN .T.;
+:ENDPROC;

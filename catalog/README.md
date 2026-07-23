@@ -105,6 +105,10 @@ encoded. Options default to `DefaultDiagnosticOptions()` plus the entry's
 **Formatter.** Each `### Before` fence is formatted with
 `DefaultFormattingOptions()` plus `spec_options` and must byte-equal the
 following `### After` fence. A `### Idempotent` fence must format to itself.
+Every `### After` fence is additionally re-formatted and must be stable
+(format-twice byte-equal, feature.formatting A6); the corpus-level
+counterpart lives in `internal/providers/testdata/idempotence/` with a
+ratcheted known-failures list (issue #103).
 
 **Features.** Each acceptance criterion must be cited by a Go test carrying
 the literal tag `[spec <id>/A<n>]` (in the test body or a comment). The

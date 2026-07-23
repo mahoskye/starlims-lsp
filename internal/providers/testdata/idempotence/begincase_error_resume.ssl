@@ -1,0 +1,18 @@
+:PROCEDURE CaseTest;
+:PARAMETERS nVal;
+:BEGINCASE;
+:CASE nVal == 1;
+DoProc("One", {});
+:EXITCASE;
+:CASE nVal == 2;
+DoProc("Two", {});
+:EXITCASE;
+:OTHERWISE;
+DoProc("Default", {});
+:EXITCASE;
+:ENDCASE;
+:ERROR;
+UsrMes("failed", "Error");
+:RESUME;
+:RETURN .T.;
+:ENDPROC;

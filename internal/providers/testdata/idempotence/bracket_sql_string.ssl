@@ -1,0 +1,7 @@
+:PROCEDURE BracketSql;
+:DECLARE sSqlLong, sSqlShort, aRes;
+sSqlShort := [select * from users];
+sSqlLong := [SELECT sample_id, sample_name, sample_status FROM samples WHERE owner_name = 'O''Brien' AND sample_status = ?status? ORDER BY sample_id];
+aRes := SQLExecute(sSqlLong);
+:RETURN aRes;
+:ENDPROC;

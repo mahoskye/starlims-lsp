@@ -1,0 +1,5 @@
+:PROCEDURE Unclosed;
+:DECLARE sX;
+sX := "never closed
+nY := 2;
+:ENDPROC;

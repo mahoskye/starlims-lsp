@@ -1,0 +1,6 @@
+:PROCEDURE StrArg;
+:DECLARE vRes;
+vRes := ExecFunction("ReallyLongCategoryName.ReallyLongScriptName.ReallyLongProcedureName", {sParameterOne});
+vRes := DoProc("ShortName", {"a rather long literal argument that pushes things over", sSecondArgument, nThird});
+:RETURN vRes;
+:ENDPROC;

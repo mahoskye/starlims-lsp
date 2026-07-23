@@ -1,0 +1,5 @@
+:PROCEDURE OverDecode;
+:DECLARE aR;
+aR := SQLExecute("SELECT sample_id, ROW_NUMBER() OVER (PARTITION BY sample_type ORDER BY created_on DESC) AS rn, DECODE(sample_status, 'A', 'Active', 'P', 'Pending', 'Unknown') AS lbl FROM samples WHERE sample_type = ?type?");
+:RETURN aR;
+:ENDPROC;

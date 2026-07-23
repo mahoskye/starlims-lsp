@@ -1,0 +1,11 @@
+:PROCEDURE TryTest;
+:DECLARE aRes, oErr;
+:TRY;
+aRes := SQLExecute("SELECT 1 FROM DUAL");
+:CATCH;
+oErr := GetLastSSLError();
+:FINALLY;
+oConn := NIL;
+:ENDTRY;
+:RETURN aRes;
+:ENDPROC;

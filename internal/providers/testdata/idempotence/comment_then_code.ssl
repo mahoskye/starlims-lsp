@@ -1,0 +1,5 @@
+:PROCEDURE MixedLine;
+/* leading; nX := 1;
+nY := 2;  /* trailing;
+:RETURN nY;
+:ENDPROC;

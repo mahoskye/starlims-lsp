@@ -1,0 +1,5 @@
+:PROCEDURE Joins;
+:DECLARE aR;
+aR := SQLExecute("SELECT s.sample_id, s.sample_name, r.result_value, u.user_full_name FROM samples s INNER JOIN results r ON r.sample_id = s.sample_id LEFT OUTER JOIN users u ON u.user_id = s.created_by WHERE s.sample_status = ?status?");
+:RETURN aR;
+:ENDPROC;

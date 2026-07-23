@@ -1,0 +1,6 @@
+:PROCEDURE DotOps;
+:DECLARE bA;
+bA := bX .and. bY .or. .not. bZ;
+bA := bX .AND. bY;
+:RETURN bA;
+:ENDPROC;

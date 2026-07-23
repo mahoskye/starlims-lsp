@@ -75,6 +75,13 @@ func TestFormatterSpecs(t *testing.T) {
 				reportSpec(t, &e, bf, got == want, expectFail,
 					"Before/After mismatch\n--- got ---\n"+got+"\n--- want ---\n"+want,
 					"Before/After pair matches")
+				// Every After fence is also an idempotence fixture: formatted
+				// output must be stable under a second pass (issue #103,
+				// feature.formatting A6).
+				stable := format(want, opts)
+				reportSpec(t, &e, after[i], stable == want, expectFail,
+					"After fence not idempotent\n--- reformatted ---\n"+stable+"\n--- want ---\n"+want,
+					"After fence is stable")
 			}
 			for _, f := range sslFences(e.FencesIn("Idempotent")) {
 				got := format(f.Code, opts)

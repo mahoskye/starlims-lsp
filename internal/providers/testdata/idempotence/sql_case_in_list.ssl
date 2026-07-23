@@ -1,0 +1,5 @@
+:PROCEDURE CaseIn;
+:DECLARE aR;
+aR := SQLExecute("SELECT sample_id, CASE WHEN sample_status = 'A' THEN 'Active' WHEN sample_status = 'P' THEN 'Pending' ELSE 'Other' END AS status_label FROM samples WHERE sample_status IN ('A', 'P', 'C', 'R', 'X') ORDER BY sample_id");
+:RETURN aR;
+:ENDPROC;

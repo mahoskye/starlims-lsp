@@ -1,0 +1,7 @@
+:PROCEDURE ConcatTest;
+:DECLARE sMsg, sName, nCount;
+sMsg := "Processing batch number " + LimsString(nBatchNumber) + " for customer " + sCustomerName + " completed";
+sMsg := "Short prefix: " + sFirstValue + sSecondValue + sThirdValue + sFourthValue + sFifthValue + sSixthValue;
+sMsg := sLeadingVariableName + " literal one " + " literal two " + " literal three " + " literal four " + sTrailer;
+:RETURN sMsg;
+:ENDPROC;

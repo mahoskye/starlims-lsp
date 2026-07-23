@@ -1,0 +1,17 @@
+:PROCEDURE First;
+:DECLARE nX;
+nX := 1;
+:ENDPROC;:PROCEDURE Second;
+:DECLARE nY;
+
+
+
+nY := 2;
+:ENDPROC;
+
+
+
+
+:PROCEDURE Third;
+nY := 3;
+:ENDPROC;

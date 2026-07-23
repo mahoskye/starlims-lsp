@@ -1,0 +1,6 @@
+:PROCEDURE NestedCalls;
+:DECLARE vRes;
+vRes := DoProc("OuterProcedure", {StrTran(AllTrim(sSourceValue), "OLD_TOKEN", "NEW_TOKEN"), Left(sOtherValue, 40)});
+vRes := DoProc("Wrapper", {DoProc("InnerOne", {sArgumentOne, sArgumentTwo}), DoProc("InnerTwo", {sArgumentThree})});
+:RETURN vRes;
+:ENDPROC;

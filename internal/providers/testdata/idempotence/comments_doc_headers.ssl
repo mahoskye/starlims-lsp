@@ -1,0 +1,22 @@
+/*
+ * Procedure: CommentTorture
+ * Returns: nothing interesting
+;
+:PROCEDURE CommentTorture;
+:DECLARE nCount;
+/* leading comment at column 0;
+nCount := 1;  /* end-of-line comment;
+:IF nCount > 0;
+/* inner comment;
+nCount := 2;
+:ENDIF;
+/* comment between siblings;
+:IF nCount > 1;
+nCount := 3;
+:ENDIF;
+:ENDPROC;
+/* doc for second proc;
+:PROCEDURE Second;
+:DECLARE nX;
+nX := 1;
+:ENDPROC;

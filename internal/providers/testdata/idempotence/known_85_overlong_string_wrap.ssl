@@ -1,0 +1,5 @@
+:PROCEDURE LongString;
+:DECLARE sMsg;
+sMsg := "This message is deliberately long but is definitely not structured query language at all okay";
+:RETURN sMsg;
+:ENDPROC;
