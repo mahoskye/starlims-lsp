@@ -22,7 +22,13 @@ history:
       Standalone comments are now indented at the enclosing block depth
       like statements; previously the indent writer skipped comment tokens,
       flushing every standalone comment to column 0.
-issues: ["#36"]
+  - date: 2026-07-22
+    ref: "issue #86"
+    note: >-
+      Expression continuations that begin with a binary operator take the
+      same one-level extra indent the line wrapper emits; previously the
+      wrapped form lost its indent level on the next format pass.
+issues: ["#36", "#86"]
 ---
 
 ## Behavior
@@ -37,7 +43,12 @@ with `"space"` each level is `ssl.format.indentSize` spaces (default 4).
 For line-length accounting a tab is counted as `indentSize` columns.
 
 Continuation lines inside an unclosed `(`/`{`/`[` get one fixed extra level
-(not proportional to nesting depth).
+(not proportional to nesting depth). A line that begins with a binary
+operator (`.AND.`/`.OR.`/`.NOT.`, arithmetic, compound assignment, `$`)
+continues the previous expression and takes the same one extra level —
+matching what the line wrapper emits, so wrapped output is idempotent
+(issue #86). Continuation lines led by any other token (e.g. an identifier
+after a trailing `.AND.`) keep the statement indent as written.
 
 Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:

@@ -16,7 +16,14 @@ history:
   - date: 2026-05-13
     ref: "PR #20 (v0.7.6), issue #16"
     note: Member-access chains excluded as wrap points (fmt.atomic_property_chains).
-issues: []
+  - date: 2026-07-22
+    ref: "issue #85"
+    note: >-
+      No-gain guard: a wrap only happens when the token actually fits on
+      its continuation line, and never on a line holding only
+      indentation. Previously an over-long atomic string was moved below
+      its assignment and every re-format grew a blank line.
+issues: ["#85"]
 ---
 
 ## Behavior
@@ -37,7 +44,9 @@ Wrapping never happens: immediately before or after a member-access `:`
 (fmt.atomic_property_chains); before comparison operators (they bind to
 their operands); or inside a string literal or comment — string tokens are
 atomic, so a single long string argument leaves the line over-long rather
-than being split or moved. A string about to be reflowed as multi-line SQL
+than being split or moved — a wrap that would not bring the token within
+the limit is not taken at all, and a line holding only indentation is
+never wrapped (issue #85). A string about to be reflowed as multi-line SQL
 (fmt.sql_in_strings) is also not wrapped before — the SQL engine manages
 its own line breaks.
 

@@ -65,6 +65,14 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
 
+	// A document ending in an unterminated string cannot be formatted
+	// safely: the string has swallowed the rest of the file and each pass
+	// appended another semicolon (issue #87). Per feature.formatting, when
+	// the formatter cannot proceed it leaves the text unchanged.
+	if hasUnterminatedString(tokens) {
+		return nil
+	}
+
 	formatted := formatTokens(tokens, opts)
 	formatted = applyPostFormatPasses(formatted, opts)
 
@@ -130,6 +138,9 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// Format the dedented text
 	lex := lexer.NewLexer(dedentedText)
 	tokens := lex.Tokenize()
+	if hasUnterminatedString(tokens) {
+		return nil // issue #87 — see FormatDocument
+	}
 	formatted := formatTokens(tokens, opts)
 
 	// Re-apply the base indentation to each line
@@ -231,6 +242,7 @@ type formatState struct {
 	afterEndProc          bool
 	afterEndRegion        bool
 	currentLineLen        int
+	lineHasContent        bool // non-indent content written on the current line
 	parenDepth            int
 	continuationIndent    int // Additional indent for continuation lines inside parens
 	inSQLFunction         bool
@@ -379,6 +391,7 @@ func (s *formatState) normalizeProcBoundary() {
 	if strings.HasSuffix(rebuilt, "\n") {
 		s.lineStart = true
 		s.currentLineLen = 0
+		s.lineHasContent = false
 	}
 }
 
@@ -408,6 +421,13 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		if isCloseParen(token) && contIndent > 0 {
 			contIndent--
 		}
+		// Issue #86: a line that starts with a binary operator continues the
+		// previous expression, so it takes the same one-level continuation
+		// indent the line wrapper produces — otherwise wrapped output loses
+		// an indent level on every re-format.
+		if contIndent == 0 && isContinuationOperator(token) {
+			contIndent = 1
+		}
 		// Calculate total indent: base indent + continuation indent
 		totalIndent := s.indent + contIndent
 		s.currentLineLen = writeIndentLen(s.builder, totalIndent, s.opts)
@@ -429,6 +449,7 @@ func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
 	s.builder.WriteString("\n")
 	s.lineStart = true
 	s.currentLineLen = 0
+	s.lineHasContent = false
 	s.pendingStatementBreak = false
 }
 
@@ -468,6 +489,7 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		s.lineStart = true
 		s.currentLineLen = 0
+		s.lineHasContent = false
 		s.pendingStatementBreak = false
 
 		// Set continuation indent for lines inside parentheses.
@@ -553,6 +575,23 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 		return
 	}
 
+	// Issue #85: wrapping must actually help. If the token still exceeds the
+	// limit on its continuation line (an over-long atomic string, or a
+	// multi-line token whose total length is meaningless for wrapping), the
+	// line stays long — fmt.max_line_length: atomic tokens are never split
+	// or moved.
+	contWidth := (s.indent + 1) * s.opts.IndentSize
+	if contWidth+tokenLen > s.opts.MaxLineLength {
+		return
+	}
+
+	// Issue #85: never wrap when the line holds nothing but indentation —
+	// re-formatting already-wrapped output would insert a blank line and
+	// grow the file on every pass.
+	if !s.lineHasContent {
+		return
+	}
+
 	// Rule F: when the next token is a string that will be reflowed as
 	// multi-line SQL, don't wrap before it. The SQL formatter handles its
 	// own line breaks, and the opening '"' should stay on the previous
@@ -565,6 +604,7 @@ func (s *formatState) applyLineWrap(token lexer.Token) {
 	contIndent := s.indent + 1 // Fixed 1-level continuation indent per schema
 	s.currentLineLen = writeIndentLen(s.builder, contIndent, s.opts)
 	s.lineStart = false
+	s.lineHasContent = false
 }
 
 func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Token, index int) bool {
@@ -576,7 +616,12 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			s.currentLineLen += len(token.Text)
 			return true
 		}
-		if !s.lineStart && s.prevToken.Type != lexer.TokenWhitespace && !isOpenParen(s.prevToken) {
+		// Issue #88: an operator directly after another operator (glued
+		// input like `:=.not.` or `**=` lexed as `**` `=`) already has the
+		// previous operator's trailing space — adding a leading one printed
+		// a double space.
+		if !s.lineStart && s.prevToken.Type != lexer.TokenWhitespace &&
+			s.prevToken.Type != lexer.TokenOperator && !isOpenParen(s.prevToken) {
 			s.builder.WriteString(" ")
 			s.currentLineLen++
 		}
@@ -772,6 +817,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 
 	s.prevToken = token
 	s.lastNonWSToken = token
+	s.lineHasContent = true
 }
 
 // formatTokens formats tokens according to options.
@@ -1348,6 +1394,51 @@ func isCallSite(tokens []lexer.Token, i int) bool {
 			continue
 		}
 		return t.Text == "("
+	}
+	return false
+}
+
+// isContinuationOperator reports whether a token at line start continues the
+// previous expression: the binary operators the wrapper breaks before
+// (fmt.max_line_length). Statements never begin with these (issue #86).
+func isContinuationOperator(token lexer.Token) bool {
+	if token.Type != lexer.TokenOperator {
+		return false
+	}
+	switch strings.ToUpper(token.Text) {
+	case ".AND.", ".OR.", ".NOT.",
+		"+", "-", "*", "/", "%", "^", "**",
+		"+=", "-=", "*=", "/=", "%=", "^=",
+		"$":
+		return true
+	}
+	return false
+}
+
+// hasUnterminatedString reports whether the token stream ends in a string
+// literal missing its closing delimiter — only the final string token can be
+// unterminated, since an unclosed string consumes to end of file (issue #87).
+func hasUnterminatedString(tokens []lexer.Token) bool {
+	for i := len(tokens) - 1; i >= 0; i-- {
+		t := tokens[i]
+		if t.Type == lexer.TokenEOF || t.Type == lexer.TokenWhitespace {
+			continue
+		}
+		if t.Type != lexer.TokenString {
+			return false
+		}
+		if len(t.Text) < 2 {
+			return true
+		}
+		open := t.Text[0]
+		close := byte('"')
+		switch open {
+		case '\'':
+			close = '\''
+		case '[':
+			close = ']'
+		}
+		return t.Text[len(t.Text)-1] != close
 	}
 	return false
 }

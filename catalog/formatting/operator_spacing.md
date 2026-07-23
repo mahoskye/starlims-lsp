@@ -19,7 +19,12 @@ history:
       Lexer fix: a number no longer consumes a trailing dot, so dot
       operators glued to a numeric literal (`10.AND.`) space correctly
       instead of corrupting the rest of the line.
-issues: ["#83"]
+  - date: 2026-07-22
+    ref: "issue #88"
+    note: >-
+      Operators glued to a preceding operator no longer double the space:
+      the previous operator's trailing space is reused.
+issues: ["#83", "#88"]
 ---
 
 ## Behavior
@@ -68,6 +73,20 @@ nCount := 0;
 :IF nCount >= 10 .AND. bReady;
 	nCount := 0;
 :ENDIF;
+```
+
+Operators glued to a preceding operator get exactly one space (issue #88):
+
+### Before
+
+```ssl
+bFlag:=.not.bFlag;
+```
+
+### After
+
+```ssl
+bFlag := .not. bFlag;
 ```
 
 A dot operator glued to a numeric literal is recognized and spaced —

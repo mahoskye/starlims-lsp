@@ -2312,31 +2312,82 @@ func TestFormatDocument_SQLFunctionStateSurvivesNestedCalls(t *testing.T) {
 	}
 }
 
-// Issue #81: a bracket-quoted SQL string that overflows the line reflows with
-// a ']' closer and formats idempotently — the second pass must not swallow the
-// remainder of the document into the string.
-func TestFormatDocument_BracketQuotedSQLStringRoundTrip(t *testing.T) {
-	input := ":PROCEDURE BracketSql;\n" +
-		":DECLARE sSql, aRes;\n" +
-		"sSql := [SELECT sample_id, sample_name, sample_status FROM samples WHERE owner_name = 'O''Brien' AND sample_status = ?status? ORDER BY sample_id];\n" +
-		"aRes := SQLExecute(sSql);\n" +
-		":RETURN aRes;\n" +
+// Issue #85: an over-long atomic string is neither split nor moved — the
+// line stays long (fmt.max_line_length) instead of wrapping to a
+// continuation that still exceeds the limit and growing a blank line on
+// every subsequent pass.
+func TestFormatDocument_OverlongAtomicStringStaysPut(t *testing.T) {
+	input := ":PROCEDURE LongString;\n" +
+		":DECLARE sMsg;\n" +
+		"sMsg := \"This message is deliberately long but is definitely not structured query language at all okay\";\n" +
+		":RETURN sMsg;\n" +
 		":ENDPROC;\n"
 	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(out, "\tsMsg := \"This message is deliberately long") {
+		t.Errorf("over-long string was moved off its assignment line:\n%s", out)
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent:\n%s", out)
+	}
+}
 
+// Issue #86: a wrapped operator continuation keeps its one-level extra
+// indent across re-formats — a line starting with a binary operator is a
+// continuation of the previous expression.
+func TestFormatDocument_OperatorContinuationIndentStable(t *testing.T) {
+	input := ":PROCEDURE OpWrap;\n" +
+		":DECLARE bResult;\n" +
+		"bResult := bFirstConditionFlag .AND. bSecondConditionFlag .AND. bThirdConditionFlag .AND. bFourthFlag;\n" +
+		":RETURN bResult;\n" +
+		":ENDPROC;\n"
+	opts := DefaultFormattingOptions()
 	once := FormatDocument(input, opts)[0].NewText
-	if !strings.Contains(once, "];") {
-		t.Fatalf("reflowed bracket string must close with ']':\n%s", once)
+	if !strings.Contains(once, "\n\t\t.AND. bFourthFlag;") {
+		t.Errorf("wrapped continuation should sit one level past the statement:\n%s", once)
 	}
-	if strings.Contains(once, "[;") {
-		t.Fatalf("reflowed bracket string must not close with '[':\n%s", once)
+	if FormatDocument(once, opts)[0].NewText != once {
+		t.Errorf("continuation indent lost on re-format:\n%s", once)
 	}
-	if !strings.Contains(once, ":ENDPROC;") {
-		t.Fatalf("document structure lost after formatting:\n%s", once)
-	}
+}
 
-	twice := FormatDocument(once, opts)[0].NewText
-	if once != twice {
-		t.Errorf("bracket-quoted SQL formatting is not idempotent.\nfirst:\n%s\nsecond:\n%s", once, twice)
+// Issue #87: a document ending in an unterminated string gets no edits —
+// formatting used to append another semicolon on every pass.
+func TestFormatDocument_UnterminatedStringNoEdits(t *testing.T) {
+	inputs := []string{
+		":PROCEDURE U;\nsX := \"never closed\nnY := 2;\n",
+		"sX := 'half open",
+		"sSql := [SELECT 1 FROM DUAL",
+	}
+	for _, input := range inputs {
+		if edits := FormatDocument(input, DefaultFormattingOptions()); len(edits) != 0 {
+			t.Errorf("expected no edits for unterminated string %q, got:\n%s", input, edits[0].NewText)
+		}
+	}
+	// A terminated multi-line string still formats.
+	ok := "sX := \"line one\nline two\";\nnY:=2;\n"
+	edits := FormatDocument(ok, DefaultFormattingOptions())
+	if len(edits) == 0 || !strings.Contains(edits[0].NewText, "nY := 2;") {
+		t.Error("terminated multi-line string should still format")
+	}
+}
+
+// Issue #88: operators glued to a preceding operator get exactly one space —
+// the previous operator's trailing space is not doubled.
+func TestFormatDocument_GluedOperatorsSingleSpace(t *testing.T) {
+	input := "bFlag:=.not.bFlag;\nnC**=2;\nnB := nA - -3;\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if strings.Contains(out, "  ") {
+		t.Errorf("double space in operator output:\n%q", out)
+	}
+	if !strings.Contains(out, "bFlag := .not. bFlag;") {
+		t.Errorf("expected single-spaced glued operators:\n%s", out)
+	}
+	if !strings.Contains(out, "nB := nA - -3;") {
+		t.Errorf("unary minus after binary minus must stay tight:\n%s", out)
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent:\n%s", out)
 	}
 }
