@@ -1064,3 +1064,64 @@ x := oObj:Unknown;
 		t.Errorf("expected null hover for unknown member on shaped receiver, got %+v", hover.Contents)
 	}
 }
+
+// A SQL-mode data source (plain SQL, or builder directives followed by SQL)
+// returns no formatting edits — the SSL formatter would inject semicolons
+// and re-case bind variables. [spec feature.formatting/A9]
+func TestHandleFormatting_SQLModeDataSourceReturnsNoEdits(t *testing.T) {
+	const dsURI = "file:///query.ds"
+	contents := []string{
+		"SELECT s.sample_id, s.sample_name\nFROM samples s\nWHERE s.sample_status = :status\nORDER BY s.sample_id\n",
+		":DSN := myConnection;\n:TABLENAME := samples;\nSELECT sample_id FROM samples WHERE sample_status = ?\n",
+	}
+	for _, content := range contents {
+		s := NewSSLServer()
+		s.documents.SetDocument(dsURI, content, 1)
+		s.documentVersion[dsURI] = 1
+
+		edits, err := s.handleFormatting(nil, &protocol.DocumentFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: dsURI},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(edits) != 0 {
+			t.Errorf("expected no edits for SQL-mode data source, got %d:\n%s", len(edits), edits[0].NewText)
+		}
+
+		rangeEdits, err := s.handleRangeFormatting(nil, &protocol.DocumentRangeFormattingParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: dsURI},
+			Range: protocol.Range{
+				Start: protocol.Position{Line: 0, Character: 0},
+				End:   protocol.Position{Line: 1, Character: 0},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(rangeEdits) != 0 {
+			t.Errorf("expected no range edits for SQL-mode data source, got %d", len(rangeEdits))
+		}
+	}
+}
+
+// An SSL-mode data source still formats normally. [spec feature.formatting/A9]
+func TestHandleFormatting_SSLDataSourceStillFormats(t *testing.T) {
+	const dsURI = "file:///logic.ds"
+	s := NewSSLServer()
+	s.documents.SetDocument(dsURI, ":PARAMETERS sStatus := \"A\";\n:DECLARE aRes;\naRes:=SQLExecute(\"SELECT 1 FROM DUAL\");\n", 1)
+	s.documentVersion[dsURI] = 1
+
+	edits, err := s.handleFormatting(nil, &protocol.DocumentFormattingParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: dsURI},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) == 0 {
+		t.Fatal("expected edits for SSL-mode data source")
+	}
+	if !strings.Contains(edits[0].NewText, "aRes := SQLExecute") {
+		t.Errorf("expected operator spacing applied:\n%s", edits[0].NewText)
+	}
+}
