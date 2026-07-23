@@ -2537,6 +2537,20 @@ func TestWrapEngine_MultilineSQLUntouched(t *testing.T) {
 	}
 }
 
+// CRLF input normalizes to LF-only output, stable on the second pass
+// (schema files.line_endings). [spec feature.formatting/A10]
+func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
+	input := ":PROCEDURE CrlfTest;\r\n:DECLARE nX;\r\nnX := 1;\r\n:ENDPROC;\r\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if strings.Contains(out, "\r") {
+		t.Errorf("output must not contain CR bytes:\n%q", out)
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent after CRLF normalization")
+	}
+}
+
 // Issue #101: a statement following a standalone comment on the same source
 // line moves to its own line (one_statement_per_line) — it must not hide
 // behind the comment. End-of-line comments after code stay attached.
