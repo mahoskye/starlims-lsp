@@ -781,7 +781,107 @@ func isSQLStatementTokens(tokens []SQLToken) bool {
 		return false
 	}
 
+	// English sentences produce runs of consecutive bare words; SQL never
+	// does — the longest legal identifier sequence is `table alias` (two).
+	// "Select the samples from the rack and update the status column…"
+	// contains such a run and must never be treated as SQL (issue #82).
+	if hasBareIdentifierRun(tokens, 3) {
+		return false
+	}
+
 	return validateSQLStructure(firstUpper, tokens)
+}
+
+// hasBareIdentifierRun reports whether the tokens contain a run of at least
+// n consecutive identifier tokens with nothing between them. Comments and
+// hints are transparent (they neither extend nor break a run).
+func hasBareIdentifierRun(tokens []SQLToken, n int) bool {
+	run := 0
+	for _, t := range tokens {
+		switch t.Type {
+		case SQLTokenComment, SQLTokenHint:
+			continue
+		case SQLTokenIdentifier:
+			run++
+			if run >= n {
+				return true
+			}
+		default:
+			run = 0
+		}
+	}
+	return false
+}
+
+// validateTargetAfter checks that the token following keyword kw looks like
+// a table reference: an identifier (dotted qualification allowed), followed
+// by at most one alias identifier, then a keyword, punctuation, or the end
+// of the statement. A third bare identifier means English prose, not SQL
+// ("from the archive folder…").
+func validateTargetAfter(tokens []SQLToken, kw string) bool {
+	idx := -1
+	for i, t := range tokens {
+		if strings.ToUpper(t.Text) == kw {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx+1 >= len(tokens) {
+		return false
+	}
+
+	i := idx + 1
+	// Subquery or parenthesized target is fine.
+	if tokens[i].Text == "(" {
+		return true
+	}
+	if tokens[i].Type != SQLTokenIdentifier {
+		return false
+	}
+	i++
+	// Dotted qualification: schema.table
+	for i+1 < len(tokens) && tokens[i].Text == "." && tokens[i+1].Type == SQLTokenIdentifier {
+		i += 2
+	}
+	// Optional alias.
+	if i < len(tokens) && tokens[i].Type == SQLTokenIdentifier {
+		i++
+	}
+	// Whatever follows must not be yet another bare identifier.
+	if i < len(tokens) && tokens[i].Type == SQLTokenIdentifier {
+		return false
+	}
+	return true
+}
+
+// validateSetClause checks that the first SET keyword is followed by an
+// assignment shape: `ident = …` (dotted qualification allowed) or a
+// parenthesized column tuple. "set a reminder so that it does not expire"
+// has no `=` after its bare words and is rejected (issue #82).
+func validateSetClause(tokens []SQLToken) bool {
+	idx := -1
+	for i, t := range tokens {
+		if strings.ToUpper(t.Text) == "SET" {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx+1 >= len(tokens) {
+		return false
+	}
+
+	i := idx + 1
+	if tokens[i].Text == "(" {
+		return true
+	}
+	if tokens[i].Type != SQLTokenIdentifier {
+		return false
+	}
+	i++
+	for i+1 < len(tokens) && tokens[i].Text == "." && tokens[i+1].Type == SQLTokenIdentifier {
+		i += 2
+	}
+	return i < len(tokens) && tokens[i].Text == "="
 }
 
 // validateSQLStructure validates that tokens form a complete SQL statement.
@@ -790,13 +890,13 @@ func validateSQLStructure(command string, tokens []SQLToken) bool {
 	case "SELECT":
 		return validateSelectStatement(tokens)
 	case "INSERT":
-		return containsKeyword(tokens, "INTO")
+		return containsKeyword(tokens, "INTO") && validateTargetAfter(tokens, "INTO")
 	case "UPDATE":
-		return containsKeyword(tokens, "SET")
+		return containsKeyword(tokens, "SET") && validateSetClause(tokens)
 	case "DELETE":
-		return containsKeyword(tokens, "FROM")
+		return containsKeyword(tokens, "FROM") && validateTargetAfter(tokens, "FROM")
 	case "MERGE":
-		return containsKeyword(tokens, "INTO")
+		return containsKeyword(tokens, "INTO") && validateTargetAfter(tokens, "INTO")
 	case "WITH":
 		// CTE - must contain a DML statement
 		return containsKeyword(tokens, "SELECT") ||
@@ -833,9 +933,30 @@ func validateSelectStatement(tokens []SQLToken) bool {
 		}
 	}
 
-	// If there's a FROM, there must be at least one token between SELECT and FROM
+	// If there's a FROM, there must be at least one token between SELECT and
+	// FROM, the list must have SELECT-list shape, and the FROM target must
+	// look like a table reference (issue #82).
 	if fromIdx > 0 {
-		return fromIdx > selectIdx+1
+		if fromIdx <= selectIdx+1 {
+			return false
+		}
+		// A SELECT list is `*`, a single expression, or comma-separated
+		// expressions. Two bare identifiers in a row ("the samples") are
+		// English, not a column list — except an alias directly after a
+		// closing paren (`COUNT(*) cnt`).
+		prevWasIdentifier := false
+		for i := selectIdx + 1; i < fromIdx; i++ {
+			t := tokens[i]
+			if t.Type == SQLTokenComment || t.Type == SQLTokenHint {
+				continue
+			}
+			isBareIdent := t.Type == SQLTokenIdentifier
+			if isBareIdent && prevWasIdentifier {
+				return false
+			}
+			prevWasIdentifier = isBareIdent
+		}
+		return validateTargetAfter(tokens, "FROM")
 	}
 
 	// SELECT without FROM is valid if there's a valid expression after SELECT
