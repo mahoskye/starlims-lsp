@@ -1,7 +1,8 @@
 // Package constants — element metadata loader.
 //
 // Provides runtime access to the per-element exception/caveat/best-practice
-// metadata extracted from ssl-docs (vendored at
+// metadata extracted from the starlims-ssl-reference repo (local
+// checkout: ssl-docs; vendored at
 // internal/constants/data/ssl-element-meta.json).
 //
 // The metadata layers onto whatever name lookup callers do — hover code
