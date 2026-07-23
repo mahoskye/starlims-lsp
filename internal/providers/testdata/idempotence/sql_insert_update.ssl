@@ -1,0 +1,6 @@
+:PROCEDURE Dml;
+:DECLARE bOk;
+bOk := RunSQL("INSERT INTO sample_audit_log (sample_id, event_type, event_description, created_by, created_on) VALUES (?, ?, ?, ?, ?)", "", {nId, sType, sDesc, sUser, dNow});
+bOk := RunSQL("UPDATE samples SET sample_status = ?, modified_by = ?, modified_on = ?, review_comment = ? WHERE sample_id = ? AND sample_status <> ?", "", {sNew, sUser, dNow, sCmt, nId, sOld});
+:RETURN bOk;
+:ENDPROC;

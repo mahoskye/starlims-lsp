@@ -1,0 +1,4 @@
+:PROCEDURE CrlfTest;
+:DECLARE nX;
+nX := 1;
+:ENDPROC;

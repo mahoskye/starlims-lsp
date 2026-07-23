@@ -1,0 +1,11 @@
+:PROCEDURE MemberAccess;
+:DECLARE oDs, oObj, nVal;
+oDs := SSLDataset{};
+oDs : MoveNext();
+nVal := oObj : Count;
+oObj:Next();
+oObj:Error := "x";
+oObj:If := 1;
+nVal := oObj:Try:Count;
+:RETURN nVal;
+:ENDPROC;

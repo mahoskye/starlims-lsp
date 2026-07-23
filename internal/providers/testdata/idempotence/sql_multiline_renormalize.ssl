@@ -1,0 +1,10 @@
+:PROCEDURE SqlTest;
+:DECLARE sSql, aRes, sXml;
+sSql := "SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id";
+aRes := SQLExecute("SELECT s.sample_id, s.sample_name FROM samples s WHERE s.sample_status IN (?aStatusCodes?) AND s.created_on < ?Today()? AND EXISTS (SELECT 1 FROM results r WHERE r.sample_id = s.sample_id)");
+sSql := "SELECT sample_id
+FROM samples
+WHERE sample_status = ?status?";
+sXml := GetDataSet("SELECT * FROM Samples WHERE Status = ?", {sStatus});
+:RETURN aRes;
+:ENDPROC;

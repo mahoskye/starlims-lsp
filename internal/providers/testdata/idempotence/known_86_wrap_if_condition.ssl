@@ -1,0 +1,11 @@
+:PROCEDURE WrapTorture;
+:DECLARE nTotal, oInvoice, aValues;
+DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarter});
+nTotal := nFirstQuarterRevenue + nSecondQuarterRevenue + nThirdQuarterRevenue + nFourthQuarterRevenue;
+:IF nFirstQuarterRevenue > nSecondQuarterRevenue .AND. nThirdQuarterRevenue > nFourthQuarterRevenue .AND. bReady;
+	nTotal := 0;
+:ENDIF;
+sValue := oInvoiceHeaderRecord:CustomerAddressBlock:PrimaryContactPerson:EmailAddressField;
+aValues := {LSearch("SELECT a FROM b WHERE c = ?", "", "", {nTotal}), LSearch("SELECT d FROM e WHERE f = ?", "", "", {nTotal})};
+:RETURN nTotal;
+:ENDPROC;

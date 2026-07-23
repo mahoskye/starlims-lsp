@@ -1,0 +1,5 @@
+:PROCEDURE OpWrap;
+:DECLARE bResult;
+bResult := bFirstConditionFlag .AND. bSecondConditionFlag .AND. bThirdConditionFlag .AND. bFourthFlag;
+:RETURN bResult;
+:ENDPROC;

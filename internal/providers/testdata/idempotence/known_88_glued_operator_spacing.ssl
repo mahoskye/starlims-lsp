@@ -1,0 +1,17 @@
+:PROCEDURE OpTorture;
+:DECLARE nA, nB, nC, bFlag;
+nA:=-5;
+nB:=nA- -3;
+nC:=nA-nB;
+nC:=(nA)-nB;
+nC:=aList[1]-nB;
+nA++;
+nB--;
+nC:=nA--nB;
+nC+=2;
+nC**=2;
+bFlag:=!bFlag;
+bFlag:=.not.bFlag;
+bFlag:=nA>=10.and.nB<=20;
+:RETURN nC;
+:ENDPROC;

@@ -1,0 +1,6 @@
+:PROCEDURE LabelTest;
+:LABELRetryPoint;
+nX := 1;
+:LABEL Named;
+:RETURN nX;
+:ENDPROC;

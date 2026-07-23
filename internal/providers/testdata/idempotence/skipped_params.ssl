@@ -1,0 +1,8 @@
+:PROCEDURE ParamTest;
+:DECLARE vRes;
+vRes := DoProc("MyProc", {param1,,param3});
+vRes := DoProc("MyProc", {param1, , param3});
+vRes := CreateUdObject({{"Property1", "value"}, {"Property2", 123}});
+vRes := RunSQL("UPDATE Samples SET Status = ? WHERE SampleID = ?",, {sStatus, sSampleID});
+:RETURN vRes;
+:ENDPROC;

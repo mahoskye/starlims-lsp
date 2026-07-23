@@ -1,0 +1,5 @@
+:PROCEDURE HintComment;
+:DECLARE aR;
+aR := SQLExecute("SELECT /*+ INDEX(samples idx_sample_status) */ sample_id, sample_name FROM samples WHERE sample_status = ?status? AND rownum <= 500 ORDER BY sample_id");
+:RETURN aR;
+:ENDPROC;

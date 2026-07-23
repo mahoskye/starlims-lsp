@@ -1,0 +1,6 @@
+:PROCEDURE GroupUnion;
+:DECLARE aR;
+aR := SQLExecute("SELECT sample_status, COUNT(*) AS status_count FROM samples GROUP BY sample_status HAVING COUNT(*) > 10 ORDER BY status_count DESC");
+aR := SQLExecute("SELECT sample_id FROM samples WHERE sample_status = 'A' UNION ALL SELECT sample_id FROM archived_samples WHERE archive_status = 'A' ORDER BY 1");
+:RETURN aR;
+:ENDPROC;

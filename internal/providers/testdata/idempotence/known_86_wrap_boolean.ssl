@@ -1,0 +1,8 @@
+:PROCEDURE BoolTest;
+:DECLARE bOk;
+bOk := bFirstConditionIsTrue .AND. bSecondConditionIsTrue .OR. bThirdConditionIsTrue .AND. bFourthCondition;
+:IF sStatusValue == "APPROVED" .AND. nRetryCounter < 5 .AND. .NOT. bAlreadyProcessedFlag .AND. bUserAuthorized;
+nX := 1;
+:ENDIF;
+:RETURN bOk;
+:ENDPROC;

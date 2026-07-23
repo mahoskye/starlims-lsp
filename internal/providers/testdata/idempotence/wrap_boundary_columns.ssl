@@ -1,0 +1,7 @@
+:PROCEDURE Boundary;
+:DECLARE nV;
+nV := DoProc("Pad", {nAlphaValue, nBetaValue, nGammaValue, nDeltaValu, nEpsilonVal, nZet});
+nV := DoProc("Pad", {nAlphaValue, nBetaValue, nGammaValue, nDeltaValue, nEpsilonVal, nZet});
+nV := DoProc("Pad", {nAlphaValue, nBetaValue, nGammaValue, nDeltaValuex, nEpsilonVal, nZet});
+:RETURN nV;
+:ENDPROC;

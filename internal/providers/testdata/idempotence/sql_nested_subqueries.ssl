@@ -1,0 +1,5 @@
+:PROCEDURE DeepNest;
+:DECLARE aR;
+aR := SQLExecute("SELECT s.sample_id FROM samples s WHERE s.sample_id IN (SELECT r.sample_id FROM results r WHERE r.result_value > (SELECT AVG(r2.result_value) FROM results r2 WHERE r2.analyte_id = r.analyte_id) AND r.result_status = 'F') AND s.sample_status = ?status?");
+:RETURN aR;
+:ENDPROC;

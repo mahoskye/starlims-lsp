@@ -1,0 +1,8 @@
+:PROCEDURE StringTest;
+:DECLARE sA, sB, sC, sD;
+sA := "operators inside: a:=b+c;  x<=y  .AND.  keep   spacing";
+sB := 'single quoted ; with semicolon and /* comment marker';
+sC := "tab	inside and trailing spaces   ";
+sD := "select this one has no from clause so not sql";
+:RETURN sA;
+:ENDPROC;

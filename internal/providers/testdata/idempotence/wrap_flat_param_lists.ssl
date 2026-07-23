@@ -1,0 +1,6 @@
+:PROCEDURE ParamsTest;
+:DECLARE vRes;
+vRes := ExecFunction("Category.ScriptName.ProcedureName", {sFirstParameter, sSecondParameter, sThirdParameter});
+vRes := ExecFunction("Category.ScriptName.LongerProcedureName", {sFirstParameterValue, sSecondParameterValue, sThirdParameterValue, sFourthParameterValue, sFifthParameterValue});
+:RETURN vRes;
+:ENDPROC;

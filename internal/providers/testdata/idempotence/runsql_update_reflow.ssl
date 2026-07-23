@@ -1,0 +1,5 @@
+:PROCEDURE RunSqlTest;
+:DECLARE bOk;
+bOk := RunSQL("UPDATE samples SET sample_status = ?, modified_on = ?, modified_by = ? WHERE sample_id = ?", "", {sStatus, dNow, sUser, nId});
+:RETURN bOk;
+:ENDPROC;

@@ -1,0 +1,5 @@
+:PROCEDURE ArgTest;
+:DECLARE sRes;
+sRes := LSearch("SELECT name FROM samples WHERE id = ?", "Select a valid sample from the list and update your filter settings before retrying the search", "", {nId});
+:RETURN sRes;
+:ENDPROC;

@@ -1,0 +1,5 @@
+:PROCEDURE BetweenTop;
+:DECLARE aR;
+aR := SQLExecute("SELECT TOP 100 sample_id, created_on FROM samples WHERE created_on BETWEEN ?dStart? AND ?dEnd? AND sample_status = ?status? ORDER BY created_on DESC");
+:RETURN aR;
+:ENDPROC;

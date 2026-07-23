@@ -1,0 +1,7 @@
+:PROCEDURE MixedBrackets;
+:DECLARE vRes, aData;
+vRes := DoProc("BuildRecord", {aSampleRows[nCurrentRowIndex], aResultColumns[nColIndex], Upper(AllTrim(sRawFieldValue))});
+aData := {{"FIRST_KEY", aValues[1]}, {"SECOND_KEY", aValues[2]}, {"THIRD_KEY", aValues[3]}, {"FOURTH_KEY", aValues[4]}};
+vRes := CreateUdObject("MyNamespace.MyClassName", {oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+:RETURN vRes;
+:ENDPROC;

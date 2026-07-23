@@ -1,0 +1,8 @@
+:PROCEDURE Messages;
+:DECLARE sMsgA, sMsgB, sMsgC;
+sMsgA := "Select the samples from the rack and update the status column before continuing with the run";
+sMsgB := "Update your password and set a reminder so that it does not expire while you are away on leave";
+sMsgC := "Delete old records from the archive folder after you have exported them to the backup share";
+UsrMes(sMsgA, "Info");
+:RETURN .T.;
+:ENDPROC;

@@ -1,0 +1,10 @@
+:REGION Setup;
+:DECLARE nX;
+nX := 1;
+:ENDREGION;
+:REGION Teardown;
+nX := 0;
+:ENDREGION;
+:BEGININLINECODE SqlBlock;
+nX := 2;
+:ENDINLINECODE;
