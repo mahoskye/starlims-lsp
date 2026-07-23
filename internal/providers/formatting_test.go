@@ -2536,3 +2536,17 @@ func TestWrapEngine_MultilineSQLUntouched(t *testing.T) {
 		t.Errorf("multi-line SQL block not stable under wrap pass:\n%s", once)
 	}
 }
+
+// CRLF input normalizes to LF-only output, stable on the second pass
+// (schema files.line_endings). [spec feature.formatting/A10]
+func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
+	input := ":PROCEDURE CrlfTest;\r\n:DECLARE nX;\r\nnX := 1;\r\n:ENDPROC;\r\n"
+	opts := DefaultFormattingOptions()
+	out := FormatDocument(input, opts)[0].NewText
+	if strings.Contains(out, "\r") {
+		t.Errorf("output must not contain CR bytes:\n%q", out)
+	}
+	if FormatDocument(out, opts)[0].NewText != out {
+		t.Errorf("not idempotent after CRLF normalization")
+	}
+}

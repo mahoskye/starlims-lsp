@@ -49,6 +49,13 @@ issues: ["#81", "#82"]
 
 ## Behavior
 
+This entry owns the *string boundary* — when a string is handed to the
+SQL engine and how the quotes and surrounding SSL lay out (rules A–F
+below). The multi-line SQL layout itself (clause breaks, indents,
+INSERT/VALUES/DECODE/MERGE/CTE shapes) is governed by
+`sql-canonical-compact-reference.md` in the ssl-style-guide repo — the
+authoritative S-rules; layout fixes cite that document, not this entry.
+
 String literals are literal text and are never reformatted — with one
 deliberate exception: a string whose content is detected as a SQL statement
 is formatted by the SQL engine when `ssl.format.sql.enabled` is on

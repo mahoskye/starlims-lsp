@@ -4,6 +4,19 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D11 — The formatter reflows, it does not rewrite (2026-07-23, issue #102)
+
+The formatter changes layout and applies authoritative canonicalizations
+(casing, spacing, semicolons) — it never restructures code. Out of scope
+by decision, not omission: statement reordering (schema module_structure
+R05/R98–R101 — a refactor), documentation-header generation (R88), and
+operator substitution (`<>`/`#` → `!=`, schema lints R53/R54 — the
+diagnostics' job to flag, the author's to change). Anything that could
+alter meaning or authorship intent belongs to diagnostics or refactoring
+tools, never to format-on-save. Open questions tracked outside this
+decision: code-block literal normalization (issue #91) and the
+builtinFunctionCase default (issue #92).
+
 ## D10 — `:` member access never warns (2026-07-03, issue #22)
 
 Member access is analyzed only from positive knowledge, and the absence

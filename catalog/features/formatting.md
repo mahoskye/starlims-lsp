@@ -42,6 +42,13 @@ history:
     note: Post-format passes (trailing-whitespace trim, blank-line cap,
       sibling-block blank lines, built-in casing) layered on the token
       formatter as configurable options.
+  - date: 2026-07-23
+    ref: "issue #102"
+    note: >-
+      LF-only output documented (schema files.line_endings); scope
+      boundary recorded in DECISIONS.md D11; SQL layout authority
+      delegated to sql-canonical-compact-reference.md via
+      fmt.sql_in_strings.
   - date: 2026-07-22
     ref: "issue #87"
     note: >-
@@ -88,6 +95,9 @@ not restate them.
   off, standalone strings are never touched but SQL-function arguments are
   still formatted. `ssl.format.sql.enabled: false` disables the hand-off
   entirely.
+- Output uses LF line endings; CRLF input is normalized (the style-guide
+  schema mandates `files.line_endings: lf`). On Windows-authored files this
+  makes the first format a whole-file diff — intended, per the schema.
 - Formatting is idempotent: formatting already-formatted output again under
   the same options produces identical text. Deviations are bugs to be
   recorded as `## Known gaps` on the relevant `fmt.*` entry.
@@ -115,6 +125,7 @@ not restate them.
 - A7: Given `ssl.format.sql.detectSQLStrings: false`, when formatted, then standalone SQL-looking strings pass through unchanged while the SQL argument of a known SQL function is still formatted.
 - A8: Given different `ssl.format.*` option values (e.g. indentStyle tab vs space), when the same document is formatted under each, then the outputs differ accordingly — the configured options are honored.
 - A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
+- A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
 
 ## Rationale
 
