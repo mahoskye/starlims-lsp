@@ -2537,7 +2537,6 @@ func TestWrapEngine_MultilineSQLUntouched(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 // CRLF input normalizes to LF-only output, stable on the second pass
 // (schema files.line_endings). [spec feature.formatting/A10]
 func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
@@ -2549,7 +2548,9 @@ func TestFormatDocument_CRLFNormalizedToLF(t *testing.T) {
 	}
 	if FormatDocument(out, opts)[0].NewText != out {
 		t.Errorf("not idempotent after CRLF normalization")
-=======
+	}
+}
+
 // Issue #101: a statement following a standalone comment on the same source
 // line moves to its own line (one_statement_per_line) — it must not hide
 // behind the comment. End-of-line comments after code stay attached.
@@ -2565,6 +2566,5 @@ func TestFormatDocument_CommentThenCodeSplits(t *testing.T) {
 	}
 	if FormatDocument(out, opts)[0].NewText != out {
 		t.Errorf("not idempotent:\n%s", out)
->>>>>>> origin/main
 	}
 }

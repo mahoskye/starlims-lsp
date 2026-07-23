@@ -66,16 +66,11 @@ Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:
 content *inside* a multi-line comment is preserved verbatim (modulo
 trailing-whitespace trimming, see fmt.trim_trailing_whitespace).
-<<<<<<< HEAD
 End-of-line comments stay attached to their statement's line, separated
 by exactly two spaces regardless of the source spacing, and are not
-separately indented.
-=======
-End-of-line comments stay attached to their statement's line and are not
 separately indented. A statement written on the same line *after* a
 standalone comment moves to its own line — code must not hide behind a
 comment (issue #101).
->>>>>>> origin/main
 
 ## Examples
 
