@@ -626,6 +626,10 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 	return false
 }
 
+// updateSQLFunctionState tracks whether the formatter is inside a known SQL
+// function call and which argument position it is at. Must run for every
+// token (including commas — issue #82: it used to run only for tokens the
+// operator/comma writer didn't handle, so sqlArgCount never advanced).
 func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 	if token.Type == lexer.TokenIdentifier {
 		upper := strings.ToUpper(token.Text)
@@ -636,15 +640,18 @@ func (s *formatState) updateSQLFunctionState(token lexer.Token) {
 		}
 	}
 
-	if s.inSQLFunction {
-		if token.Text == "(" && s.parenDepth == s.sqlFunctionParenDepth-1 {
-			s.sqlArgCount = 0
-		} else if token.Text == ")" && s.parenDepth == s.sqlFunctionParenDepth {
-			s.inSQLFunction = false
-			s.sqlFunctionParenDepth = 0
-		} else if token.Text == "," && s.parenDepth == s.sqlFunctionParenDepth {
-			s.sqlArgCount++
-		}
+	if !s.inSQLFunction {
+		return
+	}
+	switch {
+	case token.Text == ")" && s.parenDepth < s.sqlFunctionParenDepth:
+		// The call's own closing paren (parenDepth is already decremented).
+		// Nested closers land at >= sqlFunctionParenDepth and must not end
+		// the call early.
+		s.inSQLFunction = false
+		s.sqlFunctionParenDepth = 0
+	case token.Text == "," && s.parenDepth == s.sqlFunctionParenDepth:
+		s.sqlArgCount++
 	}
 }
 
@@ -659,6 +666,12 @@ func (s *formatState) willFormatAsMultilineSQL(token lexer.Token) bool {
 		return false
 	}
 	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+	// Only the SQL argument (position 0) of a known SQL function is a
+	// candidate — later arguments are friendly names, default values, and
+	// parameter arrays, never SQL (issue #82).
+	if s.inSQLFunction && s.sqlArgCount > 0 {
 		return false
 	}
 	inner := token.Text[1 : len(token.Text)-1]
@@ -683,6 +696,13 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// When DetectSQLStrings is disabled, only format strings inside SQL
 	// function calls (e.g. SQLExecute). Skip regular string literals.
 	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+
+	// Only argument 0 of a SQL function is the SQL string; later arguments
+	// (friendly names, LSearch default values) must never be reformatted
+	// even when they look like SQL (issue #82).
+	if s.inSQLFunction && s.sqlArgCount > 0 {
 		return false
 	}
 
@@ -792,10 +812,10 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			continue
 		}
 
+		state.updateSQLFunctionState(token)
 		state.applyLineWrap(token)
 		tokenWritten := state.writeOperatorOrComma(token, tokens, i)
 		if !tokenWritten {
-			state.updateSQLFunctionState(token)
 			tokenWritten = state.writeTokenWithSQLFormatting(token)
 		}
 		if !tokenWritten {

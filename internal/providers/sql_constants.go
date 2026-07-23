@@ -7,7 +7,7 @@ var SQLKeywords = map[string]bool{
 	"MERGE": true, "USING": true, "WITH": true, "RECURSIVE": true,
 	"VALUES": true, "SET": true, "WHERE": true, "FROM": true,
 	"JOIN": true, "INTO": true, "ON": true, "AND": true, "OR": true,
-	"AS": true, "IN": true, "DISTINCT": true, "TOP": true, "NOT": true,
+	"AS": true, "IN": true, "DISTINCT": true, "TOP": true, "NOT": true, "TO": true,
 	"BETWEEN": true, "LIKE": true, "IS": true, "NULL": true,
 	"INNER": true, "LEFT": true, "RIGHT": true, "FULL": true, "CROSS": true,
 	"GROUP": true, "BY": true, "ORDER": true, "HAVING": true,

@@ -2409,3 +2409,81 @@ func TestSQLFormatter_FormatSQLInString_BracketQuote(t *testing.T) {
 		t.Errorf("double-quote delimiters must be symmetric:\n%q", double)
 	}
 }
+
+// Issue #82: English sentences that happen to contain SQL trigger-word pairs
+// (select…from, update…set, delete…from) must not be detected as SQL —
+// runtime string values were being rewritten by the formatter.
+func TestIsSQLString_EnglishSentencesRejected(t *testing.T) {
+	sentences := []string{
+		"Select the samples from the rack and update the status column before continuing with the run",
+		"Update your password and set a reminder so that it does not expire while you are away on leave",
+		"Delete old records from the archive folder after you have exported them to the backup share",
+		"Select a valid sample from the list and update your filter settings before retrying the search",
+		"Insert the record into the database now please and thank you very much",
+		"Select the samples from the rack",
+		"Merge the results into the summary report before the meeting starts",
+	}
+	for _, s := range sentences {
+		if IsSQLString(s) {
+			t.Errorf("IsSQLString(%q) = true, want false", s)
+		}
+	}
+}
+
+// Issue #82: real queries — including alias forms, TOP/DISTINCT, dotted
+// qualification, and clause-heavy statements — must still be detected.
+func TestIsSQLString_RealQueriesStillDetected(t *testing.T) {
+	queries := []string{
+		"SELECT sample_id FROM samples",
+		"select * from users where id = ?id?",
+		"SELECT s.sample_id, s.sample_name FROM samples s WHERE s.sample_status = ?status?",
+		"SELECT TOP 100 sample_id, created_on FROM samples ORDER BY created_on DESC",
+		"SELECT DISTINCT testcode FROM ordtask",
+		"SELECT COUNT(*) cnt FROM samples GROUP BY sample_status",
+		"SELECT o.ordno FROM orders o INNER JOIN ordtask t ON t.ordno = o.ordno",
+		"SELECT sample_id FROM lims.samples WHERE sample_status IN ('A', 'P')",
+		"SELECT sample_id FROM samples s FOR UPDATE OF sample_status NOWAIT",
+		"UPDATE samples SET sample_status = ? WHERE sample_id = ?",
+		"UPDATE ordtask t SET t.status = 'Complete' WHERE t.ordno = ?",
+		"DELETE FROM audit_log WHERE log_date < ?",
+		"DELETE FROM lims.audit_log al WHERE al.log_date < ?dCutoff?",
+		"INSERT INTO sample_audit_log (sample_id, event_type) VALUES (?, ?)",
+		"INSERT INTO lims.samples SELECT * FROM staging_samples",
+		"MERGE INTO tgt USING src ON (tgt.id = src.id) WHEN MATCHED THEN UPDATE SET tgt.x = src.x",
+		"WITH counts AS (SELECT ordno, COUNT(*) c FROM ordtask GROUP BY ordno) SELECT * FROM counts",
+	}
+	for _, q := range queries {
+		if !IsSQLString(q) {
+			t.Errorf("IsSQLString(%q) = false, want true", q)
+		}
+	}
+}
+
+// Issue #82: first coverage for IsSQLDocument — the data-source classifier
+// shares the validator, so the stricter rules must not regress plain-SQL
+// data-source files (feature.diagnostics_pipeline A10).
+func TestIsSQLDocument_Classification(t *testing.T) {
+	sqlDocs := []string{
+		"SELECT s.sample_id, s.sample_name\nFROM samples s\nWHERE s.sample_status = :status\nORDER BY s.sample_id\n",
+		"-- lookup for the samples grid\nSELECT sample_id, sample_name FROM samples WHERE sample_status = ?\n",
+		"/* legacy report query */\nSELECT ordno, testcode FROM ordtask WHERE status = ?\n",
+		"UPDATE samples SET sample_status = ? WHERE sample_id = ?\n",
+	}
+	for _, d := range sqlDocs {
+		if !IsSQLDocument(d) {
+			t.Errorf("IsSQLDocument(%q) = false, want true", d)
+		}
+	}
+
+	nonSQLDocs := []string{
+		":PARAMETERS sStatus := \"A\";\n:DECLARE aRes;\naRes := SQLExecute(\"SELECT 1 FROM DUAL\");\n",
+		"/* SSL leading comment;\nnX := 1;\n",
+		"Select the samples from the rack and update the status column before continuing with the run",
+		"",
+	}
+	for _, d := range nonSQLDocs {
+		if IsSQLDocument(d) {
+			t.Errorf("IsSQLDocument(%q) = true, want false", d)
+		}
+	}
+}
