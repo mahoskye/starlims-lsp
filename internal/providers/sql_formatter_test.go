@@ -2453,3 +2453,37 @@ func TestIsSQLDocument_Classification(t *testing.T) {
 		}
 	}
 }
+
+// Issue #81: bracket-quoted SSL strings open with '[' and close with ']'.
+// FormatSQLInString used to write the opening byte at both ends, producing
+// an unterminated bracket string that swallowed the rest of the file on the
+// next format pass.
+func TestSQLFormatter_FormatSQLInString_BracketQuote(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+
+	multiline := f.FormatSQLInString(
+		"SELECT ordno, testcode\nFROM ordtask\nWHERE status = ?sStatus?",
+		'[',
+		"\t",
+	)
+	if !strings.HasPrefix(multiline, "[") {
+		t.Errorf("multi-line output must open with '[':\n%q", multiline)
+	}
+	if !strings.HasSuffix(multiline, "]") {
+		t.Errorf("multi-line output must close with ']':\n%q", multiline)
+	}
+	if strings.Count(multiline, "[") != 1 {
+		t.Errorf("multi-line output must contain exactly one '[' delimiter:\n%q", multiline)
+	}
+
+	singleline := f.FormatSQLInString("SELECT 1 FROM DUAL", '[', "")
+	if !strings.HasPrefix(singleline, "[") || !strings.HasSuffix(singleline, "]") {
+		t.Errorf("single-line output must be [-...-] delimited:\n%q", singleline)
+	}
+
+	// Symmetric quote styles are unchanged.
+	double := f.FormatSQLInString("SELECT 1 FROM DUAL", '"', "")
+	if !strings.HasPrefix(double, `"`) || !strings.HasSuffix(double, `"`) {
+		t.Errorf("double-quote delimiters must be symmetric:\n%q", double)
+	}
+}

@@ -2282,3 +2282,32 @@ func TestFormatDocument_SQLFunctionStateSurvivesNestedCalls(t *testing.T) {
 		t.Errorf("string inside argument array was altered:\n%s", out)
 	}
 }
+
+// Issue #81: a bracket-quoted SQL string that overflows the line reflows with
+// a ']' closer and formats idempotently — the second pass must not swallow the
+// remainder of the document into the string.
+func TestFormatDocument_BracketQuotedSQLStringRoundTrip(t *testing.T) {
+	input := ":PROCEDURE BracketSql;\n" +
+		":DECLARE sSql, aRes;\n" +
+		"sSql := [SELECT sample_id, sample_name, sample_status FROM samples WHERE owner_name = 'O''Brien' AND sample_status = ?status? ORDER BY sample_id];\n" +
+		"aRes := SQLExecute(sSql);\n" +
+		":RETURN aRes;\n" +
+		":ENDPROC;\n"
+	opts := DefaultFormattingOptions()
+
+	once := FormatDocument(input, opts)[0].NewText
+	if !strings.Contains(once, "];") {
+		t.Fatalf("reflowed bracket string must close with ']':\n%s", once)
+	}
+	if strings.Contains(once, "[;") {
+		t.Fatalf("reflowed bracket string must not close with '[':\n%s", once)
+	}
+	if !strings.Contains(once, ":ENDPROC;") {
+		t.Fatalf("document structure lost after formatting:\n%s", once)
+	}
+
+	twice := FormatDocument(once, opts)[0].NewText
+	if once != twice {
+		t.Errorf("bracket-quoted SQL formatting is not idempotent.\nfirst:\n%s\nsecond:\n%s", once, twice)
+	}
+}

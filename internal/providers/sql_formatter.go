@@ -698,11 +698,22 @@ func getPrevNonWS(tokens []SQLToken, i int) *SQLToken {
 	return nil
 }
 
+// closingQuoteFor returns the closing delimiter matching an SSL string's
+// opening delimiter: bracket strings open with '[' and close with ']';
+// the double- and single-quote styles are symmetric (issue #81).
+func closingQuoteFor(open byte) byte {
+	if open == '[' {
+		return ']'
+	}
+	return open
+}
+
 // FormatSQLInString formats SQL within an SSL string literal.
 // It handles the quote characters and maintains proper indentation.
 func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseIndent string) string {
+	closeChar := closingQuoteFor(quoteChar)
 	if !f.opts.Enabled || len(content) == 0 {
-		return string(quoteChar) + content + string(quoteChar)
+		return string(quoteChar) + content + string(closeChar)
 	}
 
 	formatted := f.FormatSQL(content, baseIndent+f.indentString)
@@ -717,11 +728,11 @@ func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseInd
 		result.WriteString(formatted)
 		result.WriteString("\n")
 		result.WriteString(baseIndent)
-		result.WriteByte(quoteChar)
+		result.WriteByte(closeChar)
 		return result.String()
 	}
 
-	return string(quoteChar) + formatted + string(quoteChar)
+	return string(quoteChar) + formatted + string(closeChar)
 }
 
 // IsSQLString checks if a string content appears to be a complete SQL statement.

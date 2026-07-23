@@ -32,13 +32,19 @@ history:
       single-line SQL assignments: single-line SQL that fits its line is
       left untouched; rules A–F pin the multi-line layout.
   - date: 2026-07-22
+    ref: "issue #81"
+    note: >-
+      Bracket-quoted strings reflow with a ']' closer. The reflow used to
+      write the opening delimiter at both ends, leaving an unterminated
+      bracket string that swallowed the rest of the file on the next pass.
+  - date: 2026-07-22
     ref: "issue #82"
     note: >-
       Detection hardened against English prose: runs of three or more
       bare words, prose-shaped SELECT lists, and SET/target clauses
       without SQL shape are rejected; only argument 0 of a known SQL
       function is a SQL candidate.
-issues: ["#82"]
+issues: ["#81", "#82"]
 ---
 
 ## Behavior
@@ -118,6 +124,26 @@ sSql := "
     WHERE sample_status = ?status?
     ORDER BY sample_id
 ";
+```
+
+Bracket-quoted strings (the idiomatic style for SQL holding embedded
+quotes) reflow the same way; the opening `[` closes with `]` (issue #81):
+
+### Before
+
+```ssl
+sSql := [SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id];
+```
+
+### After
+
+```ssl
+sSql := [
+    SELECT sample_id, sample_name, sample_status
+    FROM samples
+    WHERE sample_status = ?status?
+    ORDER BY sample_id
+];
 ```
 
 SQL that already spans lines is renormalized to the same layout:
