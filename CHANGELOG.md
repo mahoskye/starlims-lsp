@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-22
+
+Formatter hardening release: every finding from the adversarial
+conformance review against the style-guide schema and
+sql-canonical-compact-reference is closed (issues #81–#104, #118–#119;
+full report in `docs/reviews/2026-07-22-formatter-conformance-review.md`).
+
+### Fixed
+- **Corruption-class bugs.** Bracket-quoted SQL strings reflowed with `[`
+  as the closing delimiter, destroying the file on the next format (#81).
+  English strings containing SQL trigger words ("Select the samples from
+  the rack and update…") were detected as SQL and rewritten — detection
+  now rejects prose shapes, and only argument 0 of a SQL function is ever
+  a SQL candidate (#82). A number literal consumed the dot of a glued
+  dot-operator, corrupting later tokens on the line (`nA>=10.and.nB<=20`
+  → `nB< = 20`) (#83). Formatting mangled SQL-mode data sources
+  (semicolons injected, `:bind` variables re-cased); both formatting and
+  diagnostics now recognize the hybrid directive-headed
+  `sql_data_source` shape — directives keep their checks, the SQL body
+  is left alone (#84, #104).
+- **Idempotence (feature.formatting A6).** Over-long atomic strings grew
+  a blank line on every format pass (#85); wrapped operator continuations
+  lost an indent level on reformat (#86); unterminated strings gained a
+  stray semicolon per pass (#87); glued operator pairs double-spaced
+  (#88). Format-on-save is now a fixpoint, enforced by a 42-fixture
+  format-twice harness and catalog After-fence stability checks (#103).
+- **SQL canonical-compact conformance.** INSERT column lists and VALUES
+  use block style — no more stranded closing paren (#93); DECODE pairs
+  align under the first argument (#94); MERGE multi-line ON conditions
+  align under the first condition and UPDATE SET keeps its first
+  assignment inline (#95); chained CTEs break to column 0 (#96); long
+  `||` concatenations wrap with the operator leading (#97); INSERT ALL
+  branches format uniformly with the source SELECT at column 0 (#118);
+  `WITHIN GROUP` is a compound clause and `ON OVERFLOW` is no longer
+  mistaken for a join ON (#119).
+- Range-formatting a mixed tab/space selection no longer dedents the
+  block to column 0 (#98); postfix `++`/`--` statements receive semicolon
+  enforcement (#99); a statement written after a standalone comment on
+  the same line moves to its own line (#101).
+
+### Changed
+- **Wrap engine rebuilt** (#89). Line wrapping is now a whole-line
+  post-format pass with a conformance guarantee: a line exceeds
+  `maxLineLength` only when a single atomic token cannot fit. Breaks land
+  after commas, after `:=`, or before binary operators (operator leads
+  its continuation); subscripts are atomic like member-access chains; the
+  92–107-column overshoots, split subscripts, and inner-call breaks of
+  the old streaming wrapper are gone. Continuation lines sit exactly one
+  level past the statement line (lexical), including after a trailing
+  `:=` or operator.
+- **Schema-canonical forms normalize by default** (DECISIONS.md D12).
+  Dot logical operators uppercase (`.and.` → `.AND.`) and `me`/`base`
+  receivers canonicalize to `Me`/`Base` (#90); code-block literals take
+  the `{|params| expression}` shape (`{|a,b|a+b}` → `{|a, b| a + b}`),
+  with conservative pass-through for anything unsafe to rewrite (#91);
+  `ssl.format.builtinFunctionCase` defaults to `"PascalCase"` — built-in
+  call sites take the documented casing out of the box, `"preserve"`
+  remains available (#92). **Downstream note:** clients that declare
+  their own default for `builtinFunctionCase` (the VS Code extension)
+  must flip it to match.
+- Output line endings are LF-only per the style-guide schema; CRLF input
+  is normalized (documented as feature.formatting A10).
+
+### Added
+- **CLI modes** (#100): `starlims-lsp --format --write` (in place),
+  `--check` (CI gate: exit 1 listing unformatted files), and
+  `--indent-style` / `--indent-size` / `--max-line-length` / `--no-sql`
+  flags.
+- Catalog entries `fmt.keyword_case` and `fmt.code_block_literals`;
+  DECISIONS.md D11 (the formatter reflows, it does not rewrite) and D12;
+  SQL layout authority explicitly delegated to
+  `sql-canonical-compact-reference.md`, with its ambiguities filed
+  upstream (ssl-style-guide#19) (#102).
+- Test infrastructure (#103): the idempotence corpus with a ratcheted
+  known-failures list, exact want/got assertions replacing the older
+  contains-only checks (net −246 lines), and a table-driven SQL layout
+  helper.
+
 ## [0.12.0] - 2026-07-22
 
 Same-file `DoProc` hover and SQL-mode data sources (spec:
