@@ -215,7 +215,9 @@ func TestLexer_TokenNumber(t *testing.T) {
 		{"zero", "0", "0"},
 		{"decimal", "123.456", "123.456"},
 		{"leading_dot", ".5", ".5"},
-		{"trailing_dot", "5.", "5."},
+		// Grammar: DecimalPart ::= "." Digit {Digit} — a dot with no digit
+		// after it is not part of the number (issue #83).
+		{"trailing_dot_not_consumed", "5.", "5"},
 		{"scientific_explicit_plus_invalid", "1.5e+10", "1.5"},
 		{"scientific_negative", "2.3e-5", "2.3e-5"},
 		{"scientific_requires_decimal_point_lower", "1e10", "1"},
@@ -1451,5 +1453,94 @@ func TestLexer_ScientificNotation_NoPlusSign(t *testing.T) {
 	}
 	if tokens[0].Text != "9.0" {
 		t.Errorf("expected '9.0' (rejects E+), got %q", tokens[0].Text)
+	}
+}
+
+// Issue #83: a number followed by a glued dot-operator must not consume the
+// dot (`10.AND.x` is Number(10) Operator(.AND.) Identifier(x)), and a failed
+// dot-operator scan must not swallow the following character (`.nB<` used to
+// eat the '<' of '<=', corrupting the rest of the line).
+func TestLexer_NumberBeforeDotOperator(t *testing.T) {
+	type tok struct {
+		typ  TokenType
+		text string
+	}
+	cases := []struct {
+		name  string
+		input string
+		want  []tok
+	}{
+		{
+			name:  "glued_upper",
+			input: "nCount>=10.AND.bReady",
+			want: []tok{
+				{TokenIdentifier, "nCount"}, {TokenOperator, ">="}, {TokenNumber, "10"},
+				{TokenOperator, ".AND."}, {TokenIdentifier, "bReady"},
+			},
+		},
+		{
+			name:  "glued_lower_with_comparison",
+			input: "nA>=10.and.nB<=20",
+			want: []tok{
+				{TokenIdentifier, "nA"}, {TokenOperator, ">="}, {TokenNumber, "10"},
+				{TokenOperator, ".and."}, {TokenIdentifier, "nB"},
+				{TokenOperator, "<="}, {TokenNumber, "20"},
+			},
+		},
+		{
+			name:  "decimal_still_lexes",
+			input: "nX:=10.5+1.25e-3",
+			want: []tok{
+				{TokenIdentifier, "nX"}, {TokenOperator, ":="}, {TokenNumber, "10.5"},
+				{TokenOperator, "+"}, {TokenNumber, "1.25e-3"},
+			},
+		},
+		{
+			name:  "boolean_after_number",
+			input: "bX:=7.and..T.",
+			want: []tok{
+				{TokenIdentifier, "bX"}, {TokenOperator, ":="}, {TokenNumber, "7"},
+				{TokenOperator, ".and."}, {TokenKeyword, ".T."},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []tok
+			for _, tk := range NewLexer(tc.input).Tokenize() {
+				if tk.Type == TokenWhitespace || tk.Type == TokenEOF {
+					continue
+				}
+				got = append(got, tok{tk.Type, tk.Text})
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("token count: want %d got %d: %+v", len(tc.want), len(got), got)
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Errorf("token %d: want %+v got %+v", i, tc.want[i], got[i])
+				}
+			}
+		})
+	}
+}
+
+// Issue #83: the dot-operator fallback token must end before a non-alpha
+// character rather than consuming it.
+func TestLexer_DotOperatorFallbackDoesNotSwallow(t *testing.T) {
+	tokens := NewLexer(".nB<=20").Tokenize()
+	var texts []string
+	for _, tk := range tokens {
+		if tk.Type == TokenWhitespace || tk.Type == TokenEOF {
+			continue
+		}
+		texts = append(texts, tk.Text)
+	}
+	// ".nB" is not a valid dot operator (Unknown is fine) — but "<=" must
+	// survive as a single operator token and "20" as a number.
+	joined := strings.Join(texts, "|")
+	if !strings.Contains(joined, "<=") || !strings.Contains(joined, "20") {
+		t.Errorf("expected <= and 20 to survive after failed dot scan, got %v", texts)
 	}
 }

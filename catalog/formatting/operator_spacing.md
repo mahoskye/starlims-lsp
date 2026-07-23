@@ -13,7 +13,13 @@ history:
   - date: 2026-01-10
     ref: "v0.1.0 initial release"
     note: Part of the original document formatter, default on.
-issues: []
+  - date: 2026-07-22
+    ref: "issue #83"
+    note: >-
+      Lexer fix: a number no longer consumes a trailing dot, so dot
+      operators glued to a numeric literal (`10.AND.`) space correctly
+      instead of corrupting the rest of the line.
+issues: ["#83"]
 ---
 
 ## Behavior
@@ -52,6 +58,26 @@ nTotal := nBase + nExtra;
 
 ```ssl
 :IF nCount>=10 .AND. bReady;
+nCount := 0;
+:ENDIF;
+```
+
+### After
+
+```ssl
+:IF nCount >= 10 .AND. bReady;
+	nCount := 0;
+:ENDIF;
+```
+
+A dot operator glued to a numeric literal is recognized and spaced —
+before issue #83 the number consumed the dot and later operators on the
+line were corrupted:
+
+### Before
+
+```ssl
+:IF nCount>=10.AND.bReady;
 nCount := 0;
 :ENDIF;
 ```
