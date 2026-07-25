@@ -1166,7 +1166,7 @@
       "id": "ssl.function.clearlastsslerror",
       "element_type": "function",
       "title": "ClearLastSSLError",
-      "summary": "Clears the current SSL error state.",
+      "summary": "Clears the stored SSL error so later error checks start clean.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ClearLastSSLError.md",
       "exceptions": [],
@@ -2338,7 +2338,7 @@
       "id": "ssl.function.deleteinlinecode",
       "element_type": "function",
       "title": "DeleteInlineCode",
-      "summary": "Removes a named inline code entry.",
+      "summary": "Removes a named inline code entry using a case-insensitive name lookup.",
       "doc_status": "published",
       "source_path": "content/reference/functions/DeleteInlineCode.md",
       "exceptions": [
@@ -2429,7 +2429,7 @@
       "id": "ssl.function.doproc",
       "element_type": "function",
       "title": "DoProc",
-      "summary": "Calls a procedure by name at runtime.",
+      "summary": "Calls a local or scripted procedure by name with an optional argument array.",
       "doc_status": "published",
       "source_path": "content/reference/functions/DoProc.md",
       "exceptions": [
@@ -5814,7 +5814,7 @@
       "id": "ssl.function.getsetting",
       "element_type": "function",
       "title": "GetSetting",
-      "summary": "Retrieves a single named setting.",
+      "summary": "Retrieves the stored value of a named configuration setting.",
       "doc_status": "published",
       "source_path": "content/reference/functions/GetSetting.md",
       "exceptions": [
@@ -10034,7 +10034,7 @@
       "id": "ssl.function.sqrt",
       "element_type": "function",
       "title": "Sqrt",
-      "summary": "Calculates the square root of a number.",
+      "summary": "Calculates the non-negative square root of a numeric value.",
       "doc_status": "published",
       "source_path": "content/reference/functions/Sqrt.md",
       "exceptions": [
@@ -10417,7 +10417,7 @@
       "id": "ssl.function.tojson",
       "element_type": "function",
       "title": "ToJson",
-      "summary": "Serializes a value to a JSON string.",
+      "summary": "Serializes an SSL value, array, or object to a JSON string.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ToJson.md",
       "exceptions": [
@@ -10508,7 +10508,7 @@
       "id": "ssl.function.toxml",
       "element_type": "function",
       "title": "ToXml",
-      "summary": "Converts a value to an XML string.",
+      "summary": "Serializes a value, array, or dynamic object to an XML string.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ToXml.md",
       "exceptions": [],
@@ -10675,7 +10675,7 @@
       "id": "ssl.function.urldecode",
       "element_type": "function",
       "title": "UrlDecode",
-      "summary": "Decodes a URL-encoded string.",
+      "summary": "Decodes percent-encoded URL text back into its readable string form.",
       "doc_status": "published",
       "source_path": "content/reference/functions/UrlDecode.md",
       "exceptions": [
@@ -10953,7 +10953,7 @@
       "id": "ssl.function.writetext",
       "element_type": "function",
       "title": "WriteText",
-      "summary": "Writes string content to a file.",
+      "summary": "Writes or appends string content to a text file with optional encoding.",
       "doc_status": "published",
       "source_path": "content/reference/functions/WriteText.md",
       "exceptions": [

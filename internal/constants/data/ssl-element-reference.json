@@ -5388,7 +5388,7 @@
     },
     "ClearLastSSLError": {
       "title": "ClearLastSSLError",
-      "summary": "Clears the current SSL error state.",
+      "summary": "Clears the stored SSL error so later error checks start clean.",
       "signature": "ClearLastSSLError();",
       "returns": {
         "type": "boolean",
@@ -6309,7 +6309,7 @@
     },
     "DeleteInlineCode": {
       "title": "DeleteInlineCode",
-      "summary": "Removes a named inline code entry.",
+      "summary": "Removes a named inline code entry using a case-insensitive name lookup.",
       "signature": "DeleteInlineCode(sName)",
       "returns": {
         "type": "boolean",
@@ -6377,7 +6377,7 @@
     },
     "DoProc": {
       "title": "DoProc",
-      "summary": "Calls a procedure by name at runtime.",
+      "summary": "Calls a local or scripted procedure by name with an optional argument array.",
       "signature": "DoProc(sProcedureName, [aArguments]);",
       "returns": {
         "type": "any",
@@ -9079,6 +9079,10 @@
       "title": "GetNETDataSet",
       "summary": "Executes a SQL command and returns the result either as dataset XML or as a netobject wrapping a dataset.",
       "signature": "GetNETDataSet(sCommandString, [sConnectionName], [aValues], [sTableName], [bReturnXml], [bR1Compatible])",
+      "returns": {
+        "type": "string or netobject",
+        "description": "Dataset XML with schema when `bReturnXml` is omitted or `.T.`; the dataset wrapped for .NET interop when `bReturnXml` is `.F.`."
+      },
       "parameters": [
         {
           "name": "sCommandString",
@@ -9309,7 +9313,7 @@
     },
     "GetSetting": {
       "title": "GetSetting",
-      "summary": "Retrieves a single named setting.",
+      "summary": "Retrieves the stored value of a named configuration setting.",
       "signature": "GetSetting(sName)",
       "returns": {
         "type": "any",
@@ -9470,7 +9474,8 @@
       "summary": "Converts selected HTML/XML entity sequences in a string back to literal characters.",
       "signature": "HtmlDecode(sData)",
       "returns": {
-        "type": "string"
+        "type": "string",
+        "description": "The decoded string with supported entity sequences replaced by their literal characters. Returns `NIL` when `sData` is `NIL`."
       },
       "parameters": [
         {
@@ -11489,7 +11494,8 @@
       "summary": "Renames a remote file on an FTP server, or on an SFTP server when bIsSFTP is .T..",
       "signature": "RenameOnFtp(sServerNameOrIP, [sRemoteDirectory], sFileNameOld, sFileNameNew, [sUserName], [sPassword], [nPort], [sProxy], [bIsSFTP], [sPrivateKeyFilePath])",
       "returns": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "`.T.` when the rename completes; `.F.` when the underlying FTP or SFTP move helper cannot complete the rename."
       },
       "parameters": [
         {
@@ -11852,7 +11858,8 @@
       "summary": "Executes SQL and returns either query results or a success flag.",
       "signature": "SQLExecute(sCommandString, [sConnectionName], [bRollbackExistingTransaction], [bNullAsBlank], [aInvariantDateCols], [vReturnType], [sTableName], [bIncludeSchema], [bIncludeHeader])",
       "returns": {
-        "type": "any"
+        "type": "any",
+        "description": "Rows for a `SELECT` statement, as an array, XML string, or dataset object depending on `vReturnType`; a boolean success value for other statements."
       },
       "parameters": [
         {
@@ -11925,7 +11932,8 @@
       "summary": "Removes SQL comments from a string and returns the cleaned SQL text.",
       "signature": "SQLRemoveComments(sStatement)",
       "returns": {
-        "type": "string or NIL"
+        "type": "string or NIL",
+        "description": "The SQL text with comments removed, or `NIL` when `sStatement` is `NIL`."
       },
       "parameters": [
         {
@@ -12913,7 +12921,7 @@
     },
     "Sqrt": {
       "title": "Sqrt",
-      "summary": "Calculates the square root of a number.",
+      "summary": "Calculates the non-negative square root of a numeric value.",
       "signature": "Sqrt(nNumber)",
       "returns": {
         "type": "number",
@@ -13253,7 +13261,7 @@
     },
     "ToJson": {
       "title": "ToJson",
-      "summary": "Serializes a value to a JSON string.",
+      "summary": "Serializes an SSL value, array, or object to a JSON string.",
       "signature": "ToJson(vValue)",
       "returns": {
         "type": "string",
@@ -13321,7 +13329,7 @@
     },
     "ToXml": {
       "title": "ToXml",
-      "summary": "Converts a value to an XML string.",
+      "summary": "Serializes a value, array, or dynamic object to an XML string.",
       "signature": "ToXml(vValue)",
       "returns": {
         "type": "string",
@@ -13444,7 +13452,7 @@
     },
     "UrlDecode": {
       "title": "UrlDecode",
-      "summary": "Decodes a URL-encoded string.",
+      "summary": "Decodes percent-encoded URL text back into its readable string form.",
       "signature": "UrlDecode(sData)",
       "returns": {
         "type": "string",
@@ -13632,7 +13640,7 @@
     },
     "WriteText": {
       "title": "WriteText",
-      "summary": "Writes string content to a file.",
+      "summary": "Writes or appends string content to a text file with optional encoding.",
       "signature": "WriteText(sFileName, sCharsToWrite, [vConfirmRequired], [sAppend], [sEncoding])",
       "returns": {
         "type": "string",
