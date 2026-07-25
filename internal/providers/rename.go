@@ -25,6 +25,26 @@ type PrepareRenameResult struct {
 func PrepareRename(text string, line, column int, uri string, procedures []parser.ProcedureInfo, variables []parser.VariableInfo) *PrepareRenameResult {
 	tokens := lexer.NewLexer(text).Tokenize()
 
+	// Dispatch-target last segment (issue #125): the procedure segment of a
+	// dotted DoProc/ExecFunction string is renameable — the server carries
+	// the edit workspace-wide. Category/script segments are not (script
+	// rename is a file rename, out of scope), and 1-part targets keep the
+	// string rejection below — same-file rename starts from the identifier.
+	if dt := DispatchTargetAt(tokens, line, column); dt != nil && len(dt.Parts) >= 2 {
+		lastSeg := dt.Parts[len(dt.Parts)-1]
+		segStart := dt.Range.End.Character - len(lastSeg)
+		if column-1 >= segStart && column-1 <= dt.Range.End.Character {
+			return &PrepareRenameResult{
+				Range: Range{
+					Start: Position{Line: dt.Range.Start.Line, Character: segStart},
+					End:   Position{Line: dt.Range.Start.Line, Character: dt.Range.End.Character},
+				},
+				Placeholder: lastSeg,
+			}
+		}
+		return nil
+	}
+
 	// Check if we're inside a string or comment
 	ctx := lexer.GetContextAtPosition(tokens, line, column)
 	if ctx == lexer.ContextString || ctx == lexer.ContextComment {
@@ -171,6 +191,13 @@ func isUserDefinedIdentifier(word string, text string, line, column int) bool {
 	}
 
 	return true
+}
+
+// IsValidNewName reports whether name is acceptable as a rename target —
+// the same validation Rename applies, exported for the server's cross-file
+// orchestration (issue #125).
+func IsValidNewName(name string) bool {
+	return isValidIdentifier(name)
 }
 
 // isValidIdentifier checks if the new name is a valid SSL identifier.

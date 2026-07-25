@@ -1074,3 +1074,231 @@ func containsFold(names []string, want string) bool {
 	}
 	return false
 }
+
+// --- Cross-file rename (issue #125 Phase B, feature.rename A10-A16) ---
+
+// renameDefScript defines CalcTotal and calls it through a dotted self-site.
+const renameDefScript = `/* helpers;
+:PROCEDURE CalcTotal;
+:PARAMETERS nQty;
+:RETURN nQty;
+:ENDPROC;
+
+:PROCEDURE Wrapper;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalcTotal", {1});
+:ENDPROC;`
+
+const renameCallerScript = `:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalcTotal", {2});
+:ENDPROC;`
+
+func renameParamsAt(uri string, line, char uint32, newName string) *protocol.RenameParams {
+	return &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+		NewName: newName,
+	}
+}
+
+// [spec feature.rename/A10] [spec feature.rename/A14] — the WorkspaceEdit
+// spans the definition file (declaration, uses, dotted self-site) and the
+// closed caller file (last segment only, prefix and quotes intact, exact
+// supplied casing).
+func TestHandleRename_CrossFileWorkspaceEdit(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", renameDefScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", renameCallerScript)
+
+	s.documents.SetDocument(defURI, renameDefScript, 1)
+	s.documentVersion[defURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 1, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit")
+	}
+
+	defEdits := edit.Changes[protocol.DocumentUri(defURI)]
+	if len(defEdits) == 0 {
+		t.Fatal("expected edits in the definition file")
+	}
+	// Dotted self-site: last segment on the Wrapper line (0-based line 7).
+	selfSiteSeen := false
+	for _, te := range defEdits {
+		if te.Range.Start.Line == 7 {
+			selfSiteSeen = true
+			wantStart := uint32(strings.Index(`:RETURN ExecFunction("LIMS_UTILS.HELPERS.`, `"`) + 1 + len("LIMS_UTILS.HELPERS."))
+			if te.Range.Start.Character != wantStart {
+				t.Errorf("self-site edit start = %d, want %d (last segment only)", te.Range.Start.Character, wantStart)
+			}
+			if te.NewText != "ComputeTotal" {
+				t.Errorf("self-site new text = %q, want exact supplied casing", te.NewText)
+			}
+		}
+	}
+	if !selfSiteSeen {
+		t.Error("expected the dotted self-site to be edited")
+	}
+
+	callerEdits := edit.Changes[protocol.DocumentUri(callerURI)]
+	if len(callerEdits) != 1 {
+		t.Fatalf("expected exactly one caller edit, got %d", len(callerEdits))
+	}
+	ce := callerEdits[0]
+	if ce.Range.Start.Line != 1 {
+		t.Errorf("caller edit line = %d, want 1", ce.Range.Start.Line)
+	}
+	wantStart := uint32(len(`:RETURN ExecFunction("LIMS_UTILS.HELPERS.`))
+	if ce.Range.Start.Character != wantStart {
+		t.Errorf("caller edit start = %d, want %d (prefix intact)", ce.Range.Start.Character, wantStart)
+	}
+	if ce.Range.End.Character != wantStart+uint32(len("CalcTotal")) {
+		t.Errorf("caller edit end = %d, want %d (quotes intact)", ce.Range.End.Character, wantStart+uint32(len("CalcTotal")))
+	}
+	if ce.NewText != "ComputeTotal" {
+		t.Errorf("caller new text = %q, want ComputeTotal", ce.NewText)
+	}
+}
+
+// [spec feature.rename/A11] — a site resolving to multiple candidates is
+// skipped silently.
+func TestHandleRename_AmbiguousSiteSkipped(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", renameDefScript)
+	writeAndIndex(t, wi, dir, "Server Scripts/OTHER/HELPERS.srvscr", `/* other helpers;
+:PROCEDURE CalcTotal;
+:ENDPROC;`)
+	ambCallerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/AMBIG.srvscr", `:PROCEDURE Run;
+:RETURN DoProc("HELPERS.CalcTotal");
+:ENDPROC;`)
+
+	s.documents.SetDocument(defURI, renameDefScript, 1)
+	s.documentVersion[defURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 1, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit")
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(ambCallerURI)]; present {
+		t.Error("ambiguous site (two HELPERS scripts) must be skipped")
+	}
+}
+
+// [spec feature.rename/A12] — class-file procedures refuse the cross-file
+// path: declaration rename stays same-file; renaming from a caller's
+// dispatch string is refused outright.
+func TestHandleRename_ClassFileGate(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	classScript := `:CLASS CalcEngine;
+
+:PROCEDURE CalcTotal;
+:ENDPROC;`
+	classURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/CALCENGINE.srvscr", classScript)
+	callerScript := `:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.CALCENGINE.CalcTotal", {});
+:ENDPROC;`
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", callerScript)
+
+	// (a) From the declaration inside the class file: same-file edits only.
+	s.documents.SetDocument(classURI, classScript, 1)
+	s.documentVersion[classURI] = 1
+	edit, err := s.handleRename(nil, renameParamsAt(classURI, 2, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected same-file edits for the class file itself")
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(callerURI)]; present {
+		t.Error("class-file rename must not edit cross-file call sites (D8)")
+	}
+
+	// (b) From the caller's dispatch string: refused, no edits.
+	s.documents.SetDocument(callerURI, callerScript, 1)
+	s.documentVersion[callerURI] = 1
+	col := uint32(strings.Index(`:RETURN ExecFunction("LIMS_UTILS.CALCENGINE.CalcTotal`, "CalcTotal") + 2)
+	edit, err = s.handleRename(nil, renameParamsAt(callerURI, 1, col, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit != nil {
+		t.Errorf("rename from a dispatch string targeting a class-file procedure must be refused, got %+v", edit)
+	}
+}
+
+// [spec feature.rename/A13] — without a workspace index, rename is
+// single-file exactly as before.
+func TestHandleRename_NilIndexSingleFile(t *testing.T) {
+	s := NewSSLServer()
+	source := `:PROCEDURE CalcTotal;
+:ENDPROC;
+:PROCEDURE Caller;
+:RETURN DoProc("CalcTotal");
+:ENDPROC;`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(testURI, 0, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a single-file workspace edit")
+	}
+	if len(edit.Changes) != 1 {
+		t.Errorf("nil index must keep edits single-file, got %d documents", len(edit.Changes))
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(testURI)]; !present {
+		t.Error("expected edits against the current document")
+	}
+}
+
+// [spec feature.rename/A16] — edits come from current disk content: a
+// caller rewritten after indexing (site moved) is edited at its fresh
+// position.
+func TestHandleRename_StaleIndexFreshEdit(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", renameDefScript)
+	callerPath := filepath.Join(dir, "Server Scripts", "ORDERS", "PROCESS.srvscr")
+	writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", renameCallerScript)
+
+	// Rewrite on disk WITHOUT re-indexing: the site moves down one line.
+	moved := "/* moved;\n" + renameCallerScript
+	if err := os.WriteFile(callerPath, []byte(moved), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s.documents.SetDocument(defURI, renameDefScript, 1)
+	s.documentVersion[defURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 1, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit")
+	}
+	callerURI := pathToURI(callerPath)
+	callerEdits := edit.Changes[protocol.DocumentUri(callerURI)]
+	if len(callerEdits) != 1 {
+		t.Fatalf("expected one caller edit from fresh content, got %d", len(callerEdits))
+	}
+	if callerEdits[0].Range.Start.Line != 2 {
+		t.Errorf("edit line = %d, want 2 (fresh position, not the stale indexed line 1)", callerEdits[0].Range.Start.Line)
+	}
+}

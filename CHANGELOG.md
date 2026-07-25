@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cross-file rename (#125 Phase B).** Renaming a procedure — from its
+  declaration, an identifier use, or the last segment of a dotted
+  dispatch string (prepare-rename now allows exactly that segment) —
+  produces a WorkspaceEdit spanning the definition file and every
+  caller. The write side is conservative where references are liberal:
+  only sites that resolve unambiguously to the renamed procedure are
+  edited (last segment only; quotes and prefixes untouched), every edit
+  is recomputed from the file's current content at request time (open
+  buffers live, closed files re-read from disk — never indexed
+  positions), and procedures in `:CLASS` files refuse the cross-file
+  path because `obj:Method()`/`Base:Method()` callers are invisible.
+  Without a workspace index, rename is unchanged. Catalog entry amended
+  (A9–A16 + Known gaps).
 - **Cross-file references (#125 Phase A).** Find-references on a
   procedure now returns dotted `DoProc`/`ExecFunction` call sites across
   the workspace — requested from the declaration, an identifier use, or
