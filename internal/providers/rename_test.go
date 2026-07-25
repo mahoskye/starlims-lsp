@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"strings"
 	"testing"
 
 	"starlims-lsp/internal/lexer"
@@ -650,5 +651,63 @@ sName := "sName is a variable";
 		if edit.Range.Start.Line == 3 {
 			t.Error("comment content must not be edited by rename")
 		}
+	}
+}
+
+// --- Dispatch-target prepare-rename (issue #125) ---
+
+// [spec feature.rename/A9]
+func TestPrepareRename_DispatchLastSegment(t *testing.T) {
+	text := `:PROCEDURE Caller;
+:RETURN ExecFunction("CAT.SCRIPT.CalcTotal", {});
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	lineText := `:RETURN ExecFunction("CAT.SCRIPT.CalcTotal", {});`
+	segStart := strings.Index(lineText, "CalcTotal") // 0-based
+	result := PrepareRename(text, 2, segStart+3, "file:///test.ssl", procedures, variables)
+	if result == nil {
+		t.Fatal("expected prepare rename to succeed on the dispatch last segment")
+	}
+	if result.Placeholder != "CalcTotal" {
+		t.Errorf("placeholder = %q, want CalcTotal", result.Placeholder)
+	}
+	if result.Range.Start.Line != 1 || result.Range.Start.Character != segStart {
+		t.Errorf("range start = %+v, want line 1 char %d", result.Range.Start, segStart)
+	}
+	if result.Range.End.Character != segStart+len("CalcTotal") {
+		t.Errorf("range end char = %d, want %d", result.Range.End.Character, segStart+len("CalcTotal"))
+	}
+}
+
+// [spec feature.rename/A15]
+func TestPrepareRename_DispatchEarlierSegments_Rejected(t *testing.T) {
+	text := `:PROCEDURE Caller;
+:RETURN ExecFunction("CAT.SCRIPT.CalcTotal", {});
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	lineText := `:RETURN ExecFunction("CAT.SCRIPT.CalcTotal", {});`
+	for _, seg := range []string{"CAT", "SCRIPT"} {
+		col := strings.Index(lineText, seg) + 2 // 1-based, inside the segment
+		if result := PrepareRename(text, 2, col, "file:///test.ssl", procedures, variables); result != nil {
+			t.Errorf("expected rejection on the %s segment, got %+v", seg, result)
+		}
+	}
+}
+
+// [spec feature.rename/A4] — 1-part dispatch strings keep the string
+// rejection; same-file rename starts from the identifier.
+func TestPrepareRename_OnePartDispatchString_Rejected(t *testing.T) {
+	text := `:PROCEDURE CalcTotal;
+:ENDPROC;
+:PROCEDURE Caller;
+:RETURN DoProc("CalcTotal");
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	col := strings.Index(`:RETURN DoProc("CalcTotal");`, "CalcTotal") + 3
+	if result := PrepareRename(text, 4, col, "file:///test.ssl", procedures, variables); result != nil {
+		t.Errorf("expected rejection inside a 1-part dispatch string, got %+v", result)
 	}
 }

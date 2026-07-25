@@ -981,6 +981,11 @@ func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.
 }
 
 // handleRename handles rename requests.
+// handleRename handles rename requests. Procedure subjects rename
+// workspace-wide through dispatch call sites (issue #125, feature.rename
+// A9-A15); class-file procedures refuse the cross-file path (D8) and keep
+// same-file behavior; a nil workspace index reproduces the single-file
+// rename exactly.
 func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
 	uri := params.TextDocument.URI
 
@@ -991,11 +996,40 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
+	line := int(params.Position.Line) + 1
+	column := int(params.Position.Character) + 1
+
+	if s.workspaceIndex != nil {
+		// Subject: dotted dispatch string under the cursor. Conservative
+		// end to end — the subject itself must resolve unambiguously to a
+		// procedure (D1); entry points are out of scope (D4/D5).
+		if dt := providers.DispatchTargetAt(cache.Tokens, line, column); dt != nil && len(dt.Parts) >= 2 {
+			res := (liveResolver{s}).overlayResolutions(s.workspaceIndex.ResolveDispatchTarget(dt.Raw))
+			if len(res) == 1 && !res[0].IsEntry {
+				if changes := s.crossFileRename(res[0].URI, res[0].ProcName, params.NewName); changes != nil {
+					return toWorkspaceEdit(changes), nil
+				}
+			}
+			return nil, nil
+		}
+		// Subject: a procedure defined in this file. A refusal (class file,
+		// D8) falls back to the same-file path below.
+		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
+			for _, proc := range cache.Procedures {
+				if strings.EqualFold(proc.Name, word) {
+					if changes := s.crossFileRename(uri, proc.Name, params.NewName); changes != nil {
+						return toWorkspaceEdit(changes), nil
+					}
+					break
+				}
+			}
+		}
+	}
 
 	result := providers.Rename(
 		content,
-		int(params.Position.Line)+1,
-		int(params.Position.Character)+1,
+		line,
+		column,
 		params.NewName,
 		uri,
 		cache.Procedures,
@@ -1006,19 +1040,22 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 		return nil, nil
 	}
 
-	// Convert to protocol WorkspaceEdit
+	return toWorkspaceEdit(result.Changes), nil
+}
+
+// toWorkspaceEdit converts provider edit maps to a protocol WorkspaceEdit.
+func toWorkspaceEdit(providerChanges map[string][]providers.TextEdit) *protocol.WorkspaceEdit {
 	changes := make(map[protocol.DocumentUri][]protocol.TextEdit)
-	for docUri, edits := range result.Changes {
+	for docUri, edits := range providerChanges {
 		protocolEdits := make([]protocol.TextEdit, 0, len(edits))
 		for _, edit := range edits {
 			protocolEdits = append(protocolEdits, toProtocolTextEdit(edit))
 		}
 		changes[docUri] = protocolEdits
 	}
-
 	return &protocol.WorkspaceEdit{
 		Changes: changes,
-	}, nil
+	}
 }
 
 // handleInlayHint handles textDocument/inlayHint requests.
