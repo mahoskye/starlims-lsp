@@ -6,6 +6,7 @@ package providers
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -129,13 +130,17 @@ func ExtractCallSites(tokens []lexer.Token) []CallSite {
 				continue
 			}
 			content := str.Text[1 : len(str.Text)-1]
+			// Columns are rune-based (the lexer walks runes), so the end
+			// column must add the content's RUNE length — byte length
+			// skews every downstream last-segment edit as soon as the
+			// target contains a multi-byte character (v0.14.0 review F2).
 			sites = append(sites, CallSite{
 				Kind:     kind,
 				Raw:      content,
 				IsDoProc: name == "doproc",
 				Range: Range{
 					Start: Position{Line: str.Line - 1, Character: str.Column},
-					End:   Position{Line: str.Line - 1, Character: str.Column + len(content)},
+					End:   Position{Line: str.Line - 1, Character: str.Column + utf8.RuneCountInString(content)},
 				},
 			})
 		}

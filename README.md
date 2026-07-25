@@ -25,17 +25,17 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
   - Procedure completions are style-guide-aware: script contexts dispatch with `DoProc(...)`, class-method contexts suggest `Me:MethodName(...)`
 - **Hover information** for keywords, functions, classes, and user-defined symbols
 - **Signature help** for built-in functions, including dispatch helpers such as `DoProc` and `ExecFunction`
-- **Go to Definition** for procedures and variables
-- **Find References** for all symbols
+- **Go to Definition** for procedures and variables, including cross-file navigation for dotted `DoProc`/`ExecFunction` targets, `RunDS` data sources, and `:INCLUDE` paths
+- **Find References** for all symbols, including workspace-wide dispatch call sites for procedures
 - **Document Symbols** (outline) for procedures, variables, and comment regions
-- **Workspace Symbols** (open documents only; no workspace indexing)
+- **Workspace Symbols** backed by a background workspace index
 - **Diagnostics** including:
   - Core block/keyword validation (`:IF`, `:TRY`, `:CLASS`, `:DEFAULT`, keyword form, loop control)
   - Style-guide enforcement for `DoProc`/`ExecFunction`, SQL placeholder usage, class layout, `Me`/`Base` class-context forms, `:PUBLIC`, `:INCLUDE`, and legacy keyword handling
   - Conservative inferred-type checks for `:FOR`, `NIL`, `$`, string `=`, and code-block comparison mistakes
   - SSL gotcha detection for direct procedure calls, dot-property access, zero-based arrays, assignment in conditions, and comment-semicolon hazards
   - Opt-in Hungarian notation warnings (configurable prefixes)
-- **Rename Symbol** for procedures and variables across the document
+- **Rename Symbol** — variables within the document (scope-aware), procedures workspace-wide including their dispatch call sites
 - **Inlay Hints** for parameter names at call sites (configurable minimum parameter count)
 - **Document formatting** for SSL and embedded SQL
 - **Folding Ranges** for procedures, comment regions, control-flow blocks, and comments

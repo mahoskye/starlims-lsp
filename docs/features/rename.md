@@ -2,11 +2,11 @@
 
 > **Normative source:** [`feature.rename`](../../catalog/features/rename.md) in the behavior catalog. This page is a guide; when it disagrees with the catalog entry, the entry wins.
 
-The SSL Language Server provides rename functionality (`textDocument/rename`) for renaming symbols across the current document.
+The SSL Language Server provides rename functionality (`textDocument/rename`). Variables and parameters rename within the current document; procedures rename workspace-wide through their dispatch call sites (issue #125).
 
 ## Overview
 
-Rename allows you to change the name of a variable or procedure and automatically update all references to it within the same file.
+Rename changes the name of a variable or procedure and updates all references to it — file-wide for variables (scope-aware), and across every workspace file for procedures: the declaration, identifier uses, and the last segment of dotted `DoProc`/`ExecFunction` dispatch strings that unambiguously resolve to the renamed procedure.
 
 ## Supported Symbols
 

@@ -78,32 +78,33 @@ If the same name appears in multiple scopes, return the most relevant:
 1. Local scope (current procedure) first
 2. Then global scope (`:PUBLIC`)
 
-### 4.5 Cross-File Definition - PLANNED
+### 4.5 Cross-File Definition
 
-Currently, definition only works within the same file. `:INCLUDE` paths and `DoProc`/`ExecFunction` targets are not resolved across files. Workspace indexing is now implemented, providing the foundation for cross-file navigation.
+Dotted `DoProc`/`ExecFunction` targets, `RunDS` data-source targets, and
+`:INCLUDE` paths resolve across the workspace through the workspace index
+(normative contract: `catalog/features/cross_file_resolution.md`).
+Resolution is layout-flexible — canonical `Category.Script[.Proc]` anchors
+first, flat-layout basename degradation, and a workspace-unique-procedure
+fallback with a uniqueness gate. Open documents overlay live-buffer
+positions so unsaved edits never produce stale jump targets.
 
-### 4.6 DoProc/ExecFunction String Targets - PARTIAL
+### 4.6 DoProc/ExecFunction String Targets
 
-Go-to-definition works for procedure names inside `DoProc()` and `ExecFunction()` string arguments, but only for procedures defined in the same file.
+Go-to-definition works for procedure names inside `DoProc()` and
+`ExecFunction()` string arguments, same-file and cross-file:
 
-**Supported:**
 ```ssl
-:PROCEDURE CalculateTotal;
-:PARAMETERS nPrice, nQty;
-:ENDPROC;
-
 :PROCEDURE Main;
     DoProc("CalculateTotal", {10, 5});
-    /*      ^--- Ctrl+Click navigates to CalculateTotal above;
+    /*      ^--- 1-part target: navigates within this file;
+    ExecFunction("Helpers.CalculateTotal", {10, 5});
+    /*           ^--- dotted target: resolves across the workspace;
 :ENDPROC;
 ```
 
-**Not Supported:**
-- Cross-file navigation (e.g., `DoProc("Helpers.CalculateTotal")`)
-- Namespace path resolution
-- Procedures in `:INCLUDE`d files
-
-Cross-file definition support requires namespace path resolution on top of the workspace index (planned).
+Bare 1-part targets keep same-file semantics by design (the resolver's
+scoping rule); multi-line dispatch calls resolve too (token-based
+extraction, issue #125).
 
 ---
 
@@ -111,9 +112,8 @@ Cross-file definition support requires namespace path resolution on top of the w
 
 | Limitation | Notes |
 |------------|-------|
-| Single-file only | Cannot navigate to other files (workspace index provides foundation; namespace resolution planned) |
-| No `:INCLUDE` resolution | Cannot follow include paths |
-| DoProc/ExecFunction cross-file | Same-file works; cross-file requires namespace path resolution on top of workspace index |
+| Class-method channel | `obj:Method()` / `Base:Method()` calls into class scripts are not resolved (bare-identifier channel unmodeled) |
+| Concatenated dispatch strings | `DoProc("CAT." + sName)` is not extracted as a target |
 | No built-in source | Built-in functions have no navigable source |
 
 ---

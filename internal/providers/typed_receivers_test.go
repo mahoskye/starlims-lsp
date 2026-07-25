@@ -210,3 +210,27 @@ func TestCanonicalReceiverTypeName(t *testing.T) {
 		}
 	}
 }
+
+// Pre-v0.14.0 review finding M2: a property assignment's property token is
+// not a variable assignment — `oCfg:Client := WebServices{};` must not
+// bind the unrelated variable name `Client`.
+func TestBuildTypedReceivers_PropertyAssignmentNotBound(t *testing.T) {
+	src := `:PROCEDURE Demo;
+:DECLARE oCfg;
+oCfg:Client := WebServices{};
+:ENDPROC;`
+	typed := BuildTypedReceivers(tokenize(t, src), false)
+	if got, ok := typed["client"]; ok {
+		t.Errorf("property assignment bound variable Client to %q", got)
+	}
+}
+
+// Pre-v0.14.0 review finding L3: the FIRST chain hop split onto its own
+// line lexes as a fused ':Method' keyword and must still resolve.
+func TestBuildTypedReceivers_FirstHopOnContinuationLine(t *testing.T) {
+	src := ":PROCEDURE Demo;\n:DECLARE oClient, oResp;\noClient := WebServices{}:CreateHttpClient();\noResp := oClient\n    :GetResponse();\n:ENDPROC;"
+	typed := BuildTypedReceivers(tokenize(t, src), false)
+	if got := typed["oresp"]; got != "HttpResponse" {
+		t.Errorf("oResp type = %q, want HttpResponse (fused first hop)", got)
+	}
+}

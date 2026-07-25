@@ -2462,3 +2462,30 @@ func TestSQLFormatter_ConcatLeadingOperator(t *testing.T) {
 		t.Errorf("'||' must never trail a line:\n%s", got)
 	}
 }
+
+func TestSQLFormatter_OverClauseReviewRegressions(t *testing.T) {
+	// Pre-v0.14.0 review findings: a comment between OVER and '(' must not
+	// disable the window-spec layout (F1), and analytic functions must
+	// anchor to their own column, not fall back to line start (F2).
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "comment between OVER and paren still breaks per §3.1",
+			input: "SELECT ordno, ROW_NUMBER() OVER /* keep */ (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC, sampleno) AS rn FROM ordresult",
+			want: "SELECT ordno,\n" +
+				"       ROW_NUMBER() OVER /* keep */(\n" +
+				"           PARTITION BY testcode, analysisgroup\n" +
+				"           ORDER BY sampledate DESC, sampleno\n" +
+				"       ) AS rn\n" +
+				"FROM ordresult",
+		},
+		{
+			name:  "analytic function anchors at its own column",
+			input: "SELECT RATIO_TO_REPORT(resultvalue) OVER (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC, sampleno) AS ratio_share, ordno FROM ordresult",
+			want: "SELECT RATIO_TO_REPORT(resultvalue) OVER (\n" +
+				"           PARTITION BY testcode, analysisgroup\n" +
+				"           ORDER BY sampledate DESC, sampleno\n" +
+				"       ) AS ratio_share, ordno\n" +
+				"FROM ordresult",
+		},
+	})
+}

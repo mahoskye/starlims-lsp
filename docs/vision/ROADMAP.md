@@ -23,7 +23,7 @@ This document outlines the prioritized feature roadmap for the starlims-lsp proj
 | Completion | Keywords, functions, classes, snippets | ✅ Complete |
 | Hover | Function signatures, keyword docs, SQL placeholders, `Me` keyword | ✅ Complete |
 | Signature Help | 330 canonical built-in functions and dispatch helpers | ✅ Complete |
-| Navigation | Go to definition, find references, DoProc/ExecFunction targets | ✅ Single-file |
+| Navigation | Go to definition, find references, rename, DoProc/ExecFunction targets | ✅ Cross-file |
 | Symbols | Document symbols (hierarchical), folding ranges (including control flow) | ✅ Complete |
 | Formatting | SSL code + embedded SQL, end-of-line comments, SQL string detection | ✅ Complete |
 | Diagnostics | Full suite with gotcha checks + opt-in undeclared/unused/SQL param checks | ✅ Complete |

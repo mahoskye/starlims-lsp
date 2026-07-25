@@ -48,6 +48,12 @@ func typedReceiverPass(tokens []lexer.Token, typed map[string]string, endpointFi
 		if tokens[i].Type != lexer.TokenIdentifier {
 			continue
 		}
+		// Only variable assignments bind a type: the LHS must open its
+		// statement. Without this, `oCfg:Client := WebServices{};` (a
+		// property assignment) would bind the unrelated variable `Client`.
+		if !atStatementStart(tokens, i) {
+			continue
+		}
 		opIdx := nextSignificantTokenIndex(tokens, i+1)
 		if opIdx < 0 || tokens[opIdx].Type != lexer.TokenOperator || tokens[opIdx].Text != ":=" {
 			continue
@@ -79,8 +85,13 @@ func resolveProducerExpr(tokens []lexer.Token, rhsIdx int, typed map[string]stri
 		return ""
 	}
 
-	switch tokens[nextIdx].Text {
-	case "{":
+	// After whitespace the lexer fuses `:Method` into one keyword token,
+	// so a chain can open either way (mirrors resolveCallChain).
+	next := tokens[nextIdx]
+	chainOpens := next.Text == ":" || isFusedMemberToken(next)
+
+	switch {
+	case next.Text == "{":
 		// Class constructor literal, optionally followed by a producer
 		// chain: WebServices{}:CreateHttpClient() assigns HttpClient, a
 		// bare Email{...} assigns Email.
@@ -92,7 +103,7 @@ func resolveProducerExpr(tokens []lexer.Token, rhsIdx int, typed map[string]stri
 			return ""
 		}
 		return resolveCallChain(tokens, afterIdx, CanonicalReceiverTypeName(head))
-	case ":":
+	case chainOpens:
 		// Member call on a typed variable or an endpoint ambient.
 		base := ""
 		if t, ok := typed[strings.ToLower(head)]; ok {
@@ -108,7 +119,7 @@ func resolveProducerExpr(tokens []lexer.Token, rhsIdx int, typed map[string]stri
 		// A hop is always attempted (chainIdx points at ':'); a bare
 		// `oX := oY` without a producer call never reaches this case.
 		return resolveCallChain(tokens, nextIdx, base)
-	case "(":
+	case next.Text == "(":
 		// Built-in function whose declared return names a class or
 		// returns object (e.g. GetConnectionByName → SQLConnection),
 		// optionally followed by a producer chain.

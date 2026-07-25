@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -138,8 +139,46 @@ func (s *SSLServer) definitionFileSymbols(defURI string) (string, []parser.Proce
 	return content, p.ExtractProcedures(ast), p.ExtractVariables(ast), true
 }
 
+// procedureSubjectAt reports whether the word at the cursor line genuinely
+// names a procedure subject of this document — and not a local variable or
+// parameter that shadows the procedure's name inside the cursor's enclosing
+// procedure (v0.14.0 review F3: a shadowed cursor must keep the scope-aware
+// single-file path, or a local-variable rename silently mutates other
+// files). The declaration line itself is always the procedure.
+func procedureSubjectAt(cache *DocumentCache, word string, line int) (string, bool) {
+	var subject string
+	declLine := 0
+	for _, proc := range cache.Procedures {
+		if strings.EqualFold(proc.Name, word) {
+			subject = proc.Name
+			declLine = proc.StartLine
+			break
+		}
+	}
+	if subject == "" {
+		return "", false
+	}
+	if line == declLine {
+		return subject, true
+	}
+	if cursorProc := parser.FindProcedureAtLine(cache.Procedures, line); cursorProc != nil {
+		for _, v := range cache.Variables {
+			if strings.EqualFold(v.Name, word) &&
+				(v.Scope == parser.ScopeLocal || v.Scope == parser.ScopeParameter) &&
+				v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine {
+				return "", false
+			}
+		}
+	}
+	return subject, true
+}
+
 // procedureNamePosition locates the (1-based) line and column of the
-// procedure's name on its :PROCEDURE line; (0, 0) when not found.
+// procedure's name on its :PROCEDURE line; (0, 0) when not found. The name
+// is matched as a whole word AFTER the :PROCEDURE keyword — a plain
+// substring search would land inside the keyword itself for names like
+// "Proc" and hand the reference search the word "PROCEDURE" (v0.14.0
+// review F1).
 func procedureNamePosition(content string, procs []parser.ProcedureInfo, procName string) (int, int) {
 	for _, proc := range procs {
 		if !strings.EqualFold(proc.Name, procName) {
@@ -150,11 +189,15 @@ func procedureNamePosition(content string, procs []parser.ProcedureInfo, procNam
 			return 0, 0
 		}
 		lineText := lines[proc.StartLine-1]
-		idx := strings.Index(strings.ToLower(lineText), strings.ToLower(proc.Name))
-		if idx < 0 {
-			return proc.StartLine, 1
+		searchFrom := 0
+		if kw := strings.Index(strings.ToLower(lineText), ":procedure"); kw >= 0 {
+			searchFrom = kw + len(":procedure")
 		}
-		return proc.StartLine, idx + 1
+		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(proc.Name) + `\b`)
+		if m := re.FindStringIndex(lineText[searchFrom:]); m != nil {
+			return proc.StartLine, searchFrom + m[0] + 1
+		}
+		return proc.StartLine, 1
 	}
 	return 0, 0
 }

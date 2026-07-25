@@ -147,3 +147,6 @@ positive is a click, while rename (the write side) skips them.
 - **Concatenated dispatch strings.** `DoProc("CAT." + sName)` is never
   extracted as a call site; only the leading string literal is seen and its
   partial content does not resolve.
+- **Candidate cap.** Resolution candidate sets cap at 10; in a degenerate
+  workspace with more than 10 same-named candidates, a target capped out of
+  the set is omitted from references (and safely skipped by rename).

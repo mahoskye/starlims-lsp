@@ -1313,3 +1313,60 @@ Response:Redirect("https://example.test");
 		}
 	}
 }
+
+// Pre-v0.14.0 review finding M1: a typed receiver can carry ad-hoc
+// shape-augmented properties — they must survive in hover and completion.
+func TestHandleHover_TypedReceiverShapeFallback(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Demo;
+:DECLARE oClient;
+oClient := WebServices{}:CreateHttpClient();
+oClient:MyTag := "x";
+oClient:MyTag := "y";
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 10},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected shape hover for ad-hoc property on a typed receiver")
+	}
+	content := hover.Contents.(protocol.MarkupContent)
+	if !strings.Contains(content.Value, "MyTag") {
+		t.Errorf("expected MyTag shape hover, got:\n%s", content.Value)
+	}
+}
+
+func TestHandleCompletion_TypedReceiverMergesShapeProps(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Demo;
+:DECLARE oClient;
+oClient := WebServices{}:CreateHttpClient();
+oClient:MyTag := "x";
+oClient:
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 8},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if !containsCompletionLabel(items, "GetResponse") {
+		t.Error("expected typed member GetResponse")
+	}
+	if !containsCompletionLabel(items, "MyTag") {
+		t.Error("expected shape-augmented property MyTag merged into typed completions")
+	}
+}

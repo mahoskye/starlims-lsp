@@ -101,16 +101,10 @@ func (r liveResolver) overlay(resolutions []IndexResolution) []providers.Resolve
 	return out
 }
 
-// siteTargetsDefinition resolves a dispatch-site target string and reports
-// whether the definition (defURI, procName) is among its candidates
-// (matched) and is its only candidate (unambiguous). References include
-// matched-but-ambiguous sites (D2); rename requires unambiguous (D1).
-// An empty procName matches the script entry point.
-func (r liveResolver) siteTargetsDefinition(raw, defURI, procName string) (matched, unambiguous bool) {
-	if r.s.workspaceIndex == nil {
-		return false, false
-	}
-	res := r.overlayResolutions(r.s.workspaceIndex.ResolveDispatchTarget(raw))
+// resolutionsTargetDefinition reports whether the definition (defURI,
+// procName) is among the candidate resolutions (matched) and is the only
+// candidate (unambiguous). An empty procName matches the script entry.
+func resolutionsTargetDefinition(res []IndexResolution, defURI, procName string) (matched, unambiguous bool) {
 	for _, cand := range res {
 		if cand.URI != defURI {
 			continue
@@ -124,6 +118,36 @@ func (r liveResolver) siteTargetsDefinition(raw, defURI, procName string) (match
 		}
 	}
 	return matched, matched && len(res) == 1
+}
+
+// siteTargetsDefinition resolves a dispatch-site target string through the
+// open-document overlay and reports whether the definition (defURI,
+// procName) is among its candidates (matched) and is its only candidate
+// (unambiguous). References include matched-but-ambiguous sites (D2).
+func (r liveResolver) siteTargetsDefinition(raw, defURI, procName string) (matched, unambiguous bool) {
+	if r.s.workspaceIndex == nil {
+		return false, false
+	}
+	return resolutionsTargetDefinition(
+		r.overlayResolutions(r.s.workspaceIndex.ResolveDispatchTarget(raw)), defURI, procName)
+}
+
+// siteUnambiguousForWrite is rename's stricter D1 gate (v0.14.0 review
+// F4): the site must resolve to the single definition under BOTH the
+// live-buffer overlay and the raw disk/index view. The overlay's
+// truthful-null drop is right for read features, but an UNSAVED buffer
+// that deletes a competing procedure must not make a write to disk look
+// unambiguous — the buffer may never be saved.
+func (r liveResolver) siteUnambiguousForWrite(raw, defURI, procName string) bool {
+	if r.s.workspaceIndex == nil {
+		return false
+	}
+	res := r.s.workspaceIndex.ResolveDispatchTarget(raw)
+	if _, diskOK := resolutionsTargetDefinition(res, defURI, procName); !diskOK {
+		return false
+	}
+	_, liveOK := resolutionsTargetDefinition(r.overlayResolutions(res), defURI, procName)
+	return liveOK
 }
 
 // includeDeclaredVariables collects the variable names declared by a

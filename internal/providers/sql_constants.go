@@ -67,7 +67,9 @@ var SQLBuiltinFunctions = map[string]bool{
 	// Window / analytic functions
 	"ROW_NUMBER": true, "RANK": true, "DENSE_RANK": true, "NTILE": true,
 	"LAG": true, "LEAD": true, "FIRST_VALUE": true, "LAST_VALUE": true,
-	"LISTAGG": true,
+	"LISTAGG": true, "RATIO_TO_REPORT": true, "PERCENT_RANK": true,
+	"CUME_DIST": true, "NTH_VALUE": true, "MEDIAN": true,
+	"PERCENTILE_CONT": true, "PERCENTILE_DISC": true,
 	// Oracle functions
 	"TO_DATE": true, "TO_CHAR": true, "TO_NUMBER": true,
 	"DECODE": true, "NVL2": true,
