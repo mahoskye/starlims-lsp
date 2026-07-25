@@ -333,7 +333,7 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 		// so checking first is safe; unresolvable targets fall through
 		// to the suppression.
 		if isDoProcStringContext(cache.Tokens, line, column) {
-			if dt := providers.DispatchTargetAt(content, line, column); dt != nil {
+			if dt := providers.DispatchTargetAt(cache.Tokens, line, column); dt != nil {
 				var md string
 				if len(dt.Parts) >= 2 {
 					md = (liveResolver{s}).dispatchHoverMarkdown(dt.Raw)
@@ -353,7 +353,7 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 		// RunDS target strings show the resolved data-source summary
 		// (feature.hover A14); like dispatch targets, unresolvable ones
 		// fall through to the string suppression.
-		if dst := providers.DataSourceTargetAt(content, line, column); dst != nil {
+		if dst := providers.DataSourceTargetAt(cache.Tokens, line, column); dst != nil {
 			if md := (liveResolver{s}).dataSourceHoverMarkdown(dst.Raw); md != "" {
 				return &protocol.Hover{
 					Contents: protocol.MarkupContent{
@@ -497,7 +497,11 @@ func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.Def
 	}
 }
 
-// handleReferences handles find references requests.
+// handleReferences handles find references requests. Procedure subjects
+// extend cross-file through dispatch call sites (issue #125,
+// feature.references A10-A14); everything else — variables, parameters —
+// keeps the single-file path, and a nil workspace index reproduces the
+// single-file behavior exactly.
 func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
 	uri := params.TextDocument.URI
 
@@ -509,27 +513,60 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 	// Get cached procedures and variables for scope-aware search
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
+	line := int(params.Position.Line) + 1
+	column := int(params.Position.Character) + 1
+
+	// Cursor on a dotted dispatch string: the subject is the resolved
+	// procedure, wherever it lives — same-file word matches would name an
+	// unrelated local symbol. Entry-point subjects (2-part Cat.Script) and
+	// unresolvable targets keep today's behavior (D5 deferred).
+	if s.workspaceIndex != nil {
+		if dt := providers.DispatchTargetAt(cache.Tokens, line, column); dt != nil && len(dt.Parts) >= 2 {
+			res := (liveResolver{s}).overlayResolutions(s.workspaceIndex.ResolveDispatchTarget(dt.Raw))
+			if len(res) > 0 && !res[0].IsEntry {
+				return toProtocolLocations(s.crossFileProcedureReferences(
+					res[0].URI, res[0].ProcName, params.Context.IncludeDeclaration)), nil
+			}
+		}
+	}
 
 	locations := providers.FindReferencesWithScope(
 		content,
-		int(params.Position.Line)+1,
-		int(params.Position.Character)+1,
+		line,
+		column,
 		uri,
 		params.Context.IncludeDeclaration,
 		cache.Procedures,
 		cache.Variables,
 	)
 
-	if locations == nil {
-		return nil, nil
+	// Cursor on a procedure defined in this file: extend with dispatch
+	// sites across the workspace (plus dotted self-sites the same-file
+	// whole-content match cannot see).
+	if s.workspaceIndex != nil {
+		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
+			for _, proc := range cache.Procedures {
+				if strings.EqualFold(proc.Name, word) {
+					locations = append(locations, s.dispatchSiteReferences(uri, proc.Name, locations)...)
+					break
+				}
+			}
+		}
 	}
 
+	return toProtocolLocations(locations), nil
+}
+
+// toProtocolLocations converts provider locations, mapping empty to nil.
+func toProtocolLocations(locations []providers.Location) []protocol.Location {
+	if locations == nil {
+		return nil
+	}
 	result := make([]protocol.Location, 0, len(locations))
 	for _, loc := range locations {
 		result = append(result, toProtocolLocation(loc))
 	}
-
-	return result, nil
+	return result
 }
 
 // handleDocumentSymbol handles document symbol requests.

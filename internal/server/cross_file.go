@@ -38,35 +38,34 @@ func (r liveResolver) ResolveDataSource(target string) []providers.ResolvedTarge
 	return r.overlay(r.s.workspaceIndex.ResolveDataSourceTarget(target))
 }
 
-// overlay converts index resolutions to provider targets, re-deriving
-// positions from the live document cache for URIs that are currently open.
-func (r liveResolver) overlay(resolutions []IndexResolution) []providers.ResolvedTarget {
+// overlayResolutions applies the open-document overlay to raw index
+// resolutions, keeping ProcName/IsEntry intact (issue #125): positions are
+// re-derived from the live parse cache for open URIs, and procedures
+// deleted in unsaved edits are dropped (truthful null). The site→definition
+// matcher consumes these directly — the ResolvedTarget conversion below
+// would lose the fields it matches on.
+func (r liveResolver) overlayResolutions(resolutions []IndexResolution) []IndexResolution {
 	if len(resolutions) == 0 {
 		return nil
 	}
 	openURIs := r.s.documents.OpenURIs()
 
-	out := make([]providers.ResolvedTarget, 0, len(resolutions))
+	out := make([]IndexResolution, 0, len(resolutions))
 	for _, res := range resolutions {
-		target := providers.ResolvedTarget{URI: res.URI, Line: res.Line, Kind: providers.ResolvedScriptEntry}
-		if !res.IsEntry {
-			target.Kind = providers.ResolvedProcedure
-		}
-
 		if _, open := openURIs[res.URI]; open {
 			cache := r.s.documents.ParseDocument(res.URI, r.s.documentVersion[res.URI])
 			if res.IsEntry {
 				_, line := parser.NewParser(cache.Tokens).ExtractTopLevelParameters(cache.AST)
 				if line > 0 {
-					target.Line = line - 1
+					res.Line = line - 1
 				} else {
-					target.Line = 0
+					res.Line = 0
 				}
 			} else {
 				found := false
 				for _, proc := range cache.Procedures {
 					if strings.EqualFold(proc.Name, res.ProcName) {
-						target.Line = proc.StartLine - 1
+						res.Line = proc.StartLine - 1
 						found = true
 						break
 					}
@@ -79,9 +78,52 @@ func (r liveResolver) overlay(resolutions []IndexResolution) []providers.Resolve
 				}
 			}
 		}
-		out = append(out, target)
+		out = append(out, res)
 	}
 	return out
+}
+
+// overlay converts index resolutions to provider targets, re-deriving
+// positions from the live document cache for URIs that are currently open.
+func (r liveResolver) overlay(resolutions []IndexResolution) []providers.ResolvedTarget {
+	overlaid := r.overlayResolutions(resolutions)
+	if len(overlaid) == 0 {
+		return nil
+	}
+	out := make([]providers.ResolvedTarget, 0, len(overlaid))
+	for _, res := range overlaid {
+		kind := providers.ResolvedScriptEntry
+		if !res.IsEntry {
+			kind = providers.ResolvedProcedure
+		}
+		out = append(out, providers.ResolvedTarget{URI: res.URI, Line: res.Line, Kind: kind})
+	}
+	return out
+}
+
+// siteTargetsDefinition resolves a dispatch-site target string and reports
+// whether the definition (defURI, procName) is among its candidates
+// (matched) and is its only candidate (unambiguous). References include
+// matched-but-ambiguous sites (D2); rename requires unambiguous (D1).
+// An empty procName matches the script entry point.
+func (r liveResolver) siteTargetsDefinition(raw, defURI, procName string) (matched, unambiguous bool) {
+	if r.s.workspaceIndex == nil {
+		return false, false
+	}
+	res := r.overlayResolutions(r.s.workspaceIndex.ResolveDispatchTarget(raw))
+	for _, cand := range res {
+		if cand.URI != defURI {
+			continue
+		}
+		if procName == "" {
+			if cand.IsEntry {
+				matched = true
+			}
+		} else if strings.EqualFold(cand.ProcName, procName) {
+			matched = true
+		}
+	}
+	return matched, matched && len(res) == 1
 }
 
 // includeDeclaredVariables collects the variable names declared by a

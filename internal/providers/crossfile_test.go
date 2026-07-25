@@ -28,7 +28,7 @@ func (f fakeResolver) ResolveDataSource(target string) []ResolvedTarget {
 func TestDispatchTargetAt(t *testing.T) {
 	text := `result := ExecFunction("Cat.Script.Proc", {1});`
 	// Cursor inside the target string (column of "Cat...").
-	dt := DispatchTargetAt(text, 1, 26)
+	dt := DispatchTargetAt(lexer.NewLexer(text).Tokenize(), 1, 26)
 	if dt == nil {
 		t.Fatal("expected dispatch target")
 	}
@@ -37,7 +37,7 @@ func TestDispatchTargetAt(t *testing.T) {
 	}
 
 	// Cursor outside the string: nil.
-	if dt := DispatchTargetAt(text, 1, 3); dt != nil {
+	if dt := DispatchTargetAt(lexer.NewLexer(text).Tokenize(), 1, 3); dt != nil {
 		t.Errorf("expected nil outside the string, got %+v", dt)
 	}
 }
@@ -191,7 +191,7 @@ func TestFindDefinitionCrossFile_NilResolver(t *testing.T) {
 
 func TestDataSourceTargetAt(t *testing.T) {
 	text := `aRows := RunDS("QUERIES.ORDERS", {1});`
-	dst := DataSourceTargetAt(text, 1, 20)
+	dst := DataSourceTargetAt(lexer.NewLexer(text).Tokenize(), 1, 20)
 	if dst == nil {
 		t.Fatal("expected RunDS target")
 	}
@@ -200,7 +200,7 @@ func TestDataSourceTargetAt(t *testing.T) {
 	}
 
 	// Cursor outside the string: nil.
-	if dst := DataSourceTargetAt(text, 1, 3); dst != nil {
+	if dst := DataSourceTargetAt(lexer.NewLexer(text).Tokenize(), 1, 3); dst != nil {
 		t.Errorf("expected nil outside the string, got %+v", dst)
 	}
 }
@@ -289,5 +289,105 @@ x := oObj:Unknown;
 	// Unknown is declared in the file (no word fallback).
 	if locs := FindDefinitionCrossFile(text, tokens, 7, 12, "file:///self.ssl", procedures, variables, nil); locs != nil {
 		t.Errorf("expected null for unknown member on shaped receiver, got %+v", locs)
+	}
+}
+
+// --- ExtractCallSites (issue #125) ---
+
+func extractSites(t *testing.T, src string) []CallSite {
+	t.Helper()
+	return ExtractCallSites(lexer.NewLexer(src).Tokenize())
+}
+
+func TestExtractCallSites_DispatchKindsAndRanges(t *testing.T) {
+	src := `:PROCEDURE Run;
+:RETURN ExecFunction("Cat.Script.Proc", {1});
+result := DoProc('Other.Thing');
+aData := RunDS("DS_CAT.Orders");
+:INCLUDE SharedLib;
+:ENDPROC;`
+	sites := extractSites(t, src)
+	if len(sites) != 4 {
+		t.Fatalf("expected 4 sites, got %d: %+v", len(sites), sites)
+	}
+
+	if sites[0].Kind != CallDispatch || sites[0].Raw != "Cat.Script.Proc" || sites[0].IsDoProc {
+		t.Errorf("site 0: %+v", sites[0])
+	}
+	if sites[0].Range.Start.Line != 1 {
+		t.Errorf("site 0 line = %d, want 1", sites[0].Range.Start.Line)
+	}
+	wantStart := len(`:RETURN ExecFunction("`)
+	if sites[0].Range.Start.Character != wantStart {
+		t.Errorf("site 0 start = %d, want %d (content, quotes excluded)", sites[0].Range.Start.Character, wantStart)
+	}
+	if got := sites[0].Range.End.Character - sites[0].Range.Start.Character; got != len("Cat.Script.Proc") {
+		t.Errorf("site 0 span = %d, want %d", got, len("Cat.Script.Proc"))
+	}
+
+	if sites[1].Kind != CallDispatch || sites[1].Raw != "Other.Thing" || !sites[1].IsDoProc {
+		t.Errorf("site 1 (single quotes): %+v", sites[1])
+	}
+	if sites[2].Kind != CallDataSource || sites[2].Raw != "DS_CAT.Orders" {
+		t.Errorf("site 2 (RunDS): %+v", sites[2])
+	}
+	if sites[3].Kind != CallInclude || sites[3].Raw != "SharedLib" {
+		t.Errorf("site 3 (include): %+v", sites[3])
+	}
+}
+
+func TestExtractCallSites_MultiLineCall(t *testing.T) {
+	src := ":RETURN ExecFunction(\n    \"Cat.Script.Proc\",\n    {1});"
+	sites := extractSites(t, src)
+	if len(sites) != 1 || sites[0].Raw != "Cat.Script.Proc" {
+		t.Fatalf("expected the multi-line call site, got %+v", sites)
+	}
+	if sites[0].Range.Start.Line != 1 {
+		t.Errorf("site line = %d, want 1 (the string's line)", sites[0].Range.Start.Line)
+	}
+}
+
+func TestExtractCallSites_CommentBetweenNameAndParen(t *testing.T) {
+	src := `:RETURN DoProc /* choose the anchored target;("Real.Target");`
+	sites := extractSites(t, src)
+	if len(sites) != 1 || sites[0].Raw != "Real.Target" {
+		t.Fatalf("expected the real target only, got %+v", sites)
+	}
+}
+
+func TestExtractCallSites_NoFalsePositives(t *testing.T) {
+	src := `/* DoProc("InComment.Not.A.Site") ;
+sNote := "mentions ExecFunction('X.Y') in prose";
+sName := "Cat.Script.Proc";
+:RETURN DoProc(sName);`
+	if sites := extractSites(t, src); len(sites) != 0 {
+		t.Fatalf("expected no sites from comments/strings/variable args, got %+v", sites)
+	}
+}
+
+// Concatenated targets are not extracted as full targets — the walk stops at
+// the first string token, whose partial content never resolves (F8 pin).
+func TestExtractCallSites_ConcatenatedTarget(t *testing.T) {
+	src := `:RETURN DoProc("CAT." + sName);`
+	sites := extractSites(t, src)
+	if len(sites) != 1 || sites[0].Raw != "CAT." {
+		t.Fatalf("expected the leading partial only, got %+v", sites)
+	}
+}
+
+func TestExtractCallSites_BracketAndEmptyStringsSkipped(t *testing.T) {
+	src := `:RETURN DoProc([Bracket.Not.Legal]);
+x := ExecFunction("");`
+	if sites := extractSites(t, src); len(sites) != 0 {
+		t.Fatalf("expected no sites for bracket/empty strings, got %+v", sites)
+	}
+}
+
+func TestDispatchTargetAt_MultiLineCall(t *testing.T) {
+	src := ":RETURN ExecFunction(\n    \"Cat.Script.Proc\",\n    {1});"
+	tokens := lexer.NewLexer(src).Tokenize()
+	dt := DispatchTargetAt(tokens, 2, 8) // cursor inside the string on line 2
+	if dt == nil || dt.Raw != "Cat.Script.Proc" {
+		t.Fatalf("expected multi-line dispatch target, got %+v", dt)
 	}
 }
