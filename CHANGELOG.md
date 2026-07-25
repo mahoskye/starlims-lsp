@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Returns-category objects in the element inventory (#123).** The
+  vendored element reference and meta JSONs are refreshed from
+  starlims-ssl-reference (446 → 460 elements): 12 returns-category
+  objects (HttpClient, HttpResponse, SoapClient, SSLRequest,
+  SSLResponse, …) and the `Request`/`Response` special forms now reach
+  the LSP as `GeneratedReturnsObjectDetails` (+ their meta via
+  `LookupMeta`). The generator now fails on any totals key it doesn't
+  handle, so an upstream category can no longer be dropped silently.
+- **Vendored-data drift guards (#123).** A new test compares both
+  vendored JSONs byte-for-byte against a sibling ssl-style-guide
+  checkout (skips when absent) and always cross-checks internal totals
+  against the generated inventory; CI now verifies `go generate` is a
+  no-op on every push.
+
 ### Fixed
+- **77 broken class-method names in completion (#123).** 42 method rows
+  used the `method` JSON key and emitted empty names (invisible to
+  completion — all of WebServices' methods among them); 35 more carried
+  paren signatures that flowed verbatim into completion insert text
+  (inserting e.g. `IsRunning(vBatchId)` literally). Method names are
+  now normalized to the bare name at generation time.
 - **OVER() window-spec layout (#122).** Long window specs now follow
   sql-canonical-compact-reference §3.1: a space before the paren
   (`OVER (`), each clause (PARTITION BY / ORDER BY / ROWS / RANGE) on

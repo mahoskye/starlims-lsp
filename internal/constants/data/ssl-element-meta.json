@@ -2,7 +2,7 @@
   "version": "1.0",
   "source": "ssl-docs/content/reference",
   "totals": {
-    "elements": 446,
+    "elements": 460,
     "by_type": {
       "function": 330,
       "class": 29,
@@ -10,11 +10,12 @@
       "operator": 32,
       "literal": 3,
       "type": 8,
-      "special_form": 6
+      "special_form": 8,
+      "returns": 12
     },
     "with_exceptions": 263,
-    "with_caveats": 343,
-    "with_best_practices": 397
+    "with_caveats": 363,
+    "with_best_practices": 409
   },
   "elements": [
     {
@@ -307,7 +308,7 @@
         "dont": [
           "Pass a value that might be NIL without checking first. The call fails instead of returning a fallback result.",
           "Use Abs when the sign itself carries meaning, such as debit versus credit or gain versus loss. Converting the value removes that distinction.",
-          "Treat Abs as full validation. It only removes the sign and does not"
+          "Treat Abs as full validation. It only removes the sign and does not enforce business-specific thresholds or rules."
         ]
       }
     },
@@ -430,7 +431,7 @@
         ],
         "dont": [
           "Store objects or arrays directly. AddToSession rejects both.",
-          "Assume a successful call means the value was definitely stored. If",
+          "Assume a successful call means the value was definitely stored. If the session context is unavailable, the function returns NIL silently.",
           "Leave stale session values around longer than the workflow needs."
         ]
       }
@@ -540,15 +541,15 @@
       "best_practices": {
         "do": [
           "Use the operation codes exactly as documented in uppercase.",
-          "Treat DUP and COPY as the non-mutating options when you need to keep",
-          "Use SORT with a numeric column index, an array of column indexes, or a",
+          "Treat DUP and COPY as the non-mutating options when you need to keep the original array unchanged.",
+          "Use SORT with a numeric column index, an array of column indexes, or a comparison code block that returns a negative, zero, or positive number.",
           "Use AScan, AFill, AAdd, or SortArray directly when a dedicated function expresses the intent more clearly than ArrayCalc."
         ],
         "dont": [
-          "Assume every operation mutates aTarget. DUP, COPY, and the",
-          "Assume AVG and AVG1 mean the same thing. AVG skips empty",
-          "Assume COPY or DEL fails when nCount runs past the end of the",
-          "Rely on an invalid operation code raising an error. ArrayCalc"
+          "Assume every operation mutates aTarget. DUP, COPY, and the statistical operations return separate results.",
+          "Assume AVG and AVG1 mean the same thing. AVG skips empty strings and zero values, while AVG1 uses the full array.",
+          "Assume COPY or DEL fails when nCount runs past the end of the array. ArrayCalc trims the count to the available range.",
+          "Rely on an invalid operation code raising an error. ArrayCalc returns NIL for unrecognized operations."
         ]
       }
     },
@@ -629,23 +630,23 @@
         }
       ],
       "caveats": [
-        "Empty arrays are allowed. With omitted type information, an empty array",
-        "NIL elements are allowed as long as the non-NIL elements still match the",
-        "The one-dimensional check is explicit only for the first element. Other",
-        "This function only creates the TVP object. How that object is bound to a"
+        "Empty arrays are allowed. With omitted type information, an empty array defaults to string TVP behavior.",
+        "NIL elements are allowed as long as the non-NIL elements still match the chosen TVP type.",
+        "The one-dimensional check is explicit only for the first element. Other unsupported element shapes fail later through the normal mixed-type checks.",
+        "This function only creates the TVP object. How that object is bound to a query or procedure depends on the database call that receives it."
       ],
       "best_practices": {
         "do": [
-          "Pass a flat array whose non-NIL elements are all strings or all whole",
-          "Omit sDataType when the array contents already make the intended type",
-          "Pass sConnectionName explicitly when the TVP must target a non-default",
-          "Validate numeric input before calling ArrayToTVP if fractional values"
+          "Pass a flat array whose non-NIL elements are all strings or all whole numbers.",
+          "Omit sDataType when the array contents already make the intended type obvious.",
+          "Pass sConnectionName explicitly when the TVP must target a non-default database.",
+          "Validate numeric input before calling ArrayToTVP if fractional values might be present."
         ],
         "dont": [
           "Pass nested arrays. ArrayToTVP is for one-dimensional input.",
-          "Assume \"DOUBLE\" or \"DATE\" are usable output types. They are",
-          "Mix strings and numbers in one TVP array unless you expect the call",
-          "Assume every unknown sDataType string raises an error. Unknown"
+          "Assume \"DOUBLE\" or \"DATE\" are usable output types. They are recognized names, but TVP creation still fails.",
+          "Mix strings and numbers in one TVP array unless you expect the call to fail.",
+          "Assume every unknown sDataType string raises an error. Unknown strings fall back to string TVP behavior."
         ]
       }
     },
@@ -834,7 +835,7 @@
           "Pass the actual row separator when parsing newline-delimited text.",
           "Leave bTrimSpaces enabled unless leading or trailing spaces are meaningful data.",
           "Handle the {{\"\"}} result when sText may be NIL or whitespace-only.",
-          "Set bCrlfOk to .T. when row text may contain embedded CR/LF that"
+          "Set bCrlfOk to .T. when row text may contain embedded CR/LF that must stay inside a column value."
         ],
         "dont": [
           "Assume empty input returns {}. BuildArray2 returns one row with one empty string.",
@@ -1433,7 +1434,7 @@
           "Log or surface the caught error description when conversion is part of a batch process."
         ],
         "dont": [
-          "Write logic that expects ConvertReport to return .F. on failure.",
+          "Write logic that expects ConvertReport to return .F. on failure. Failure paths raise errors instead.",
           "Pass a NIL path. That raises an immediate error.",
           "Ignore exceptions in batch or migration code where one bad file should be reported and the rest should continue."
         ]
@@ -2841,9 +2842,9 @@
       ],
       "best_practices": {
         "do": [
-          "Validate that sLoginName and sPassword are assigned before calling the",
-          "Pass optional attributes during creation when the account needs folder,",
-          "Check whether the returned identifier is empty before treating the create"
+          "Validate that sLoginName and sPassword are assigned before calling the function.",
+          "Pass optional attributes during creation when the account needs folder, group, permission, or privilege settings immediately.",
+          "Check whether the returned identifier is empty before treating the create operation as successful."
         ],
         "dont": [
           "Pass NIL for sLoginName or sPassword. Those arguments raise an immediate error instead of creating the user.",
@@ -3125,7 +3126,7 @@
           "Check DocCommandFailed and DocGetErrorMessage immediately after an empty-string result."
         ],
         "dont": [
-          "Pass NIL for sDocumentId; that raises an argument error instead of",
+          "Pass NIL for sDocumentId; that raises an argument error instead of returning \"\".",
           "Call the function before the Documentum interface is initialized.",
           "Assume \"\" means the document was simply empty; inspect the Documentum failure state before deciding how to handle the result.",
           "Rely on the default format when a specific sFormat is part of your contract with another system."
@@ -5174,10 +5175,10 @@
         }
       ],
       "caveats": [
-        "The implementation falls back to port 21 when nPort is omitted or less",
-        "On the FTP path, unparseable listing text causes a user message and a NIL",
-        "SFTP connection, login, or private-key setup failures occur before the NIL",
-        "The returned array shape is the same on both paths, but the date and time"
+        "The implementation falls back to port 21 when nPort is omitted or less than or equal to zero, even on the SFTP path.",
+        "On the FTP path, unparseable listing text causes a user message and a NIL return.",
+        "SFTP connection, login, or private-key setup failures occur before the NIL return path, so those errors can propagate as exceptions rather than returning NIL.",
+        "The returned array shape is the same on both paths, but the date and time values come from each protocol's listing data."
       ],
       "best_practices": {
         "do": [
@@ -5185,13 +5186,13 @@
           "Leave sProxy empty and rely on the system proxy configuration.",
           "Use sFilePattern for FTP filtering, but pass NIL or \"\" for SFTP.",
           "Check for NIL before iterating the returned array.",
-          "Read column positions consistently, for example aEntry[1] for the name"
+          "Read column positions consistently, for example aEntry[1] for the name and aEntry[5] for the file-or-directory flag."
         ],
         "dont": [
-          "Assume sFilePattern works on both protocols. A non-empty value is",
-          "Pass a manual proxy value. Any non-empty sProxy argument raises an",
-          "Assume SFTP failures always become NIL. Connection and login",
-          "Guess the entry layout. The returned rows are positional arrays, not"
+          "Assume sFilePattern works on both protocols. A non-empty value is valid only on the FTP path.",
+          "Pass a manual proxy value. Any non-empty sProxy argument raises an error.",
+          "Assume SFTP failures always become NIL. Connection and login failures can raise before the function returns.",
+          "Guess the entry layout. The returned rows are positional arrays, not named objects."
         ]
       }
     },
@@ -5370,7 +5371,7 @@
       ],
       "best_practices": {
         "do": [
-          "Use GetInlineCode when you need the stored inline code text, with or",
+          "Use GetInlineCode when you need the stored inline code text, with or without variable substitution.",
           "Pass only the variable names that must be resolved into the returned code.",
           "Delete temporary inline code with DeleteInlineCode when you are finished with it."
         ],
@@ -5452,7 +5453,7 @@
         "dont": [
           "Pass NIL for oTarget, sCollectionName, or vArg1. Those inputs raise an error immediately.",
           "Supply deeper index arguments unless every earlier step is valid for the target structure.",
-          "Assume a failed nested lookup will quietly return an empty value. The"
+          "Assume a failed nested lookup will quietly return an empty value. The indexed value may raise its own runtime error."
         ]
       }
     },
@@ -5704,12 +5705,12 @@
       ],
       "best_practices": {
         "do": [
-          "Wrap GetRegion in :TRY / :CATCH when the region may not be",
+          "Wrap GetRegion in :TRY / :CATCH when the region may not be available in the current scope.",
           "Pass aSourceValues and aDestinationValues as parallel arrays of equal length when doing token replacement.",
           "Use placeholder-style region text such as {USER} or {DATE} when the same template needs different values at runtime."
         ],
         "dont": [
-          "Assume a missing region returns a fallback value. Missing region",
+          "Assume a missing region returns a fallback value. Missing region names raise an error once region storage exists.",
           "Pass only one replacement array and expect partial substitution. If either aSourceValues or aDestinationValues is omitted, no replacements are performed.",
           "Target a custom region dictionary with GetRegion; use GetRegionEx instead."
         ]
@@ -6320,7 +6321,7 @@
         }
       ],
       "caveats": [
-        "Variable lookup follows normal SSL variable resolution: current local scope,",
+        "Variable lookup follows normal SSL variable resolution: current local scope, then caller scopes, then public scope.",
         "The name comparison is case-insensitive, consistent with SSL variable names.",
         "IsDefined() checks whether the variable exists, not whether its value is empty."
       ],
@@ -6973,7 +6974,8 @@
         }
       ],
       "caveats": [
-        "LSearch falls back only when the scalar result is missing or database NULL. An actual empty string from the database is returned as-is."
+        "LSearch falls back only when the scalar result is missing or database NULL. An actual empty string from the database is returned as-is.",
+        "Passing a non-array value as aArrayOfValues (the fourth parameter) can lock up the application — the runtime's error handling for this type mismatch is anything but graceful. Always pass an array of bind values or omit the parameter entirely."
       ],
       "best_practices": {
         "do": [
@@ -7276,7 +7278,7 @@
           "Capture the result only if needed; the return value is always \"\"."
         ],
         "dont": [
-          "Use LWait in code paths that require UI responsiveness or asynchronous activities.",
+          "Use LWait in code paths that require UI responsiveness or asynchronous activities. It blocks execution and may produce an unresponsive application if misapplied.",
           "Add LWait to temporarily work around race conditions or timing bugs in production scripts. Relying on fixed delays leads to fragile and unreliable automation.",
           "Pass non-numeric types as nSeconds. Unrecognized types default to zero, causing the wait to be silently skipped."
         ]
@@ -7998,7 +8000,7 @@
         "dont": [
           "Assume SFTP automatically switches to port 22. This function uses 21 unless you pass another nPort.",
           "Pass a manual proxy string expecting the function to use it. A non-empty sProxy argument raises an error.",
-          "Assume every failure comes back as .F.. On the SFTP path, some setup",
+          "Assume every failure comes back as .F.. On the SFTP path, some setup failures can raise before the boolean result is reached.",
           "Document or code around a separate MakeDirOnSftp call when this API is already the supported entry point for both modes."
         ]
       }
@@ -8411,7 +8413,7 @@
         ],
         "dont": [
           "Assume it normalizes every kind of empty value in a populated array. It only replaces elements that are exactly \"\".",
-          "Expect sItemType to affect populated arrays. Typed sentinels are only",
+          "Expect sItemType to affect populated arrays. Typed sentinels are only used when the array starts empty.",
           "Pass numeric type codes such as 1 or undocumented strings and expect typed behavior."
         ]
       }
@@ -8550,7 +8552,7 @@
         "The function reads the full file into memory before returning the base64 value.",
         "The return value is the encoded file content only. It does not include file name, MIME type, or other metadata.",
         "If the file cannot be opened, the underlying file I/O error is raised.",
-        "If whitelist folders are not configured, the whitelist check does not block"
+        "If whitelist folders are not configured, the whitelist check does not block access."
       ],
       "best_practices": {
         "do": [
@@ -9148,14 +9150,14 @@
       ],
       "best_practices": {
         "do": [
-          "Use SQLRemoveComments when you need cleaned SQL text for logging,",
+          "Use SQLRemoveComments when you need cleaned SQL text for logging, comparison, or display.",
           "Handle the NIL return path when the source SQL text can be missing.",
           "Keep optimizer hints in mind: /*+ ... */ is preserved rather than removed."
         ],
         "dont": [
-          "Treat this as SQL validation or SQL injection protection; it only",
-          "Assume every /* ... */ sequence will be stripped; optimizer hints",
-          "Pass numbers, arrays, objects, or booleans; non-string non-NIL"
+          "Treat this as SQL validation or SQL injection protection; it only removes supported comment forms.",
+          "Assume every /* ... */ sequence will be stripped; optimizer hints beginning with /*+ are left in place.",
+          "Pass numbers, arrays, objects, or booleans; non-string non-NIL values raise an error."
         ]
       }
     },
@@ -9821,7 +9823,7 @@
       ],
       "caveats": [
         "SetInternalC writes at the last supplied non-null index argument.",
-        "Any failure beyond the null checks on oTarget, sCollectionName, and vArg1"
+        "Any failure beyond the null checks on oTarget, sCollectionName, and vArg1 depends on the target value's indexed access behavior."
       ],
       "best_practices": {
         "do": [
@@ -10050,7 +10052,7 @@
         ],
         "dont": [
           "Assume a negative input returns 0 or raises a domain exception. It returns NaN.",
-          "Pass a value that might be NIL without checking first. The call",
+          "Pass a value that might be NIL without checking first. The call fails instead of returning a fallback result.",
           "Use MatFunc just to wrap a fixed square-root call."
         ]
       }
@@ -10091,7 +10093,7 @@
         ],
         "dont": [
           "Assume StdRound returns a number. It returns formatted text.",
-          "Pass NIL for any argument. The function raises an error instead",
+          "Pass NIL for any argument. The function raises an error instead of supplying defaults.",
           "Rely on undocumented standard names or alternate casing. The function only branches on exact FDA, EPA, and ISO values.",
           "Assume nDigits means the same thing for every standard. The EPA path does not behave like a simple decimal-place formatter."
         ]
@@ -11055,7 +11057,7 @@
         "Attribute names that contain : are surfaced with _ instead.",
         "When an attribute name is value, the function renames it with an Attr prefix to avoid colliding with the generated Value property.",
         "bPreserveWhitespace only changes what the XML loader keeps. Whitespace nodes between nested elements are still not exposed as child properties in the returned object tree.",
-        "Non-boolean bPreserveWhitespace values behave like the argument was omitted,"
+        "Non-boolean bPreserveWhitespace values behave like the argument was omitted, so whitespace preservation stays off."
       ],
       "best_practices": {
         "do": [
@@ -11308,7 +11310,7 @@
         ],
         "dont": [
           "Assume the credential constructors default to HTTPS. The two-argument constructor uses HTTP, and the three-argument constructor only uses HTTPS when bUseHttp is .T..",
-          "Build SelectEntities() filters with comparison operators such as less-than or greater-than.",
+          "Build SelectEntities() filters with comparison operators such as less-than or greater-than. The public API only builds equality filters from the properties you supply.",
           "Expect GetBlob() to return blob contents. It returns a file path to the downloaded blob.",
           "Omit PartitionKey or RowKey when inserting or updating entities. Those calls fail before the request is sent."
         ]
@@ -11585,7 +11587,7 @@
           "Configure proxy and TLS settings before Connect so the session starts with the intended network and certificate behavior.",
           "Call Connect, then Login, then Secure only when that matches the server workflow you need.",
           "Check boolean return values after file and directory operations so your script can stop or recover cleanly.",
-          "Validate remote file names, directory paths, and local file paths before",
+          "Validate remote file names, directory paths, and local file paths before calling methods that require them.",
           "Call Disconnect when the transfer session is complete.",
           "Treat WriteToFtps as an append operation when the remote file already exists."
         ],
@@ -11867,7 +11869,7 @@
       "id": "ssl.class.sslcodeprovider",
       "element_type": "class",
       "title": "SSLCodeProvider",
-      "summary": "Compiles published server scripts and data sources and returns the compilation results as an SSLCompilerErrorList.",
+      "summary": "Compiles published server scripts and data sources and returns a list of compilation errors.",
       "doc_status": "published",
       "source_path": "content/reference/classes/SSLCodeProvider.md",
       "exceptions": [],
@@ -11880,7 +11882,7 @@
         "do": [
           "Pass a full category.name or a GUID when targeting one server script or data source.",
           "Use the bulk and category methods when validating larger changes.",
-          "Check the returned SSLCompilerErrorList even when you expect a clean compile.",
+          "Check the returned error list even when you expect a clean compile.",
           "Use category GUIDs with the ...Category and ...Categories methods."
         ],
         "dont": [
@@ -12139,7 +12141,7 @@
       "source_path": "content/reference/classes/WebServices.md",
       "exceptions": [],
       "caveats": [
-        "This page documents the WebServices factory class only. The returned HTTP and SOAP client objects have their own APIs that are not described here."
+        "This page documents the factory only. The returned clients and the objects they surface in turn (HttpRequest, HttpResponse, HttpException, SoapResponse, SoapParameters) live in the Returns section."
       ],
       "best_practices": {
         "do": [
@@ -12149,8 +12151,7 @@
         ],
         "dont": [
           "Call CreateSoapClient() when you need an HTTP client.",
-          "Call CreateHttpClient() when you need a SOAP client.",
-          "Assume this page documents the full API of the returned client objects."
+          "Call CreateHttpClient() when you need a SOAP client."
         ]
       }
     },
@@ -12265,15 +12266,16 @@
       ],
       "best_practices": {
         "do": [
-          "Put :INHERIT immediately after :CLASS when the class derives from",
-          "Keep class fields in :DECLARE statements near the top of the file so",
+          "Put :INHERIT immediately after :CLASS when the class derives from another class.",
+          "Keep class fields in :DECLARE statements near the top of the file so the object shape is easy to read.",
           "Place regular methods before Constructor and keep the constructor last for predictable structure.",
           "Instantiate user-defined classes with CreateUdObject instead of built-in-class curly-brace syntax.",
-          "Use Me: for sibling method calls and Base: for inherited behavior inside class methods."
+          "Use Me: for sibling method calls and Base: for inherited behavior inside class methods.",
+          "Qualify every class-field reference inside a method with Me: (or Base: for a parent field). A bare name resolves to a local or parameter, not the class field."
         ],
         "dont": [
-          "Mix script logic and a class definition in the same file. :CLASS runs",
-          "Use ClassName{} syntax for a user-defined class — that pattern targets",
+          "Mix script logic and a class definition in the same file. :CLASS runs to end-of-file, so the file must stay class-only.",
+          "Use ClassName{} syntax for a user-defined class — that pattern targets built-in class construction rules.",
           "Return a value from Constructor. SSL treats that as a compile-time error.",
           "Split related fields across method bodies. Declaring them in the class body makes the instance state clear and consistent."
         ]
@@ -12705,7 +12707,7 @@
       "exceptions": [],
       "caveats": [
         ":INCLUDE must be written in uppercase with the leading colon.",
-        "The target name must use identifier syntax, not a quoted string.",
+        "The target name is normally written in identifier syntax (:INCLUDE ScriptName; or :INCLUDE Category.ScriptName;). A quoted-string target (:INCLUDE \"ScriptName\";) also occurs in production code and is accepted.",
         "If the target script cannot be loaded, compilation fails."
       ],
       "best_practices": {
@@ -12904,12 +12906,12 @@
       "id": "ssl.keyword.public",
       "element_type": "keyword",
       "title": "PUBLIC",
-      "summary": "Declares global variables that can be accessed from any scope in the program.",
+      "summary": "Declares public variables shared down the call stack — visible to the declaring scope and every scope it calls.",
       "doc_status": "published",
       "source_path": "content/reference/keywords/PUBLIC.md",
       "exceptions": [],
       "caveats": [
-        ":PUBLIC is valid in script and procedure statement flow. It is not a class",
+        ":PUBLIC is valid in script and procedure statement flow. It is not a class field declaration.",
         "Public variables start as the empty string \"\", not NIL.",
         "Colon-prefixed keywords are case-sensitive, so write :PUBLIC in uppercase."
       ],
@@ -13102,8 +13104,8 @@
       "caveats": [
         "Omitting the matching :ENDWHILE causes a compile-time error.",
         "If the condition does not evaluate to a boolean value at runtime, SSL raises a runtime error.",
-        ":EXITWHILE outside a :WHILE block causes a compile-time error:",
-        ":LOOP outside a :WHILE or :FOR block causes a compile-time error:",
+        ":EXITWHILE outside a :WHILE block causes a compile-time error: Found :EXITWHILE outside :WHILE.",
+        ":LOOP outside a :WHILE or :FOR block causes a compile-time error: Found :LOOP outside :WHILE/:FOR.",
         ":EXITWHILE and :LOOP are not allowed inside :FINALLY blocks.",
         "Keywords are case-sensitive and must be uppercase, for example :WHILE and :ENDWHILE."
       ],
@@ -13513,7 +13515,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/array.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET list object when no SSL-side member matches (e.g. aValues:Count). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13524,7 +13528,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/boolean.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET Boolean object when no SSL-side member matches (e.g. bFlag:ToString()). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13546,7 +13552,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/date.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET DateTime object when no SSL-side member matches (e.g. dValue:AddMonths(2)). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13557,7 +13565,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/netobject.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET wrapped object when no SSL-side member matches (e.g. oNet:AnyMember(...)). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13568,7 +13578,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/number.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET numeric object when no SSL-side member matches (e.g. nValue:ToString(\"F2\")). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13590,7 +13602,9 @@
       "doc_status": "published",
       "source_path": "content/reference/types/string.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Member access with : forwards to the underlying .NET String object when no SSL-side member matches (e.g. sValue:EndsWith(\"suffix\")). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+      ],
       "best_practices": {}
     },
     {
@@ -13607,7 +13621,7 @@
     {
       "id": "ssl.special_form.base",
       "element_type": "special_form",
-      "title": "base",
+      "title": "Base:",
       "summary": "Provides explicit access to members on a class's immediate parent type from within a class method.",
       "doc_status": "published",
       "source_path": "content/reference/special-forms/base.md",
@@ -13618,7 +13632,7 @@
     {
       "id": "ssl.special_form.code-block",
       "element_type": "special_form",
-      "title": "code-block",
+      "title": "Code Block",
       "summary": "Defines an anonymous code block with bound variables and a single expression body. A code block can be created at the top level, passed as a function argument, or assigned to a variable for later execution.",
       "doc_status": "published",
       "source_path": "content/reference/special-forms/code-block.md",
@@ -13640,7 +13654,7 @@
     {
       "id": "ssl.special_form.constructor",
       "element_type": "special_form",
-      "title": "constructor",
+      "title": "Constructor",
       "summary": "Runs one-time class initialization code when a user-defined class instance is created.",
       "doc_status": "published",
       "source_path": "content/reference/special-forms/constructor.md",
@@ -13651,13 +13665,374 @@
     {
       "id": "ssl.special_form.me",
       "element_type": "special_form",
-      "title": "me",
+      "title": "Me:",
       "summary": "Provides a reference to the current class instance inside :CLASS methods.",
       "doc_status": "published",
       "source_path": "content/reference/special-forms/me.md",
       "exceptions": [],
       "caveats": [],
       "best_practices": {}
+    },
+    {
+      "id": "ssl.special_form.request",
+      "element_type": "special_form",
+      "title": "Request",
+      "summary": "An ambient identifier in endpoint scripts that holds the incoming HTTP request.",
+      "doc_status": "published",
+      "source_path": "content/reference/special-forms/request.md",
+      "exceptions": [],
+      "caveats": [
+        "Request is read-only from the script's perspective. Modifying values on its collection properties (QueryString, Headers, etc.) does not change anything downstream.",
+        "Outside an endpoint context, Request raises an undeclared-variable error on access. Guard with :TRY / :CATCH if your script may run in either context.",
+        "Whether Request is an SSLRequest or SSLWsRequest depends on how the script was invoked. Code that needs to work in both contexts should rely only on the inherited surface — avoid Parameters unless you know the call path is a web service."
+      ],
+      "best_practices": {}
+    },
+    {
+      "id": "ssl.special_form.response",
+      "element_type": "special_form",
+      "title": "Response",
+      "summary": "An ambient identifier in endpoint scripts that holds the outgoing HTTP response.",
+      "doc_status": "published",
+      "source_path": "content/reference/special-forms/response.md",
+      "exceptions": [],
+      "caveats": [
+        "Response is mutable: assigning properties and calling methods affects what the client receives. Be deliberate about ordering — set ContentType and StatusCode before the first Write so headers go out correctly.",
+        "Outside an endpoint context, Response raises an undeclared-variable error on access. Guard with :TRY / :CATCH if your script may run in either context.",
+        "Whether Response is an SSLResponse or SSLWsResponse depends on how the script was invoked. Code that needs to work in both contexts should rely only on the inherited surface — avoid Value unless you know the call path is a web service.",
+        "After calling End(), further Write calls have no effect on the wire. After Redirect(), :RETURN from the script — subsequent code may run but its output is unlikely to reach the client."
+      ],
+      "best_practices": {}
+    },
+    {
+      "id": "ssl.returns.httpclient",
+      "element_type": "returns",
+      "title": "HttpClient",
+      "summary": "Entry point for outbound HTTP requests — builds requests, fetches responses, and retrieves text, XML, or files.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/HttpClient.md",
+      "exceptions": [],
+      "caveats": [
+        "HttpClient is not directly constructable. Obtain it from WebServices{}:CreateHttpClient().",
+        "A failed request raises an HttpException. The same exception is also recorded for retrieval through GetLastServerException.",
+        "The two-argument SaveFile writes to the path you give it. The one-argument form writes to a runtime-chosen path; capture the returned path if you need to find the file later."
+      ],
+      "best_practices": {
+        "do": [
+          "Use the URL-only forms (GetText(sUrl), GetResponse(sUrl), GetXmlDom(sUrl), SaveFile(sUrl)) for simple, unauthenticated GETs.",
+          "Build an HttpRequest when you need to set headers, change the method, or attach a body.",
+          "Check GetLastServerException after a failure to see the server's response body."
+        ],
+        "dont": [
+          "Try to construct an HttpClient directly — it is only obtainable via WebServices{}:CreateHttpClient().",
+          "Reuse the value returned by GetLastServerException after a successful call. The next success clears it.",
+          "Assume GetXmlDom will succeed on non-XML bodies. It will raise."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.httpexception",
+      "element_type": "returns",
+      "title": "HttpException",
+      "summary": "Details on a failed HTTP request — status, message, and the server's response body.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/HttpException.md",
+      "exceptions": [],
+      "caveats": [
+        "HttpException is not directly constructable. Obtain it from HttpClient:GetLastServerException or catch it as the error raised by a failed HttpClient:GetResponse.",
+        "The value returned by GetLastServerException is cleared by the next successful response on the same client. Read it immediately after a failure.",
+        "StatusCode is not the HTTP response code. For HTTP-level failures (404, 500, etc.) the failure mode is reported as a protocol-level status, and the server's body is exposed via MessageDetails."
+      ],
+      "best_practices": {
+        "do": [
+          "Read MessageDetails to get the server's error body when an API returns one — many APIs return JSON or plain-text error payloads alongside non-success statuses.",
+          "Branch on Status (the text label) when behavior should differ for transient failures (timeouts, connect failures) vs. server-reported errors (protocol error).",
+          "Capture both Status and MessageDetails in error logs so a reader can tell whether the failure was on the way out or on the way back."
+        ],
+        "dont": [
+          "Try to construct an HttpException directly — it is only obtainable via HttpClient:GetLastServerException or by catching the error raised by a failed call.",
+          "Confuse StatusCode with the HTTP response status code. StatusCode here describes the failure mode of the request itself; for a non-success HTTP status (e.g., 404, 500), the server's response is in MessageDetails.",
+          "Rely on MessageDetails always being meaningful — when the server returned no body, it falls back to a generic message."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.httprequest",
+      "element_type": "returns",
+      "title": "HttpRequest",
+      "summary": "A configurable outbound HTTP request — method, headers, content type, body, and timeout.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/HttpRequest.md",
+      "exceptions": [],
+      "caveats": [
+        "HttpRequest is not directly constructable. Obtain it from HttpClient:CreateHttpRequest.",
+        "Timeout is in milliseconds. Setting a value of 30 waits 30 milliseconds, not 30 seconds.",
+        "SetContent(sValue) encodes text as UTF-8. If you need a different encoding, build the byte array yourself and pass it to the bytes form.",
+        "The multipart forms of SetContent (and CreateHttpForm) are usable today, but the multipart object surfaces are documented in a separate, forthcoming batch."
+      ],
+      "best_practices": {
+        "do": [
+          "Set Method, ContentType, and Accept before calling SetContent so the request is fully configured before it is sent.",
+          "Use a finite Timeout (in milliseconds) when calling endpoints that may stall; otherwise the runtime default applies.",
+          "Use SetContentFromFile for large bodies rather than reading the file into a string and passing it to SetContent."
+        ],
+        "dont": [
+          "Try to construct an HttpRequest directly — it is only obtainable via HttpClient:CreateHttpRequest.",
+          "Set ContentLength manually after calling SetContent. The byte length is already configured.",
+          "Use AddHeader to set Content-Type or Accept. Use the dedicated properties so the runtime can manage them consistently."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.httpresponse",
+      "element_type": "returns",
+      "title": "HttpResponse",
+      "summary": "An HTTP response — content metadata, headers, and the body as text, XML, or a saved file.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/HttpResponse.md",
+      "exceptions": [],
+      "caveats": [
+        "HttpResponse is not directly constructable. Obtain it from HttpClient:GetResponse.",
+        "The response body is consumed once. The first value-extraction call reads it; subsequent calls on the same response are not supported.",
+        "HeaderNames returns the header names only. Use GetHeader(sName) to read each value.",
+        "ContentLength reflects what the server sent. It may be -1 for chunked responses where the length is not declared."
+      ],
+      "best_practices": {
+        "do": [
+          "Choose one of GetValueAsString, GetValueAsXmlDom, or SaveValueToFile per response — each consumes the body.",
+          "Inspect ContentType before choosing how to consume the body (parse XML only when the type indicates XML).",
+          "Use SaveValueToFile for large or binary bodies; it avoids loading them into memory."
+        ],
+        "dont": [
+          "Try to construct an HttpResponse directly — it is only obtainable via HttpClient:GetResponse.",
+          "Call GetValueAsString and then GetValueAsXmlDom on the same response. The body is consumed by the first call.",
+          "Assume GetValueAsXmlDom will return a DOM for non-XML responses. It will raise."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.sslnamevaluecontainer",
+      "element_type": "returns",
+      "title": "SSLNameValueContainer",
+      "summary": "A name/value bag — read or list values from a request's headers, query string, cookies, forms, server variables, or client certificate fields.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SSLNameValueContainer.md",
+      "exceptions": [],
+      "caveats": [
+        "SSLNameValueContainer is not directly constructable. Obtain it from one of the SSLRequest collection properties.",
+        "Values from the request side (QueryString, Cookies, Forms, Headers, ServerVariables, ClientCertificate) reflect the incoming request. Calling Set on them does not modify the request and has no effect downstream.",
+        "The expando form (oContainer:Name) reads work for any name present in the collection. Writes to a name in the collection raise an error — use Set for writes.",
+        "Lookups are case-insensitive: oQueryString:UserName and oQueryString:USERNAME resolve to the same value."
+      ],
+      "best_practices": {
+        "do": [
+          "Use the expando form (oContainer:SomeName) for fixed, known keys — it reads more naturally.",
+          "Use Get(sName) when the key is in a variable.",
+          "Use AllKeys to list every entry, then Get each value, when you need to iterate."
+        ],
+        "dont": [
+          "Try to construct an SSLNameValueContainer directly — it is only obtainable from one of the six SSLRequest properties listed above.",
+          "Use the expando form to *write* a value (e.g., oContainer:SomeName := \"x\"). Expando-style writes to a name already in the collection raise an error; use Set(sName, sValue) instead.",
+          "Assume Get raises when a name is missing. It returns an empty string instead."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.sslrequest",
+      "element_type": "returns",
+      "title": "SSLRequest",
+      "summary": "The incoming HTTP request inside an endpoint script — method, URL, headers, query string, cookies, forms, body, and uploaded files.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SSLRequest.md",
+      "exceptions": [],
+      "caveats": [
+        "SSLRequest is not directly constructable. It is the value of the Request ambient, available only in endpoint contexts.",
+        "BodyAsString returns NIL (not an empty string) when the body is empty. Test with Empty() or compare to NIL.",
+        "BodyAsBinary returns NIL when the body is empty.",
+        "For web-service contexts, Request is the SSLWsRequest subclass; everything documented here is still available, plus the additional Parameters array."
+      ],
+      "best_practices": {
+        "do": [
+          "Reach for Request:QueryString:Foo (expando form) when you know the parameter name; reach for :Get(sName) when the name is dynamic.",
+          "Check IsJson before treating BodyAsString as JSON.",
+          "Use SaveInputStream() for large or binary bodies rather than loading them into a variable.",
+          "Treat Request as read-only — the values reflect what the client sent."
+        ],
+        "dont": [
+          "Try to construct an SSLRequest directly — it is only available as the Request ambient inside endpoint scripts.",
+          "Reach for Request outside an endpoint context (e.g., from a script invoked through DoProc from an interactive session). It will not be available — see Request for behavior.",
+          "Use BodyAsString for binary uploads. Use BodyAsBinary or SaveInputStream() instead.",
+          "Modify values on the collection properties expecting the incoming request to change. The values are read-only views."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.sslresponse",
+      "element_type": "returns",
+      "title": "SSLResponse",
+      "summary": "The outgoing HTTP response inside an endpoint script — write content, set status, redirect, add headers and cookies.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SSLResponse.md",
+      "exceptions": [],
+      "caveats": [
+        "SSLResponse is not directly constructable. It is the value of the Response ambient, available only in endpoint contexts.",
+        "For web-service contexts, Response is the SSLWsResponse subclass; everything documented here is still available, plus the additional Value property used to return a structured result.",
+        "AddCookie and SetCookie both require an explicit expiration date. If you want a session cookie, supply a date in the past or NIL per your environment's convention — confirm with a small test in your target environment."
+      ],
+      "best_practices": {
+        "do": [
+          "Set ContentType and StatusCode before calling Write so the headers go out correctly.",
+          ":RETURN from the script immediately after Redirect so the rest of the script does not run.",
+          "Use WriteFile for static or pre-built bodies — it streams the file rather than reading it into a string.",
+          "Use End() when you want to terminate the response early after writing partial content."
+        ],
+        "dont": [
+          "Try to construct an SSLResponse directly — it is only available as the Response ambient inside endpoint scripts.",
+          "Reach for Response outside an endpoint context. It will not be available — see Response for behavior.",
+          "Use AddHeader to set Content-Type. Use the ContentType property so the runtime can manage it consistently.",
+          "Continue writing after End() and expect the new content to appear on the wire."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.sslwsrequest",
+      "element_type": "returns",
+      "title": "SSLWsRequest",
+      "summary": "The web-service variant of the request object — adds Parameters to everything an SSLRequest exposes.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SSLWsRequest.md",
+      "exceptions": [],
+      "caveats": [
+        "SSLWsRequest is not directly constructable. Obtain it from the Request ambient.",
+        "Whether Request is an SSLWsRequest or a plain SSLRequest depends on how the script was invoked. Code that needs to handle both shapes should read the inherited surface only."
+      ],
+      "best_practices": {
+        "do": [
+          "Read positional parameters from Request:Parameters rather than parsing the body manually. The runtime has already extracted them.",
+          "Treat Request as SSLWsRequest only inside web-service scripts. For plain HTTP endpoints, use the base SSLRequest surface."
+        ],
+        "dont": [
+          "Try to construct an SSLWsRequest directly — it is only available as the Request ambient when the script runs as a web service.",
+          "Assume Parameters is always populated. Calls with no arguments produce an empty array."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.sslwsresponse",
+      "element_type": "returns",
+      "title": "SSLWsResponse",
+      "summary": "The web-service variant of the response object — adds Value (the structured return) to everything an SSLResponse exposes.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SSLWsResponse.md",
+      "exceptions": [],
+      "caveats": [
+        "SSLWsResponse is not directly constructable. Obtain it from the Response ambient.",
+        "Whether Response is an SSLWsResponse or a plain SSLResponse depends on how the script was invoked. Code that needs to handle both shapes should use the inherited surface only.",
+        "The serialization format applied to Value depends on the protocol the call arrived on. For HTML web-service entry points the value is typically returned as JSON."
+      ],
+      "best_practices": {
+        "do": [
+          "Assign the result of the call to Response:Value rather than calling Write with a serialized string. The runtime handles serialization for you.",
+          "Set Response:StatusCode for error cases (e.g., 400, 404, 500) just as you would on a plain HTTP response.",
+          "Use Response:Value for structured returns; use the inherited Write only if you genuinely need raw body output."
+        ],
+        "dont": [
+          "Try to construct an SSLWsResponse directly — it is only available as the Response ambient when the script runs as a web service.",
+          "Mix Response:Value := X and Response:Write(...) in the same script — they target different code paths and combining them is unlikely to produce what you expect."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.soapclient",
+      "element_type": "returns",
+      "title": "SoapClient",
+      "summary": "Calls SOAP web services — configures the endpoint from a WSDL, supplies credentials, invokes methods.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SoapClient.md",
+      "exceptions": [],
+      "caveats": [
+        "SoapClient is not directly constructable. Obtain it from WebServices{}:CreateSoapClient().",
+        "Use* methods return .F. on failure rather than raising — always check the return value and Error.",
+        "CallWebService returns NIL on failure rather than raising. Check the return value before reading the response.",
+        "TimeOut is in milliseconds. Values <= 0 disable the timeout entirely.",
+        "The configuration step caches results based on the WSDL content. Calling UseWebService repeatedly with the same WSDL is cheap; switching WSDLs on the same client is supported but may rebuild the proxy.",
+        "UseDefaultCredentials falls back to GlobalUseDefaultCredentials only when the local property has not been set. Once you assign to it, the local value wins regardless of the global value."
+      ],
+      "best_practices": {
+        "do": [
+          "Configure the client with one of the Use* methods exactly once before calling CallWebService.",
+          "Check the return value of Use* and read Error when it returns .F..",
+          "Populate Parameters in the order the SOAP method expects them, and call Parameters:Clear() between distinct invocations on the same client.",
+          "Use UseWebService (no credentials) only for services that allow anonymous access or when default credentials are appropriate.",
+          "Set TimeOut (in milliseconds) for slow services so a stalled call does not block indefinitely."
+        ],
+        "dont": [
+          "Try to construct a SoapClient directly — it is only obtainable via WebServices{}:CreateSoapClient().",
+          "Reuse Parameters across calls without clearing it between invocations — leftover parameters are silently passed to the next method.",
+          "Use UseProxy unless you know exactly what proxy file you need; UseWebService from the WSDL is the normal path.",
+          "Treat Error as a one-shot value. It is cleared on the next successful step and overwritten on the next failure; capture its content immediately."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.soapparameters",
+      "element_type": "returns",
+      "title": "SoapParameters",
+      "summary": "The parameter list passed to the next SOAP method invocation — add scalar, XML-typed, binary, or by-reference parameters.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SoapParameters.md",
+      "exceptions": [],
+      "caveats": [
+        "SoapParameters is not directly constructable. Obtain it from SoapClient:Parameters.",
+        "The XML forms (Add, AddAll, AddByRef) require well-formed XML matching the type the SOAP method expects. Malformed XML or a type mismatch sets Error on the parent SoapClient.",
+        "CreateCustomType only works after the client has been configured with a Use* method — the WSDL must have been processed first.",
+        "By-reference parameters do not change the SSL variables you passed in. Read the modified values from SoapResponse:XmlByRef after the call.",
+        "AddParameter2 interprets the type name as a SOAP-side type, not an SSL type."
+      ],
+      "best_practices": {
+        "do": [
+          "Add parameters in the order the SOAP method declares them.",
+          "Call Clear between invocations on the same SoapClient unless you intentionally want the parameters carried over.",
+          "Use CreateCustomType to construct DTOs the WSDL defines, populate the fields, then pass the instance to AddParameter.",
+          "Use the *ByRef variants only for parameters the SOAP method declares as by-reference; using them on regular parameters has no effect on the call but signals intent that does not match the contract."
+        ],
+        "dont": [
+          "Try to construct a SoapParameters directly — obtain it from SoapClient:Parameters, or use the empty one created automatically with the client.",
+          "Rely on CreateCustomType for primitive types — use Add with the appropriate XML wrapper instead.",
+          "Mix XML-form (Add) and value-form (AddParameter) for the same parameter list unless you have a specific reason; pick one form per call site for readability.",
+          "Forget to Clear between calls. Leftover parameters silently corrupt the next invocation."
+        ]
+      }
+    },
+    {
+      "id": "ssl.returns.soapresponse",
+      "element_type": "returns",
+      "title": "SoapResponse",
+      "summary": "The result of a SOAP call — read scalar values, navigate object fields and arrays, save binary results, or get the result as XML.",
+      "doc_status": "published",
+      "source_path": "content/reference/returns/SoapResponse.md",
+      "exceptions": [],
+      "caveats": [
+        "SoapResponse is not directly constructable. Obtain it from SoapClient:CallWebService or from GetObjectField / GetArrayItem on another SoapResponse.",
+        "GetArrayItem uses **zero-based** indexing, unlike most SSL array operations.",
+        "GetArrayLength returns -1 (not 0) when the wrapped value is not an array. Use this to distinguish \"not an array\" from \"empty array.\"",
+        "ValueAsStringDate and ValueAsStringTime return empty strings when the wrapped value is not a date/time. Both are derived from the same underlying value when present.",
+        "Serialization or read errors on Xml and XmlByRef return empty strings and set the parent SoapClient's Error property. Check Error after reading these properties when an empty value is unexpected."
+      ],
+      "best_practices": {
+        "do": [
+          "Use GetObjectField to descend into complex results, and chain calls for nested fields.",
+          "Use GetArrayLength + GetArrayItem to iterate array results.",
+          "Use Xml for logging or for handing the result to another system that consumes XML.",
+          "Use SaveToFile for binary results so you do not hold large payloads in memory."
+        ],
+        "dont": [
+          "Try to construct a SoapResponse directly — it is only obtainable from a SoapClient call or from navigation methods on another SoapResponse.",
+          "Call SaveToFile on a non-binary result. It will raise.",
+          "Rely on Value for arrays of complex types — use UnWrap to get an array of SoapResponse you can iterate.",
+          "Read Xml and assume the result is non-empty without checking — serialization failures return empty string and set Error on the parent SoapClient."
+        ]
+      }
     }
   ]
 }

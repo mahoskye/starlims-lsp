@@ -377,3 +377,11 @@ func IsSSLClass(s string) bool {
 	_, ok := sslClassLookup[strings.ToLower(s)]
 	return ok
 }
+
+// IsReturnsObject checks if a string names a returns-category object
+// (an object only obtainable as a built-in method's return value, or
+// ambient in endpoint scripts).
+func IsReturnsObject(s string) bool {
+	_, ok := GeneratedReturnsObjectDetails[strings.ToLower(s)]
+	return ok
+}

@@ -3,7 +3,7 @@
 
 package constants
 
-// Generated special-form inventory (6 special forms).
+// Generated special-form inventory (8 special forms).
 
 // GeneratedSpecialFormDetails maps each special-form slug to its details.
 var GeneratedSpecialFormDetails = map[string]SpecialFormDetails{
@@ -13,12 +13,12 @@ var GeneratedSpecialFormDetails = map[string]SpecialFormDetails{
 		Syntax:  "/*@private;\n:PROCEDURE ProcedureName;\n\n/*@protected;\n:PROCEDURE ProcedureName;",
 	},
 	"base": {
-		Title:   "base",
+		Title:   "Base:",
 		Summary: "Provides explicit access to members on a class's immediate parent type from within a class method.",
-		Syntax:  "Base:FieldName;\nBase:PropertyName;\nBase:MethodName(args);\nBase:Constructor(args);",
+		Syntax:  "Base:FieldName;\nBase:MethodName(args);\nBase:Constructor(args);",
 	},
 	"code-block": {
-		Title:   "code-block",
+		Title:   "Code Block",
 		Summary: "Defines an anonymous code block with bound variables and a single expression body. A code block can be created at the top level, passed as a function argument, or assigned to a variable for later execution.",
 		Syntax:  "{|param1| expression}\n{|param1, param2| expression}",
 	},
@@ -28,13 +28,23 @@ var GeneratedSpecialFormDetails = map[string]SpecialFormDetails{
 		Syntax:  "/* region Region Name;\n\n/* region content;\n\n/* endregion;",
 	},
 	"constructor": {
-		Title:   "constructor",
+		Title:   "Constructor",
 		Summary: "Runs one-time class initialization code when a user-defined class instance is created.",
 		Syntax:  ":CLASS MyClass;\n\n:PROCEDURE Constructor;\n    /* Initialization code;\n:ENDPROC;",
 	},
 	"me": {
-		Title:   "me",
+		Title:   "Me:",
 		Summary: "Provides a reference to the current class instance inside :CLASS methods.",
-		Syntax:  "Me;\nMe:PropertyName;\nMe:MethodName(args);",
+		Syntax:  "Me;\nMe:FieldName;\nMe:MethodName(args);",
+	},
+	"request": {
+		Title:   "Request",
+		Summary: "An ambient identifier in endpoint scripts that holds the incoming HTTP request.",
+		Syntax:  "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args);",
+	},
+	"response": {
+		Title:   "Response",
+		Summary: "An ambient identifier in endpoint scripts that holds the outgoing HTTP response.",
+		Syntax:  "Response:PropertyName := value;\nResponse:MethodName(args);",
 	},
 }

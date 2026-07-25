@@ -136,7 +136,78 @@ func TestInventoryTotalsAlignWithGenerated(t *testing.T) {
 		t.Errorf("inventory total Classes=%d but SSLClassNames has %d entries",
 			got, len(constants.SSLClassNames))
 	}
-	if constants.InventoryTotals.All != 446 {
-		t.Errorf("expected 446 total elements, got %d", constants.InventoryTotals.All)
+	if constants.InventoryTotals.All != 460 {
+		t.Errorf("expected 460 total elements, got %d", constants.InventoryTotals.All)
+	}
+	if got := constants.InventoryTotals.Returns; got != len(constants.GeneratedReturnsObjectNames) {
+		t.Errorf("inventory total Returns=%d but GeneratedReturnsObjectNames has %d entries",
+			got, len(constants.GeneratedReturnsObjectNames))
+	}
+}
+
+func TestReturnsObjectsGenerated(t *testing.T) {
+	// Issue #123: the returns category (12 objects) must survive the
+	// vendored refresh — the generator now fails on unhandled totals keys,
+	// and this pins the wired result.
+	if got := len(constants.GeneratedReturnsObjectDetails); got != 12 {
+		t.Errorf("expected 12 returns objects, got %d", got)
+	}
+	for _, name := range []string{"httpclient", "httpresponse", "soapclient", "sslrequest", "sslresponse"} {
+		if _, ok := constants.GeneratedReturnsObjectDetails[name]; !ok {
+			t.Errorf("expected returns object %q in GeneratedReturnsObjectDetails", name)
+		}
+		if !constants.IsReturnsObject(name) {
+			t.Errorf("IsReturnsObject(%q) = false, want true", name)
+		}
+	}
+	if constants.IsReturnsObject("email") {
+		t.Error("IsReturnsObject should not match class names")
+	}
+	// Meta parity: returns objects index into LookupMeta automatically.
+	for _, name := range []string{"HttpResponse", "SoapClient"} {
+		if _, ok := constants.LookupMeta(name); !ok {
+			t.Errorf("expected LookupMeta(%q) to find returns-object meta", name)
+		}
+	}
+	// New special forms from the refresh.
+	for _, slug := range []string{"request", "response"} {
+		if _, ok := constants.GeneratedSpecialFormDetails[slug]; !ok {
+			t.Errorf("expected special form %q after refresh", slug)
+		}
+	}
+}
+
+func TestGeneratedMethodNamesAreClean(t *testing.T) {
+	// Issue #123 (R1/R2): 42 method rows used the "method" JSON key (emitted
+	// as Name: "") and 35 more carried paren signatures that flowed verbatim
+	// into completion InsertText. All method names must now be bare.
+	check := func(owner, name string) {
+		if name == "" {
+			t.Errorf("%s: empty method name", owner)
+		}
+		if strings.Contains(name, "(") {
+			t.Errorf("%s: method name %q contains a paren signature", owner, name)
+		}
+	}
+	for class, det := range constants.GeneratedClassDetails {
+		for _, m := range det.Methods {
+			check("class "+class, m.Name)
+		}
+	}
+	for obj, det := range constants.GeneratedReturnsObjectDetails {
+		for _, m := range det.Methods {
+			check("returns object "+obj, m.Name)
+		}
+	}
+	// The worst-affected class: every WebServices method row used the
+	// "method" key and was invisible to completion.
+	ws := constants.GeneratedClassDetails["webservices"]
+	if len(ws.Methods) == 0 {
+		t.Fatal("expected WebServices methods")
+	}
+	for _, m := range ws.Methods {
+		if m.Name == "" {
+			t.Error("WebServices method with empty name survived normalization")
+		}
 	}
 }

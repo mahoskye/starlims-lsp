@@ -13,6 +13,7 @@ var InventoryTotals = struct {
 	Types        int
 	Classes      int
 	SpecialForms int
+	Returns      int
 	Functions    int
 	All          int
 }{
@@ -21,7 +22,8 @@ var InventoryTotals = struct {
 	Literals:     3,
 	Types:        8,
 	Classes:      29,
-	SpecialForms: 6,
+	SpecialForms: 8,
+	Returns:      12,
 	Functions:    330,
-	All:          446,
+	All:          460,
 }
