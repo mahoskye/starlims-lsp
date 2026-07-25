@@ -43,6 +43,9 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getClassHover(word); hover != nil {
 		return hover
 	}
+	if hover := getReturnsObjectHover(word); hover != nil {
+		return hover
+	}
 	if hover := getTypeHover(word); hover != nil {
 		return hover
 	}
@@ -70,24 +73,49 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 // pre-injected runtime objects available only in endpoint scripts; in
 // other contexts the identifiers are unbound. Returns nil if the word
 // isn't one of the ambients.
+//
+// Since the issue #123 refresh, the hover renders from published data:
+// the special-form summary/syntax plus the backing returns object's
+// member tables (SSLRequest/SSLResponse) and element meta.
 func GetEndpointAmbientHover(word string) *Hover {
+	var slug, backing string
 	switch strings.ToUpper(word) {
 	case "REQUEST":
-		return &Hover{
-			Contents: "**Request** *(endpoint ambient)*\n\n" +
-				"The incoming HTTP request, pre-injected in endpoint scripts. " +
-				"Access URL, headers, body, and query/form values via `Request:` members. " +
-				"Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.",
-		}
+		slug, backing = "request", "SSLRequest"
 	case "RESPONSE":
-		return &Hover{
-			Contents: "**Response** *(endpoint ambient)*\n\n" +
-				"The outgoing HTTP reply being built, pre-injected in endpoint scripts. " +
-				"Shape the response via `Response:` members (status, headers, body). " +
-				"Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.",
+		slug, backing = "response", "SSLResponse"
+	default:
+		return nil
+	}
+
+	var b strings.Builder
+	det, ok := constants.GeneratedSpecialFormDetails[slug]
+	if !ok {
+		return nil
+	}
+	fmt.Fprintf(&b, "**%s** *(endpoint ambient — `%s`)*\n\n", det.Title, backing)
+	if det.Summary != "" {
+		b.WriteString(det.Summary)
+		b.WriteString("\n\n")
+	}
+	b.WriteString("Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.\n")
+	if det.Syntax != "" {
+		b.WriteString("\n**Syntax:**\n\n```ssl\n")
+		b.WriteString(det.Syntax)
+		b.WriteString("\n```\n")
+	}
+
+	obj := constants.GeneratedReturnsObjectDetails[strings.ToLower(backing)]
+	writeMemberTables(&b, obj.Properties, obj.Methods)
+
+	if meta, ok := constants.LookupMeta(backing); ok {
+		if extra := formatElementMeta(meta); extra != "" {
+			b.WriteString("\n")
+			b.WriteString(extra)
 		}
 	}
-	return nil
+
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 
 // getKeywordHover returns hover information for a keyword.
@@ -330,37 +358,7 @@ func getClassHover(word string) *Hover {
 		}
 	}
 
-	if len(det.Properties) > 0 {
-		b.WriteString("\n**Properties:**\n\n")
-		for _, p := range det.Properties {
-			fmt.Fprintf(&b, "- `%s`", p.Name)
-			if p.Type != "" {
-				fmt.Fprintf(&b, " *(%s", p.Type)
-				if p.Access != "" {
-					fmt.Fprintf(&b, ", %s", p.Access)
-				}
-				b.WriteString(")*")
-			}
-			if p.Description != "" {
-				fmt.Fprintf(&b, " — %s", p.Description)
-			}
-			b.WriteString("\n")
-		}
-	}
-
-	if len(det.Methods) > 0 {
-		b.WriteString("\n**Methods:**\n\n")
-		for _, m := range det.Methods {
-			fmt.Fprintf(&b, "- `%s`", m.Name)
-			if m.Returns != "" && m.Returns != "none" {
-				fmt.Fprintf(&b, " → %s", m.Returns)
-			}
-			if m.Description != "" {
-				fmt.Fprintf(&b, " — %s", m.Description)
-			}
-			b.WriteString("\n")
-		}
-	}
+	writeMemberTables(&b, det.Properties, det.Methods)
 
 	if meta, ok := constants.LookupMeta(canonical); ok {
 		extra := formatElementMeta(meta)
@@ -371,6 +369,72 @@ func getClassHover(word string) *Hover {
 	}
 
 	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
+}
+
+// getReturnsObjectHover returns hover information for a returns-category
+// object (issue #123): an object obtainable only as a built-in method's
+// return value (HttpClient, SoapResponse, …) or ambient in endpoint
+// scripts. Renders like a class hover — summary, properties, methods —
+// plus the element meta the other categories already surface.
+func getReturnsObjectHover(word string) *Hover {
+	if !constants.IsReturnsObject(word) {
+		return nil
+	}
+	canonical := CanonicalReceiverTypeName(word)
+	det := constants.GeneratedReturnsObjectDetails[strings.ToLower(word)]
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**%s**  *(returns object)*\n\n", canonical)
+	if det.Summary != "" {
+		b.WriteString(det.Summary)
+		b.WriteString("\n")
+	}
+	writeMemberTables(&b, det.Properties, det.Methods)
+
+	if meta, ok := constants.LookupMeta(canonical); ok {
+		extra := formatElementMeta(meta)
+		if extra != "" {
+			b.WriteString("\n")
+			b.WriteString(extra)
+		}
+	}
+
+	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
+}
+
+// writeMemberTables renders the Properties/Methods bullet lists shared by
+// class, returns-object, and endpoint-ambient hovers.
+func writeMemberTables(b *strings.Builder, properties []constants.ClassProperty, methods []constants.ClassMethod) {
+	if len(properties) > 0 {
+		b.WriteString("\n**Properties:**\n\n")
+		for _, p := range properties {
+			fmt.Fprintf(b, "- `%s`", p.Name)
+			if p.Type != "" {
+				fmt.Fprintf(b, " *(%s", p.Type)
+				if p.Access != "" {
+					fmt.Fprintf(b, ", %s", p.Access)
+				}
+				b.WriteString(")*")
+			}
+			if p.Description != "" {
+				fmt.Fprintf(b, " — %s", p.Description)
+			}
+			b.WriteString("\n")
+		}
+	}
+	if len(methods) > 0 {
+		b.WriteString("\n**Methods:**\n\n")
+		for _, m := range methods {
+			fmt.Fprintf(b, "- `%s`", m.Name)
+			if m.Returns != "" && m.Returns != "none" {
+				fmt.Fprintf(b, " → %s", m.Returns)
+			}
+			if m.Description != "" {
+				fmt.Fprintf(b, " — %s", m.Description)
+			}
+			b.WriteString("\n")
+		}
+	}
 }
 
 // getLiteralHover returns hover information for a literal.
@@ -494,11 +558,21 @@ func getTypeHover(word string) *Hover {
 	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 
-// getSpecialFormHover returns hover information for one of the 6 SSL special
-// forms (access-modifiers, base, code-block, code-organization, constructor,
-// me). Shows summary and canonical syntax block.
+// getSpecialFormHover returns hover information for an SSL special form
+// (access-modifiers, base, code-block, code-organization, constructor, me,
+// request, response). Shows summary and canonical syntax block.
+//
+// The request/response slugs are excluded here: in endpoint files the
+// ambient hover (GetEndpointAmbientHover) owns them with full member
+// detail, and in any other file an identifier named Request or Response is
+// an ordinary variable that must not receive special-form hover (issue
+// #123 D1).
 func getSpecialFormHover(word string) *Hover {
-	det, ok := constants.GeneratedSpecialFormDetails[strings.ToLower(word)]
+	slug := strings.ToLower(word)
+	if slug == "request" || slug == "response" {
+		return nil
+	}
+	det, ok := constants.GeneratedSpecialFormDetails[slug]
 	if !ok {
 		return nil
 	}
@@ -625,6 +699,9 @@ func GetHoverForToken(token *lexer.Token, procedures []parser.ProcedureInfo, var
 			return hover
 		}
 		if hover := getClassHover(word); hover != nil {
+			return hover
+		}
+		if hover := getReturnsObjectHover(word); hover != nil {
 			return hover
 		}
 		if hover := getProcedureHover(word, procedures); hover != nil {

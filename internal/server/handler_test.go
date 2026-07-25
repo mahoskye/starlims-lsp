@@ -1125,3 +1125,191 @@ func TestHandleFormatting_SSLDataSourceStillFormats(t *testing.T) {
 		t.Errorf("expected operator spacing applied:\n%s", edits[0].NewText)
 	}
 }
+
+// --- Issue #123 piece D: returns-category member surface ---
+
+func TestHandleCompletion_EndpointResponseMembers(t *testing.T) {
+	s := newTestServerWithDocument(`/*
+ * Endpoint: HandleUpload
+;
+:PROCEDURE Handle;
+Response:
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 9},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	item := findCompletionItem(items, "Redirect")
+	if item == nil {
+		t.Fatalf("expected SSLResponse member completion Redirect, got %d items", len(items))
+	}
+	if item.Detail == nil || !strings.Contains(*item.Detail, "SSLResponse") {
+		t.Errorf("expected detail naming SSLResponse, got %#v", item.Detail)
+	}
+}
+
+func TestHandleCompletion_NonEndpointResponseColon_NoAmbientMembers(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Handle;
+Response:
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 1, Character: 9},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	if containsCompletionLabel(items, "Redirect") {
+		t.Error("SSLResponse members must not surface outside endpoint files")
+	}
+}
+
+func TestHandleCompletion_TypedReceiverMembers(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Demo;
+:DECLARE oClient;
+oClient := WebServices{}:CreateHttpClient();
+oClient:
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 8},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, ok := result.([]protocol.CompletionItem)
+	if !ok {
+		t.Fatalf("expected completion items, got %T", result)
+	}
+	item := findCompletionItem(items, "GetResponse")
+	if item == nil {
+		t.Fatalf("expected HttpClient member completion GetResponse, got %d items", len(items))
+	}
+	if item.Detail == nil || !strings.Contains(*item.Detail, "HttpClient") {
+		t.Errorf("expected detail naming HttpClient, got %#v", item.Detail)
+	}
+}
+
+func TestHandleHover_TypedReceiverMember(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Demo;
+:DECLARE oClient, oResp;
+oClient := WebServices{}:CreateHttpClient();
+oResp := oClient:GetResponse();
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected hover for typed receiver member GetResponse")
+	}
+	content := hover.Contents.(protocol.MarkupContent)
+	for _, want := range []string{"GetResponse", "HttpClient", "HttpResponse"} {
+		if !strings.Contains(content.Value, want) {
+			t.Errorf("expected hover to contain %q, got:\n%s", want, content.Value)
+		}
+	}
+}
+
+func TestHandleHover_TypedReceiverUnknownMember_Null(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Demo;
+:DECLARE oClient, oResp;
+oClient := WebServices{}:CreateHttpClient();
+oResp := oClient:Bogus();
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 20},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover != nil {
+		t.Errorf("expected null hover for unknown member of typed receiver, got %#v", hover)
+	}
+}
+
+func TestHandleHover_EndpointAmbientMember(t *testing.T) {
+	s := newTestServerWithDocument(`/*
+ * Endpoint: HandleUpload
+;
+:PROCEDURE Handle;
+Response:Redirect("https://example.test");
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 12},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected hover for Response:Redirect in endpoint file")
+	}
+	content := hover.Contents.(protocol.MarkupContent)
+	for _, want := range []string{"Redirect", "SSLResponse"} {
+		if !strings.Contains(content.Value, want) {
+			t.Errorf("expected hover to contain %q, got:\n%s", want, content.Value)
+		}
+	}
+}
+
+func TestHandleHover_EndpointAmbientWord(t *testing.T) {
+	s := newTestServerWithDocument(`/*
+ * Endpoint: HandleUpload
+;
+:PROCEDURE Handle;
+Response:Redirect("https://example.test");
+:ENDPROC;`)
+
+	hover, err := s.handleHover(nil, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 4, Character: 3},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hover == nil {
+		t.Fatal("expected ambient hover for Response in endpoint file")
+	}
+	content := hover.Contents.(protocol.MarkupContent)
+	for _, want := range []string{"endpoint", "Redirect"} {
+		if !strings.Contains(content.Value, want) {
+			t.Errorf("expected ambient hover to contain %q, got:\n%s", want, content.Value)
+		}
+	}
+}
