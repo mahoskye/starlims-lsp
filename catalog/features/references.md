@@ -8,7 +8,9 @@ schema_ref: null
 config: []
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/crossfile_test.go
   - internal/server/handler_test.go
+  - internal/server/cross_file_test.go
 history:
   - date: 2026-01-10
     ref: "f27f727 (v0.2.0)"
@@ -28,7 +30,15 @@ history:
     note: Text matches are classified against lexer tokens — matches inside
       comments and non-dispatch strings are no longer returned; DoProc/
       ExecFunction first-argument dispatch targets remain references.
-issues: ["#42", "#43"]
+  - date: 2026-07-24
+    ref: "issue #125"
+    note: Cross-file references for procedure subjects — the single-file-only
+      rule is lifted. Dotted dispatch call sites across the workspace are
+      returned via a token-based call-site index (candidate discovery) with
+      per-site re-resolution through the dispatch resolver; open documents
+      scan from the live parse. Dotted self-sites in the definition file,
+      previously invisible to the whole-content match, are included.
+issues: ["#42", "#43", "#125"]
 ---
 
 ## Behavior
@@ -52,8 +62,28 @@ issues: ["#42", "#43"]
   confined to its declaring procedure; a same-named local in another
   procedure MUST NOT appear in the results. `:PUBLIC` variables and
   procedure names are file-global.
-- Results are single-file only; locations in other files MUST NOT be
-  returned.
+- Procedure subjects extend cross-file: when the cursor names a procedure
+  (its declaration, an identifier use, or a dotted dispatch-target string
+  that resolves to it), dotted `DoProc`/`ExecFunction` call sites across
+  the workspace whose target resolves to that procedure MUST be returned,
+  at the string-content range. Site→definition matching uses the dispatch
+  resolver (`feature.cross_file_resolution` — same degradation chain,
+  uniqueness gate, open-document overlay), so references agree exactly
+  with go-to-definition. Ambiguously-resolving sites that include the
+  target among their candidates are returned (a reference listing is
+  read-only and liberal; rename is the conservative side).
+- A 1-part dispatch target (`DoProc("Foo")`) in ANOTHER file is NOT a
+  reference — 1-part targets are same-file calls by the resolver's scoping
+  rule (`feature.cross_file_resolution` A14). This is a deliberate scoping
+  decision, not a semantic fact; see Known gaps for the include-splice
+  consequence.
+- Dotted self-sites — a dispatch string inside the definition file whose
+  target resolves to a procedure of that same file — MUST be returned
+  exactly once (the same-file whole-content match cannot see them).
+- Non-procedure subjects (variables, parameters) remain single-file.
+  Without a workspace index the whole feature behaves exactly as the
+  single-file contract above.
+- Cross-file locations are capped at 500 per request.
 - Matches inside comments and non-dispatch strings MUST NOT be returned;
   the only legitimate string-context references are `DoProc`/`ExecFunction`
   first arguments. Each text match is classified against the lexer tokens:
@@ -74,6 +104,11 @@ issues: ["#42", "#43"]
 - A7: Given `:PROCEDURE TargetProc;` and a call `DoProc("TargetProc")`, when references are requested on the procedure, then the string target inside the DoProc call is included as a reference.
 - A8: Given the cursor on a *use* of a symbol, when references are requested with `includeDeclaration: false`, then the declaration location is still excluded from the results.
 - A9: Given a comment or a non-dispatch string containing the symbol name as a whole word, when references are requested, then those comment/string matches are NOT returned.
+- A10: Given `:PROCEDURE CalculateTotal;` in one file and `ExecFunction("CAT.SCRIPT.CalculateTotal")` in another, when references are requested from the declaration (or from the call-site string), then the call site is returned at its string-content range (and the declaration is returned per `includeDeclaration`).
+- A11: Given a 1-part `DoProc("CalculateTotal")` in a different file, when references are requested on the procedure, then that site is NOT returned (same-file scoping rule for 1-part targets).
+- A12: Given a caller file open with unsaved edits that removed its dispatch site, when references are requested, then the stale indexed site is NOT returned — open documents are scanned from the live buffer.
+- A13: Given no workspace index, when references are requested, then results are byte-identical to the single-file behavior.
+- A14: Given a dotted dispatch self-site inside the definition file, when references are requested on the procedure, then that site appears exactly once in the results.
 
 ## Rationale
 
@@ -89,3 +124,26 @@ parsed symbol. Comment/string leakage was a long-standing defect
 noise); issue #43 fixed it by classifying every text match against the lexer
 tokens, keeping `DoProc`/`ExecFunction` dispatch targets (A7) as the only
 string-context references.
+
+Cross-file references (issue #125) reuse the dispatch resolver per site
+rather than trusting the index's positions as answers: the index only
+discovers candidate files (last-segment match), and each candidate re-runs
+the same resolution chain go-to-definition uses, so the two features can
+never disagree about what a dispatch string means. Ambiguous sites are
+included because a references listing is read-only — the cost of a false
+positive is a click, while rename (the write side) skips them.
+
+## Known gaps
+
+- **Class-method channel.** `obj:Method()` on a `CreateUdObject`-
+  instantiated class and `Base:Method()` after `:INHERIT` reference
+  procedures in other scripts via bare identifiers. The LSP does not model
+  this channel (definition/hover share the blind spot), so references
+  under-report for class files.
+- **Include-spliced 1-part calls.** `:INCLUDE` splices the included file's
+  text, so a 1-part `DoProc("Foo")` in an includer of the definition file
+  is a genuine runtime call — excluded by the 1-part scoping rule (A11).
+  Closable later via a reverse-include walk.
+- **Concatenated dispatch strings.** `DoProc("CAT." + sName)` is never
+  extracted as a call site; only the leading string literal is seen and its
+  partial content does not resolve.

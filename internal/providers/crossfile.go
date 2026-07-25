@@ -5,7 +5,6 @@
 package providers
 
 import (
-	"regexp"
 	"strings"
 
 	"starlims-lsp/internal/lexer"
@@ -56,73 +55,136 @@ type DispatchTarget struct {
 	Range    Range
 }
 
-// DispatchTargetAt returns the dispatch target whose string literal contains
-// the cursor position (1-based line/column), or nil. Reuses the same
-// line-based pattern as same-file DoProc navigation; multi-line and
-// concatenated targets are out of scope (see the catalog entry).
-func DispatchTargetAt(text string, line, column int) *DispatchTarget {
-	lines := strings.Split(text, "\n")
-	if line < 1 || line > len(lines) {
-		return nil
-	}
-	lineText := lines[line-1]
+// CallSiteKind classifies a whole-file call-site extraction.
+type CallSiteKind int
 
-	for _, match := range doProcPattern.FindAllStringSubmatchIndex(lineText, -1) {
-		if len(match) < 6 {
+const (
+	// CallDispatch is a DoProc/ExecFunction first-argument string target.
+	CallDispatch CallSiteKind = iota
+	// CallDataSource is a RunDS first-argument string target.
+	CallDataSource
+	// CallInclude is an :INCLUDE path.
+	CallInclude
+)
+
+// CallSite is one call site found by ExtractCallSites. Range covers the
+// string CONTENT (or include path) — quotes excluded — 0-based.
+type CallSite struct {
+	Kind     CallSiteKind
+	Raw      string
+	IsDoProc bool // dispatch sites only: DoProc vs ExecFunction
+	Range    Range
+}
+
+// ExtractCallSites walks the token stream and returns every dispatch
+// (DoProc/ExecFunction), RunDS, and :INCLUDE call site in the file, in
+// order of appearance (issue #125). The token walk is the forward form of
+// isDispatchTargetMatch's walk-back: function identifier → optional
+// whitespace/comments → '(' → optional whitespace/comments → quoted string.
+// It handles multi-line calls the old line regex missed. Bracket strings,
+// empty strings, and strings spanning lines are not legal dispatch syntax
+// and are skipped; concatenated targets ("CAT." + sName) extract only when
+// the first operand is itself a complete quoted target — the walk stops at
+// the string token, so a leading partial never matches a real procedure.
+func ExtractCallSites(tokens []lexer.Token) []CallSite {
+	var sites []CallSite
+	for i, token := range tokens {
+		switch token.Type {
+		case lexer.TokenKeyword:
+			if !strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INCLUDE") {
+				continue
+			}
+			if target, startCol, endCol := includePathAfter(tokens, i); target != "" {
+				sites = append(sites, CallSite{
+					Kind: CallInclude,
+					Raw:  target,
+					Range: Range{
+						Start: Position{Line: token.Line - 1, Character: startCol},
+						End:   Position{Line: token.Line - 1, Character: endCol},
+					},
+				})
+			}
+		case lexer.TokenIdentifier:
+			name := strings.ToLower(token.Text)
+			var kind CallSiteKind
+			switch name {
+			case "doproc", "execfunction":
+				kind = CallDispatch
+			case "runds":
+				kind = CallDataSource
+			default:
+				continue
+			}
+			parenIdx := nextSignificantTokenIndex(tokens, i+1)
+			if parenIdx < 0 || tokens[parenIdx].Type != lexer.TokenPunctuation || tokens[parenIdx].Text != "(" {
+				continue
+			}
+			strIdx := nextSignificantTokenIndex(tokens, parenIdx+1)
+			if strIdx < 0 || tokens[strIdx].Type != lexer.TokenString {
+				continue
+			}
+			str := tokens[strIdx]
+			if len(str.Text) < 3 || (str.Text[0] != '"' && str.Text[0] != '\'') ||
+				str.Text[len(str.Text)-1] != str.Text[0] || strings.Contains(str.Text, "\n") {
+				continue
+			}
+			content := str.Text[1 : len(str.Text)-1]
+			sites = append(sites, CallSite{
+				Kind:     kind,
+				Raw:      content,
+				IsDoProc: name == "doproc",
+				Range: Range{
+					Start: Position{Line: str.Line - 1, Character: str.Column},
+					End:   Position{Line: str.Line - 1, Character: str.Column + len(content)},
+				},
+			})
+		}
+	}
+	return sites
+}
+
+// dispatchTargetFromSite converts an extracted call site to the cursor-side
+// DispatchTarget shape.
+func dispatchTargetFromSite(site CallSite) *DispatchTarget {
+	return &DispatchTarget{
+		Raw:      site.Raw,
+		Parts:    strings.Split(site.Raw, "."),
+		IsDoProc: site.IsDoProc,
+		Range:    site.Range,
+	}
+}
+
+// callSiteAt returns the call site of the wanted kind whose target range
+// contains the (1-based) cursor position, or nil.
+func callSiteAt(tokens []lexer.Token, line, column int, kind CallSiteKind) *CallSite {
+	for _, site := range ExtractCallSites(tokens) {
+		if site.Kind != kind || site.Range.Start.Line != line-1 {
 			continue
 		}
-		nameStart := match[4] + 1 // 1-based
-		nameEnd := match[5] + 1
-		if column < nameStart || column > nameEnd {
-			continue
-		}
-		raw := lineText[match[4]:match[5]]
-		fn := strings.ToLower(lineText[match[2]:match[3]])
-		return &DispatchTarget{
-			Raw:      raw,
-			Parts:    strings.Split(raw, "."),
-			IsDoProc: fn == "doproc",
-			Range: Range{
-				Start: Position{Line: line - 1, Character: match[4]},
-				End:   Position{Line: line - 1, Character: match[5]},
-			},
+		if column-1 >= site.Range.Start.Character && column-1 <= site.Range.End.Character {
+			s := site
+			return &s
 		}
 	}
 	return nil
 }
 
-// runDSPattern matches RunDS calls to extract the data-source target,
-// mirroring doProcPattern's shape (single capture group for the target).
-var runDSPattern = regexp.MustCompile(`(?i)\bRunDS\s*\(\s*["']([^"']+)["']`)
+// DispatchTargetAt returns the dispatch target whose string literal contains
+// the cursor position (1-based line/column), or nil. Token-walk based via
+// ExtractCallSites (issue #125), so multi-line calls resolve; concatenated
+// targets remain out of scope (see the catalog entry).
+func DispatchTargetAt(tokens []lexer.Token, line, column int) *DispatchTarget {
+	if site := callSiteAt(tokens, line, column, CallDispatch); site != nil {
+		return dispatchTargetFromSite(*site)
+	}
+	return nil
+}
 
 // DataSourceTargetAt returns the RunDS target whose string literal contains
-// the cursor position (1-based line/column), or nil. Same line-based
-// limitations as DispatchTargetAt.
-func DataSourceTargetAt(text string, line, column int) *DispatchTarget {
-	lines := strings.Split(text, "\n")
-	if line < 1 || line > len(lines) {
-		return nil
-	}
-	lineText := lines[line-1]
-
-	for _, match := range runDSPattern.FindAllStringSubmatchIndex(lineText, -1) {
-		if len(match) < 4 {
-			continue
-		}
-		nameStart := match[2] + 1 // 1-based
-		nameEnd := match[3] + 1
-		if column < nameStart || column > nameEnd {
-			continue
-		}
-		raw := lineText[match[2]:match[3]]
-		return &DispatchTarget{
-			Raw:   raw,
-			Parts: strings.Split(raw, "."),
-			Range: Range{
-				Start: Position{Line: line - 1, Character: match[2]},
-				End:   Position{Line: line - 1, Character: match[3]},
-			},
-		}
+// the cursor position (1-based line/column), or nil.
+func DataSourceTargetAt(tokens []lexer.Token, line, column int) *DispatchTarget {
+	if site := callSiteAt(tokens, line, column, CallDataSource); site != nil {
+		return dispatchTargetFromSite(*site)
 	}
 	return nil
 }
@@ -249,7 +311,7 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 	procedures []parser.ProcedureInfo, variables []parser.VariableInfo,
 	resolver WorkspaceResolver) []Location {
 
-	if dt := DispatchTargetAt(text, line, column); dt != nil {
+	if dt := DispatchTargetAt(tokens, line, column); dt != nil {
 		if len(dt.Parts) == 1 {
 			// Same-script semantics, unchanged (feature.definition A6/A7).
 			if loc := findDoProcDefinition(text, line, column, uri, procedures); loc != nil {
@@ -263,7 +325,7 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 		return resolvedToLocations(resolver.ResolveDispatch(dt.Raw))
 	}
 
-	if dst := DataSourceTargetAt(text, line, column); dst != nil {
+	if dst := DataSourceTargetAt(tokens, line, column); dst != nil {
 		// RunDS targets resolve even as 1-part names — a data source is
 		// always a separate file (feature.definition A13).
 		if resolver == nil {

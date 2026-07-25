@@ -289,33 +289,248 @@ func TestHandleDefinition_CrossFileDispatch(t *testing.T) {
 	}
 }
 
-// References stay single-file: a dispatch target that resolves cross-file
-// for definition must NOT leak other-file locations into references
-// (feature.references contract preserved).
-func TestHandleReferences_StaySingleFileWithWorkspaceIndex(t *testing.T) {
+// --- Cross-file references (issue #125, feature.references A10-A14) ---
+
+// helperWithSelfSite is a definition script whose Wrapper procedure calls
+// its own CalculateTotal through a dotted dispatch string — invisible to
+// the same-file whole-content match.
+const helperWithSelfSite = `/* helpers;
+:PROCEDURE CalculateTotal;
+:PARAMETERS nQty, nPrice;
+:RETURN nQty * nPrice;
+:ENDPROC;
+
+:PROCEDURE Wrapper;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {1, 2});
+:ENDPROC;`
+
+func refsContain(refs []protocol.Location, uri string) bool {
+	for _, ref := range refs {
+		if string(ref.URI) == uri {
+			return true
+		}
+	}
+	return false
+}
+
+// [spec feature.references/A10] — references from the declaration include
+// dotted dispatch sites in other files, at the string-content range.
+func TestHandleReferences_CrossFileFromDeclaration(t *testing.T) {
 	s := NewSSLServer()
 	wi, dir := newResolverIndex(t)
 	s.workspaceIndex = wi
-	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr",
+		`:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {2, 3});
+:ENDPROC;`)
 
-	source := `result := ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {});`
-	s.documents.SetDocument(testURI, source, 1)
-	s.documentVersion[testURI] = 1
+	s.documents.SetDocument(defURI, helperScript, 1)
+	s.documentVersion[defURI] = 1
 
 	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
-			Position:     protocol.Position{Line: 0, Character: 45},
+			TextDocument: protocol.TextDocumentIdentifier{URI: defURI},
+			Position:     protocol.Position{Line: 4, Character: 15}, // on CalculateTotal
 		},
 		Context: protocol.ReferenceContext{IncludeDeclaration: true},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !refsContain(refs, callerURI) {
+		t.Fatalf("expected a reference in the caller file, got %+v", refs)
+	}
+	for _, ref := range refs {
+		if string(ref.URI) != callerURI {
+			continue
+		}
+		if ref.Range.Start.Line != 1 {
+			t.Errorf("caller site line = %d, want 1", ref.Range.Start.Line)
+		}
+		wantStart := strings.Index(`:RETURN ExecFunction("`, `"`) + 1
+		if int(ref.Range.Start.Character) != wantStart {
+			t.Errorf("caller site start char = %d, want %d (string content)", ref.Range.Start.Character, wantStart)
+		}
+		wantLen := len("LIMS_UTILS.HELPERS.CalculateTotal")
+		if int(ref.Range.End.Character-ref.Range.Start.Character) != wantLen {
+			t.Errorf("caller site span = %d, want %d", ref.Range.End.Character-ref.Range.Start.Character, wantLen)
+		}
+	}
+}
+
+// [spec feature.references/A10] — references requested from the call-site
+// string return the declaration (per includeDeclaration) and the site.
+func TestHandleReferences_FromCallSiteString(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+
+	source := `result := ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {});`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	params := &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 45},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	}
+	refs, err := s.handleReferences(nil, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !refsContain(refs, defURI) {
+		t.Errorf("expected the declaration in the definition file, got %+v", refs)
+	}
+	if !refsContain(refs, testURI) {
+		t.Errorf("expected the call site itself, got %+v", refs)
+	}
+
+	params.Context.IncludeDeclaration = false
+	refs, err = s.handleReferences(nil, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if refsContain(refs, defURI) {
+		t.Errorf("includeDeclaration=false must exclude the declaration, got %+v", refs)
+	}
+	if !refsContain(refs, testURI) {
+		t.Errorf("call site must remain without the declaration, got %+v", refs)
+	}
+}
+
+// [spec feature.references/A11] — a 1-part DoProc("Proc") in another file
+// is NOT a reference (same-file scoping rule, cross_file_resolution A14).
+func TestHandleReferences_OnePartOtherFileNotReturned(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	onePartURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/LOCALCALL.srvscr",
+		`:PROCEDURE Run;
+:RETURN DoProc("CalculateTotal");
+:ENDPROC;`)
+
+	s.documents.SetDocument(defURI, helperScript, 1)
+	s.documentVersion[defURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: defURI},
+			Position:     protocol.Position{Line: 4, Character: 15},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if refsContain(refs, onePartURI) {
+		t.Errorf("1-part dispatch in another file must not be a reference, got %+v", refs)
+	}
+}
+
+// [spec feature.references/A12] — open documents are scanned from the live
+// buffer: a site deleted in unsaved edits disappears from results.
+func TestHandleReferences_OpenDocOverlay(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr",
+		`:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalculateTotal", {2, 3});
+:ENDPROC;`)
+
+	// The caller is open with the dispatch site edited away (unsaved).
+	s.documents.SetDocument(callerURI, `:PROCEDURE Run;
+:RETURN 0;
+:ENDPROC;`, 1)
+	s.documentVersion[callerURI] = 1
+
+	s.documents.SetDocument(defURI, helperScript, 1)
+	s.documentVersion[defURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: defURI},
+			Position:     protocol.Position{Line: 4, Character: 15},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if refsContain(refs, callerURI) {
+		t.Errorf("live buffer deleted the site; the stale indexed site must not return, got %+v", refs)
+	}
+}
+
+// [spec feature.references/A13] — without a workspace index, references
+// behave exactly as the single-file feature.
+func TestHandleReferences_NilIndexSingleFile(t *testing.T) {
+	s := NewSSLServer()
+
+	source := `:PROCEDURE TargetProc;
+:ENDPROC;
+:PROCEDURE Caller;
+:RETURN DoProc("TargetProc");
+:ENDPROC;`
+	s.documents.SetDocument(testURI, source, 1)
+	s.documentVersion[testURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 0, Character: 14},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(refs) == 0 {
+		t.Fatal("expected same-file references with a nil index")
+	}
 	for _, ref := range refs {
 		if string(ref.URI) != testURI {
-			t.Errorf("references must stay single-file, got location in %s", ref.URI)
+			t.Errorf("nil index must keep references single-file, got %s", ref.URI)
 		}
+	}
+}
+
+// [spec feature.references/A14] — a dotted self-site inside the definition
+// file is returned exactly once (deduped against the same-file pass).
+func TestHandleReferences_DottedSelfSiteOnce(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperWithSelfSite)
+
+	s.documents.SetDocument(defURI, helperWithSelfSite, 1)
+	s.documentVersion[defURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: defURI},
+			Position:     protocol.Position{Line: 1, Character: 14}, // on CalculateTotal
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	selfSiteLine := 7 // 0-based line of the ExecFunction call
+	count := 0
+	for _, ref := range refs {
+		if string(ref.URI) == defURI && int(ref.Range.Start.Line) == selfSiteLine {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("dotted self-site must appear exactly once, got %d (refs: %+v)", count, refs)
 	}
 }
 

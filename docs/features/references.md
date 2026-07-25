@@ -79,9 +79,18 @@ Only match complete identifiers:
 
 Built-in functions return references (call sites) but no definition.
 
-### 4.6 Cross-File References - NOT IMPLEMENTED
+### 4.6 Cross-File References (issue #125)
 
-Currently, references are found only within the same file.
+Procedure subjects extend across the workspace: dotted `DoProc`/
+`ExecFunction` call sites whose target resolves to the procedure are
+returned, matched through the same dispatch resolver go-to-definition
+uses. Open documents are scanned from the live buffer; other files come
+from the workspace call-site index. 1-part targets in other files are
+excluded (same-file scoping rule), dotted self-sites in the definition
+file are included exactly once, and without a workspace index behavior
+is identical to single-file. See the catalog entry for the normative
+contract and its Known gaps (class-method channel, include-spliced
+1-part calls, concatenated strings).
 
 ---
 
@@ -89,9 +98,9 @@ Currently, references are found only within the same file.
 
 | Limitation | Notes |
 |------------|-------|
-| Single-file only | Cannot find references in other files |
-| Strings/comments included | Search is word-based after symbol selection |
-| No semantic call-site model | `DoProc("ProcName")` matches as text, not as a specialized call reference |
+| Variables single-file | Locals/params/`:PUBLIC` references stay within the file (cross-file `:PUBLIC`-via-include deferred) |
+| Class-method channel invisible | `obj:Method()` / `Base:Method()` bare-identifier calls into class scripts are not modeled |
+| Concatenated dispatch strings | `DoProc("CAT." + sName)` is never extracted as a call site |
 
 ---
 

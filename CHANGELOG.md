@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cross-file references (#125 Phase A).** Find-references on a
+  procedure now returns dotted `DoProc`/`ExecFunction` call sites across
+  the workspace — requested from the declaration, an identifier use, or
+  the call-site string itself. A token-based call-site extractor feeds
+  the workspace index for candidate discovery; every candidate re-runs
+  the same dispatch resolution go-to-definition uses (degradation chain,
+  uniqueness gate, open-document overlay), so the two features cannot
+  disagree. Dotted self-sites inside the definition file — previously
+  invisible — are included. `DispatchTargetAt` is now token-walk based,
+  so multi-line dispatch calls resolve from the cursor too. Variables
+  stay single-file; without a workspace index, behavior is unchanged.
+  Catalog entry amended (A10–A14 + Known gaps).
 - **Returns-category objects in the element inventory (#123).** The
   vendored element reference and meta JSONs are refreshed from
   starlims-ssl-reference (446 → 460 elements): 12 returns-category

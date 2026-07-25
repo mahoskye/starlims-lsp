@@ -62,6 +62,46 @@ type FileSymbols struct {
 	// (spec feature.cross_file_resolution/A18-A19).
 	DeclaredVars   []string
 	IncludeTargets []string
+	// CallSites are the file's dispatch/RunDS/:INCLUDE call sites
+	// (issue #125). Candidate discovery only: reference locations and
+	// rename edits are always recomputed from current content at request
+	// time, never emitted from these indexed positions.
+	CallSites []IndexedCallSite
+}
+
+// IndexedCallSite is one call site stored in the index. Kind mirrors
+// providers.CallSiteKind; positions are 0-based and cover the string
+// content (or include path).
+type IndexedCallSite struct {
+	Kind      providers.CallSiteKind
+	Raw       string
+	Line      int
+	StartChar int
+	EndChar   int
+}
+
+// indexedCallSites converts extracted call sites to their indexed form.
+func indexedCallSites(sites []providers.CallSite) []IndexedCallSite {
+	if len(sites) == 0 {
+		return nil
+	}
+	out := make([]IndexedCallSite, len(sites))
+	for i, s := range sites {
+		out[i] = IndexedCallSite{
+			Kind:      s.Kind,
+			Raw:       s.Raw,
+			Line:      s.Range.Start.Line,
+			StartChar: s.Range.Start.Character,
+			EndChar:   s.Range.End.Character,
+		}
+	}
+	return out
+}
+
+// URICallSite pairs an indexed call site with its file.
+type URICallSite struct {
+	URI  string
+	Site IndexedCallSite
 }
 
 // IndexResolution is one candidate returned by the resolver methods.
@@ -229,6 +269,7 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 		EntryParamsLine: entryLine,
 		DeclaredVars:    dedupeVariableNames(p.ExtractVariables(ast)),
 		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
+		CallSites:       indexedCallSites(providers.ExtractCallSites(tokens)),
 	}
 
 	wi.mu.Lock()
@@ -637,6 +678,46 @@ func (wi *WorkspaceIndex) ResolveDataSourceTarget(target string) []IndexResoluti
 	}
 
 	return orderResolutions(results)
+}
+
+// CallSitesFor returns every indexed dispatch call site (skipping URIs in
+// skipURIs) whose dotted target's last segment equals lastSeg,
+// case-insensitively (issue #125). 1-part targets are excluded — they are
+// same-file calls by the resolver's scoping rule
+// (feature.cross_file_resolution/A14). Linear scan, SearchSymbols-style.
+func (wi *WorkspaceIndex) CallSitesFor(lastSeg string, skipURIs map[string]struct{}) []URICallSite {
+	wi.mu.RLock()
+	defer wi.mu.RUnlock()
+
+	var out []URICallSite
+	for uri, fs := range wi.files {
+		if _, skip := skipURIs[uri]; skip {
+			continue
+		}
+		for _, site := range fs.CallSites {
+			if site.Kind != providers.CallDispatch {
+				continue
+			}
+			parts := strings.Split(site.Raw, ".")
+			if len(parts) < 2 {
+				continue
+			}
+			if !strings.EqualFold(parts[len(parts)-1], lastSeg) {
+				continue
+			}
+			out = append(out, URICallSite{URI: uri, Site: site})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].URI != out[j].URI {
+			return out[i].URI < out[j].URI
+		}
+		if out[i].Site.Line != out[j].Site.Line {
+			return out[i].Site.Line < out[j].Site.Line
+		}
+		return out[i].Site.StartChar < out[j].Site.StartChar
+	})
+	return out
 }
 
 // CategoryNames returns all known category names (original casing of the
