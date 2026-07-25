@@ -24,7 +24,10 @@ The hover provider displays contextual information when the user hovers over ide
 | Built-in Functions | Signature, parameters, return type, description |
 | Built-in Classes | Summary, base class, constructors with parameter lists, properties table, methods table |
 | Core SSL Types (`array`, `boolean`, `codeblock`, `date`, `netobject`, `number`, `object`, `string`) | Runtime type, supported operators, members |
-| Special Forms (`access-modifiers`, `base`, `code-block`, `code-organization`, `constructor`, `me`) | Summary and canonical syntax block |
+| Special Forms (`access-modifiers`, `base`, `code-block`, `code-organization`, `constructor`, `me`, `request`, `response`) | Summary and canonical syntax block (`request`/`response` render only through the endpoint ambient hover below) |
+| Returns Objects (`HttpClient`, `HttpResponse`, `SoapClient`, `SSLRequest`, `SSLResponse`, …) | Summary, properties table, methods table, element meta |
+| Endpoint Ambients (`Request` / `Response`, endpoint files only) | Special-form summary/syntax plus the backing `SSLRequest`/`SSLResponse` member tables |
+| Typed-Receiver Members (`oResp:ContentType` where `oResp` came from a producer chain) | The member's type/access/description, attributed to its class or returns object |
 | Literals (`.T.`, `.F.`, `NIL`) | Description of the literal value |
 | Operators (`.AND.`, `.OR.`, `+=`, `==`, `$`, …) | Description, usage, and type-behavior table for binary operators |
 | User Procedures | Signature with parameters from `:PARAMETERS` |
@@ -126,7 +129,7 @@ Hovering over `?` inside a SQL string shows:
 
 | Limitation | Notes |
 |------------|-------|
-| Object method hover | No type tracking for object methods |
+| Object method hover | Typed-receiver tracking covers class instances and returns objects from producer chains (issue #123); ad-hoc object methods outside those patterns are untracked |
 | `:INCLUDE` definitions | Cannot show info from included files |
 | Custom function hover | No support for project-defined functions |
 

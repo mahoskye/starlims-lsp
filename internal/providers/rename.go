@@ -2,6 +2,7 @@ package providers
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
@@ -32,7 +33,7 @@ func PrepareRename(text string, line, column int, uri string, procedures []parse
 	// string rejection below — same-file rename starts from the identifier.
 	if dt := DispatchTargetAt(tokens, line, column); dt != nil && len(dt.Parts) >= 2 {
 		lastSeg := dt.Parts[len(dt.Parts)-1]
-		segStart := dt.Range.End.Character - len(lastSeg)
+		segStart := dt.Range.End.Character - utf8.RuneCountInString(lastSeg)
 		if column-1 >= segStart && column-1 <= dt.Range.End.Character {
 			return &PrepareRenameResult{
 				Range: Range{

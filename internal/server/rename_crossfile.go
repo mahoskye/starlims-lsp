@@ -4,6 +4,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/providers"
@@ -111,12 +112,13 @@ func (s *SSLServer) dispatchSiteEdits(defURI, procName, newName string) map[stri
 				continue
 			}
 			// D1: the write side edits only sites whose resolution is a
-			// single candidate equal to the renamed definition.
-			if _, unambiguous := resolver.siteTargetsDefinition(site.Raw, defURI, procName); !unambiguous {
+			// single candidate equal to the renamed definition — under
+			// both the live overlay and the disk/index view (F4).
+			if !resolver.siteUnambiguousForWrite(site.Raw, defURI, procName) {
 				continue
 			}
 			lastSeg := parts[len(parts)-1]
-			segStart := site.Range.End.Character - len(lastSeg)
+			segStart := site.Range.End.Character - utf8.RuneCountInString(lastSeg)
 			edits[uri] = append(edits[uri], providers.TextEdit{
 				Range: providers.Range{
 					Start: providers.Position{Line: site.Range.Start.Line, Character: segStart},

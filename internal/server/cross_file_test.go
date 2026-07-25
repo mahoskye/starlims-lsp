@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/providers"
 
@@ -1300,5 +1301,186 @@ func TestHandleRename_StaleIndexFreshEdit(t *testing.T) {
 	}
 	if callerEdits[0].Range.Start.Line != 2 {
 		t.Errorf("edit line = %d, want 2 (fresh position, not the stale indexed line 1)", callerEdits[0].Range.Start.Line)
+	}
+}
+
+// --- v0.14.0 pre-release review regressions (F1-F4) ---
+
+// F1: a procedure whose name is a substring of the :PROCEDURE keyword must
+// still locate its declaration as a whole word — not inside the keyword.
+func TestHandleReferences_ProcNamedProc(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defScript := `/* h;
+:PROCEDURE Proc;
+:ENDPROC;
+
+:PROCEDURE Other;
+:ENDPROC;`
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", defScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", `:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.Proc", {});
+:ENDPROC;`)
+
+	s.documents.SetDocument(defURI, defScript, 1)
+	s.documentVersion[defURI] = 1
+
+	refs, err := s.handleReferences(nil, &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: defURI},
+			Position:     protocol.Position{Line: 1, Character: 12},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !refsContain(refs, callerURI) {
+		t.Errorf("expected caller reference for procedure named Proc, got %+v", refs)
+	}
+	for _, ref := range refs {
+		if string(ref.URI) == defURI && ref.Range.Start.Line != 1 {
+			t.Errorf("unexpected def-file reference on line %d — keyword lines must not match", ref.Range.Start.Line)
+		}
+	}
+}
+
+// F1 (rename side): renaming a procedure named Proc from its declaration
+// must carry the caller edit, not silently fall back to same-file.
+func TestHandleRename_ProcNamedProc(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defScript := `/* h;
+:PROCEDURE Proc;
+:ENDPROC;`
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", defScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", `:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.Proc", {});
+:ENDPROC;`)
+
+	s.documents.SetDocument(defURI, defScript, 1)
+	s.documentVersion[defURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 1, 12, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit")
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(callerURI)]; !present {
+		t.Errorf("caller edit missing — declaration position matched inside the keyword? changes: %+v", edit.Changes)
+	}
+}
+
+// F2: a multi-byte character in the dispatch target must not skew the
+// last-segment edit range (rune columns, not byte lengths).
+func TestHandleRename_MultiByteTargetEditRange(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", renameDefScript)
+	callerLine := `:RETURN DoProc("CATÉ.HELPERS.CalcTotal");`
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr",
+		":PROCEDURE Run;\n"+callerLine+"\n:ENDPROC;")
+
+	s.documents.SetDocument(defURI, renameDefScript, 1)
+	s.documentVersion[defURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 1, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit")
+	}
+	callerEdits := edit.Changes[protocol.DocumentUri(callerURI)]
+	if len(callerEdits) != 1 {
+		t.Fatalf("expected one caller edit, got %d", len(callerEdits))
+	}
+	wantStart := uint32(utf8.RuneCountInString(`:RETURN DoProc("CATÉ.HELPERS.`))
+	ce := callerEdits[0]
+	if ce.Range.Start.Character != wantStart {
+		t.Errorf("edit start = %d, want %d (rune-based)", ce.Range.Start.Character, wantStart)
+	}
+	if ce.Range.End.Character != wantStart+uint32(len("CalcTotal")) {
+		t.Errorf("edit end = %d, want %d — a skewed range eats the closing quote", ce.Range.End.Character, wantStart+uint32(len("CalcTotal")))
+	}
+}
+
+// F3: a local variable shadowing a procedure's name keeps the scope-aware
+// single-file rename — it must not mutate other files or the declaration.
+func TestHandleRename_ShadowingVariableStaysLocal(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defScript := `:PROCEDURE CalcTotal;
+:ENDPROC;
+
+:PROCEDURE Other;
+:DECLARE CalcTotal;
+CalcTotal := 5;
+:ENDPROC;`
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", defScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", renameCallerScript)
+
+	s.documents.SetDocument(defURI, defScript, 1)
+	s.documentVersion[defURI] = 1
+
+	// Cursor on the variable USE inside Other (0-based line 5).
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 5, 3, "nLocalTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a local-variable rename edit")
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(callerURI)]; present {
+		t.Error("local-variable rename must not touch other files")
+	}
+	for _, te := range edit.Changes[protocol.DocumentUri(defURI)] {
+		if te.Range.Start.Line == 0 {
+			t.Error("local-variable rename must not touch the procedure declaration")
+		}
+	}
+}
+
+// F4: an UNSAVED buffer deleting a competing procedure must not make a
+// disk-ambiguous site editable — the write side requires disk and buffer
+// to agree.
+func TestHandleRename_UnsavedOverlayCannotDisambiguateWrite(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	aScript := `/* a;
+:PROCEDURE CalcTotal;
+:ENDPROC;`
+	aURI := writeAndIndex(t, wi, dir, "Server Scripts/A/HELPERS.srvscr", aScript)
+	bScript := `/* b;
+:PROCEDURE CalcTotal;
+:ENDPROC;`
+	bURI := writeAndIndex(t, wi, dir, "Server Scripts/B/HELPERS.srvscr", bScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/AMBIG.srvscr", `:PROCEDURE Run;
+:RETURN DoProc("HELPERS.CalcTotal");
+:ENDPROC;`)
+
+	// B open with the competing procedure deleted — unsaved.
+	s.documents.SetDocument(bURI, "/* b;\n", 1)
+	s.documentVersion[bURI] = 1
+
+	s.documents.SetDocument(aURI, aScript, 1)
+	s.documentVersion[aURI] = 1
+
+	edit, err := s.handleRename(nil, renameParamsAt(aURI, 1, 14, "ComputeTotal"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected a workspace edit for the definition file")
+	}
+	if _, present := edit.Changes[protocol.DocumentUri(callerURI)]; present {
+		t.Error("disk-ambiguous site edited on the strength of an unsaved buffer (F4)")
 	}
 }

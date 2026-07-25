@@ -81,10 +81,15 @@ oMetadata:tableName    /* completion lists tableName, exists */
 Coarse value types (`string`, `boolean`, `number`, `array`) are extracted
 from the initializer values and surfaced in the completion `detail`. The
 analysis is file-global with last-write-wins semantics — there is no
-per-procedure scoping yet. Variables assigned from procedure-call returns,
-parameters, or anywhere outside a recognized `CreateUDObject`/`clone()`
-chain do not get a shape; member access on them shows no focused list. See
-issue #7.
+per-procedure scoping yet. Variables assigned from producer chains get a
+typed member surface instead (issue #123): class constructor literals
+(`oMail := Email{}`), producer method chains
+(`oClient := WebServices{}:CreateHttpClient()` and follow-on hops), and
+class-returning builtins (`oConn := GetConnectionByName(...)`) complete
+from the class or returns-object member tables. In endpoint files,
+`Request:` / `Response:` complete from `SSLRequest`/`SSLResponse`.
+Parameters and variables outside both the shape and producer patterns
+show no focused list. See issues #7 and #123.
 
 ### 2.4 Completion Item Details
 
@@ -164,7 +169,7 @@ Snippet templates follow the bundled style-guide defaults:
 | Single-file scope | Variables from `:INCLUDE` files not available |
 | No scope filtering | Variables are document-local, not narrowed to the current procedure |
 | No semantic ranking | The server does not reorder items by context or prefix relevance |
-| No type inference | Cannot suggest methods based on object type |
+| Limited type inference | Producer-chain typed receivers and UDObject shapes are tracked (file-global, last-write-wins); cross-procedure propagation and arbitrary expressions are not |
 
 > **Future work — .NET method dispatch on built-in types.** When the LSP
 > grows type-aware member completion or an "unknown member" diagnostic on

@@ -814,6 +814,13 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.7.7...v0.8.0
 [0.2.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mahoskye/starlims-lsp/releases/tag/v0.1.0

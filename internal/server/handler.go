@@ -140,15 +140,17 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 				}
 				// Typed receivers — class instances and returns objects
 				// tracked through producer chains (issue #123 D2); checked
-				// before UDObject shapes.
+				// before UDObject shapes, with any ad-hoc shape-augmented
+				// properties of the same variable merged in.
 				typed := providers.BuildTypedReceivers(cache.Tokens, endpointFile)
+				shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
 				if typeName, isTyped := typed[strings.ToLower(tok.Text)]; isTyped {
 					if items := providers.GetTypedMemberCompletions(typeName); items != nil {
+						items = append(items, mergeShapeCompletions(items, tok.Text, shapes)...)
 						return items
 					}
 				}
 				// Issue #7: variable bound to an inferred UDObject shape.
-				shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
 				if items := providers.GetUDObjectShapeCompletions(tok.Text, shapes); items != nil {
 					return items
 				}
@@ -157,6 +159,29 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 	}
 
 	return nil
+}
+
+// mergeShapeCompletions returns the shape-augmented properties of varName
+// that aren't already present (by label, case-insensitive) in the typed
+// member list — a typed receiver can carry ad-hoc `oVar:prop := ...`
+// properties on top of its class/returns-object members.
+func mergeShapeCompletions(existing []providers.CompletionItem, varName string, shapes map[string]providers.UDObjectShape) []providers.CompletionItem {
+	shapeItems := providers.GetUDObjectShapeCompletions(varName, shapes)
+	if len(shapeItems) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, it := range existing {
+		seen[strings.ToLower(it.Label)] = struct{}{}
+	}
+	var out []providers.CompletionItem
+	for _, it := range shapeItems {
+		if _, dup := seen[strings.ToLower(it.Label)]; dup {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // isDoProcStringContext reports whether the cursor at (line, column) sits
@@ -415,6 +440,20 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 					},
 				}, nil
 			}
+			// A typed receiver can still carry ad-hoc shape-augmented
+			// properties (`oClient:MyTag := ...`) — consult the shape
+			// before answering null.
+			shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
+			if shape, shaped := shapes[strings.ToLower(recv)]; shaped {
+				if md := providers.RenderUDObjectMemberHover(shape, recv, member); md != "" {
+					return &protocol.Hover{
+						Contents: protocol.MarkupContent{
+							Kind:  protocol.MarkupKindMarkdown,
+							Value: md,
+						},
+					}, nil
+				}
+			}
 			return nil, nil
 		}
 		shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
@@ -542,14 +581,12 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 
 	// Cursor on a procedure defined in this file: extend with dispatch
 	// sites across the workspace (plus dotted self-sites the same-file
-	// whole-content match cannot see).
+	// whole-content match cannot see). A local/parameter that shadows the
+	// procedure's name keeps the scope-aware single-file result (F3).
 	if s.workspaceIndex != nil {
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
-			for _, proc := range cache.Procedures {
-				if strings.EqualFold(proc.Name, word) {
-					locations = append(locations, s.dispatchSiteReferences(uri, proc.Name, locations)...)
-					break
-				}
+			if procName, ok := procedureSubjectAt(cache, word, line); ok {
+				locations = append(locations, s.dispatchSiteReferences(uri, procName, locations)...)
 			}
 		}
 	}
@@ -1012,15 +1049,14 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 			}
 			return nil, nil
 		}
-		// Subject: a procedure defined in this file. A refusal (class file,
-		// D8) falls back to the same-file path below.
+		// Subject: a procedure defined in this file — unless a local or
+		// parameter shadows the name at the cursor (F3), which keeps the
+		// scope-aware single-file path. A refusal (class file, D8) falls
+		// back to the same-file path below.
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
-			for _, proc := range cache.Procedures {
-				if strings.EqualFold(proc.Name, word) {
-					if changes := s.crossFileRename(uri, proc.Name, params.NewName); changes != nil {
-						return toWorkspaceEdit(changes), nil
-					}
-					break
+			if procName, ok := procedureSubjectAt(cache, word, line); ok {
+				if changes := s.crossFileRename(uri, procName, params.NewName); changes != nil {
+					return toWorkspaceEdit(changes), nil
 				}
 			}
 		}

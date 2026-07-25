@@ -222,9 +222,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// any wrap of OVER itself, and `OVER w` (named window, no paren) never
 		// enters the state. The '(' cannot be wrapped away from OVER: the
 		// proactive wrapper only breaks keywords/identifiers and after commas.
-		if t.Text == "(" && prevCommand == "OVER" {
-			if p := getPrevNonWS(nonWSTokens, i); p != nil &&
-				(p.Type == SQLTokenKeyword || p.Type == SQLTokenFunction) {
+		// Comment tokens between OVER and '(' are skipped — nonWSTokens
+		// retains them, and `OVER /* c */ (` must still enter the state.
+		if t.Text == "(" {
+			pIdx := i - 1
+			for pIdx >= 0 && nonWSTokens[pIdx].Type == SQLTokenComment {
+				pIdx--
+			}
+			if pIdx >= 0 && strings.ToUpper(nonWSTokens[pIdx].Text) == "OVER" &&
+				(nonWSTokens[pIdx].Type == SQLTokenKeyword || nonWSTokens[pIdx].Type == SQLTokenFunction) {
 				inOverClause = true
 				overParenDepth = parenDepth // already incremented for this '('
 				overDidBreak = false
