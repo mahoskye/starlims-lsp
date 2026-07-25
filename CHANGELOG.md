@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the LSP as `GeneratedReturnsObjectDetails` (+ their meta via
   `LookupMeta`). The generator now fails on any totals key it doesn't
   handle, so an upstream category can no longer be dropped silently.
+- **Vendored-data drift guards (#123).** A new test compares both
+  vendored JSONs byte-for-byte against a sibling ssl-style-guide
+  checkout (skips when absent) and always cross-checks internal totals
+  against the generated inventory; CI now verifies `go generate` is a
+  no-op on every push.
 
 ### Fixed
 - **77 broken class-method names in completion (#123).** 42 method rows

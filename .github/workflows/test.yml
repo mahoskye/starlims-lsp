@@ -33,6 +33,16 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # Vendored-data freshness (issue #123): regenerating from the vendored
+      # JSON must be a no-op — catches an edited JSON without `go generate`
+      # and generator changes without a regen. The sibling-drift compare in
+      # internal/constants/drift_test.go is a dev-machine guard only; CI has
+      # no ssl-style-guide checkout, so that test skips here.
+      - name: generated code is fresh
+        run: |
+          go generate ./internal/constants/...
+          git diff --exit-code internal/constants
+
       # Includes the catalog conformance suite (internal/catalog): slug
       # bijection, executable spec fences, criterion traceability, config-key
       # and generated-docs checks — the catalog cannot drift from the code
