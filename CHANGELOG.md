@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-07-25
+
+### Changed
+- **Element data refresh.** The vendored element reference and metadata
+  pick up the reference-content fixes from starlims-ssl-reference#16:
+  nine expanded summaries and five newly parseable return descriptions
+  now show in hover and member completion.
+
+### Added
+- **Third-party notices.** `THIRD-PARTY-NOTICES.md` collects the license
+  texts of the 19 Go modules statically linked into the release
+  binaries; `make notices` regenerates it, and releases attach it
+  alongside the binaries automatically.
+
 ## [0.14.0] - 2026-07-25
 
 Cross-file references and rename complete the cross-file milestone
@@ -824,7 +838,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.11.0...v0.12.0
