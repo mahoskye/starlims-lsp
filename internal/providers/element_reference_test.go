@@ -211,3 +211,54 @@ func TestGeneratedMethodNamesAreClean(t *testing.T) {
 		}
 	}
 }
+
+func TestReturnsObjectHover(t *testing.T) {
+	// Issue #123 D1: returns-category objects hover like classes, meta included.
+	hover := getReturnsObjectHover("HttpResponse")
+	if hover == nil {
+		t.Fatal("expected hover for returns object HttpResponse")
+	}
+	for _, want := range []string{"HttpResponse", "returns object", "ContentType"} {
+		if !strings.Contains(hover.Contents, want) {
+			t.Errorf("expected hover to contain %q, got:\n%s", want, hover.Contents)
+		}
+	}
+	if hover := getReturnsObjectHover("Email"); hover != nil {
+		t.Error("classes must not get returns-object hover")
+	}
+	if hover := getReturnsObjectHover("nothing"); hover != nil {
+		t.Error("unknown words must not get returns-object hover")
+	}
+}
+
+func TestSpecialFormHover_RequestResponseGated(t *testing.T) {
+	// Issue #123 D1: the request/response slugs are owned by the endpoint
+	// ambient hover; a variable named Request in a normal script must not
+	// receive special-form hover.
+	if hover := getSpecialFormHover("request"); hover != nil {
+		t.Errorf("expected nil special-form hover for request, got:\n%s", hover.Contents)
+	}
+	if hover := getSpecialFormHover("response"); hover != nil {
+		t.Errorf("expected nil special-form hover for response, got:\n%s", hover.Contents)
+	}
+	if hover := getSpecialFormHover("me"); hover == nil {
+		t.Error("other special forms must keep their hover")
+	}
+}
+
+func TestEndpointAmbientHoverContent(t *testing.T) {
+	// Issue #123 D1: the ambient hover renders from published data — the
+	// special-form summary plus the backing returns object's members.
+	hover := GetEndpointAmbientHover("Response")
+	if hover == nil {
+		t.Fatal("expected ambient hover for Response")
+	}
+	for _, want := range []string{"SSLResponse", "endpoint", "Redirect"} {
+		if !strings.Contains(hover.Contents, want) {
+			t.Errorf("expected ambient hover to contain %q, got:\n%s", want, hover.Contents)
+		}
+	}
+	if hover := GetEndpointAmbientHover("sUser"); hover != nil {
+		t.Error("non-ambient words must not get ambient hover")
+	}
+}

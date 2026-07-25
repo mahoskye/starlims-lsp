@@ -38,11 +38,18 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 		return []protocol.CompletionItem{}, nil
 	}
 
+	// Computed ahead of the context-aware shortcuts: the endpoint gate
+	// controls the ambient Request:/Response: member surface (issue #123).
+	endpointFile := false
+	if content, ok := s.documents.GetDocument(uri); ok {
+		endpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
+	}
+
 	// Context-aware shortcuts: if the cursor is right after `<ClassName>{`
 	// or after a member-access `:`, return the focused completion list
 	// instead of the full inventory. This produces better suggestions in
 	// editors that display unfiltered LSP results.
-	if focused := s.contextAwareCompletions(cache, line, column); focused != nil {
+	if focused := s.contextAwareCompletions(cache, line, column, endpointFile); focused != nil {
 		return toProtocolCompletionItems(focused), nil
 	}
 
@@ -67,10 +74,6 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
 	dsFile := isDataSourceURI(uri)
-	endpointFile := false
-	if content, ok := s.documents.GetDocument(uri); ok {
-		endpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
-	}
 	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile, endpointFile)
 	snippets := providers.GetSnippetCompletions(dsFile)
 
@@ -88,10 +91,13 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 //   - `Me:` / `Base:` (in a class) — method/field suggestions for the
 //     enclosing class declaration
 //   - `<BuiltInClass>:`           — methods/properties of that class
+//   - `Request:` / `Response:`    — the ambient's members (endpoint files)
+//   - `<typedVar>:`               — members of the class or returns object
+//     a producer chain assigned to the variable (issue #123)
 //
 // Returns nil when no context applies; the caller falls back to the full
 // completion list.
-func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column int) []providers.CompletionItem {
+func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column int, endpointFile bool) []providers.CompletionItem {
 	// Find the most recently emitted token that ends at or before the
 	// cursor. We then peek at the token immediately before it for context.
 	idx := indexOfTokenBefore(cache.Tokens, line, column)
@@ -127,6 +133,20 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 			case constants.IsSSLClass(tok.Text):
 				return providers.GetClassMemberCompletions(tok.Text)
 			default:
+				// Endpoint ambients complete from their backing returns
+				// object (issue #123 D1).
+				if typeName := providers.AmbientReceiverType(tok.Text, endpointFile); typeName != "" {
+					return providers.GetReturnsMemberCompletions(typeName)
+				}
+				// Typed receivers — class instances and returns objects
+				// tracked through producer chains (issue #123 D2); checked
+				// before UDObject shapes.
+				typed := providers.BuildTypedReceivers(cache.Tokens, endpointFile)
+				if typeName, isTyped := typed[strings.ToLower(tok.Text)]; isTyped {
+					if items := providers.GetTypedMemberCompletions(typeName); items != nil {
+						return items
+					}
+				}
 				// Issue #7: variable bound to an inferred UDObject shape.
 				shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
 				if items := providers.GetUDObjectShapeCompletions(tok.Text, shapes); items != nil {
@@ -372,10 +392,31 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 		}
 	}
 
-	// Member hover for shape-inferred UDObject receivers
-	// (feature.hover A15-A16): a shaped receiver's known member shows the
-	// property; its unknown member is null, never an unrelated symbol.
+	endpointFile := isEndpointFile(uri, content, s.settings.EndpointPatterns)
+
+	// Member hover for typed receivers and shape-inferred UDObject
+	// receivers (feature.hover A15-A16, issue #123): a known receiver's
+	// known member shows its detail; its unknown member is null, never an
+	// unrelated symbol. Typed receivers (ambient Request/Response, class
+	// instances, returns objects from producer chains) are checked before
+	// UDObject shapes.
 	if recv, member, ok := providers.MemberAccessAt(cache.Tokens, line, column); ok {
+		typeName := providers.AmbientReceiverType(recv, endpointFile)
+		if typeName == "" {
+			typed := providers.BuildTypedReceivers(cache.Tokens, endpointFile)
+			typeName = typed[strings.ToLower(recv)]
+		}
+		if typeName != "" {
+			if md := providers.RenderTypedMemberHover(typeName, recv, member); md != "" {
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.MarkupKindMarkdown,
+						Value: md,
+					},
+				}, nil
+			}
+			return nil, nil
+		}
 		shapes := providers.BuildUDObjectShapesWithProcedures(cache.Tokens, cache.Procedures)
 		if shape, shaped := shapes[strings.ToLower(recv)]; shaped {
 			if md := providers.RenderUDObjectMemberHover(shape, recv, member); md != "" {
@@ -391,7 +432,7 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 	}
 
 	var hover *providers.Hover
-	if isEndpointFile(uri, content, s.settings.EndpointPatterns) {
+	if endpointFile {
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
 			hover = providers.GetEndpointAmbientHover(word)
 		}

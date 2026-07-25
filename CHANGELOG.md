@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the LSP as `GeneratedReturnsObjectDetails` (+ their meta via
   `LookupMeta`). The generator now fails on any totals key it doesn't
   handle, so an upstream category can no longer be dropped silently.
+- **Returns-object member surface (#123).** Hover on a returns-object
+  name (`HttpResponse`, `SoapClient`, …) renders its summary, members,
+  and element meta like classes do. In endpoint files, `Request:` /
+  `Response:` complete from their backing `SSLRequest`/`SSLResponse`
+  member sets and the ambient hover now renders from published data;
+  outside endpoint files those identifiers stay ordinary variables.
+- **Typed-receiver inference (#123).** Variables assigned from producer
+  chains — `oClient := WebServices{}:CreateHttpClient()`, follow-on
+  hops like `oResp := oClient:GetResponse()`, class constructor
+  literals, and class-returning builtins (`GetConnectionByName`) — now
+  get member completion and member hover for the class or returns
+  object they hold. A typed receiver's unknown member hovers as null,
+  never an unrelated symbol. File-global, last-write-wins, mirroring
+  UDObject shape inference; cross-procedure propagation deferred.
 - **Vendored-data drift guards (#123).** A new test compares both
   vendored JSONs byte-for-byte against a sibling ssl-style-guide
   checkout (skips when absent) and always cross-checks internal totals
