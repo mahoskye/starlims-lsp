@@ -1,0 +1,14 @@
+:PROCEDURE OverFrame;
+:DECLARE aR;
+aR := SQLExecute("
+    SELECT sample_id,
+           AVG(result_value) OVER (
+               PARTITION BY test_code
+               ORDER BY sample_date
+               ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+           ) AS moving_avg_7
+    FROM results
+    WHERE test_code = ?code?
+");
+:RETURN aR;
+:ENDPROC;

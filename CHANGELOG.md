@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **OVER() window-spec layout (#122).** Long window specs now follow
+  sql-canonical-compact-reference §3.1: a space before the paren
+  (`OVER (`), each clause (PARTITION BY / ORDER BY / ROWS / RANGE) on
+  its own line indented 4 past the window function's column, and the
+  closing `) AS alias` on its own line at the function's column. Short
+  specs stay fully inline (S48) — previously every spec broke, with a
+  glued `OVER(`, a fixed indent unrelated to the function's position,
+  and the closer glued to the last clause.
+
 ## [0.13.0] - 2026-07-22
 
 Formatter hardening release: every finding from the adversarial

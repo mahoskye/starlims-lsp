@@ -94,9 +94,22 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	caseInSelectColumns := false
 	caseDepth := 0
 
-	// OVER() clause tracking (Gap 8)
+	// OVER() window-spec tracking (Gap 8, issue #122). State is entered at
+	// the '(' following OVER — after OVER's own line placement is settled —
+	// and layout anchors to the window function's output column (§3.1).
 	inOverClause := false
 	overParenDepth := 0
+	overBreaks := false
+	overDidBreak := false
+	overFuncCol := 0
+	// Output-column bookkeeping for the OVER anchor: parenFuncCols mirrors
+	// parenOpenCols with the calling function's start column (-1 when the
+	// '(' is not a function call); the pop at ')' remembers the column of
+	// the most recently closed call.
+	var parenFuncCols []int
+	lastClosedCallCol := -1
+	lastTokStartCol := len(baseIndent)
+	lineStartCol := len(baseIndent)
 
 	// DECODE function tracking (Gap 7)
 	inDecodeCall := false
@@ -204,13 +217,35 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			inWithinGroup = false
 		}
 
-		// Track OVER() clause (Gap 8)
-		if upperText == "OVER" && (t.Type == SQLTokenKeyword || t.Type == SQLTokenFunction) {
-			inOverClause = true
-			overParenDepth = parenDepth + 1
-		}
-		if t.Text == ")" && inOverClause && parenDepth == overParenDepth-1 {
-			inOverClause = false
+		// Enter the OVER window-spec state at its '(' (issue #122). Deciding
+		// here — not at the OVER token — means currentLineLen already reflects
+		// any wrap of OVER itself, and `OVER w` (named window, no paren) never
+		// enters the state. The '(' cannot be wrapped away from OVER: the
+		// proactive wrapper only breaks keywords/identifiers and after commas.
+		if t.Text == "(" && prevCommand == "OVER" {
+			if p := getPrevNonWS(nonWSTokens, i); p != nil &&
+				(p.Type == SQLTokenKeyword || p.Type == SQLTokenFunction) {
+				inOverClause = true
+				overParenDepth = parenDepth // already incremented for this '('
+				overDidBreak = false
+				// Anchor: the window function's output column, from the call
+				// paren that closed immediately before OVER; fall back to the
+				// current line's start column when there was none.
+				overFuncCol = lastClosedCallCol
+				if overFuncCol < 0 {
+					overFuncCol = lineStartCol
+				}
+				// Long/short decision (S48/S13): break only when the rendered
+				// tail from this '(' through the end of the projection would
+				// overflow the current line (+1 for the space before '('), and
+				// the spec actually holds a clause — `OVER ()` stays inline.
+				overBreaks = false
+				if f.opts.MaxLineLength > 0 && overSpecHasClause(nonWSTokens, i) {
+					end := f.projectionEndIndex(nonWSTokens, i)
+					tail := f.projectionRenderLen(nonWSTokens, i, end)
+					overBreaks = currentLineLen+1+tail > f.opts.MaxLineLength
+				}
+			}
 		}
 
 		// Track DECODE function (Gap 7). Pair-per-line layout applies only
@@ -273,6 +308,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
 					// ORDER BY etc. inside WITHIN GROUP (...) stays inline
 					needsBreak = false
+				} else if inOverClause && parenDepth >= overParenDepth {
+					// clauses inside OVER (...) are laid out solely by the
+					// dedicated window-spec rule (issue #122)
+					needsBreak = false
 				} else if upperText == "CASE" && prev != nil && prev.Type == SQLTokenOperator {
 					// CASE after = in SET clause stays inline: fldsts = CASE WHEN ...
 					needsBreak = false
@@ -303,6 +342,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					needsBreak = false
 				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
 					// contents of WITHIN GROUP (...) stay inline (issue #119)
+					needsBreak = false
+				} else if inOverClause && parenDepth >= overParenDepth {
+					// AND/OR inside OVER (...) — e.g. a CASE predicate in
+					// PARTITION BY — stays on its clause line (issue #122)
 					needsBreak = false
 				} else if insertAll && upperText == "WHEN" {
 					// keep the S37 branch indent set by the major-clause
@@ -513,8 +556,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 		}
 
-		// WHEN/ELSE inside CASE in SELECT columns: align at col 11 (7 + 4)
-		if caseInSelectColumns && (upperText == "WHEN" || upperText == "ELSE") && t.Type == SQLTokenKeyword {
+		// WHEN/ELSE inside CASE in SELECT columns: align at col 11 (7 + 4).
+		// Inside an OVER (...) spec the clause line owns its CASE whole
+		// (issue #122), so the rule is suppressed there.
+		if caseInSelectColumns && (upperText == "WHEN" || upperText == "ELSE") && t.Type == SQLTokenKeyword &&
+			!(inOverClause && parenDepth >= overParenDepth) {
 			needsBreak = true
 			extraIndent = strings.Repeat(" ", 11)
 		}
@@ -539,17 +585,36 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 		}
 
-		// OVER() internal formatting: PARTITION BY / ORDER BY on their own lines (Gap 8)
-		if inOverClause && parenDepth >= overParenDepth && t.Type == SQLTokenKeyword {
-			if upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE" {
-				needsBreak = true
-				extraIndent = strings.Repeat(" ", 11)
-			}
-		}
-		// Closing ) of OVER on its own line aligned with OVER
-		if t.Text == ")" && inOverClause && parenDepth+1 == overParenDepth {
+		// OVER() window-spec layout (§3.1, issue #122): in a long spec each
+		// clause starts its own line one indent level past the window
+		// function's column; short specs stay fully inline (S48).
+		if inOverClause && overBreaks && parenDepth == overParenDepth &&
+			t.Type == SQLTokenKeyword &&
+			(upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE") {
 			needsBreak = true
-			extraIndent = strings.Repeat(" ", 7)
+			spaces := overFuncCol + len(f.indentString) - len(baseIndent) - len(f.indentString)*parenDepth
+			if spaces < 0 {
+				spaces = 0
+			}
+			extraIndent = strings.Repeat(" ", spaces)
+			overDidBreak = true
+		}
+		// The spec's ')': `) AS alias` on its own line at the function's
+		// column when the spec broke. The state clear is unconditional —
+		// a short inline spec must not leave stale state that a later ')'
+		// at the same depth would trip over.
+		if t.Text == ")" && inOverClause && parenDepth == overParenDepth-1 {
+			if overDidBreak {
+				needsBreak = true
+				spaces := overFuncCol - len(baseIndent) - len(f.indentString)*parenDepth
+				if spaces < 0 {
+					spaces = 0
+				}
+				extraIndent = strings.Repeat(" ", spaces)
+			}
+			inOverClause = false
+			overBreaks = false
+			overDidBreak = false
 		}
 
 		// DECODE argument alignment (S68, issue #94): the selector stays on
@@ -617,6 +682,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(parenIndent)
 			result.WriteString(extraIndent)
 			currentLineLen = len(baseIndent) + len(parenIndent) + len(extraIndent)
+			lineStartCol = currentLineLen
 		} else if prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken) {
 			result.WriteString(" ")
 			currentLineLen++
@@ -631,18 +697,33 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(" ")
 			currentLineLen++
 		}
+		tokStartCol := currentLineLen
 		result.WriteString(tokenText)
 		currentLineLen += len(tokenText)
 		isFirstToken = false
 
 		// Rule D: maintain stack of opening-paren columns for hang-indent.
 		// Push the column where contents begin (i.e. currentLineLen after
-		// '(' is written) on '(', pop on ')'.
+		// '(' is written) on '(', pop on ')'. parenFuncCols mirrors it with
+		// the calling function's start column so the OVER anchor resolves to
+		// the outer window function even mid-expression (issue #122).
 		if t.Text == "(" {
 			parenOpenCols = append(parenOpenCols, currentLineLen)
-		} else if t.Text == ")" && len(parenOpenCols) > 0 {
-			parenOpenCols = parenOpenCols[:len(parenOpenCols)-1]
+			funcCol := -1
+			if prev != nil && prev.Type == SQLTokenFunction {
+				funcCol = lastTokStartCol
+			}
+			parenFuncCols = append(parenFuncCols, funcCol)
+		} else if t.Text == ")" {
+			if len(parenOpenCols) > 0 {
+				parenOpenCols = parenOpenCols[:len(parenOpenCols)-1]
+			}
+			if len(parenFuncCols) > 0 {
+				lastClosedCallCol = parenFuncCols[len(parenFuncCols)-1]
+				parenFuncCols = parenFuncCols[:len(parenFuncCols)-1]
+			}
 		}
+		lastTokStartCol = tokStartCol
 
 		// Post-token: decrement CASE depth after END has been formatted
 		if upperText == "END" && t.Type == SQLTokenKeyword && caseDepth > 0 {
@@ -685,6 +766,34 @@ func (f *SQLFormatter) projectionEndIndex(tokens []SQLToken, start int) int {
 		}
 	}
 	return len(tokens)
+}
+
+// overSpecHasClause reports whether the window spec opened by the '(' at
+// start holds a clause keyword (PARTITION/ORDER/ROWS/RANGE) at its top
+// level. An empty spec — `COUNT(*) OVER ()` — has none and stays inline
+// (issue #122).
+func overSpecHasClause(tokens []SQLToken, start int) bool {
+	depth := 0
+	for j := start; j < len(tokens); j++ {
+		switch tokens[j].Text {
+		case "(":
+			depth++
+			continue
+		case ")":
+			depth--
+			if depth == 0 {
+				return false
+			}
+			continue
+		}
+		if depth == 1 && tokens[j].Type == SQLTokenKeyword {
+			switch strings.ToUpper(tokens[j].Text) {
+			case "PARTITION", "ORDER", "ROWS", "RANGE":
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // projectionRenderLen estimates the rendered length of tokens[start:end]

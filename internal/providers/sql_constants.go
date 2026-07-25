@@ -68,7 +68,6 @@ var SQLBuiltinFunctions = map[string]bool{
 	"ROW_NUMBER": true, "RANK": true, "DENSE_RANK": true, "NTILE": true,
 	"LAG": true, "LEAD": true, "FIRST_VALUE": true, "LAST_VALUE": true,
 	"LISTAGG": true,
-	"OVER":    true, "PARTITION": true,
 	// Oracle functions
 	"TO_DATE": true, "TO_CHAR": true, "TO_NUMBER": true,
 	"DECODE": true, "NVL2": true,

@@ -1837,32 +1837,147 @@ func TestSQLFormatter_CaseWhenAlignmentInSelect(t *testing.T) {
 // --- Gap 8: OVER() internal formatting ---
 
 func TestSQLFormatter_OverClauseFormatting(t *testing.T) {
-	// sql-canonical-compact-reference §3.1: PARTITION BY/ORDER BY inside OVER on own lines
+	// sql-canonical-compact-reference §3.1 (issue #122): a long window spec
+	// breaks — `OVER (` with a space, each clause on its own line at the
+	// window function's column + 4, `) AS alias` at the function's column;
+	// a short spec stays fully inline (S48).
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "long spec breaks per §3.1",
+			input: "SELECT ordno, testcode, analysisgroup, ROW_NUMBER() OVER (PARTITION BY ordno, analysisgroup ORDER BY testcode DESC, analysisgroup) AS rn FROM ordresult WHERE ordno = ?",
+			want: "SELECT ordno, testcode, analysisgroup,\n" +
+				"       ROW_NUMBER() OVER (\n" +
+				"           PARTITION BY ordno, analysisgroup\n" +
+				"           ORDER BY testcode DESC, analysisgroup\n" +
+				"       ) AS rn\n" +
+				"FROM ordresult\n" +
+				"WHERE ordno = ?",
+		},
+		{
+			name:  "short spec stays inline (S48)",
+			input: "SELECT ordno, ROW_NUMBER() OVER (ORDER BY ordno) AS rn FROM ordtask",
+			want: "SELECT ordno, ROW_NUMBER() OVER (ORDER BY ordno) AS rn\n" +
+				"FROM ordtask",
+		},
+		{
+			name:  "inline spec leaves no stale state for a later call",
+			input: "SELECT ROW_NUMBER() OVER (ORDER BY ordno) AS rn, NVL(status, 'X') AS st FROM ordtask WHERE ordno = ?",
+			want: "SELECT ROW_NUMBER() OVER (ORDER BY ordno) AS rn, NVL(status, 'X') AS st\n" +
+				"FROM ordtask\n" +
+				"WHERE ordno = ?",
+		},
+		{
+			name:  "at the 90-col budget stays inline",
+			input: "SELECT ROW_NUMBER() OVER (PARTITION BY ordersection_name ORDER BY testcode_sequence) AS rn, ordno FROM ordresult",
+			want: "SELECT ROW_NUMBER() OVER (PARTITION BY ordersection_name ORDER BY testcode_sequence) AS rn,\n" +
+				"       ordno\n" +
+				"FROM ordresult",
+		},
+		{
+			name:  "one past the budget breaks",
+			input: "SELECT ROW_NUMBER() OVER (PARTITION BY ordersection_name ORDER BY testcode_sequences) AS rn, ordno FROM ordresult",
+			want: "SELECT ROW_NUMBER() OVER (\n" +
+				"           PARTITION BY ordersection_name\n" +
+				"           ORDER BY testcode_sequences\n" +
+				"       ) AS rn, ordno\n" +
+				"FROM ordresult",
+		},
+		{
+			name:  "frame clause on its own line (§3.2)",
+			input: "SELECT ordno, AVG(resultvalue) OVER (PARTITION BY testcode ORDER BY sampledate ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS moving_avg_7 FROM ordresult",
+			want: "SELECT ordno,\n" +
+				"       AVG(resultvalue) OVER (\n" +
+				"           PARTITION BY testcode\n" +
+				"           ORDER BY sampledate\n" +
+				"           ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n" +
+				"       ) AS moving_avg_7\n" +
+				"FROM ordresult",
+		},
+		{
+			name:  "two window functions reset state per spec (§3.3)",
+			input: "SELECT sampleno, LAG(resultvalue) OVER (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC) AS prev_result, LEAD(resultvalue) OVER (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC) AS next_result FROM ordresult",
+			want: "SELECT sampleno,\n" +
+				"       LAG(resultvalue) OVER (\n" +
+				"           PARTITION BY testcode, analysisgroup\n" +
+				"           ORDER BY sampledate DESC\n" +
+				"       ) AS prev_result,\n" +
+				"       LEAD(resultvalue) OVER (\n" +
+				"           PARTITION BY testcode, analysisgroup\n" +
+				"           ORDER BY sampledate DESC\n" +
+				"       ) AS next_result\n" +
+				"FROM ordresult",
+		},
+		{
+			name:  "CASE inside a short spec stays inline",
+			input: "SELECT ordno, ROW_NUMBER() OVER (PARTITION BY CASE WHEN s = 1 THEN g ELSE v END ORDER BY c) AS r FROM ordtask",
+			want: "SELECT ordno,\n" +
+				"       ROW_NUMBER() OVER (PARTITION BY CASE WHEN s = 1 THEN g ELSE v END ORDER BY c) AS r\n" +
+				"FROM ordtask",
+		},
+		{
+			name:  "CASE inside a long spec stays on its clause line",
+			input: "SELECT ordno, ROW_NUMBER() OVER (PARTITION BY CASE WHEN sts = 1 THEN grp ELSE srv END ORDER BY ordno DESC) AS rn FROM ordtask",
+			want: "SELECT ordno,\n" +
+				"       ROW_NUMBER() OVER (\n" +
+				"           PARTITION BY CASE WHEN sts = 1 THEN grp ELSE srv END\n" +
+				"           ORDER BY ordno DESC\n" +
+				"       ) AS rn\n" +
+				"FROM ordtask",
+		},
+		{
+			name:  "empty spec stays inline",
+			input: "SELECT ordno, COUNT(*) OVER () AS total FROM ordresult",
+			want: "SELECT ordno, COUNT(*) OVER () AS total\n" +
+				"FROM ordresult",
+		},
+	})
+}
+
+func TestSQLFormatter_OverClauseNearBudgetWrap(t *testing.T) {
+	// Issue #122 review point 2: when the projection is so long that the
+	// proactive wrapper moves OVER itself to a continuation line, the spec
+	// still breaks deterministically — the anchor is the window function's
+	// column on its own (previous) line. Pins the chosen geometry.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			// The break decision runs after OVER's own wrap settles, so a
+			// spec that fits on the continuation line stays inline there.
+			name:  "spec fits inline after OVER wraps",
+			input: "SELECT SUM(NVL(result_value_for_the_long_test_column_one, 0) + NVL(dilution_factor, 0)) OVER (PARTITION BY testcode ORDER BY sampledate) AS total_for_group FROM ordresult",
+			want: "SELECT SUM(NVL(result_value_for_the_long_test_column_one, 0) + NVL(dilution_factor, 0))\n" +
+				"       OVER (PARTITION BY testcode ORDER BY sampledate) AS total_for_group\n" +
+				"FROM ordresult",
+		},
+		{
+			// A spec too long even for the continuation line breaks, anchored
+			// to the window function's column on its previous physical line.
+			name:  "long spec still breaks after OVER wraps",
+			input: "SELECT SUM(NVL(result_value_for_the_long_test_column_one, 0) + NVL(dilution_factor, 0)) OVER (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC, sampleno) AS total_for_group FROM ordresult",
+			want: "SELECT SUM(NVL(result_value_for_the_long_test_column_one, 0) + NVL(dilution_factor, 0))\n" +
+				"       OVER (\n" +
+				"           PARTITION BY testcode, analysisgroup\n" +
+				"           ORDER BY sampledate DESC, sampleno\n" +
+				"       ) AS total_for_group\n" +
+				"FROM ordresult",
+		},
+	})
+}
+
+func TestSQLFormatter_OverClauseEmbeddedBaseIndent(t *testing.T) {
+	// The function-column math must include baseIndent (embedded strings).
 	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
 	f := NewSQLFormatter(opts)
-
-	input := "SELECT ordno, ROW_NUMBER() OVER (PARTITION BY ordno ORDER BY testcode) AS rn FROM ordresult"
-	result := f.FormatSQL(input, "")
-
-	foundPartition := false
-	foundOrder := false
-	for _, line := range strings.Split(result, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "PARTITION BY") {
-			foundPartition = true
-		}
-		if strings.HasPrefix(trimmed, "ORDER BY") && !strings.HasPrefix(trimmed, "ORDER BY ordno") {
-			foundOrder = true
-		}
+	input := "SELECT ordno, testcode, analysisgroup, ROW_NUMBER() OVER (PARTITION BY ordno, analysisgroup ORDER BY testcode DESC, analysisgroup) AS rn FROM ordresult"
+	got := f.FormatSQL(input, "    ")
+	want := "SELECT ordno, testcode, analysisgroup,\n" +
+		"           ROW_NUMBER() OVER (\n" +
+		"               PARTITION BY ordno, analysisgroup\n" +
+		"               ORDER BY testcode DESC, analysisgroup\n" +
+		"           ) AS rn\n" +
+		"    FROM ordresult"
+	if got != want {
+		t.Errorf("embedded layout mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
-	if !foundPartition {
-		t.Errorf("expected PARTITION BY on its own line, got:\n%s", result)
-	}
-	if !foundOrder {
-		t.Errorf("expected ORDER BY on its own line inside OVER, got:\n%s", result)
-	}
-	t.Logf("Formatted OVER:\n%s", result)
 }
 
 // --- Gap 7: DECODE argument alignment ---
