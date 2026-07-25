@@ -7,9 +7,10 @@
     "literals": 3,
     "types": 8,
     "classes": 29,
-    "special_forms": 6,
+    "special_forms": 8,
+    "returns": 12,
     "functions": 330,
-    "all": 446
+    "all": 460
   },
   "keywords": {
     "BEGINCASE": {
@@ -164,7 +165,7 @@
     },
     "PUBLIC": {
       "title": "PUBLIC",
-      "summary": "Declares global variables that can be accessed from any scope in the program.",
+      "summary": "Declares public variables shared down the call stack — visible to the declaring scope and every scope it calls.",
       "syntax": ":PUBLIC variable1[, variable2, ...];"
     },
     "REGION": {
@@ -3192,7 +3193,7 @@
     },
     "SSLCodeProvider": {
       "title": "SSLCodeProvider",
-      "summary": "Compiles published server scripts and data sources and returns the compilation results as an SSLCompilerErrorList.",
+      "summary": "Compiles published server scripts and data sources and returns a list of compilation errors.",
       "constructors": [
         {
           "signature": "SSLCodeProvider{}",
@@ -3202,62 +3203,62 @@
       "methods": [
         {
           "name": "CompileAll",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all server scripts and data sources."
         },
         {
           "name": "CompileAllServerScripts",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all server scripts."
         },
         {
           "name": "CompileAllDataSources",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all data sources."
         },
         {
           "name": "CompileServerScript",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles one server script by GUID or full name."
         },
         {
           "name": "CompileServerScripts",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles multiple server scripts."
         },
         {
           "name": "CompileServerScriptCategory",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all server scripts in one category."
         },
         {
           "name": "CompileServerScriptCategories",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all server scripts in multiple categories."
         },
         {
           "name": "CompileDataSource",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles one data source by GUID or full name."
         },
         {
           "name": "CompileDataSources",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles multiple data sources."
         },
         {
           "name": "CompileDataSourceCategory",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all data sources in one category."
         },
         {
           "name": "CompileDataSourceCategories",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Compiles all data sources in multiple categories."
         },
         {
           "name": "CompileScript",
-          "returns": "SSLCompilerErrorList",
+          "returns": "object",
           "description": "Accepts SSL code text, but currently raises a not-implemented error for non-null input."
         }
       ]
@@ -3862,12 +3863,12 @@
       "methods": [
         {
           "method": "CreateHttpClient()",
-          "returns": "object",
+          "returns": "HttpClient",
           "description": "Returns a new HTTP client object."
         },
         {
           "method": "CreateSoapClient()",
-          "returns": "object",
+          "returns": "SoapClient",
           "description": "Returns a new SOAP client object."
         }
       ]
@@ -3880,12 +3881,12 @@
       "syntax": "/*@private;\n:PROCEDURE ProcedureName;\n\n/*@protected;\n:PROCEDURE ProcedureName;"
     },
     "base": {
-      "title": "base",
+      "title": "Base:",
       "summary": "Provides explicit access to members on a class's immediate parent type from within a class method.",
-      "syntax": "Base:FieldName;\nBase:PropertyName;\nBase:MethodName(args);\nBase:Constructor(args);"
+      "syntax": "Base:FieldName;\nBase:MethodName(args);\nBase:Constructor(args);"
     },
     "code-block": {
-      "title": "code-block",
+      "title": "Code Block",
       "summary": "Defines an anonymous code block with bound variables and a single expression body. A code block can be created at the top level, passed as a function argument, or assigned to a variable for later execution.",
       "syntax": "{|param1| expression}\n{|param1, param2| expression}"
     },
@@ -3895,14 +3896,557 @@
       "syntax": "/* region Region Name;\n\n/* region content;\n\n/* endregion;"
     },
     "constructor": {
-      "title": "constructor",
+      "title": "Constructor",
       "summary": "Runs one-time class initialization code when a user-defined class instance is created.",
       "syntax": ":CLASS MyClass;\n\n:PROCEDURE Constructor;\n    /* Initialization code;\n:ENDPROC;"
     },
     "me": {
-      "title": "me",
+      "title": "Me:",
       "summary": "Provides a reference to the current class instance inside :CLASS methods.",
-      "syntax": "Me;\nMe:PropertyName;\nMe:MethodName(args);"
+      "syntax": "Me;\nMe:FieldName;\nMe:MethodName(args);"
+    },
+    "request": {
+      "title": "Request",
+      "summary": "An ambient identifier in endpoint scripts that holds the incoming HTTP request.",
+      "syntax": "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args);"
+    },
+    "response": {
+      "title": "Response",
+      "summary": "An ambient identifier in endpoint scripts that holds the outgoing HTTP response.",
+      "syntax": "Response:PropertyName := value;\nResponse:MethodName(args);"
+    }
+  },
+  "returns": {
+    "HttpClient": {
+      "title": "HttpClient",
+      "summary": "Entry point for outbound HTTP requests — builds requests, fetches responses, and retrieves text, XML, or files.",
+      "methods": [
+        {
+          "name": "CreateHttpRequest",
+          "returns": "HttpRequest",
+          "description": "Creates a configurable request for the given URL."
+        },
+        {
+          "name": "GetResponse",
+          "returns": "HttpResponse",
+          "description": "Sends a request and returns the response."
+        },
+        {
+          "name": "GetLastServerException",
+          "returns": "HttpException",
+          "description": "Returns the most recent failure, or NIL if the last call succeeded."
+        },
+        {
+          "name": "GetText",
+          "returns": "string",
+          "description": "Sends a request and returns the body as text."
+        },
+        {
+          "name": "GetXmlDom",
+          "returns": "object",
+          "description": "Sends a request and returns the body as an XML DOM object."
+        },
+        {
+          "name": "SaveFile",
+          "returns": "string",
+          "description": "Sends a request and writes the body to a file."
+        }
+      ]
+    },
+    "HttpException": {
+      "title": "HttpException",
+      "summary": "Details on a failed HTTP request — status, message, and the server's response body.",
+      "properties": [
+        {
+          "name": "StatusCode",
+          "type": "number",
+          "access": "read-only",
+          "description": "A numeric code identifying the failure mode (e.g., timeout, name resolution failure, protocol error)."
+        },
+        {
+          "name": "Status",
+          "type": "string",
+          "access": "read-only",
+          "description": "A short text label for the failure mode (e.g., Timeout, ConnectFailure, ProtocolError)."
+        },
+        {
+          "name": "Message",
+          "type": "string",
+          "access": "read-only",
+          "description": "A short, human-readable description of the failure."
+        },
+        {
+          "name": "MessageDetails",
+          "type": "string",
+          "access": "read-only",
+          "description": "The server's response body when one was returned. Falls back to a \"Server is unable to provide more information\" message followed by Message when no body is available."
+        }
+      ]
+    },
+    "HttpRequest": {
+      "title": "HttpRequest",
+      "summary": "A configurable outbound HTTP request — method, headers, content type, body, and timeout.",
+      "properties": [
+        {
+          "name": "UserAgent",
+          "type": "string",
+          "access": "read-write",
+          "description": "The User-Agent header value."
+        },
+        {
+          "name": "Timeout",
+          "type": "number",
+          "access": "read-write",
+          "description": "Maximum wait, in milliseconds, for the response."
+        },
+        {
+          "name": "ContentType",
+          "type": "string",
+          "access": "read-write",
+          "description": "The Content-Type header for the request body (e.g., application/json)."
+        },
+        {
+          "name": "ContentLength",
+          "type": "number",
+          "access": "read-write",
+          "description": "Byte length of the request body. Set automatically by SetContent; assign explicitly only when streaming bodies you build by hand."
+        },
+        {
+          "name": "Method",
+          "type": "string",
+          "access": "read-write",
+          "description": "HTTP method (GET, POST, PUT, DELETE, etc.). Defaults to GET."
+        },
+        {
+          "name": "Accept",
+          "type": "string",
+          "access": "read-write",
+          "description": "The Accept header value."
+        }
+      ],
+      "methods": [
+        {
+          "name": "AddHeader",
+          "returns": "none",
+          "description": "Adds a custom request header."
+        },
+        {
+          "name": "SetContent",
+          "returns": "none",
+          "description": "Sets the request body. Multiple forms accept text, binary, or multipart content."
+        },
+        {
+          "name": "SetContentFromFile",
+          "returns": "none",
+          "description": "Sets the request body to the contents of a file."
+        },
+        {
+          "name": "CreateHttpForm",
+          "returns": "object",
+          "description": "Returns a multipart form object you can populate and pass to SetContent."
+        }
+      ]
+    },
+    "HttpResponse": {
+      "title": "HttpResponse",
+      "summary": "An HTTP response — content metadata, headers, and the body as text, XML, or a saved file.",
+      "properties": [
+        {
+          "name": "ContentLength",
+          "type": "number",
+          "access": "read-only",
+          "description": "Length of the response body in bytes, as reported by the server."
+        },
+        {
+          "name": "ContentEncoding",
+          "type": "string",
+          "access": "read-only",
+          "description": "The Content-Encoding header value (e.g., gzip)."
+        },
+        {
+          "name": "ContentType",
+          "type": "string",
+          "access": "read-only",
+          "description": "The Content-Type header value."
+        },
+        {
+          "name": "HeaderNames",
+          "type": "array",
+          "access": "read-only",
+          "description": "All response header names, as an array of strings. Use with GetHeader to read individual values."
+        }
+      ],
+      "methods": [
+        {
+          "name": "GetHeader",
+          "returns": "string",
+          "description": "Returns the value of a named response header."
+        },
+        {
+          "name": "GetValueAsString",
+          "returns": "string",
+          "description": "Returns the response body as text."
+        },
+        {
+          "name": "GetValueAsXmlDom",
+          "returns": "object",
+          "description": "Returns the response body parsed as an XML DOM object."
+        },
+        {
+          "name": "SaveValueToFile",
+          "returns": "string",
+          "description": "Writes the response body to a file and returns the path."
+        }
+      ]
+    },
+    "SSLNameValueContainer": {
+      "title": "SSLNameValueContainer",
+      "summary": "A name/value bag — read or list values from a request's headers, query string, cookies, forms, server variables, or client certificate fields.",
+      "properties": [
+        {
+          "name": "AllKeys",
+          "type": "array",
+          "access": "read-only",
+          "description": "Every key in the collection, as an array of strings. Returns an empty array when the collection has no entries."
+        }
+      ]
+    },
+    "SSLRequest": {
+      "title": "SSLRequest",
+      "summary": "The incoming HTTP request inside an endpoint script — method, URL, headers, query string, cookies, forms, body, and uploaded files.",
+      "methods": [
+        {
+          "name": "SaveInputStream",
+          "returns": "string",
+          "description": "Saves the request body to a file and returns the path."
+        }
+      ]
+    },
+    "SSLResponse": {
+      "title": "SSLResponse",
+      "summary": "The outgoing HTTP response inside an endpoint script — write content, set status, redirect, add headers and cookies.",
+      "properties": [
+        {
+          "name": "ContentType",
+          "type": "string",
+          "access": "read-write",
+          "description": "The response Content-Type header (e.g., application/json, text/html)."
+        },
+        {
+          "name": "StatusCode",
+          "type": "number",
+          "access": "read-write",
+          "description": "The HTTP status code to send (200, 400, 404, 500, etc.)."
+        },
+        {
+          "name": "Tag",
+          "type": "string",
+          "access": "read-write",
+          "description": "A free-form tag used to associate the response with a cache invalidation key."
+        },
+        {
+          "name": "CacheRetention",
+          "type": "number",
+          "access": "read-write",
+          "description": "How long the response may be cached, in seconds."
+        },
+        {
+          "name": "InvalidateCache",
+          "type": "boolean",
+          "access": "read-write",
+          "description": "When .T., signals that any cached entry for this response should be discarded."
+        },
+        {
+          "name": "InvalidateCacheByTag",
+          "type": "string",
+          "access": "read-write",
+          "description": "A tag value; cached entries marked with this tag are discarded."
+        }
+      ],
+      "methods": [
+        {
+          "name": "Write",
+          "returns": "none",
+          "description": "Appends text to the response body."
+        },
+        {
+          "name": "WriteFile",
+          "returns": "none",
+          "description": "Appends the contents of a file to the response body."
+        },
+        {
+          "name": "Redirect",
+          "returns": "none",
+          "description": "Sends a redirect to the given URL."
+        },
+        {
+          "name": "AddHeader",
+          "returns": "none",
+          "description": "Adds a custom response header."
+        },
+        {
+          "name": "AddCookie",
+          "returns": "none",
+          "description": "Adds a cookie to the response."
+        },
+        {
+          "name": "SetCookie",
+          "returns": "none",
+          "description": "Sets (or replaces) a cookie on the response."
+        },
+        {
+          "name": "Flush",
+          "returns": "none",
+          "description": "Sends any buffered content immediately."
+        },
+        {
+          "name": "End",
+          "returns": "none",
+          "description": "Ends the response — no further content is sent after this call."
+        },
+        {
+          "name": "DisablePageCaching",
+          "returns": "none",
+          "description": "Suppresses caching for this response."
+        },
+        {
+          "name": "Send401",
+          "returns": "none",
+          "description": "Sends a 401 Unauthorized status with the appropriate authentication challenge."
+        }
+      ]
+    },
+    "SSLWsRequest": {
+      "title": "SSLWsRequest",
+      "summary": "The web-service variant of the request object — adds Parameters to everything an SSLRequest exposes.",
+      "properties": [
+        {
+          "name": "Parameters",
+          "type": "array",
+          "access": "read-only",
+          "description": "The positional parameters of the call, in the order the caller supplied them. Empty array when there are no parameters."
+        }
+      ]
+    },
+    "SSLWsResponse": {
+      "title": "SSLWsResponse",
+      "summary": "The web-service variant of the response object — adds Value (the structured return) to everything an SSLResponse exposes.",
+      "properties": [
+        {
+          "name": "Value",
+          "type": "any",
+          "access": "read-write",
+          "description": "The script's return value to the web-service caller. The runtime serializes the assigned value into the appropriate response format."
+        }
+      ]
+    },
+    "SoapClient": {
+      "title": "SoapClient",
+      "summary": "Calls SOAP web services — configures the endpoint from a WSDL, supplies credentials, invokes methods.",
+      "properties": [
+        {
+          "name": "Error",
+          "type": "string",
+          "access": "read-write",
+          "description": "The reason the most recent configuration step failed. Empty string when the last step succeeded."
+        },
+        {
+          "name": "TimeOut",
+          "type": "number",
+          "access": "read-write",
+          "description": "Maximum wait, in milliseconds, for a CallWebService invocation. Values <= 0 disable the timeout."
+        },
+        {
+          "name": "Parameters",
+          "type": "SoapParameters",
+          "access": "read-write",
+          "description": "The parameter list passed to the next CallWebService invocation. Replace it with another instance, or call its add methods directly."
+        },
+        {
+          "name": "AcceptCookies",
+          "type": "boolean",
+          "access": "read-write",
+          "description": "When .T. (the default), the client retains cookies set by the service across calls."
+        },
+        {
+          "name": "UseDefaultCredentials",
+          "type": "boolean",
+          "access": "read-write",
+          "description": "When .T., calls authenticate with the calling process's default credentials. Falls back to GlobalUseDefaultCredentials when not set explicitly on the client."
+        },
+        {
+          "name": "GlobalUseDefaultCredentials",
+          "type": "boolean",
+          "access": "read-write",
+          "description": "Class-wide default for UseDefaultCredentials. Affects every SoapClient that has not set the property locally."
+        },
+        {
+          "name": "WsAssembly",
+          "type": "object",
+          "access": "read-only",
+          "description": "Advanced — a handle to the generated proxy types for the configured WSDL. Used internally by Parameters:CreateCustomType and GetWSType; rarely needed directly."
+        }
+      ],
+      "methods": [
+        {
+          "name": "UseWebService",
+          "returns": "boolean",
+          "description": "Configures the client from a WSDL location, with no credentials."
+        },
+        {
+          "name": "UseWebServiceWithCredentials",
+          "returns": "boolean",
+          "description": "Configures the client from a WSDL location with explicit user/password."
+        },
+        {
+          "name": "UseProxy",
+          "returns": "boolean",
+          "description": "Advanced — configures the client from a pre-built proxy file."
+        },
+        {
+          "name": "CallWebService",
+          "returns": "SoapResponse",
+          "description": "Invokes a SOAP method on the configured service."
+        },
+        {
+          "name": "GetWSType",
+          "returns": "object",
+          "description": "Advanced — returns a handle to a named proxy type."
+        }
+      ]
+    },
+    "SoapParameters": {
+      "title": "SoapParameters",
+      "summary": "The parameter list passed to the next SOAP method invocation — add scalar, XML-typed, binary, or by-reference parameters.",
+      "methods": [
+        {
+          "name": "Add",
+          "returns": "none",
+          "description": "Adds one parameter from an XML representation."
+        },
+        {
+          "name": "AddAll",
+          "returns": "none",
+          "description": "Adds several parameters from an XML array."
+        },
+        {
+          "name": "AddByRef",
+          "returns": "none",
+          "description": "Like Add, and flags the parameter as by-reference."
+        },
+        {
+          "name": "AddBinary",
+          "returns": "none",
+          "description": "Adds a binary parameter sourced from a file."
+        },
+        {
+          "name": "AddBinaryByRef",
+          "returns": "none",
+          "description": "Like AddBinary, and flags the parameter as by-reference."
+        },
+        {
+          "name": "AddParameter",
+          "returns": "none",
+          "description": "Adds a parameter from an SSL value directly."
+        },
+        {
+          "name": "AddParameterByRef",
+          "returns": "none",
+          "description": "Like AddParameter, and flags the parameter as by-reference."
+        },
+        {
+          "name": "AddParameter2",
+          "returns": "none",
+          "description": "Adds a parameter from an SSL value with an explicit type name."
+        },
+        {
+          "name": "AddParameters",
+          "returns": "none",
+          "description": "Appends every parameter from another SoapParameters (preserving by-reference flags)."
+        },
+        {
+          "name": "CreateCustomType",
+          "returns": "object",
+          "description": "Returns a new instance of a custom DTO defined in the WSDL."
+        },
+        {
+          "name": "Clear",
+          "returns": "none",
+          "description": "Removes all parameters and by-reference flags."
+        }
+      ]
+    },
+    "SoapResponse": {
+      "title": "SoapResponse",
+      "summary": "The result of a SOAP call — read scalar values, navigate object fields and arrays, save binary results, or get the result as XML.",
+      "properties": [
+        {
+          "name": "ValueAsStringDate",
+          "type": "string",
+          "access": "read-only",
+          "description": "The wrapped value formatted as YYYY-M-D when the value is a date. Empty string otherwise."
+        },
+        {
+          "name": "ValueAsStringTime",
+          "type": "string",
+          "access": "read-only",
+          "description": "The wrapped value formatted as HH:MM:SS (zero-padded) when the value is a date/time. Empty string otherwise."
+        },
+        {
+          "name": "Xml",
+          "type": "string",
+          "access": "read-only",
+          "description": "The wrapped value serialized to XML. Empty string when serialization fails; in that case, the parent SoapClient's Error property is set."
+        },
+        {
+          "name": "XmlByRef",
+          "type": "string",
+          "access": "read-only",
+          "description": "The by-reference parameter values from the call serialized to XML. Empty string when there are none or serialization fails."
+        }
+      ],
+      "methods": [
+        {
+          "name": "Value",
+          "returns": "object",
+          "description": "Returns the wrapped value as-is."
+        },
+        {
+          "name": "UnWrap",
+          "returns": "object",
+          "description": "Returns the wrapped value, expanding arrays of complex types into arrays of SoapResponse."
+        },
+        {
+          "name": "GetObjectField",
+          "returns": "SoapResponse",
+          "description": "Returns a named field of a complex result."
+        },
+        {
+          "name": "GetArrayItem",
+          "returns": "SoapResponse",
+          "description": "Returns an element of an array result."
+        },
+        {
+          "name": "GetArrayLength",
+          "returns": "number",
+          "description": "Returns the length of an array result, or -1 when the result is not an array."
+        },
+        {
+          "name": "SaveToFile",
+          "returns": "string",
+          "description": "Writes a binary result to a file."
+        },
+        {
+          "name": "GetTypeInfo",
+          "returns": "string",
+          "description": "Returns a name for the wrapped value's type."
+        },
+        {
+          "name": "GetObjectFieldList",
+          "returns": "string",
+          "description": "Returns the names and types of all fields on a complex result, as XML."
+        }
+      ]
     }
   },
   "functions": {

@@ -39,6 +39,17 @@ type ClassDetails struct {
 	Properties   []ClassProperty
 }
 
+// ReturnsObjectDetails holds the structured detail rows for a returns-category
+// object — an object surfaced only as a built-in class method's return value
+// (HttpClient, SoapResponse, …) or ambient in endpoint scripts (SSLRequest,
+// SSLResponse). Row shapes are shared with classes.
+type ReturnsObjectDetails struct {
+	Title      string
+	Summary    string
+	Properties []ClassProperty
+	Methods    []ClassMethod
+}
+
 // OperatorTypeBehavior is one row of an operator's type-behavior table.
 type OperatorTypeBehavior struct {
 	Left     string

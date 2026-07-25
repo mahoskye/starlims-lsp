@@ -201,7 +201,7 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	},
 	"PUBLIC": {
 		Title:   "PUBLIC",
-		Summary: "Declares global variables that can be accessed from any scope in the program.",
+		Summary: "Declares public variables shared down the call stack — visible to the declaring scope and every scope it calls.",
 		Syntax:  ":PUBLIC variable1[, variable2, ...];",
 	},
 	"REGION": {
