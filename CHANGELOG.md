@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-25
+
+Cross-file references and rename complete the cross-file milestone
+(#125); the element reference catches up to the canonical source with
+drift guards so it can never silently go stale again (#123); and the
+OVER() window-spec layout lands per spec (#122). All work shipped
+through adversarially-reviewed specs, and the release itself passed a
+four-reviewer deep review (9 pre-tag fixes, including two
+corruption-class rename bugs caught before any user hit them).
+
 ### Added
 - **Cross-file rename (#125 Phase B).** Renaming a procedure — from its
   declaration, an identifier use, or the last segment of a dotted
