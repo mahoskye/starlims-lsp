@@ -547,7 +547,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"clearlastsslerror": {
 		Title:     "ClearLastSSLError",
-		Summary:   "Clears the current SSL error state.",
+		Summary:   "Clears the stored SSL error so later error checks start clean.",
 		Signature: "ClearLastSSLError();",
 		Returns:   "boolean",
 	},
@@ -727,7 +727,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"deleteinlinecode": {
 		Title:     "DeleteInlineCode",
-		Summary:   "Removes a named inline code entry.",
+		Summary:   "Removes a named inline code entry using a case-insensitive name lookup.",
 		Signature: "DeleteInlineCode(sName)",
 		Returns:   "boolean",
 	},
@@ -1027,7 +1027,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"doproc": {
 		Title:     "DoProc",
-		Summary:   "Calls a procedure by name at runtime.",
+		Summary:   "Calls a local or scripted procedure by name with an optional argument array.",
 		Signature: "DoProc(sProcedureName, [aArguments]);",
 		Returns:   "any",
 	},
@@ -1341,6 +1341,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 		Title:     "GetNETDataSet",
 		Summary:   "Executes a SQL command and returns the result either as dataset XML or as a netobject wrapping a dataset.",
 		Signature: "GetNETDataSet(sCommandString, [sConnectionName], [aValues], [sTableName], [bReturnXml], [bR1Compatible])",
+		Returns:   "string or netobject",
 	},
 	"getnolock": {
 		Title:     "GetNoLock",
@@ -1374,7 +1375,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"getsetting": {
 		Title:     "GetSetting",
-		Summary:   "Retrieves a single named setting.",
+		Summary:   "Retrieves the stored value of a named configuration setting.",
 		Signature: "GetSetting(sName)",
 		Returns:   "any",
 	},
@@ -2124,7 +2125,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"sqrt": {
 		Title:     "Sqrt",
-		Summary:   "Calculates the square root of a number.",
+		Summary:   "Calculates the non-negative square root of a numeric value.",
 		Signature: "Sqrt(nNumber)",
 		Returns:   "number",
 	},
@@ -2202,7 +2203,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"tojson": {
 		Title:     "ToJson",
-		Summary:   "Serializes a value to a JSON string.",
+		Summary:   "Serializes an SSL value, array, or object to a JSON string.",
 		Signature: "ToJson(vValue)",
 		Returns:   "string",
 	},
@@ -2220,7 +2221,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"toxml": {
 		Title:     "ToXml",
-		Summary:   "Converts a value to an XML string.",
+		Summary:   "Serializes a value, array, or dynamic object to an XML string.",
 		Signature: "ToXml(vValue)",
 		Returns:   "string",
 	},
@@ -2244,7 +2245,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"urldecode": {
 		Title:     "UrlDecode",
-		Summary:   "Decodes a URL-encoded string.",
+		Summary:   "Decodes percent-encoded URL text back into its readable string form.",
 		Signature: "UrlDecode(sData)",
 		Returns:   "string",
 	},
@@ -2298,7 +2299,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"writetext": {
 		Title:     "WriteText",
-		Summary:   "Writes string content to a file.",
+		Summary:   "Writes or appends string content to a text file with optional encoding.",
 		Signature: "WriteText(sFileName, sCharsToWrite, [vConfirmRequired], [sAppend], [sEncoding])",
 		Returns:   "string",
 	},
