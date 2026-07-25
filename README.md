@@ -47,6 +47,11 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 
 Download the appropriate binary for your platform from the [releases page](https://github.com/mahoskye/starlims-lsp/releases).
 
+The binaries statically link third-party Go modules; their license texts are
+collected in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is also
+attached to each release. Regenerate it with `make notices` when `go.mod`
+changes.
+
 ### Build from Source
 
 Requires Go 1.21 or later.

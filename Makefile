@@ -39,6 +39,12 @@ catalog-check:
 generate-docs:
 	go generate ./internal/catalog
 
+# Regenerate THIRD-PARTY-NOTICES.md from the binary's linked dependencies.
+# Run when go.mod changes; attach the result to each GitHub release.
+notices:
+	go run github.com/google/go-licenses@latest save ./cmd/starlims-lsp --save_path=/tmp/starlims-lsp-licenses --force
+	scripts/build-notices.sh /tmp/starlims-lsp-licenses THIRD-PARTY-NOTICES.md
+
 test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
