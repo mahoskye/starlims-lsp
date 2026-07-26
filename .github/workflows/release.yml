@@ -58,6 +58,30 @@ jobs:
           go build -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
             -o "dist/starlims-lsp-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}" ./cmd/starlims-lsp
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: starlims-lsp-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    # Attach all assets from a single job — concurrent uploads from the
+    # build matrix raced on the shared THIRD-PARTY-NOTICES.md (the release
+    # action deletes-then-recreates an existing asset, so two jobs
+    # overwriting the same file collide with a 404).
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
