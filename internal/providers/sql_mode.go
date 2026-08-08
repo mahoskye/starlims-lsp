@@ -1,7 +1,12 @@
 // Package providers implements LSP feature providers for SSL.
 package providers
 
-import "strings"
+import (
+	"strings"
+
+	"starlims-lsp/internal/constants"
+	"starlims-lsp/internal/lexer"
+)
 
 // dataSourceHeaderKeywords are the statements that may legally precede the
 // raw SQL body of a sql_data_source module: the builder directives
@@ -126,20 +131,67 @@ func SplitDataSourceHeader(content string) (header, body string) {
 	return strings.Join(lines[:end], ""), strings.Join(lines[end:], "")
 }
 
-// IsSQLModeDataSource reports whether data-source content is in SQL mode:
-// a plain SQL document (feature.diagnostics_pipeline A10), a
-// comment-only stub (A16), or builder directives / a :PARAMETERS header —
-// optionally preceded by a terminated header comment — followed by a SQL
-// statement or nothing at all (A13/A17/A18): the canonical sql_data_source
-// shapes (issues #104, #148). Callers must already know the document is a
-// data-source file; this function only classifies its content.
+// hasStrongSSLMarker reports whether body contains a SQL-exclusive SSL
+// construct — decisive evidence that a data-source body is SSL, not SQL
+// (issue #153):
+//
+//   - a non-directive colon keyword (:DECLARE, :IF, :RETURN, :PROCEDURE, …).
+//     SQL has no `:KEYWORD` syntax at all, and the lexer only emits a
+//     keyword token off a leading colon, so any such token is SSL. The one
+//     SSL keyword that is also a data-source header directive, :PARAMETERS,
+//     is excluded; the builder directives (:DSN/:TABLENAME/…) are not SSL
+//     keywords, so they never match regardless.
+//   - a `:=` assignment. A plain SQL statement never contains one; the
+//     inline `:=` defaults of a :PARAMETERS header do, which is why callers
+//     scan the body with the directive header already stripped by
+//     SplitDataSourceHeader.
+//
+// Strings and comments are consumed as single tokens, so a `:DECLARE` or
+// `:=` inside a SQL string or comment does not trip the check. Oracle-style
+// binds (`= :status`) lex as a colon keyword whose name is not an SSL
+// keyword, so they do not either. The unterminated SSL comment form is
+// detected separately (hasUnterminatedLeadingBlockComment) because the SSL
+// lexer stops a `/*` at the first `;`, mis-reading SQL comments.
+func hasStrongSSLMarker(body string) bool {
+	for _, t := range lexer.NewLexer(body).Tokenize() {
+		switch t.Type {
+		case lexer.TokenKeyword:
+			name := strings.ToUpper(strings.TrimPrefix(t.Text, ":"))
+			if name != "PARAMETERS" && constants.IsKeyword(name) {
+				return true
+			}
+		case lexer.TokenOperator:
+			if t.Text == ":=" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasUnterminatedLeadingBlockComment reports whether content begins with a
+// `/*` block comment that has no `*/` terminator — the SSL comment form,
+// which the comment-termination check must still flag
+// (feature.diagnostics_pipeline A16). maskLeadingSQLComments blanks every
+// leading terminated SQL comment (closing on `*/`, so embedded `;` and
+// string content are irrelevant); if a bare `/*` still leads what remains,
+// it is unterminated and the document is SSL, not SQL.
+func hasUnterminatedLeadingBlockComment(content string) bool {
+	rest := strings.TrimLeft(maskLeadingSQLComments(content), " \t\r\n")
+	return strings.HasPrefix(rest, "/*")
+}
+
+// IsSQLModeDataSource reports whether data-source content is in SQL mode.
+// A data-source file is SQL by default — the overwhelmingly common case —
+// and only classifies as SSL when its body carries a strong SSL marker
+// (hasStrongSSLMarker) or leads with an unterminated SSL comment (issue
+// #153). The directive / :PARAMETERS header is stripped first so its
+// keywords and inline `:=` defaults never read as SSL (A13/A17/A18); plain
+// SQL (A10), a comment-only stub (A16), and the hybrid header-then-SQL
+// shapes all fall through to SQL because their bodies hold no SSL marker.
+// Callers must already know the document is a data-source file; this
+// function only classifies its content.
 func IsSQLModeDataSource(content string) bool {
-	if IsSQLDocument(content) || IsSQLCommentOnly(content) {
-		return true
-	}
-	header, body := SplitDataSourceHeader(content)
-	if strings.TrimSpace(header) == "" {
-		return false
-	}
-	return IsSQLDocument(body) || strings.TrimSpace(body) == ""
+	_, body := SplitDataSourceHeader(content)
+	return !hasStrongSSLMarker(body) && !hasUnterminatedLeadingBlockComment(content)
 }
