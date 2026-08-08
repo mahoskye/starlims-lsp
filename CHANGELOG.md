@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-08
+
+A SQL data-source hardening batch: two new data-source diagnostics, an
+inverted `.ds` classifier so SSL checks stop firing on SQL, and a cluster
+of false-positive fixes for qualified names, class-method dispatch, and
+.NET indexing. Downstream consumers pick this up via the ssl-style-guide
+MCP binaries and vs-code-ssl-formatter extension bumps.
+
+### Added
+- **`datasource_undeclared_placeholder` diagnostic (ssl-style-guide#51/#53).**
+  A `@name` placeholder in a SQL-mode data-source body with no matching
+  `:PARAMETERS` declaration warns — it is not substituted and fails when the
+  query executes. Structural exclusions keep `@@` system functions, declared
+  placeholders (any casing), `@name` inside string literals and SQL comments,
+  and `DECLARE`-scripted bodies silent.
+- **`datasource_sql_semicolon` diagnostic (#154).** A bare `;` outside
+  comments and string literals in a SQL-mode data-source body warns: the body
+  runs as a single SQL command, and `;` statement separators are not part of
+  the data-source format and may fail on some database platforms. Honors rule
+  overrides; never fires outside data-source files.
+
+### Changed
+- **`.ds` files classify as SQL by default (#153).** SQL-vs-SSL detection was
+  inverted. A data-source file is now SQL unless its body (directive /
+  `:PARAMETERS` header split off) carries a strong, SQL-exclusive SSL marker —
+  a non-directive colon keyword, a `:=` assignment, or a leading unterminated
+  `/*` comment. The former structural-SQL detector rejected valid queries it
+  could not distinguish from English prose (a SELECT list with implicit column
+  aliases, `col alias`), leaking SSL diagnostics like `bare_logical_operator`
+  onto legitimate SQL `and`. Genuine SSL data sources keep the full diagnostic
+  set.
+- **Zero-based indexing on .NET objects is a warning, not an error (#152).**
+  The pattern is valid against .NET collections, so it no longer blocks as an
+  error.
+
+### Removed
+- **`datasource_default_required` rule (#147, ssl-style-guide#48).** The
+  data-source builder accepts `:PARAMETERS` without inline `:=` defaults
+  (`:PARAMETERS sName, nCount := 10;` is valid), so the rule is gone — no
+  default-related diagnostic fires on a defaultless data-source parameter.
+
+### Fixed
+- **`undeclared_variable` false positives on declaration names (#149, #155).**
+  The qualified base name in `:INHERIT Category.ScriptName;` (#149) and the
+  class name in `:CLASS Name;` (#155) were flagged as undeclared variables.
+  Both are declarations, not variable uses — same skip-until-semicolon
+  exemption as `:INCLUDE` paths — and no longer flag; ordinary undeclared
+  identifiers still do.
+- **`dot_property_access` on `:INHERIT` qualified names (#149).** The dots in
+  an `:INHERIT Category.ScriptName;` base name are path separators, not
+  property access, and no longer flag.
+- **`doproc_in_class` on qualified script references (#151).** A qualified
+  `DoProc`/`ExecFunction` dispatch to a script procedure from a class method no
+  longer reports a spurious compile error — only genuinely class-targeted
+  dispatch does.
+- **SQL-mode classification robustness (#148, #154).** SQL data sources now
+  stay SQL-classified when a column or table name collides with a SQL
+  builtin-function name (`set FORMAT = …`, `delete from FORMAT`), when SQL
+  comments or quoted literals contain semicolons (`'all;msoffice->pdf'`), and
+  when a banner comment precedes the builder-directive header or the file is
+  comment-only — cases that previously fell back to SSL parsing and drew false
+  diagnostics.
+
 ## [0.15.0] - 2026-08-07
 
 Clears the whole open-issue backlog (#132, #138–#143) in one batch:
@@ -905,7 +968,9 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.12.0...v0.13.0
