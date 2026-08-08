@@ -28,9 +28,9 @@ func checkDataSourceSQLSemicolons(body string, lineOffset int) []Diagnostic {
 				Start: Position{Line: lineOffset + tok.Line - 1, Character: tok.Column - 1},
 				End:   Position{Line: lineOffset + tok.Line - 1, Character: tok.Column},
 			},
-			Message:  "Semicolon outside comments and string literals in a SQL data-source body. The body runs as a single SQL command; ';' statement separators are not part of the data-source format and may fail on some database platforms.",
-			Source:   "ssl-lsp",
-			Code:     CodeDatasourceSQLSemicolon,
+			Message: "Semicolon outside comments and string literals in a SQL data-source body. The body runs as a single SQL command; ';' statement separators are not part of the data-source format and may fail on some database platforms.",
+			Source:  "ssl-lsp",
+			Code:    CodeDatasourceSQLSemicolon,
 		})
 	}
 	return diagnostics
