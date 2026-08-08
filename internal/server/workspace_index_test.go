@@ -425,3 +425,40 @@ func TestIsSSLFile(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkspaceIndex_DispatchResolvesToClassOnly(t *testing.T) {
+	// diag.execfunction_class_target (issue #143): true only when the
+	// target has candidates and every candidate is a class file.
+	dir := t.TempDir()
+	scriptURI := pathToURI(writeTestFile(t, dir, "test.srvscr", testSSLContent))
+	classURI := pathToURI(writeTestFile(t, dir, "myclass.srvscr", testClassContent))
+
+	wi := NewWorkspaceIndex(nil)
+	close(wi.doneCh)
+	for _, uri := range []string{scriptURI, classURI} {
+		if err := wi.IndexFile(uri); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cases := []struct {
+		target string
+		want   bool
+	}{
+		// flat Script.Proc form landing in the class file
+		{"myclass.GetField", true},
+		// same form landing in an ordinary script
+		{"test.GetName", false},
+		// no candidates at all
+		{"nosuch.Thing", false},
+		// unique-procedure fallback into the class file
+		{"Cat.Sub.GetField", true},
+		// unique-procedure fallback into the ordinary script
+		{"Cat.Sub.GetName", false},
+	}
+	for _, tc := range cases {
+		if got := wi.DispatchResolvesToClassOnly(tc.target); got != tc.want {
+			t.Errorf("DispatchResolvesToClassOnly(%q) = %v, want %v", tc.target, got, tc.want)
+		}
+	}
+}

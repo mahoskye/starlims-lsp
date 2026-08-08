@@ -605,6 +605,27 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 	return orderResolutions(results)
 }
 
+// DispatchResolvesToClassOnly reports whether a dotted dispatch target has
+// at least one resolution candidate and every candidate lands in a class
+// file (diag.execfunction_class_target, issue #143). The all-candidates
+// gate is deliberate: a target that also matches an ordinary script stays
+// unflagged, mirroring the conservative write side of #125.
+func (wi *WorkspaceIndex) DispatchResolvesToClassOnly(target string) bool {
+	resolutions := wi.ResolveDispatchTarget(target)
+	if len(resolutions) == 0 {
+		return false
+	}
+	wi.mu.RLock()
+	defer wi.mu.RUnlock()
+	for _, r := range resolutions {
+		fs := wi.files[r.URI]
+		if fs == nil || !fs.IsClass {
+			return false
+		}
+	}
+	return true
+}
+
 // ResolveIncludeTarget resolves an :INCLUDE target ("Name" or
 // "Category.Script", already unquoted) to candidate files at line 0.
 func (wi *WorkspaceIndex) ResolveIncludeTarget(target string) []IndexResolution {

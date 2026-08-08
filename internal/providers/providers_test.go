@@ -7801,6 +7801,164 @@ func TestGetDiagnostics_DataSource_IdentifierDefaultNotFalsePositive(t *testing.
 	}
 }
 
+func TestGetDiagnostics_ExecFunctionClassTarget(t *testing.T) {
+	// diag.execfunction_class_target (issue #143): only ExecFunction sites
+	// whose target is in the pre-resolved class list flag; DoProc and
+	// unresolved targets never do.
+	code := `:PROCEDURE Demo;
+ExecFunction("LIMS.SampleTools", {1});
+ExecFunction("LIMS.OrdinaryScript", {1});
+DoProc("LIMS.SampleTools", {1});
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.ClassFileDispatchTargets = []string{"lims.sampletools"} // case-insensitive match
+
+	var flagged []int
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeExecFunctionClassTarget {
+			flagged = append(flagged, d.Range.Start.Line)
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity, got %v", d.Severity)
+			}
+		}
+	}
+	if len(flagged) != 1 || flagged[0] != 1 {
+		t.Fatalf("expected exactly one execfunction_class_target on line 1 (0-indexed), got lines %v", flagged)
+	}
+
+	// Without workspace verdicts the check is silent.
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeExecFunctionClassTarget {
+			t.Errorf("check must be disabled with no ClassFileDispatchTargets, got: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_RaiseErrorInCatchFlagged(t *testing.T) {
+	// diag.raiseerror_in_catch (issue #142): the nearest enclosing :TRY
+	// section decides — :CATCH flags, :TRY body of a nested try inside a
+	// handler does not.
+	code := `:PROCEDURE Demo;
+:TRY;
+	RaiseError("in try - fine");
+:CATCH;
+	RaiseError("in catch - flagged");
+	:TRY;
+		RaiseError("nested try body - fine");
+	:CATCH;
+		RaiseError("nested catch - flagged");
+	:ENDTRY;
+:ENDTRY;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeRaiseErrorInCatch {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 2 || lines[0] != 4 || lines[1] != 8 {
+		t.Fatalf("expected raiseerror_in_catch on lines 4 and 8 (0-indexed), got lines %v", lines)
+	}
+}
+
+func TestGetDiagnostics_RaiseErrorOutsideCatchNotFlagged(t *testing.T) {
+	// Raise-only helpers and :FINALLY raises are outside this rule's scope.
+	code := `:PROCEDURE Helper;
+RaiseError("raise-only helper");
+:ENDPROC;
+:PROCEDURE Demo;
+:TRY;
+	DoWork();
+:CATCH;
+	LogIt(GetLastSSLError());
+:FINALLY;
+	RaiseError("in finally - not this rule's business");
+:ENDTRY;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeRaiseErrorInCatch {
+			t.Errorf("unexpected raiseerror_in_catch at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DeclareInitializerFlagged(t *testing.T) {
+	// diag.declare_initializer (issue #138): :DECLARE accepts only an
+	// identifier list; each inline := is a syntax error, ranged on the :=.
+	code := `:PROCEDURE Demo;
+:DECLARE nOne := 1, nTwo := 2;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var found []Diagnostic
+	for _, d := range diagnostics {
+		if d.Code == CodeDeclareInitializer {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected 2 declare_initializer diagnostics, got %d: %+v", len(found), found)
+	}
+	for _, d := range found {
+		if d.Severity != SeverityError {
+			t.Errorf("expected error severity, got %v", d.Severity)
+		}
+		if d.Range.Start.Line != 1 {
+			t.Errorf("expected diagnostic on line 1 (0-indexed), got %d", d.Range.Start.Line)
+		}
+	}
+}
+
+func TestGetDiagnostics_DeclareWithoutInitializerNotFlagged(t *testing.T) {
+	// Plain identifier lists and later assignments are the valid form.
+	code := `:PROCEDURE Demo;
+:DECLARE nCount, sName;
+nCount := 1;
+sName := "x";
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeDeclareInitializer {
+			t.Errorf(":DECLARE without initializer should not be flagged: %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_DataSource_DeclareInitializerFlagged(t *testing.T) {
+	// :DECLARE never takes initializers, in data-source files included —
+	// while the inline-default :PARAMETERS form stays legal there
+	// (diag.declare_initializer Behavior, data-source coverage pin).
+	code := `:PARAMETERS sName := '';
+:DECLARE nCount := 1;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	diagnostics := GetDiagnostics(code, opts)
+
+	count := 0
+	for _, d := range diagnostics {
+		if d.Code == CodeDeclareInitializer {
+			count++
+			if d.Range.Start.Line != 1 {
+				t.Errorf("expected declare_initializer on the :DECLARE line (1), got line %d", d.Range.Start.Line)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 declare_initializer diagnostic (:PARAMETERS := must not flag), got %d", count)
+	}
+}
+
 func TestGetDiagnostics_DataSource_ExpressionDefaultNotFalsePositive(t *testing.T) {
 	// Default values with complex expressions should not produce false positives
 	code := `:PARAMETERS sName := 'hello' + ' world', nVal := 1 + 2;`

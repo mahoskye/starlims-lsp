@@ -21,6 +21,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-08-07
+    ref: "issue #139"
+    note: >-
+      :RETURN as the clause's final statement now satisfies the rule — an
+      :EXITCASE after it would be unreachable. Only the final-statement
+      position counts: a conditional :RETURN mid-clause (inside :IF etc.)
+      still flags because fall-through remains possible.
 issues: []
 ---
 
@@ -39,6 +46,12 @@ It must NOT flag:
 
 - clauses that end with `:EXITCASE` (anywhere in the clause body,
   including inside nested `:IF`s at the same BEGINCASE depth);
+- clauses whose **final statement** is a `:RETURN` (issue #139) — the
+  procedure exits, so an `:EXITCASE` after it would never execute.
+  Only the final-statement position qualifies: a `:RETURN` earlier in
+  the clause (for example inside an `:IF`) does not satisfy the rule,
+  because execution can continue past it and fall through. Comments
+  after the final `:RETURN` are transparent;
 - code outside any `:BEGINCASE` block — stray `:CASE` tokens without a
   `:BEGINCASE` are ignored by this rule.
 
@@ -72,6 +85,38 @@ who rely on it must suppress the diagnostic.
 :ENDCASE;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS nVal;
+	:BEGINCASE;
+	:CASE nVal == 1;
+		:RETURN nVal;
+	:OTHERWISE;
+		:RETURN 0;
+		/* trailing comment is transparent;
+	:ENDCASE;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS nVal, bFlag;
+	:BEGINCASE;
+	:CASE nVal == 1;
+		:IF bFlag;
+			:RETURN nVal;
+		:ENDIF;
+	:OTHERWISE;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN 0;
+:ENDPROC;
+```
+
 ## Rationale
 
 The schema lists `prefer_exitcase` under `lints.coding_standards` with
@@ -82,4 +127,8 @@ unless multi-match behavior is intentional." Because a missing
 `:EXITCASE` silently changes control flow (multiple case bodies can
 run), this earns a warning rather than a hint, while staying overridable
 for codebases that use multi-match deliberately. One of the oldest rules
-in the pipeline (history, 2026-01-14).
+in the pipeline (history, 2026-01-14). The `:RETURN` exemption (issue
+#139) is deliberately strict — final statement only — because unlike a
+conditional `:EXITCASE` (which exists solely to exit the case and so
+signals intent), a conditional `:RETURN` is ordinary control flow and
+fall-through past it is usually an accident.

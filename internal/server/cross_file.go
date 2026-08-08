@@ -38,6 +38,33 @@ func (r liveResolver) ResolveDataSource(target string) []providers.ResolvedTarge
 	return r.overlay(r.s.workspaceIndex.ResolveDataSourceTarget(target))
 }
 
+// classFileDispatchTargets pre-resolves the document's ExecFunction
+// dispatch targets against the workspace index and returns those that
+// resolve to class files only (diag.execfunction_class_target, issue
+// #143). The verdicts feed DiagnosticOptions so the check runs inside
+// diagnostic collection, where suppression and overrides apply.
+func (r liveResolver) classFileDispatchTargets(tokens []lexer.Token) []string {
+	if r.s.workspaceIndex == nil {
+		return nil
+	}
+	var out []string
+	seen := make(map[string]bool)
+	for _, site := range providers.ExtractCallSites(tokens) {
+		if site.Kind != providers.CallDispatch || site.IsDoProc {
+			continue
+		}
+		key := strings.ToLower(site.Raw)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if r.s.workspaceIndex.DispatchResolvesToClassOnly(site.Raw) {
+			out = append(out, site.Raw)
+		}
+	}
+	return out
+}
+
 // overlayResolutions applies the open-document overlay to raw index
 // resolutions, keeping ProcName/IsEntry intact (issue #125): positions are
 // re-derived from the live parse cache for open URIs, and procedures

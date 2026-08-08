@@ -76,6 +76,13 @@ type DiagnosticOptions struct {
 	// undeclared_variable and invalid_sql_param.
 	IncludeDeclaredVariables []string
 
+	// ClassFileDispatchTargets lists this document's dispatch target
+	// strings that resolve through the workspace index to class files only
+	// (diag.execfunction_class_target, issue #143). Matched
+	// case-insensitively against ExecFunction targets. Empty/nil — as in
+	// workspace-less consumers like --validate — disables the check.
+	ClassFileDispatchTargets []string
+
 	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
 	// Recognized values: "off" (drop the diagnostic), "info", "warn",
 	// "warning", "error". Diagnostics whose Code is not in the map pass
@@ -205,6 +212,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		diagnostics = append(diagnostics, checkParameterPlacement(tokens)...)
 		diagnostics = append(diagnostics, checkDefaultPlacement(tokens)...)
 	}
+	diagnostics = append(diagnostics, checkDeclareInitializer(tokens)...)
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
 	diagnostics = append(diagnostics, checkMissingOtherwise(tokens)...)
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
@@ -215,6 +223,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
 	diagnostics = append(diagnostics, checkErrorHandlerStructure(tokens)...)
 	diagnostics = append(diagnostics, checkCatchClauseForm(tokens)...)
+	diagnostics = append(diagnostics, checkRaiseErrorInCatch(tokens)...)
+	diagnostics = append(diagnostics, checkExecFunctionClassTargets(tokens, opts.ClassFileDispatchTargets)...)
 	diagnostics = append(diagnostics, checkForLoopNumericLiterals(tokens, typeInfo)...)
 	diagnostics = append(diagnostics, checkLoopAndFinallyControl(tokens)...)
 	diagnostics = append(diagnostics, checkDeprecatedKeywords(tokens)...)
@@ -2273,6 +2283,7 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 	type caseState struct {
 		currentCaseToken *lexer.Token
 		hasExitCase      bool
+		lastStmtReturn   bool // clause's most recent statement starts with :RETURN
 	}
 	var stack []caseState
 
@@ -2288,13 +2299,39 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	statementStart := true
 	for i := range tokens {
 		token := &tokens[i]
-		if token.Type != lexer.TokenKeyword {
+		switch token.Type {
+		case lexer.TokenWhitespace, lexer.TokenComment:
 			continue
 		}
+		if token.Type == lexer.TokenPunctuation && token.Text == ";" {
+			statementStart = true
+			continue
+		}
+		isStart := statementStart
+		statementStart = false
 
-		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		normalized := ""
+		if token.Type == lexer.TokenKeyword {
+			normalized = strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		}
+
+		// A :RETURN as the clause's FINAL statement satisfies the rule — the
+		// :EXITCASE after it would be unreachable (issue #139). Track whether
+		// the most recent statement in the open clause starts with :RETURN;
+		// the case-structure keywords below are boundaries, not statements
+		// (except BEGINCASE, which does start a statement in the enclosing
+		// clause and must clear the flag before pushing).
+		switch normalized {
+		case "CASE", "OTHERWISE", "EXITCASE", "ENDCASE":
+			// boundary handling below reads lastStmtReturn — don't touch it
+		default:
+			if isStart && len(stack) > 0 && stack[len(stack)-1].currentCaseToken != nil {
+				stack[len(stack)-1].lastStmtReturn = normalized == "RETURN"
+			}
+		}
 
 		switch normalized {
 		case "BEGINCASE":
@@ -2304,11 +2341,12 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 			if len(stack) > 0 {
 				top := &stack[len(stack)-1]
 				// If we had a previous CASE/OTHERWISE without EXITCASE, report it
-				if !top.hasExitCase {
+				if !top.hasExitCase && !top.lastStmtReturn {
 					reportMissing(top.currentCaseToken)
 				}
 				top.currentCaseToken = token
 				top.hasExitCase = false
+				top.lastStmtReturn = false
 			}
 
 		case "EXITCASE":
@@ -2320,7 +2358,7 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 			if len(stack) > 0 {
 				top := &stack[len(stack)-1]
 				// Check the last CASE/OTHERWISE block
-				if !top.hasExitCase {
+				if !top.hasExitCase && !top.lastStmtReturn {
 					reportMissing(top.currentCaseToken)
 				}
 				stack = stack[:len(stack)-1]
@@ -2604,6 +2642,143 @@ func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	return diagnostics
+}
+
+// checkDeclareInitializer flags inline initializers in :DECLARE statements
+// (diag.declare_initializer, issue #138). Authoritative SSL accepts only
+// :DECLARE ident(, ident)*; in every context — procedure locals, script
+// level, class fields, and data-source files alike — so each := between the
+// :DECLARE keyword and its terminating ; is a syntax error. Initialization
+// belongs in a separate assignment statement (for class fields, in the
+// Constructor).
+func checkDeclareInitializer(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	inDeclare := false
+	for _, token := range tokens {
+		switch {
+		case token.Type == lexer.TokenKeyword:
+			inDeclare = strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "DECLARE")
+		case token.Type == lexer.TokenPunctuation && token.Text == ";":
+			inDeclare = false
+		case inDeclare && token.Type == lexer.TokenOperator && token.Text == ":=":
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(token),
+				Message:  "':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement",
+				Source:   "ssl-lsp",
+				Code:     CodeDeclareInitializer,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkRaiseErrorInCatch flags RaiseError( calls whose nearest enclosing
+// :TRY section is a :CATCH block (diag.raiseerror_in_catch, issue #142) —
+// the RaiseError placement doctrine (ssl-style-guide schema
+// error_handling.raise_error_doctrine): the error handler must not become
+// the thing that crashes. A RaiseError inside a deeper :TRY body nested
+// within the handler is fine; its own :CATCH contains it.
+func checkRaiseErrorInCatch(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// Stack of the section we are in for each open :TRY structure.
+	const (
+		sectionTry = iota
+		sectionCatch
+		sectionFinally
+	)
+	var stack []int
+
+	nextSignificant := func(from int) *lexer.Token {
+		for j := from; j < len(tokens); j++ {
+			switch tokens[j].Type {
+			case lexer.TokenWhitespace, lexer.TokenComment:
+				continue
+			}
+			return &tokens[j]
+		}
+		return nil
+	}
+
+	for i := range tokens {
+		token := &tokens[i]
+		switch token.Type {
+		case lexer.TokenKeyword:
+			switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
+			case "TRY":
+				stack = append(stack, sectionTry)
+			case "CATCH":
+				if len(stack) > 0 {
+					stack[len(stack)-1] = sectionCatch
+				}
+			case "FINALLY":
+				if len(stack) > 0 {
+					stack[len(stack)-1] = sectionFinally
+				}
+			case "ENDTRY":
+				if len(stack) > 0 {
+					stack = stack[:len(stack)-1]
+				}
+			}
+		case lexer.TokenIdentifier:
+			if len(stack) == 0 || stack[len(stack)-1] != sectionCatch {
+				continue
+			}
+			if !strings.EqualFold(token.Text, "RaiseError") {
+				continue
+			}
+			if next := nextSignificant(i + 1); next == nil || next.Type != lexer.TokenPunctuation || next.Text != "(" {
+				continue
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(*token),
+				Message:  "'RaiseError' inside ':CATCH' - the error handler should not raise; move the raise into the ':TRY' block it belongs to",
+				Source:   "ssl-lsp",
+				Code:     CodeRaiseErrorInCatch,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkExecFunctionClassTargets flags ExecFunction dispatch strings whose
+// target the server resolved to class files only
+// (diag.execfunction_class_target, issue #143): a class file has no script
+// entry point, so the two-segment call fails at runtime and the
+// three-segment form does not invoke the method. classTargets carries the
+// pre-resolved verdicts; the check itself stays workspace-free.
+func checkExecFunctionClassTargets(tokens []lexer.Token, classTargets []string) []Diagnostic {
+	if len(classTargets) == 0 {
+		return nil
+	}
+	targets := make(map[string]bool, len(classTargets))
+	for _, t := range classTargets {
+		targets[strings.ToLower(t)] = true
+	}
+
+	var diagnostics []Diagnostic
+	for _, site := range ExtractCallSites(tokens) {
+		if site.Kind != CallDispatch || site.IsDoProc {
+			continue
+		}
+		if !targets[strings.ToLower(site.Raw)] {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    site.Range,
+			Message: fmt.Sprintf("'ExecFunction' cannot run '%s' - the target is a class file, which has no script entry point (and class methods are not invokable this way). Instantiate with CreateUdObject and call the method on the instance.",
+				site.Raw),
+			Source: "ssl-lsp",
+			Code:   CodeExecFunctionClassTarget,
+		})
+	}
 	return diagnostics
 }
 
