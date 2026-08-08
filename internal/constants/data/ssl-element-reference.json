@@ -16,12 +16,12 @@
     "BEGINCASE": {
       "title": "BEGINCASE",
       "summary": "Starts a :BEGINCASE block for evaluating one or more boolean :CASE conditions, with an optional :OTHERWISE branch and a required :ENDCASE.",
-      "syntax": ":BEGINCASE;\n:CASE <condition>;\n    /* statements;\n    :EXITCASE;\n:CASE <condition>;\n    /* statements;\n    :EXITCASE;\n:OTHERWISE;\n    /* statements;\n    :EXITCASE;\n:ENDCASE;"
+      "syntax": ":BEGINCASE;\n:CASE <condition>;\n\t/* statements;\n\t:EXITCASE;\n:CASE <condition>;\n\t/* statements;\n\t:EXITCASE;\n:OTHERWISE;\n\t/* statements;\n\t:EXITCASE;\n:ENDCASE;"
     },
     "BEGININLINECODE": {
       "title": "BEGININLINECODE",
       "summary": "Starts a named inline SSL code block that is stored for later retrieval with GetInlineCode.",
-      "syntax": ":BEGININLINECODE BlockName;\n    /* Inline SSL code here;\n:ENDINLINECODE;"
+      "syntax": ":BEGININLINECODE BlockName;\n\t/* Inline SSL code here;\n:ENDINLINECODE;"
     },
     "CASE": {
       "title": "CASE",
@@ -206,7 +206,7 @@
   },
   "operators": {
     "add-assign": {
-      "title": "add-assign",
+      "title": "+= (add-assign)",
       "summary": "Updates a variable, property, or array element in place by applying + and then storing the result back into the left side.",
       "syntax": "target += value;",
       "type_behavior": [
@@ -231,7 +231,7 @@
       ]
     },
     "and": {
-      "title": "and",
+      "title": ".AND. (and)",
       "summary": "Combines two boolean expressions and returns .T. only when both are .T..",
       "syntax": "leftBoolean .AND. rightBoolean",
       "type_behavior": [
@@ -244,7 +244,7 @@
       ]
     },
     "assignment": {
-      "title": "assignment",
+      "title": ":= (assignment)",
       "summary": "Stores a value in a variable, object property, or array element and evaluates to the assigned value.",
       "syntax": "target := value;",
       "type_behavior": [
@@ -269,7 +269,7 @@
       ]
     },
     "bang": {
-      "title": "bang",
+      "title": "! (bang)",
       "summary": "Performs boolean negation, returning the opposite boolean value.",
       "syntax": "!booleanExpression\n!(compoundExpression)",
       "type_behavior": [
@@ -282,7 +282,7 @@
       ]
     },
     "decrement": {
-      "title": "decrement",
+      "title": "-- (decrement)",
       "summary": "Decreases a number variable by one, trims trailing spaces in strings, or subtracts days from a date depending on operand type.",
       "syntax": "--variable",
       "type_behavior": [
@@ -307,7 +307,7 @@
       ]
     },
     "divide-assign": {
-      "title": "divide-assign",
+      "title": "/= (divide-assign)",
       "summary": "Divides a numeric value by another numeric value and stores the quotient back in the left operand.",
       "syntax": "target /= divisor;",
       "type_behavior": [
@@ -320,7 +320,7 @@
       ]
     },
     "divide": {
-      "title": "divide",
+      "title": "/ (divide)",
       "summary": "Divides the left number by the right number and returns the result as a number.",
       "syntax": "nQuotient := nLeft / nRight;",
       "type_behavior": [
@@ -345,7 +345,7 @@
       ]
     },
     "dollar": {
-      "title": "dollar",
+      "title": "$ (dollar)",
       "summary": "Tests whether the left string is found within the right operand as a substring.",
       "syntax": "bResult := needle $ haystack;",
       "type_behavior": [
@@ -370,7 +370,7 @@
       ]
     },
     "double-star-power": {
-      "title": "double-star-power",
+      "title": "** (double-star-power)",
       "summary": "Raises one number to the exponent of another number.",
       "syntax": "nResult := nBase ** nExponent;",
       "type_behavior": [
@@ -395,7 +395,7 @@
       ]
     },
     "equals": {
-      "title": "equals",
+      "title": "= (equals)",
       "summary": "Compares two values for equality, using prefix matching for strings, exact matching for numbers, booleans, and dates, and reference equality for arrays and objects.",
       "syntax": "bEqual := vLeft = vRight;",
       "type_behavior": [
@@ -462,7 +462,7 @@
       ]
     },
     "greater-than-or-equal": {
-      "title": "greater-than-or-equal",
+      "title": ">= (greater-than-or-equal)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is greater than or equal to the right operand.",
       "syntax": "vLeft >= vRight",
       "type_behavior": [
@@ -487,7 +487,7 @@
       ]
     },
     "greater-than": {
-      "title": "greater-than",
+      "title": "> (greater-than)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is strictly greater than the right operand.",
       "syntax": "vLeft > vRight",
       "type_behavior": [
@@ -512,7 +512,7 @@
       ]
     },
     "hash": {
-      "title": "hash",
+      "title": "# (hash)",
       "summary": "Returns .T. when two values are not equal and .F. when they are equal.",
       "syntax": "bResult := vLeft # vRight;",
       "type_behavior": [
@@ -579,7 +579,7 @@
       ]
     },
     "increment": {
-      "title": "increment",
+      "title": "++ (increment)",
       "summary": "Increases a number variable by one, modifying its value in place.",
       "syntax": "variable++",
       "type_behavior": [
@@ -592,7 +592,7 @@
       ]
     },
     "less-than-or-equal": {
-      "title": "less-than-or-equal",
+      "title": "<= (less-than-or-equal)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is less than or equal to the right operand.",
       "syntax": "vLeft <= vRight",
       "type_behavior": [
@@ -617,7 +617,7 @@
       ]
     },
     "less-than": {
-      "title": "less-than",
+      "title": "< (less-than)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is strictly less than the right operand.",
       "syntax": "vLeft < vRight",
       "type_behavior": [
@@ -642,7 +642,7 @@
       ]
     },
     "minus": {
-      "title": "minus",
+      "title": "- (minus)",
       "summary": "Subtracts numbers, trims trailing spaces before string concatenation, or performs date arithmetic depending on operand types.",
       "syntax": "vLeft - vRight",
       "type_behavior": [
@@ -673,7 +673,7 @@
       ]
     },
     "modulo-assign": {
-      "title": "modulo-assign",
+      "title": "%= (modulo-assign)",
       "summary": "Updates a numeric variable, property, or array element in place by applying % and storing the remainder back into the left side.",
       "syntax": "target %= divisor;",
       "type_behavior": [
@@ -686,7 +686,7 @@
       ]
     },
     "modulo": {
-      "title": "modulo",
+      "title": "% (modulo)",
       "summary": "Calculates the remainder after dividing one number by another.",
       "syntax": "nRemainder := nLeft % nRight;",
       "type_behavior": [
@@ -711,7 +711,7 @@
       ]
     },
     "multiply-assign": {
-      "title": "multiply-assign",
+      "title": "*= (multiply-assign)",
       "summary": "Multiplies a numeric value by another numeric value and stores the product back in the left operand.",
       "syntax": "target *= value;",
       "type_behavior": [
@@ -724,7 +724,7 @@
       ]
     },
     "multiply": {
-      "title": "multiply",
+      "title": "* (multiply)",
       "summary": "Multiplies one number by another number and returns the product.",
       "syntax": "nProduct := nLeft * nRight;",
       "type_behavior": [
@@ -749,7 +749,7 @@
       ]
     },
     "not-equals-legacy": {
-      "title": "not-equals-legacy",
+      "title": "<> (not-equals-legacy)",
       "summary": "Returns .T. when two values are not equal under SSL's strict inequality rules.",
       "syntax": "bDifferent := vLeft <> vRight;",
       "type_behavior": [
@@ -816,7 +816,7 @@
       ]
     },
     "not-equals": {
-      "title": "not-equals",
+      "title": "!= (not-equals)",
       "summary": "Returns .T. when two values are not strictly equal under SSL equality rules.",
       "syntax": "bDifferent := vLeft != vRight;",
       "type_behavior": [
@@ -883,7 +883,7 @@
       ]
     },
     "not": {
-      "title": "not",
+      "title": ".NOT. (not)",
       "summary": "Performs boolean negation, returning .T. for .F. and .F. for .T..",
       "syntax": ".NOT. booleanExpression\n.NOT. (compoundExpression)",
       "type_behavior": [
@@ -896,7 +896,7 @@
       ]
     },
     "or": {
-      "title": "or",
+      "title": ".OR. (or)",
       "summary": "Combines two boolean expressions and returns .T. when either operand is .T..",
       "syntax": "leftBoolean .OR. rightBoolean",
       "type_behavior": [
@@ -909,7 +909,7 @@
       ]
     },
     "plus": {
-      "title": "plus",
+      "title": "+ (plus)",
       "summary": "Adds numbers, concatenates strings, or adds days to dates depending on operand types.",
       "syntax": "left + right",
       "type_behavior": [
@@ -934,7 +934,7 @@
       ]
     },
     "power-assign": {
-      "title": "power-assign",
+      "title": "^= (power-assign)",
       "summary": "Raises a numeric value to a numeric power and stores the result back into the left side.",
       "syntax": "target ^= value;",
       "type_behavior": [
@@ -947,7 +947,7 @@
       ]
     },
     "power": {
-      "title": "power",
+      "title": "^ (power)",
       "summary": "Raises one number to the exponent of another number.",
       "syntax": "nResult := nBase ^ nExponent;",
       "type_behavior": [
@@ -972,7 +972,7 @@
       ]
     },
     "shift-left": {
-      "title": "shift-left",
+      "title": "<< (shift-left)",
       "summary": "Shifts the bits of one integer number to the left by the number of positions specified by another integer number.",
       "syntax": "nResult := nLeft << nShiftCount;",
       "type_behavior": [
@@ -985,7 +985,7 @@
       ]
     },
     "shift-right": {
-      "title": "shift-right",
+      "title": ">> (shift-right)",
       "summary": "Shifts the bits of one integer number to the right by the number of positions specified by another integer number.",
       "syntax": "nResult := nLeft >> nShiftCount;",
       "type_behavior": [
@@ -998,7 +998,7 @@
       ]
     },
     "strict-equals": {
-      "title": "strict-equals",
+      "title": "== (strict-equals)",
       "summary": "Returns .T. when two values are strictly equal under SSL equality rules.",
       "syntax": "bEqual := vLeft == vRight;",
       "type_behavior": [
@@ -1065,7 +1065,7 @@
       ]
     },
     "subtract-assign": {
-      "title": "subtract-assign",
+      "title": "-= (subtract-assign)",
       "summary": "Updates a variable, property, or array element in place by applying - and then storing the result back into the left side.",
       "syntax": "target -= value;",
       "type_behavior": [
@@ -3530,7 +3530,7 @@
         },
         {
           "signature": "SSLRegex{sPattern, bCaseSensitive}",
-          "description": "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching |",
+          "description": "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching. Omitting this parameter gives case-sensitive matching. |",
           "parameters": [
             {
               "parameter": "sPattern",
@@ -3542,7 +3542,7 @@
               "parameter": "bCaseSensitive",
               "type": "boolean",
               "required": "no",
-              "description": ".T. for case-sensitive matching, .F. for case-insensitive matching"
+              "description": ".T. for case-sensitive matching, .F. for case-insensitive matching. Omitting this parameter gives case-sensitive matching."
             }
           ]
         }
@@ -3883,7 +3883,7 @@
     "base": {
       "title": "Base:",
       "summary": "Provides explicit access to members on a class's immediate parent type from within a class method.",
-      "syntax": "Base:FieldName;\nBase:MethodName(args);\nBase:Constructor(args);"
+      "syntax": "Base:FieldName;\nBase:MethodName(args)\nBase:Constructor(args)"
     },
     "code-block": {
       "title": "Code Block",
@@ -3903,17 +3903,17 @@
     "me": {
       "title": "Me:",
       "summary": "Provides a reference to the current class instance inside :CLASS methods.",
-      "syntax": "Me;\nMe:FieldName;\nMe:MethodName(args);"
+      "syntax": "Me;\nMe:FieldName;\nMe:MethodName(args)"
     },
     "request": {
       "title": "Request",
       "summary": "An ambient identifier in endpoint scripts that holds the incoming HTTP request.",
-      "syntax": "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args);"
+      "syntax": "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args)"
     },
     "response": {
       "title": "Response",
       "summary": "An ambient identifier in endpoint scripts that holds the outgoing HTTP response.",
-      "syntax": "Response:PropertyName := value;\nResponse:MethodName(args);"
+      "syntax": "Response:PropertyName := value;\nResponse:MethodName(args)"
     }
   },
   "returns": {
@@ -4477,7 +4477,7 @@
     },
     "AEval": {
       "title": "AEval",
-      "summary": "Evaluate a code block for each array element and return the same array.",
+      "summary": "Evaluates a code block for each array element and returns the same array.",
       "signature": "AEval(aTarget, fnBlock, [nStart], [nCount])",
       "returns": {
         "type": "array",
@@ -4516,7 +4516,7 @@
     },
     "AEvalA": {
       "title": "AEvalA",
-      "summary": "Evaluate a code block for each selected array element and write the result back to the same array.",
+      "summary": "Evaluates a code block for each selected array element and writes the result back to the same array.",
       "signature": "AEvalA(aTarget, fnBlock, [nStart], [nCount])",
       "returns": {
         "type": "array",
@@ -4555,7 +4555,7 @@
     },
     "AFill": {
       "title": "AFill",
-      "summary": "Fill an array element range with the same value and return the same array.",
+      "summary": "Fills an array element range with the same value and returns the same array.",
       "signature": "AFill(aTarget, vValue, [nStart], [nCount])",
       "returns": {
         "type": "array",
@@ -4594,7 +4594,7 @@
     },
     "ALen": {
       "title": "ALen",
-      "summary": "Return the number of elements in an array.",
+      "summary": "Returns the number of elements in an array.",
       "signature": "ALen(aTarget)",
       "returns": {
         "type": "number",
@@ -4612,7 +4612,7 @@
     },
     "AScan": {
       "title": "AScan",
-      "summary": "Return the index of the first array element that matches a value or condition.",
+      "summary": "Returns the index of the first array element that matches a value or condition.",
       "signature": "AScan(aTarget, vValueOrBlock, [nStart], [nCount])",
       "returns": {
         "type": "number",
@@ -4651,7 +4651,7 @@
     },
     "AScanExact": {
       "title": "AScanExact",
-      "summary": "Return the index of the first array element that matches a value or condition exactly.",
+      "summary": "Returns the index of the first array element that matches a value or condition exactly.",
       "signature": "AScanExact(aTarget, vValueOrBlock, [nStart], [nCount])",
       "returns": {
         "type": "number",
@@ -4765,7 +4765,7 @@
     },
     "AddProperty": {
       "title": "AddProperty",
-      "summary": "Add one or more properties to an object.",
+      "summary": "Adds one or more properties to an object.",
       "signature": "AddProperty(oTarget, vPropName)",
       "returns": {
         "type": "NIL",
@@ -4790,7 +4790,7 @@
     },
     "AddToSession": {
       "title": "AddToSession",
-      "summary": "Store a non-object, non-array value in the current session under a string key.",
+      "summary": "Stores a non-object, non-array value in the current session under a string key.",
       "signature": "AddToSession(sKey, vValue)",
       "returns": {
         "type": "NIL",
@@ -4815,7 +4815,7 @@
     },
     "AllTrim": {
       "title": "AllTrim",
-      "summary": "Remove leading and trailing space characters from a string.",
+      "summary": "Removes leading and trailing space characters from a string.",
       "signature": "AllTrim(sSource)",
       "returns": {
         "type": "string",
@@ -4879,7 +4879,7 @@
     },
     "ArrayNew": {
       "title": "ArrayNew",
-      "summary": "Create a new array with up to three dimensions.",
+      "summary": "Creates a new array with up to three dimensions.",
       "signature": "ArrayNew([nDim1], [nDim2], [nDim3])",
       "returns": {
         "type": "array",
@@ -4911,7 +4911,7 @@
     },
     "ArrayToTVP": {
       "title": "ArrayToTVP",
-      "summary": "Convert a one-dimensional array into a table-valued parameter object.",
+      "summary": "Converts a one-dimensional array into a table-valued parameter object.",
       "signature": "ArrayToTVP(aValues, [sDataType], [sConnectionName])",
       "returns": {
         "type": "object",
@@ -4943,7 +4943,7 @@
     },
     "Asc": {
       "title": "Asc",
-      "summary": "Return the character code of the first character in a string.",
+      "summary": "Returns the character code of the first character in a string.",
       "signature": "Asc(sSource)",
       "returns": {
         "type": "number",
@@ -5389,7 +5389,7 @@
     "ClearLastSSLError": {
       "title": "ClearLastSSLError",
       "summary": "Clears the stored SSL error so later error checks start clean.",
-      "signature": "ClearLastSSLError();",
+      "signature": "ClearLastSSLError()",
       "returns": {
         "type": "boolean",
         "description": "Always returns `.T.`."
@@ -5398,7 +5398,7 @@
     "ClearSession": {
       "title": "ClearSession",
       "summary": "Clears all values from the current session.",
-      "signature": "ClearSession();",
+      "signature": "ClearSession()",
       "returns": {
         "type": "NIL",
         "description": "Returned after the current session is cleared successfully."
@@ -5443,7 +5443,7 @@
     "CombineFiles": {
       "title": "CombineFiles",
       "summary": "Concatenates multiple files into one output file on disk.",
-      "signature": "CombineFiles(aFileNames, sOutFile);",
+      "signature": "CombineFiles(aFileNames, sOutFile)",
       "returns": {
         "type": "string",
         "description": "An empty string on success."
@@ -6378,7 +6378,7 @@
     "DoProc": {
       "title": "DoProc",
       "summary": "Calls a local or scripted procedure by name with an optional argument array.",
-      "signature": "DoProc(sProcedureName, [aArguments]);",
+      "signature": "DoProc(sProcedureName, [aArguments])",
       "returns": {
         "type": "any",
         "description": "Returns the target procedure's return value."
@@ -6882,7 +6882,7 @@
     "DocEndDocumentumInterface": {
       "title": "DocEndDocumentumInterface",
       "summary": "Ends the current Documentum interface context.",
-      "signature": "DocEndDocumentumInterface();",
+      "signature": "DocEndDocumentumInterface()",
       "returns": {
         "type": "NIL",
         "description": "Always returns `NIL`."
@@ -7197,7 +7197,7 @@
     "DocInitDocumentumInterface": {
       "title": "DocInitDocumentumInterface",
       "summary": "Creates a fresh Documentum interface context for the current execution.",
-      "signature": "DocInitDocumentumInterface();",
+      "signature": "DocInitDocumentumInterface()",
       "returns": {
         "type": "NIL",
         "description": "Always returns `NIL`."
@@ -7815,7 +7815,7 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "The name of the function or method to execute. May include a namespace path (e.g., \"ServerScript.ClassName.MethodName\")."
+          "description": "The name of the function or method to execute. Accepts a dotted path of two or three segments — \"Category.ScriptName\" or \"Category.ScriptName.ProcName\" — where the first segment is a server-script category or an application name."
         },
         {
           "name": "aParameters",
@@ -8925,7 +8925,7 @@
     "GetGroupSeparator": {
       "title": "GetGroupSeparator",
       "summary": "Returns the current group separator as a string.",
-      "signature": "GetGroupSeparator();",
+      "signature": "GetGroupSeparator()",
       "returns": {
         "type": "string",
         "description": "The current group separator."
@@ -9386,7 +9386,7 @@
     "GetUserData": {
       "title": "GetUserData",
       "summary": "Returns the current session user name as a string.",
-      "signature": "GetUserData();",
+      "signature": "GetUserData()",
       "returns": {
         "type": "string",
         "description": "The current session user name."
@@ -10706,7 +10706,7 @@
     "LimsSqlDisconnect": {
       "title": "LimsSqlDisconnect",
       "summary": "Closes an active database connection by name and removes it from the internal registry.",
-      "signature": "LimsSqlDisconnect([sConnectionName]);",
+      "signature": "LimsSqlDisconnect([sConnectionName])",
       "returns": {
         "type": "boolean",
         "description": "`.T.` if the disconnect operation succeeded; `.F.` otherwise."
@@ -12811,7 +12811,7 @@
     "SetUserData": {
       "title": "SetUserData",
       "summary": "Sets the current user name for the active execution context.",
-      "signature": "SetUserData(sUserName);",
+      "signature": "SetUserData(sUserName)",
       "returns": {
         "type": "NIL",
         "description": "`SetUserData` updates context state and does not return a value."

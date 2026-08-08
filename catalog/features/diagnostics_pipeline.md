@@ -12,6 +12,7 @@ tests:
   - internal/providers/providers_test.go
   - internal/providers/sql_mode_test.go
   - internal/server/server_test.go
+  - cmd/starlims-lsp/validate_test.go
 history:
   - date: 2026-04-30
     ref: "LSP PR #3 (d744511, v0.4.0)"
@@ -49,6 +50,15 @@ history:
       data-source diagnostics, the SQL body is suppressed. Previously the
       leading directive line classified the whole file as SSL and every
       SSL check fired on the SQL body.
+  - date: 2026-08-07
+    ref: "issue #141"
+    note: >-
+      The --validate CLI bypassed SQL-mode data-source classification: it
+      fed tokens straight to collection, so every SSL check fired on the
+      SQL body of .ds files (dot_property_access on table.column, etc.)
+      even though the editor path suppressed them. --validate now routes
+      through the same text-path classification, and a --ds flag marks
+      stdin content as a data source (stdin has no URI to classify by).
 issues: []
 ---
 
@@ -100,7 +110,10 @@ rules (those are `diag.*` entries).
   and the statement passes the same structural validation the formatter's
   embedded-SQL detection uses. A data-source document whose content is SSL
   keeps the full data-source diagnostic set, and a non-data-source
-  document is never SQL-classified regardless of content.
+  document is never SQL-classified regardless of content. The
+  classification applies identically in every consumer: the editor path
+  and the `--validate` CLI (issue #141). For `--validate --stdin`, where
+  no URI exists, the `--ds` flag declares the content a data source.
 - A panic in any diagnostic check MUST NOT crash the server: it is
   recovered, the stack trace is logged to stderr, and a single
   error-severity diagnostic with Code `internal_error` and Source `ssl-lsp`
@@ -121,6 +134,8 @@ rules (those are `diag.*` entries).
 - A11: Given a data-source document containing SSL code, when diagnostics are collected, then SSL and data-source diagnostics are produced exactly as before — SQL mode only activates on SQL content.
 - A12: Given a non-data-source document whose content is a SQL statement, when diagnostics are collected, then SSL diagnostics still run — SQL-mode classification is scoped to data-source files.
 - A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or an inline-defaults `:PARAMETERS` statement followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
+- A14: Given a `.ds` (or `.ds.txt`) file whose content is plain SQL or the hybrid header-then-SQL shape, when it is validated via the `--validate` CLI file path, then the result matches the editor path — no diagnostic fires on SQL content, header lines keep their checks — and an SSL-content `.ds` file keeps the full data-source diagnostic set.
+- A15: Given `--validate --stdin --ds`, when stdin content is validated, then it is classified as a data-source document (SQL-mode suppression and data-source rules apply); without `--ds`, stdin content is treated as an ordinary SSL document.
 
 ## Rationale
 

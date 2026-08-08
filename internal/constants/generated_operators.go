@@ -9,7 +9,7 @@ package constants
 var GeneratedOperatorDetails = map[string]OperatorDetails{
 	"add-assign": {
 		Symbol:  "+=",
-		Title:   "add-assign",
+		Title:   "+= (add-assign)",
 		Summary: "Updates a variable, property, or array element in place by applying + and then storing the result back into the left side.",
 		Syntax:  "target += value;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -20,7 +20,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"and": {
 		Symbol:  ".AND.",
-		Title:   "and",
+		Title:   ".AND. (and)",
 		Summary: "Combines two boolean expressions and returns .T. only when both are .T..",
 		Syntax:  "leftBoolean .AND. rightBoolean",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -29,7 +29,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"assignment": {
 		Symbol:  ":=",
-		Title:   "assignment",
+		Title:   ":= (assignment)",
 		Summary: "Stores a value in a variable, object property, or array element and evaluates to the assigned value.",
 		Syntax:  "target := value;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -40,7 +40,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"bang": {
 		Symbol:  "!",
-		Title:   "bang",
+		Title:   "! (bang)",
 		Summary: "Performs boolean negation, returning the opposite boolean value.",
 		Syntax:  "!booleanExpression\n!(compoundExpression)",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -49,7 +49,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"decrement": {
 		Symbol:  "--",
-		Title:   "decrement",
+		Title:   "-- (decrement)",
 		Summary: "Decreases a number variable by one, trims trailing spaces in strings, or subtracts days from a date depending on operand type.",
 		Syntax:  "--variable",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -60,7 +60,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"divide": {
 		Symbol:  "/",
-		Title:   "divide",
+		Title:   "/ (divide)",
 		Summary: "Divides the left number by the right number and returns the result as a number.",
 		Syntax:  "nQuotient := nLeft / nRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -71,7 +71,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"divide-assign": {
 		Symbol:  "/=",
-		Title:   "divide-assign",
+		Title:   "/= (divide-assign)",
 		Summary: "Divides a numeric value by another numeric value and stores the quotient back in the left operand.",
 		Syntax:  "target /= divisor;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -80,7 +80,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"dollar": {
 		Symbol:  "$",
-		Title:   "dollar",
+		Title:   "$ (dollar)",
 		Summary: "Tests whether the left string is found within the right operand as a substring.",
 		Syntax:  "bResult := needle $ haystack;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -91,7 +91,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"double-star-power": {
 		Symbol:  "**",
-		Title:   "double-star-power",
+		Title:   "** (double-star-power)",
 		Summary: "Raises one number to the exponent of another number.",
 		Syntax:  "nResult := nBase ** nExponent;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -102,7 +102,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"equals": {
 		Symbol:  "=",
-		Title:   "equals",
+		Title:   "= (equals)",
 		Summary: "Compares two values for equality, using prefix matching for strings, exact matching for numbers, booleans, and dates, and reference equality for arrays and objects.",
 		Syntax:  "bEqual := vLeft = vRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -120,7 +120,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"greater-than": {
 		Symbol:  "\u003e",
-		Title:   "greater-than",
+		Title:   "\u003e (greater-than)",
 		Summary: "Compares two values of the same supported type and returns .T. when the left operand is strictly greater than the right operand.",
 		Syntax:  "vLeft \u003e vRight",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -131,7 +131,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"greater-than-or-equal": {
 		Symbol:  "\u003e=",
-		Title:   "greater-than-or-equal",
+		Title:   "\u003e= (greater-than-or-equal)",
 		Summary: "Compares two values of the same supported type and returns .T. when the left operand is greater than or equal to the right operand.",
 		Syntax:  "vLeft \u003e= vRight",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -142,7 +142,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"hash": {
 		Symbol:  "#",
-		Title:   "hash",
+		Title:   "# (hash)",
 		Summary: "Returns .T. when two values are not equal and .F. when they are equal.",
 		Syntax:  "bResult := vLeft # vRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -160,7 +160,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"increment": {
 		Symbol:  "++",
-		Title:   "increment",
+		Title:   "++ (increment)",
 		Summary: "Increases a number variable by one, modifying its value in place.",
 		Syntax:  "variable++",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -169,7 +169,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"less-than": {
 		Symbol:  "\u003c",
-		Title:   "less-than",
+		Title:   "\u003c (less-than)",
 		Summary: "Compares two values of the same supported type and returns .T. when the left operand is strictly less than the right operand.",
 		Syntax:  "vLeft \u003c vRight",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -180,7 +180,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"less-than-or-equal": {
 		Symbol:  "\u003c=",
-		Title:   "less-than-or-equal",
+		Title:   "\u003c= (less-than-or-equal)",
 		Summary: "Compares two values of the same supported type and returns .T. when the left operand is less than or equal to the right operand.",
 		Syntax:  "vLeft \u003c= vRight",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -191,7 +191,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"minus": {
 		Symbol:  "-",
-		Title:   "minus",
+		Title:   "- (minus)",
 		Summary: "Subtracts numbers, trims trailing spaces before string concatenation, or performs date arithmetic depending on operand types.",
 		Syntax:  "vLeft - vRight",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -203,7 +203,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"modulo": {
 		Symbol:  "%",
-		Title:   "modulo",
+		Title:   "% (modulo)",
 		Summary: "Calculates the remainder after dividing one number by another.",
 		Syntax:  "nRemainder := nLeft % nRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -214,7 +214,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"modulo-assign": {
 		Symbol:  "%=",
-		Title:   "modulo-assign",
+		Title:   "%= (modulo-assign)",
 		Summary: "Updates a numeric variable, property, or array element in place by applying % and storing the remainder back into the left side.",
 		Syntax:  "target %= divisor;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -223,7 +223,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"multiply": {
 		Symbol:  "*",
-		Title:   "multiply",
+		Title:   "* (multiply)",
 		Summary: "Multiplies one number by another number and returns the product.",
 		Syntax:  "nProduct := nLeft * nRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -234,7 +234,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"multiply-assign": {
 		Symbol:  "*=",
-		Title:   "multiply-assign",
+		Title:   "*= (multiply-assign)",
 		Summary: "Multiplies a numeric value by another numeric value and stores the product back in the left operand.",
 		Syntax:  "target *= value;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -243,7 +243,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"not": {
 		Symbol:  ".NOT.",
-		Title:   "not",
+		Title:   ".NOT. (not)",
 		Summary: "Performs boolean negation, returning .T. for .F. and .F. for .T..",
 		Syntax:  ".NOT. booleanExpression\n.NOT. (compoundExpression)",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -252,7 +252,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"not-equals": {
 		Symbol:  "!=",
-		Title:   "not-equals",
+		Title:   "!= (not-equals)",
 		Summary: "Returns .T. when two values are not strictly equal under SSL equality rules.",
 		Syntax:  "bDifferent := vLeft != vRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -270,7 +270,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"not-equals-legacy": {
 		Symbol:  "\u003c\u003e",
-		Title:   "not-equals-legacy",
+		Title:   "\u003c\u003e (not-equals-legacy)",
 		Summary: "Returns .T. when two values are not equal under SSL's strict inequality rules.",
 		Syntax:  "bDifferent := vLeft \u003c\u003e vRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -288,7 +288,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"or": {
 		Symbol:  ".OR.",
-		Title:   "or",
+		Title:   ".OR. (or)",
 		Summary: "Combines two boolean expressions and returns .T. when either operand is .T..",
 		Syntax:  "leftBoolean .OR. rightBoolean",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -297,7 +297,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"plus": {
 		Symbol:  "+",
-		Title:   "plus",
+		Title:   "+ (plus)",
 		Summary: "Adds numbers, concatenates strings, or adds days to dates depending on operand types.",
 		Syntax:  "left + right",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -308,7 +308,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"power": {
 		Symbol:  "^",
-		Title:   "power",
+		Title:   "^ (power)",
 		Summary: "Raises one number to the exponent of another number.",
 		Syntax:  "nResult := nBase ^ nExponent;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -319,7 +319,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"power-assign": {
 		Symbol:  "^=",
-		Title:   "power-assign",
+		Title:   "^= (power-assign)",
 		Summary: "Raises a numeric value to a numeric power and stores the result back into the left side.",
 		Syntax:  "target ^= value;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -328,7 +328,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"shift-left": {
 		Symbol:  "\u003c\u003c",
-		Title:   "shift-left",
+		Title:   "\u003c\u003c (shift-left)",
 		Summary: "Shifts the bits of one integer number to the left by the number of positions specified by another integer number.",
 		Syntax:  "nResult := nLeft \u003c\u003c nShiftCount;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -337,7 +337,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"shift-right": {
 		Symbol:  "\u003e\u003e",
-		Title:   "shift-right",
+		Title:   "\u003e\u003e (shift-right)",
 		Summary: "Shifts the bits of one integer number to the right by the number of positions specified by another integer number.",
 		Syntax:  "nResult := nLeft \u003e\u003e nShiftCount;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -346,7 +346,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"strict-equals": {
 		Symbol:  "==",
-		Title:   "strict-equals",
+		Title:   "== (strict-equals)",
 		Summary: "Returns .T. when two values are strictly equal under SSL equality rules.",
 		Syntax:  "bEqual := vLeft == vRight;",
 		TypeBehavior: []OperatorTypeBehavior{
@@ -364,7 +364,7 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 	},
 	"subtract-assign": {
 		Symbol:  "-=",
-		Title:   "subtract-assign",
+		Title:   "-= (subtract-assign)",
 		Summary: "Updates a variable, property, or array element in place by applying - and then storing the result back into the left side.",
 		Syntax:  "target -= value;",
 		TypeBehavior: []OperatorTypeBehavior{

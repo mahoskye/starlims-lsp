@@ -397,43 +397,43 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"addproperty": {
 		Title:     "AddProperty",
-		Summary:   "Add one or more properties to an object.",
+		Summary:   "Adds one or more properties to an object.",
 		Signature: "AddProperty(oTarget, vPropName)",
 		Returns:   "NIL",
 	},
 	"addtosession": {
 		Title:     "AddToSession",
-		Summary:   "Store a non-object, non-array value in the current session under a string key.",
+		Summary:   "Stores a non-object, non-array value in the current session under a string key.",
 		Signature: "AddToSession(sKey, vValue)",
 		Returns:   "NIL",
 	},
 	"aeval": {
 		Title:     "AEval",
-		Summary:   "Evaluate a code block for each array element and return the same array.",
+		Summary:   "Evaluates a code block for each array element and returns the same array.",
 		Signature: "AEval(aTarget, fnBlock, [nStart], [nCount])",
 		Returns:   "array",
 	},
 	"aevala": {
 		Title:     "AEvalA",
-		Summary:   "Evaluate a code block for each selected array element and write the result back to the same array.",
+		Summary:   "Evaluates a code block for each selected array element and writes the result back to the same array.",
 		Signature: "AEvalA(aTarget, fnBlock, [nStart], [nCount])",
 		Returns:   "array",
 	},
 	"afill": {
 		Title:     "AFill",
-		Summary:   "Fill an array element range with the same value and return the same array.",
+		Summary:   "Fills an array element range with the same value and returns the same array.",
 		Signature: "AFill(aTarget, vValue, [nStart], [nCount])",
 		Returns:   "array",
 	},
 	"alen": {
 		Title:     "ALen",
-		Summary:   "Return the number of elements in an array.",
+		Summary:   "Returns the number of elements in an array.",
 		Signature: "ALen(aTarget)",
 		Returns:   "number",
 	},
 	"alltrim": {
 		Title:     "AllTrim",
-		Summary:   "Remove leading and trailing space characters from a string.",
+		Summary:   "Removes leading and trailing space characters from a string.",
 		Signature: "AllTrim(sSource)",
 		Returns:   "string",
 	},
@@ -445,31 +445,31 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"arraynew": {
 		Title:     "ArrayNew",
-		Summary:   "Create a new array with up to three dimensions.",
+		Summary:   "Creates a new array with up to three dimensions.",
 		Signature: "ArrayNew([nDim1], [nDim2], [nDim3])",
 		Returns:   "array",
 	},
 	"arraytotvp": {
 		Title:     "ArrayToTVP",
-		Summary:   "Convert a one-dimensional array into a table-valued parameter object.",
+		Summary:   "Converts a one-dimensional array into a table-valued parameter object.",
 		Signature: "ArrayToTVP(aValues, [sDataType], [sConnectionName])",
 		Returns:   "object",
 	},
 	"asc": {
 		Title:     "Asc",
-		Summary:   "Return the character code of the first character in a string.",
+		Summary:   "Returns the character code of the first character in a string.",
 		Signature: "Asc(sSource)",
 		Returns:   "number",
 	},
 	"ascan": {
 		Title:     "AScan",
-		Summary:   "Return the index of the first array element that matches a value or condition.",
+		Summary:   "Returns the index of the first array element that matches a value or condition.",
 		Signature: "AScan(aTarget, vValueOrBlock, [nStart], [nCount])",
 		Returns:   "number",
 	},
 	"ascanexact": {
 		Title:     "AScanExact",
-		Summary:   "Return the index of the first array element that matches a value or condition exactly.",
+		Summary:   "Returns the index of the first array element that matches a value or condition exactly.",
 		Signature: "AScanExact(aTarget, vValueOrBlock, [nStart], [nCount])",
 		Returns:   "number",
 	},
@@ -548,13 +548,13 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"clearlastsslerror": {
 		Title:     "ClearLastSSLError",
 		Summary:   "Clears the stored SSL error so later error checks start clean.",
-		Signature: "ClearLastSSLError();",
+		Signature: "ClearLastSSLError()",
 		Returns:   "boolean",
 	},
 	"clearsession": {
 		Title:     "ClearSession",
 		Summary:   "Clears all values from the current session.",
-		Signature: "ClearSession();",
+		Signature: "ClearSession()",
 		Returns:   "NIL",
 	},
 	"clientendofday": {
@@ -578,7 +578,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"combinefiles": {
 		Title:     "CombineFiles",
 		Summary:   "Concatenates multiple files into one output file on disk.",
-		Signature: "CombineFiles(aFileNames, sOutFile);",
+		Signature: "CombineFiles(aFileNames, sOutFile)",
 		Returns:   "string",
 	},
 	"comparray": {
@@ -848,7 +848,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"docenddocumentuminterface": {
 		Title:     "DocEndDocumentumInterface",
 		Summary:   "Ends the current Documentum interface context.",
-		Signature: "DocEndDocumentumInterface();",
+		Signature: "DocEndDocumentumInterface()",
 		Returns:   "NIL",
 	},
 	"docexists": {
@@ -944,7 +944,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"docinitdocumentuminterface": {
 		Title:     "DocInitDocumentumInterface",
 		Summary:   "Creates a fresh Documentum interface context for the current execution.",
-		Signature: "DocInitDocumentumInterface();",
+		Signature: "DocInitDocumentumInterface()",
 		Returns:   "NIL",
 	},
 	"doclogintodocumentum": {
@@ -1028,7 +1028,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"doproc": {
 		Title:     "DoProc",
 		Summary:   "Calls a local or scripted procedure by name with an optional argument array.",
-		Signature: "DoProc(sProcedureName, [aArguments]);",
+		Signature: "DoProc(sProcedureName, [aArguments])",
 		Returns:   "any",
 	},
 	"dossupport": {
@@ -1298,7 +1298,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"getgroupseparator": {
 		Title:     "GetGroupSeparator",
 		Summary:   "Returns the current group separator as a string.",
-		Signature: "GetGroupSeparator();",
+		Signature: "GetGroupSeparator()",
 		Returns:   "string",
 	},
 	"getinlinecode": {
@@ -1406,7 +1406,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"getuserdata": {
 		Title:     "GetUserData",
 		Summary:   "Returns the current session user name as a string.",
-		Signature: "GetUserData();",
+		Signature: "GetUserData()",
 		Returns:   "string",
 	},
 	"getwebfolder": {
@@ -1658,7 +1658,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"limssqldisconnect": {
 		Title:     "LimsSqlDisconnect",
 		Summary:   "Closes an active database connection by name and removes it from the internal registry.",
-		Signature: "LimsSqlDisconnect([sConnectionName]);",
+		Signature: "LimsSqlDisconnect([sConnectionName])",
 		Returns:   "boolean",
 	},
 	"limsstring": {
@@ -2084,7 +2084,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"setuserdata": {
 		Title:     "SetUserData",
 		Summary:   "Sets the current user name for the active execution context.",
-		Signature: "SetUserData(sUserName);",
+		Signature: "SetUserData(sUserName)",
 		Returns:   "NIL",
 	},
 	"setuserpassword": {

@@ -567,6 +567,9 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	opts.IsDataSourceFile = isDataSourceURI(uri)
 	opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
 	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
+	if !opts.IsDataSourceFile {
+		opts.ClassFileDispatchTargets = (liveResolver{s}).classFileDispatchTargets(cache.Tokens)
+	}
 
 	// Data-source documents route through the text path, which owns the
 	// SQL-mode handling: plain SQL gets no SSL diagnostics at all

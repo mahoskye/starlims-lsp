@@ -52,12 +52,12 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	"BEGINCASE": {
 		Title:   "BEGINCASE",
 		Summary: "Starts a :BEGINCASE block for evaluating one or more boolean :CASE conditions, with an optional :OTHERWISE branch and a required :ENDCASE.",
-		Syntax:  ":BEGINCASE;\n:CASE \u003ccondition\u003e;\n    /* statements;\n    :EXITCASE;\n:CASE \u003ccondition\u003e;\n    /* statements;\n    :EXITCASE;\n:OTHERWISE;\n    /* statements;\n    :EXITCASE;\n:ENDCASE;",
+		Syntax:  ":BEGINCASE;\n:CASE \u003ccondition\u003e;\n\t/* statements;\n\t:EXITCASE;\n:CASE \u003ccondition\u003e;\n\t/* statements;\n\t:EXITCASE;\n:OTHERWISE;\n\t/* statements;\n\t:EXITCASE;\n:ENDCASE;",
 	},
 	"BEGININLINECODE": {
 		Title:   "BEGININLINECODE",
 		Summary: "Starts a named inline SSL code block that is stored for later retrieval with GetInlineCode.",
-		Syntax:  ":BEGININLINECODE BlockName;\n    /* Inline SSL code here;\n:ENDINLINECODE;",
+		Syntax:  ":BEGININLINECODE BlockName;\n\t/* Inline SSL code here;\n:ENDINLINECODE;",
 	},
 	"CASE": {
 		Title:   "CASE",

@@ -15,7 +15,7 @@ var GeneratedSpecialFormDetails = map[string]SpecialFormDetails{
 	"base": {
 		Title:   "Base:",
 		Summary: "Provides explicit access to members on a class's immediate parent type from within a class method.",
-		Syntax:  "Base:FieldName;\nBase:MethodName(args);\nBase:Constructor(args);",
+		Syntax:  "Base:FieldName;\nBase:MethodName(args)\nBase:Constructor(args)",
 	},
 	"code-block": {
 		Title:   "Code Block",
@@ -35,16 +35,16 @@ var GeneratedSpecialFormDetails = map[string]SpecialFormDetails{
 	"me": {
 		Title:   "Me:",
 		Summary: "Provides a reference to the current class instance inside :CLASS methods.",
-		Syntax:  "Me;\nMe:FieldName;\nMe:MethodName(args);",
+		Syntax:  "Me;\nMe:FieldName;\nMe:MethodName(args)",
 	},
 	"request": {
 		Title:   "Request",
 		Summary: "An ambient identifier in endpoint scripts that holds the incoming HTTP request.",
-		Syntax:  "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args);",
+		Syntax:  "Request;\nRequest:PropertyName;\nRequest:CollectionName:Key;\nRequest:MethodName(args)",
 	},
 	"response": {
 		Title:   "Response",
 		Summary: "An ambient identifier in endpoint scripts that holds the outgoing HTTP response.",
-		Syntax:  "Response:PropertyName := value;\nResponse:MethodName(args);",
+		Syntax:  "Response:PropertyName := value;\nResponse:MethodName(args)",
 	},
 }

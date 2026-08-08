@@ -31,6 +31,18 @@ history:
       targets contribute their declared variable names to the including
       file's diagnostics, transitively with a cycle guard. Consumed by
       diag.undeclared_variable and diag.invalid_sql_param.
+  - date: 2026-08-07
+    ref: "issue #143 (ssl-style-guide#37)"
+    note: >-
+      Resolver audited against the namespace doctrine adopted upstream:
+      applications and server-script categories share a single namespace,
+      so a dotted path's first segment always names exactly one container.
+      The resolver was already consistent — it models categories only and
+      has no application-vs-category precedence hedging. (The 2-part
+      Cat.Script vs Script.Proc dual interpretation is shape ambiguity
+      within the language, not a namespace collision, and is unaffected.)
+      Class-only dispatch classification (DispatchResolvesToClassOnly)
+      added for diag.execfunction_class_target.
 issues: []
 ---
 

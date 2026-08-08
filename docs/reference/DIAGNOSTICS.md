@@ -34,6 +34,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
 | `datasource_default_required` | Data source parameter missing its inline default | error | authoritative | active | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
+| `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |
 | `default_on_declare_line` | :DEFAULT on the same line as :DECLARE | error | tool | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |
 | `deprecated_keyword` | Legacy keyword discouraged in new code | warning | tool | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
@@ -45,6 +46,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | tool | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
 | `equals_vs_strict_equals` | String comparison with = is prefix matching | info | advisory | active | [diag.equals_vs_strict_equals](../../catalog/diagnostics/equals_vs_strict_equals.md) |
 | `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
+| `execfunction_class_target` | ExecFunction targets a class file | error | authoritative | active | [diag.execfunction_class_target](../../catalog/diagnostics/execfunction_class_target.md) |
 | `execfunction_missing_quotes` | Unquoted namespace path in ExecFunction/DoProc | error | tool | active | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
 | `exitfor_in_finally` | :EXITFOR inside a :FINALLY block | error | authoritative | active | [diag.exitfor_in_finally](../../catalog/diagnostics/exitfor_in_finally.md) |
 | `exitfor_outside_loop` | EXITFOR outside a FOR loop | error | authoritative | active | [diag.exitfor_outside_loop](../../catalog/diagnostics/exitfor_outside_loop.md) |
@@ -86,6 +88,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
+| `raiseerror_in_catch` | RaiseError called inside :CATCH | warning | style_only | active | [diag.raiseerror_in_catch](../../catalog/diagnostics/raiseerror_in_catch.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
 | `region_end_mismatch` | Region end marker with no open region | warning | tool | active | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
 | `region_legacy` | REGION keyword flagged as legacy (removed — premise was wrong) | info | tool | removed | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |

@@ -44,6 +44,15 @@ history:
       bare words, prose-shaped SELECT lists, and SET/target clauses
       without SQL shape are rejected; only argument 0 of a known SQL
       function is a SQL candidate.
+  - date: 2026-08-07
+    ref: "issue #140"
+    note: >-
+      Split SQL-string assignments rejoin: a source line break between
+      ':=' and a detected SQL string, or between the string and its ';',
+      was preserved forever — the layout depended on how the input
+      happened to be split instead of converging on rule F / the
+      fits-inline form. Single line breaks at those two seams now join
+      before layout so every input reaches the same canonical shape.
 issues: ["#81", "#82"]
 ---
 
@@ -85,6 +94,13 @@ are considered. Within the exception:
   ever a candidate — friendly names, LSearch default values, and parameter
   arrays are byte-preserved even when they look like SQL (issue #82).
 - SQL parameter placeholders (`?param?`) are preserved verbatim.
+- Split assignments converge (issue #140): a single source line break
+  between `:=` and a detected SQL string, and between the string and its
+  terminating `;`, is joined before layout — so
+  `sSQL :=` / `"SELECT ..."` / `;` on three lines reaches the same
+  canonical result as the one-line form (inline when it fits, rule F
+  when it doesn't). Non-SQL strings keep their user line breaks, and
+  blank lines (two or more newlines) at those seams are never joined.
 
 ## Examples
 
@@ -149,6 +165,56 @@ sSql := [
     WHERE sample_status = ?status?
     ORDER BY sample_id
 ];
+```
+
+A split assignment — line break after `:=` and a dangling `;` — rejoins
+and then takes the normal layout: inline when short (issue #140):
+
+### Before
+
+```ssl
+sSQL :=
+	"SELECT 1"
+;
+```
+
+### After
+
+```ssl
+sSQL := "SELECT 1";
+```
+
+The same split shape with an over-long SQL string rejoins and reflows to
+rule F:
+
+### Before
+
+```ssl
+sSql :=
+	"SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id"
+;
+```
+
+### After
+
+```ssl
+sSql := "
+    SELECT sample_id, sample_name, sample_status
+    FROM samples
+    WHERE sample_status = ?status?
+    ORDER BY sample_id
+";
+```
+
+A split non-SQL string keeps its user layout — joining is scoped to
+detected SQL:
+
+### Idempotent
+
+```ssl
+sMsg :=
+	"sample not found for the given identifier"
+;
 ```
 
 SQL that already spans lines is renormalized to the same layout:

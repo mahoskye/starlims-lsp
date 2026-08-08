@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"starlims-lsp/internal/lexer"
-	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
 )
 
@@ -40,13 +38,17 @@ func runValidate(args []string) {
 		}
 	}
 
-	// Check for --stdin flag
+	// Check for --stdin / --ds flags
 	useStdin := false
+	forceDataSource := false
 	files := make([]string, 0, len(args))
 	for _, arg := range args {
-		if arg == "--stdin" {
+		switch arg {
+		case "--stdin":
 			useStdin = true
-		} else {
+		case "--ds":
+			forceDataSource = true
+		default:
 			files = append(files, arg)
 		}
 	}
@@ -63,7 +65,7 @@ func runValidate(args []string) {
 	hasErrors := false
 
 	if useStdin {
-		result := validateStdin()
+		result := validateStdin(forceDataSource)
 		results = append(results, result)
 		if !result.Valid {
 			hasErrors = true
@@ -71,7 +73,7 @@ func runValidate(args []string) {
 	}
 
 	for _, filePath := range files {
-		result := validateFilePath(filePath)
+		result := validateFilePath(filePath, forceDataSource)
 		results = append(results, result)
 		if !result.Valid {
 			hasErrors = true
@@ -105,6 +107,9 @@ func printValidateHelp() {
 	fmt.Println()
 	fmt.Println("Flags:")
 	fmt.Println("  --stdin     Read SSL content from stdin instead of files")
+	fmt.Println("  --ds        Treat input as a data source (.ds) document; needed for")
+	fmt.Println("              stdin content, where there is no file extension to detect.")
+	fmt.Println("              Data source SQL content is exempt from SSL checks.")
 	fmt.Println("  --help      Print this help message")
 	fmt.Println()
 	fmt.Println("Exit codes:")
@@ -144,7 +149,7 @@ func printValidateHelp() {
 	fmt.Println("  echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin")
 }
 
-func validateFilePath(filePath string) DiagnosticOutput {
+func validateFilePath(filePath string, forceDataSource bool) DiagnosticOutput {
 	fileName := filepath.Base(filePath)
 
 	content, err := os.ReadFile(filePath)
@@ -164,7 +169,7 @@ func validateFilePath(filePath string) DiagnosticOutput {
 		}
 	}
 
-	return validateContent(fileName, string(content), isDataSourcePath(fileName))
+	return validateContent(fileName, string(content), forceDataSource || isDataSourcePath(fileName))
 }
 
 // isDataSourcePath checks if a file path refers to a data source file (.ds or .ds.txt).
@@ -173,7 +178,7 @@ func isDataSourcePath(name string) bool {
 	return strings.HasSuffix(lower, ".ds") || strings.HasSuffix(lower, ".ds.txt")
 }
 
-func validateStdin() DiagnosticOutput {
+func validateStdin(isDataSource bool) DiagnosticOutput {
 	content, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return DiagnosticOutput{
@@ -191,22 +196,18 @@ func validateStdin() DiagnosticOutput {
 		}
 	}
 
-	return validateContent("stdin", string(content), false)
+	return validateContent("stdin", string(content), isDataSource)
 }
 
 func validateContent(name string, content string, isDataSource bool) DiagnosticOutput {
-	// Tokenize
-	lex := lexer.NewLexer(content)
-	tokens := lex.Tokenize()
-
-	// Parse
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-
-	// Get diagnostics with default options
+	// Route through the text path, which owns data-source SQL-mode
+	// classification (feature.diagnostics_pipeline A14, issue #141): plain
+	// SQL .ds content gets no SSL diagnostics, and the hybrid
+	// directives-then-SQL shape keeps diagnostics on its header only —
+	// identical to the editor path in validateDocument.
 	opts := providers.DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = isDataSource
-	diagnostics := providers.GetDiagnosticsFromTokens(tokens, ast, opts)
+	diagnostics := providers.GetDiagnostics(content, opts)
 
 	// Convert to output format
 	details := make([]DiagnosticDetail, 0, len(diagnostics))
