@@ -334,3 +334,78 @@ func TestIsSQLModeDataSource(t *testing.T) {
 		}
 	}
 }
+
+// A SQL data-source body stays SQL-classified when a column or table name
+// collides with a SQL builtin-function name (`set FORMAT = …`) and when
+// string literals or SQL comments contain semicolons — the UpdateDocTypes
+// shape from issue #154. None of these may fall back to SSL parsing, so
+// none may produce any diagnostic. [spec feature.diagnostics_pipeline/A19]
+func TestGetDiagnostics_SQLDataSource_FunctionNameColumnsAndInertSemicolons(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	for name, content := range map[string]string{
+		"function_name_column": "update DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf'\nwhere ORIGREC = 1\n",
+		"function_name_table":  "delete from FORMAT where ORIGREC = 1\n",
+		"block_comment":        "/* examples: 'all;msoffice->pdf' and 'doc->pdf'; keep in sync */\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf'\nwhere ORIGREC = 1\n",
+		"line_comment":         "update DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' -- default is 'all;msoffice->pdf'; keep\nwhere ORIGREC = 1\n",
+		"hybrid":               ":DSN := \"LimsDB\";\n:PARAMETERS pDocType;\n\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' /* e.g. 'a;b'; note */\nwhere DOCTYPE = @pDocType\n",
+	} {
+		if diags := GetDiagnostics(content, opts); len(diags) != 0 {
+			t.Errorf("%s: expected no diagnostics, got %+v", name, diags)
+		}
+	}
+}
+
+// A bare `;` outside comments and string literals in a SQL-mode
+// data-source body warns with datasource_sql_semicolon at the semicolon's
+// position — including in the hybrid shape, where positions are offset
+// past the directive header and the header's own `;` terminators never
+// flag. The warning honors rule overrides and never fires outside
+// data-source files. [spec feature.diagnostics_pipeline/A20]
+func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	collect := func(content string, o DiagnosticOptions) []Diagnostic {
+		var hits []Diagnostic
+		for _, d := range GetDiagnostics(content, o) {
+			if d.Code == CodeDatasourceSQLSemicolon {
+				hits = append(hits, d)
+			}
+		}
+		return hits
+	}
+
+	plain := "update A set X = 1;\nupdate B set Y = 2\n"
+	hits := collect(plain, opts)
+	if len(hits) != 1 {
+		t.Fatalf("plain: expected exactly one separator warning, got %+v", hits)
+	}
+	if hits[0].Severity != SeverityWarning {
+		t.Errorf("plain: expected warning severity, got %d", hits[0].Severity)
+	}
+	if hits[0].Range.Start.Line != 0 || hits[0].Range.Start.Character != 18 {
+		t.Errorf("plain: expected range at 0:18 (the ';'), got %+v", hits[0].Range)
+	}
+
+	hybrid := ":DSN := \"LimsDB\";\n:PARAMETERS p1;\n\nselect A from B where C = @p1;\n"
+	hits = collect(hybrid, opts)
+	if len(hits) != 1 {
+		t.Fatalf("hybrid: expected exactly one separator warning (header ';' must not flag), got %+v", hits)
+	}
+	if hits[0].Range.Start.Line != 3 || hits[0].Range.Start.Character != 29 {
+		t.Errorf("hybrid: expected range at 3:29 (the body ';'), got %+v", hits[0].Range)
+	}
+
+	override := opts
+	override.RuleOverrides = map[string]string{CodeDatasourceSQLSemicolon: "off"}
+	if hits := collect(plain, override); len(hits) != 0 {
+		t.Errorf("override off: expected no separator warnings, got %+v", hits)
+	}
+
+	ssl := DefaultDiagnosticOptions()
+	if hits := collect(":DECLARE nX;\nnX := 1;\n", ssl); len(hits) != 0 {
+		t.Errorf("ssl file: separator warning must not fire outside data sources, got %+v", hits)
+	}
+}

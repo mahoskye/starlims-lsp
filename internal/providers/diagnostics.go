@@ -111,21 +111,32 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// such as dot-qualified column names (feature.diagnostics_pipeline
 	// A10-A12, issue #77). The server routes data-source documents through
 	// this text path in validateDocument.
+	// SQL-mode bodies carry no SSL tokens, so suppression comments cannot
+	// apply there; rule overrides still must (the config surface may not
+	// diverge between SSL and SQL-mode diagnostics), hence the explicit
+	// applyRuleOverrides on both SQL-mode paths below.
+	var sqlBodyDiagnostics []Diagnostic
 	if opts.IsDataSourceFile {
 		// A comment-only stub (a terminated /* banner */ and nothing else)
-		// is the schema's header_comment shape, not SSL — no diagnostics
-		// (feature.diagnostics_pipeline A16, issue #148).
+		// is the schema's header_comment shape, not SSL — no SSL
+		// diagnostics (feature.diagnostics_pipeline A16, issue #148). The
+		// only check that runs on a whole-document SQL body is the bare
+		// statement-separator warning (issue #154).
 		if IsSQLDocument(text) || IsSQLCommentOnly(text) {
-			return nil
+			return applyRuleOverrides(checkDataSourceSQLSemicolons(text, 0), opts.RuleOverrides)
 		}
 		// Hybrid sql_data_source shape: builder directives / :PARAMETERS
 		// header — optionally preceded by a terminated header comment,
 		// which SplitDataSourceHeader masks to blanks — followed by raw
 		// SQL, or by nothing (directives-only stub). The header keeps its
-		// SSL and data-source checks; the SQL body is suppressed. The
-		// header is a position-preserving prefix of the document, so
-		// diagnostic ranges line up unchanged (issues #104, #148).
+		// SSL and data-source checks; the SQL body gets only the
+		// statement-separator warning (issue #154), offset past the
+		// header. The header is a position-preserving prefix of the
+		// document, so diagnostic ranges line up unchanged (issues #104,
+		// #148).
 		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && (IsSQLDocument(body) || strings.TrimSpace(body) == "") {
+			sqlBodyDiagnostics = applyRuleOverrides(
+				checkDataSourceSQLSemicolons(body, strings.Count(header, "\n")), opts.RuleOverrides)
 			text = header
 		}
 	}
@@ -134,7 +145,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
-	return collectDiagnostics(tokens, ast, p, opts)
+	return append(collectDiagnostics(tokens, ast, p, opts), sqlBodyDiagnostics...)
 }
 
 // GetDiagnosticsFromTokens returns diagnostics using cached tokens/AST.

@@ -34,6 +34,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
 | `datasource_default_required` | Data source parameter missing its inline default (removed — premise was wrong) | error | authoritative | removed | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
+| `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | warning | advisory | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |
 | `default_on_declare_line` | :DEFAULT on the same line as :DECLARE | error | tool | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |

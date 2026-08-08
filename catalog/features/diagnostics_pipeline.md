@@ -73,6 +73,17 @@ history:
       body at all keeps header-only diagnostics. Also removed
       datasource_default_required from the data-source check set
       (defaultless :PARAMETERS is valid; spec fix in ssl-style-guide#48).
+  - date: 2026-08-08
+    ref: "issue #154, ssl-style-guide#50/#51"
+    note: >-
+      SQL-mode classification made robust to column/table names that
+      collide with SQL builtin-function names (`set FORMAT = …` fell back
+      to SSL parsing, where the SSL comment rule mangled string literals
+      like 'all;msoffice->pdf'), per the schema's sql_data_source comment
+      semantics (semicolons in SQL comments and quoted literals are
+      content). Bare `;` statement separators in a SQL-mode body now warn
+      with datasource_sql_semicolon — the one semicolon case the schema
+      leaves undefined.
 issues: []
 ---
 
@@ -169,6 +180,8 @@ rules (those are `diag.*` entries).
 - A16: Given a data-source document containing only terminated SQL comments (`/* banner */`, `--` lines) and whitespace, when diagnostics are collected, then the result is empty; a document whose comment is the unterminated SSL form (`/* text;`) is NOT comment-classified and keeps SSL diagnostics.
 - A17: Given a data-source document whose builder-directive / `:PARAMETERS` header is preceded by a terminated `/* ... */` comment, when diagnostics are collected, then hybrid detection still applies — no diagnostic fires on the comment or the SQL body, header lines keep their SSL and data-source checks at unshifted positions.
 - A18: Given a data-source document containing a recognized header (optionally preceded by a terminated comment) and nothing after it, when diagnostics are collected, then header lines keep their checks and no comment-related diagnostic fires.
+- A19: Given a SQL data-source body whose column or table names collide with SQL builtin-function names (`set FORMAT = …`, `delete from FORMAT`), or whose SQL comments and quoted string literals contain semicolons (`'all;msoffice->pdf'`), when diagnostics are collected, then the document classifies as SQL mode and no diagnostic fires on any of it.
+- A20: Given a SQL-mode data-source body containing a `;` outside comments and string literals, when diagnostics are collected, then exactly one `datasource_sql_semicolon` warning fires per such semicolon at its position (offset past the header in the hybrid shape, whose own `;` terminators never flag); the warning honors rule overrides and never fires outside data-source files.
 
 ## Rationale
 

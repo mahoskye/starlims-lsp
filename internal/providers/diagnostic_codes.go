@@ -46,6 +46,7 @@ const (
 
 	// Schema lints — datasource.
 	CodeNoDefaultStatementsInDatasource = "no_default_statements_in_datasource"
+	CodeDatasourceSQLSemicolon          = "datasource_sql_semicolon"
 
 	// Schema lints — deprecated.
 	CodeDeprecatedKeyword = "deprecated_keyword"
