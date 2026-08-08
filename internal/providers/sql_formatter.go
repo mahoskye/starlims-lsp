@@ -1153,6 +1153,16 @@ func hasBareIdentifierRun(tokens []SQLToken, n int) bool {
 	return false
 }
 
+// isSQLNameToken reports whether a token can serve as a table or column
+// name. Builtin-function names count: SQL permits columns named FORMAT,
+// STR, etc., and the lexer types those as SQLTokenFunction even in name
+// position (`set FORMAT = …` — issue #154's UpdateDocTypes shape must
+// classify as SQL). The English-prose guards stay identifier-only: prose
+// words never lex as functions, so widening them would gain nothing.
+func isSQLNameToken(t SQLToken) bool {
+	return t.Type == SQLTokenIdentifier || t.Type == SQLTokenFunction
+}
+
 // validateTargetAfter checks that the token following keyword kw looks like
 // a table reference: an identifier (dotted qualification allowed), followed
 // by at most one alias identifier, then a keyword, punctuation, or the end
@@ -1175,12 +1185,12 @@ func validateTargetAfter(tokens []SQLToken, kw string) bool {
 	if tokens[i].Text == "(" {
 		return true
 	}
-	if tokens[i].Type != SQLTokenIdentifier {
+	if !isSQLNameToken(tokens[i]) {
 		return false
 	}
 	i++
 	// Dotted qualification: schema.table
-	for i+1 < len(tokens) && tokens[i].Text == "." && tokens[i+1].Type == SQLTokenIdentifier {
+	for i+1 < len(tokens) && tokens[i].Text == "." && isSQLNameToken(tokens[i+1]) {
 		i += 2
 	}
 	// Optional alias.
@@ -1214,11 +1224,11 @@ func validateSetClause(tokens []SQLToken) bool {
 	if tokens[i].Text == "(" {
 		return true
 	}
-	if tokens[i].Type != SQLTokenIdentifier {
+	if !isSQLNameToken(tokens[i]) {
 		return false
 	}
 	i++
-	for i+1 < len(tokens) && tokens[i].Text == "." && tokens[i+1].Type == SQLTokenIdentifier {
+	for i+1 < len(tokens) && tokens[i].Text == "." && isSQLNameToken(tokens[i+1]) {
 		i += 2
 	}
 	return i < len(tokens) && tokens[i].Text == "="
