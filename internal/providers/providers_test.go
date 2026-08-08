@@ -1960,7 +1960,9 @@ func TestGetDiagnostics_DoProcInClassMethod(t *testing.T) {
 func TestGetDiagnostics_DoProcInClassMethod_QualifiedAndUnprovableTargetsAllowed(t *testing.T) {
 	// Qualified "Category.Script.Procedure" references are valid inside
 	// class methods, and non-literal targets are not provable — neither may
-	// flag (issue #151, ssl-style-guide#49).
+	// flag (issue #151, ssl-style-guide#49). ExecFunction has no
+	// class-method restriction in any form, including unqualified
+	// string-literal targets.
 	cases := []struct {
 		name string
 		code string
@@ -1992,6 +1994,16 @@ func TestGetDiagnostics_DoProcInClassMethod_QualifiedAndUnprovableTargetsAllowed
 	:PARAMETERS oInput;
 	:DECLARE bResult;
 	bResult := ExecFunction("API_Helper.ValidationHelper.ValidateProperties", {oInput});
+	:RETURN bResult;
+:ENDPROC;`,
+		},
+		{
+			name: "unqualified ExecFunction target",
+			code: `:CLASS ValidationClient;
+:PROCEDURE CheckInput;
+	:PARAMETERS oInput;
+	:DECLARE bResult;
+	bResult := ExecFunction("ValidateProperties", {oInput});
 	:RETURN bResult;
 :ENDPROC;`,
 		},
