@@ -409,3 +409,69 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 		t.Errorf("ssl file: separator warning must not fire outside data sources, got %+v", hits)
 	}
 }
+
+// A @name placeholder in a SQL-mode data-source body with no matching
+// :PARAMETERS declaration warns with datasource_undeclared_placeholder;
+// declared placeholders (any casing), @@system functions, @name inside
+// literals and comments, unused declared parameters, and DECLARE-scripted
+// bodies stay silent. [spec feature.diagnostics_pipeline/A21]
+func TestGetDiagnostics_DataSourceUndeclaredPlaceholder(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	collect := func(content string) []Diagnostic {
+		var hits []Diagnostic
+		for _, d := range GetDiagnostics(content, opts) {
+			if d.Code == CodeDatasourceUndeclaredPlaceholder {
+				hits = append(hits, d)
+			}
+		}
+		return hits
+	}
+
+	// Hybrid shape: typo'd placeholder flags at its position, offset past
+	// the header; the declared one does not.
+	hybrid := ":DSN := \"LimsDB\";\n:PARAMETERS pFolderNo;\n\nselect SAMPLEID from SAMPLES\nwhere FOLDERNO = @pFolder and STATUS = @pFolderNo\n"
+	hits := collect(hybrid)
+	if len(hits) != 1 {
+		t.Fatalf("hybrid: expected exactly one undeclared-placeholder warning, got %+v", hits)
+	}
+	if hits[0].Severity != SeverityWarning {
+		t.Errorf("hybrid: expected warning severity, got %d", hits[0].Severity)
+	}
+	if hits[0].Range.Start.Line != 4 || hits[0].Range.Start.Character != 17 || hits[0].Range.End.Character != 25 {
+		t.Errorf("hybrid: expected range 4:17-4:25 (the '@pFolder'), got %+v", hits[0].Range)
+	}
+
+	// Whole-document SQL body with no header: every real placeholder is
+	// undeclared.
+	if hits := collect("select SAMPLEID from SAMPLES where FOLDERNO = @pFolderNo\n"); len(hits) != 1 {
+		t.Errorf("headerless: expected one undeclared-placeholder warning, got %+v", hits)
+	}
+
+	for name, content := range map[string]string{
+		"case_insensitive_match": ":PARAMETERS pFolderNo;\n\nselect SAMPLEID from SAMPLES where FOLDERNO = @PFOLDERNO\n",
+		"default_with_commas":    ":PARAMETERS pIds := {1,2}, pStatus := Foo(1, 2);\n\nselect SAMPLEID from SAMPLES where STATUS = @pStatus and ORIGREC in (@pIds)\n",
+		"system_function":        ":PARAMETERS pFolderNo;\n\nselect @@ROWCOUNT from SAMPLES where FOLDERNO = @pFolderNo\n",
+		"literal_and_comment":    "select SAMPLEID from SAMPLES where NOTE = '@pX' -- mentions @pY\n",
+		"unused_declared":        ":PARAMETERS pFolderNo;\n\nselect SAMPLEID from SAMPLES\n",
+	} {
+		if hits := collect(content); len(hits) != 0 {
+			t.Errorf("%s: expected no undeclared-placeholder warnings, got %+v", name, hits)
+		}
+	}
+
+	// A body that declares its own SQL variables bows the check out
+	// entirely (tested against the helper directly: a DECLARE-first body
+	// does not classify as SQL mode, so the wired path never sees one
+	// with a leading DECLARE).
+	if hits := checkDataSourceUndeclaredPlaceholders("declare @pLocal int\nselect SAMPLEID from SAMPLES where FOLDERNO = @pLocal and X = @pOther\n", nil, 0); len(hits) != 0 {
+		t.Errorf("declare_scripted_body: expected bow-out, got %+v", hits)
+	}
+
+	// A DECLARE inside a comment or literal is content and does NOT bow
+	// the check out.
+	if hits := collect("select SAMPLEID from SAMPLES where NOTE = 'declare' and FOLDERNO = @pFolderNo -- declare\n"); len(hits) != 1 {
+		t.Errorf("declare_in_content: expected one undeclared-placeholder warning, got %+v", hits)
+	}
+}
