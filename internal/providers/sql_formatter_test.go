@@ -1295,6 +1295,40 @@ func TestSQLFormatter_ListaggOnOverflow(t *testing.T) {
 	})
 }
 
+// --- KEEP (DENSE_RANK ...) ---
+
+func TestSQLFormatter_KeepDenseRank(t *testing.T) {
+	// Issue #132: KEEP (...) gets the WITHIN GROUP treatment — the compound
+	// stays glued to its aggregate, the paren contents (DENSE_RANK
+	// FIRST/LAST ORDER BY ...) stay inline, and KEEP itself is cased as a
+	// keyword instead of lowercased like an identifier.
+	runSQLLayoutCases(t, []struct{ name, input, want string }{
+		{
+			name:  "short_inline_with_casing",
+			input: "select deptno, min(sal) keep (dense_rank first order by sal) as lowest from emp group by deptno",
+			want: "SELECT deptno, MIN(sal) KEEP (DENSE_RANK FIRST ORDER BY sal) AS lowest\n" +
+				"FROM emp\n" +
+				"GROUP BY deptno",
+		},
+		{
+			// The OVER anchor must survive KEEP's paren: MAX(sal) KEEP (...)
+			// is one compound call, so the window spec anchors at the
+			// aggregate's column, not at a broken continuation line.
+			name:  "keep_then_over_window_spec",
+			input: "SELECT deptno, empno, MAX(sal) KEEP (DENSE_RANK LAST ORDER BY sal, comm) OVER (PARTITION BY deptno ORDER BY empno ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS best_sal FROM emp WHERE status = ? ORDER BY deptno",
+			want: "SELECT deptno, empno,\n" +
+				"       MAX(sal) KEEP (DENSE_RANK LAST ORDER BY sal, comm) OVER (\n" +
+				"           PARTITION BY deptno\n" +
+				"           ORDER BY empno\n" +
+				"           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n" +
+				"       ) AS best_sal\n" +
+				"FROM emp\n" +
+				"WHERE status = ?\n" +
+				"ORDER BY deptno",
+		},
+	})
+}
+
 // --- MERGE multi-line ON ---
 
 func TestSQLFormatter_MergeMultilineOn(t *testing.T) {

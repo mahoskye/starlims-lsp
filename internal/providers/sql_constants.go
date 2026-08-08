@@ -28,7 +28,7 @@ var SQLKeywords = map[string]bool{
 	"ADD": true, "MODIFY": true,
 	// Additional
 	"OUTER": true, "FOR": true, "WITHIN": true, "UNBOUNDED": true,
-	"OVERFLOW": true,
+	"OVERFLOW": true, "KEEP": true,
 	// Oracle data types and pseudocolumns (uppercased in SQL context)
 	"NUMBER": true, "VARCHAR2": true, "DATE": true, "INTERVAL": true,
 	"LEVEL": true, "NEXTVAL": true, "CURRVAL": true,

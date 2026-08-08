@@ -477,6 +477,18 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		return true
 	}
 
+	// A split SQL-string assignment rejoins (fmt.sql_in_strings, issue
+	// #140): a single line break between ':=' and a detected SQL string, or
+	// between that string and its terminating ';', is treated as a plain
+	// space so the statement converges on the canonical layout (inline when
+	// it fits, rule F when it doesn't) instead of preserving whatever split
+	// the source happened to have. Blank-line runs and lines carrying an
+	// end-of-line comment are left alone.
+	if strings.Count(token.Text, "\n") == 1 && s.pendingComment == nil &&
+		s.shouldJoinSQLStringBreak(tokens, index) {
+		token.Text = " "
+	}
+
 	if strings.Contains(token.Text, "\n") {
 		if s.opts.SemicolonEnforcement && needsSemicolonAtLineEnd(s.lastNonWSToken, tokens, index) {
 			s.builder.WriteString(";")
@@ -562,6 +574,44 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 
 	s.prevToken = token
 	return true
+}
+
+// shouldJoinSQLStringBreak reports whether a newline whitespace token sits at
+// one of the two seams of a split SQL-string assignment (issue #140):
+// directly after ':=' with a detected SQL string next, or directly after the
+// SQL string with its ';' next. Detection mirrors writeTokenWithSQLFormatting:
+// outside SQL function calls it requires DetectSQLStrings, and only argument
+// 0 of a SQL function call is ever a SQL candidate.
+func (s *formatState) shouldJoinSQLStringBreak(tokens []lexer.Token, index int) bool {
+	next := findNextNonWS(tokens, index)
+	if next == nil {
+		return false
+	}
+	if s.lastNonWSToken.Type == lexer.TokenOperator && s.lastNonWSToken.Text == ":=" &&
+		next.Type == lexer.TokenString {
+		return s.isDetectedSQLString(*next)
+	}
+	if s.lastNonWSToken.Type == lexer.TokenString &&
+		next.Type == lexer.TokenPunctuation && next.Text == ";" {
+		return s.isDetectedSQLString(s.lastNonWSToken)
+	}
+	return false
+}
+
+// isDetectedSQLString applies the fmt.sql_in_strings candidacy gates to a
+// string token: quote-delimited, allowed by DetectSQLStrings / SQL-function
+// argument position, and structurally SQL (IsSQLString).
+func (s *formatState) isDetectedSQLString(tok lexer.Token) bool {
+	if len(tok.Text) < 2 {
+		return false
+	}
+	if !s.opts.SQL.DetectSQLStrings && !s.inSQLFunction {
+		return false
+	}
+	if s.inSQLFunction && s.sqlArgCount > 0 {
+		return false
+	}
+	return IsSQLString(tok.Text[1 : len(tok.Text)-1])
 }
 
 // findNextNonWS returns the next non-whitespace token starting from startIdx+1, or nil.

@@ -128,6 +128,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// WITHIN GROUP (...) suppression (S51/S52 — issue #119).
 	inWithinGroup := false
 	withinGroupParenDepth := 0
+	// KEEP (DENSE_RANK ...) suppression — same treatment as WITHIN GROUP:
+	// the compound stays glued to its aggregate and the paren contents stay
+	// inline (issue #132).
+	inKeep := false
+	keepParenDepth := 0
 	// Column where a MERGE UPDATE SET's first assignment starts, for
 	// aligning subsequent assignments (S43 — issue #95).
 	mergeSetCol := -1
@@ -215,6 +220,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		}
 		if t.Text == ")" && inWithinGroup && parenDepth == withinGroupParenDepth-1 {
 			inWithinGroup = false
+		}
+
+		// Track KEEP (...) — glued compound, inline contents (issue #132).
+		if upperText == "KEEP" && t.Type == SQLTokenKeyword {
+			inKeep = true
+			keepParenDepth = parenDepth + 1
+		}
+		if t.Text == ")" && inKeep && parenDepth == keepParenDepth-1 {
+			inKeep = false
 		}
 
 		// Enter the OVER window-spec state at its '(' (issue #122). Deciding
@@ -314,6 +328,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
 					// ORDER BY etc. inside WITHIN GROUP (...) stays inline
 					needsBreak = false
+				} else if inKeep && parenDepth >= keepParenDepth {
+					// ORDER BY inside KEEP (...) stays inline (issue #132)
+					needsBreak = false
 				} else if inOverClause && parenDepth >= overParenDepth {
 					// clauses inside OVER (...) are laid out solely by the
 					// dedicated window-spec rule (issue #122)
@@ -348,6 +365,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					needsBreak = false
 				} else if inWithinGroup && parenDepth >= withinGroupParenDepth {
 					// contents of WITHIN GROUP (...) stay inline (issue #119)
+					needsBreak = false
+				} else if inKeep && parenDepth >= keepParenDepth {
+					// contents of KEEP (...) stay inline (issue #132)
 					needsBreak = false
 				} else if inOverClause && parenDepth >= overParenDepth {
 					// AND/OR inside OVER (...) — e.g. a CASE predicate in
@@ -718,6 +738,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			funcCol := -1
 			if prev != nil && prev.Type == SQLTokenFunction {
 				funcCol = lastTokStartCol
+			} else if prev != nil && prev.Type == SQLTokenKeyword &&
+				strings.ToUpper(prev.Text) == "KEEP" {
+				// MAX(x) KEEP (...) is one compound call for anchor purposes:
+				// closing KEEP's paren must not clobber the aggregate's column,
+				// or a following OVER anchors to the wrong place (issue #132).
+				funcCol = lastClosedCallCol
 			}
 			parenFuncCols = append(parenFuncCols, funcCol)
 		} else if t.Text == ")" {
