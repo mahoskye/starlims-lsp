@@ -112,14 +112,20 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// A10-A12, issue #77). The server routes data-source documents through
 	// this text path in validateDocument.
 	if opts.IsDataSourceFile {
-		if IsSQLDocument(text) {
+		// A comment-only stub (a terminated /* banner */ and nothing else)
+		// is the schema's header_comment shape, not SSL — no diagnostics
+		// (feature.diagnostics_pipeline A16, issue #148).
+		if IsSQLDocument(text) || IsSQLCommentOnly(text) {
 			return nil
 		}
 		// Hybrid sql_data_source shape: builder directives / :PARAMETERS
-		// header followed by raw SQL (issue #104). The header keeps its SSL
-		// and data-source checks; the SQL body is suppressed. The header is
-		// a prefix of the document, so diagnostic ranges line up unchanged.
-		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && IsSQLDocument(body) {
+		// header — optionally preceded by a terminated header comment,
+		// which SplitDataSourceHeader masks to blanks — followed by raw
+		// SQL, or by nothing (directives-only stub). The header keeps its
+		// SSL and data-source checks; the SQL body is suppressed. The
+		// header is a position-preserving prefix of the document, so
+		// diagnostic ranges line up unchanged (issues #104, #148).
+		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && (IsSQLDocument(body) || strings.TrimSpace(body) == "") {
 			text = header
 		}
 	}
@@ -205,7 +211,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	if opts.IsDataSourceFile {
 		diagnostics = append(diagnostics, checkKeywordFormsDataSource(tokens)...)
 		diagnostics = append(diagnostics, checkDataSourceDefaultUsage(tokens)...)
-		diagnostics = append(diagnostics, checkDataSourceParameterDefaults(tokens)...)
 	} else {
 		diagnostics = append(diagnostics, checkKeywordForms(tokens)...)
 		diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
@@ -5535,80 +5540,6 @@ func checkDataSourceDefaultUsage(tokens []lexer.Token) []Diagnostic {
 				Source:   "ssl-lsp",
 				Code:     CodeNoDefaultStatementsInDatasource,
 			})
-		}
-	}
-
-	return diagnostics
-}
-
-// checkDataSourceParameterDefaults checks that every parameter in a data source
-// :PARAMETERS declaration has an inline := default value.
-// Expected syntax: :PARAMETERS p1 := val1, p2 := val2;
-//
-// The scanner uses a state machine: after finding a parameter name (identifier),
-// it expects := followed by a default value. The default value is consumed
-// (skipped until , or ;) so that identifiers within default values are not
-// mistaken for parameter names.
-func checkDataSourceParameterDefaults(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		if token.Type != lexer.TokenKeyword {
-			continue
-		}
-		normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-		if normalized != "PARAMETERS" {
-			continue
-		}
-
-		// State machine scanning the :PARAMETERS statement.
-		// expectParam: true when we expect the next identifier to be a parameter name.
-		j := i + 1
-		expectParam := true
-		for j < len(tokens) {
-			t := tokens[j]
-			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
-				break
-			}
-			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
-				j++
-				continue
-			}
-
-			if expectParam && t.Type == lexer.TokenIdentifier {
-				// This is a parameter name. Look ahead for :=
-				k := j + 1
-				for k < len(tokens) && tokens[k].Type == lexer.TokenWhitespace {
-					k++
-				}
-				if k >= len(tokens) || tokens[k].Type != lexer.TokenOperator || tokens[k].Text != ":=" {
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
-						Range:    tokenToRange(t),
-						Message:  fmt.Sprintf("Data source parameter '%s' must have an inline ':=' default value", t.Text),
-						Source:   "ssl-lsp",
-						Code:     CodeDatasourceDefaultRequired,
-					})
-					// Skip to next comma or semicolon
-					for j < len(tokens) && !(tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ";")) {
-						j++
-					}
-				} else {
-					// Skip past := and consume the default value until , or ;
-					j = k + 1
-					for j < len(tokens) && !(tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ";")) {
-						j++
-					}
-				}
-				expectParam = false
-				continue
-			}
-
-			if t.Type == lexer.TokenPunctuation && t.Text == "," {
-				expectParam = true
-			}
-			j++
 		}
 	}
 

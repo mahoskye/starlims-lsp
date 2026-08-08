@@ -46,7 +46,6 @@ const (
 
 	// Schema lints — datasource.
 	CodeNoDefaultStatementsInDatasource = "no_default_statements_in_datasource"
-	CodeDatasourceDefaultRequired       = "datasource_default_required"
 
 	// Schema lints — deprecated.
 	CodeDeprecatedKeyword = "deprecated_keyword"

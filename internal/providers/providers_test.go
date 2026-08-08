@@ -7748,55 +7748,19 @@ func TestGetDiagnostics_DataSource_DefaultStatementFlagged(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_DataSource_MissingInlineDefault(t *testing.T) {
-	// Every parameter must have an inline := default in data source files
+func TestGetDiagnostics_DataSource_ParametersWithoutDefaultsValid(t *testing.T) {
+	// diag.datasource_default_required was removed (issue #147,
+	// ssl-style-guide#48): the data source builder accepts :PARAMETERS
+	// without inline defaults, so no default-related error may fire.
 	code := `:PARAMETERS sName, nCount := 10;`
 
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 	diagnostics := GetDiagnostics(code, opts)
 
-	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "sName") && strings.Contains(d.Message, "inline ':=' default") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("expected diagnostic for parameter 'sName' missing inline default")
-	}
-}
-
-func TestGetDiagnostics_DataSource_ValidInlineDefaults(t *testing.T) {
-	// Valid data source :PARAMETERS with inline defaults should not produce errors
-	code := `:PARAMETERS sName := '', nCount := 10;`
-
-	opts := DefaultDiagnosticOptions()
-	opts.IsDataSourceFile = true
-	diagnostics := GetDiagnostics(code, opts)
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "inline ':=' default") {
-			t.Errorf("valid inline defaults should not be flagged: %s", d.Message)
-		}
-	}
-}
-
-func TestGetDiagnostics_DataSource_IdentifierDefaultNotFalsePositive(t *testing.T) {
-	// Default values that are identifiers (constants/variables) should NOT be
-	// flagged as parameters missing defaults
-	code := `:PARAMETERS sName := DEFAULT_VALUE, nCount := SOME_CONST;`
-
-	opts := DefaultDiagnosticOptions()
-	opts.IsDataSourceFile = true
-	diagnostics := GetDiagnostics(code, opts)
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DEFAULT_VALUE") && strings.Contains(d.Message, "inline ':=' default") {
-			t.Error("identifier default value 'DEFAULT_VALUE' should not be flagged as a parameter missing a default")
-		}
-		if strings.Contains(d.Message, "SOME_CONST") && strings.Contains(d.Message, "inline ':=' default") {
-			t.Error("identifier default value 'SOME_CONST' should not be flagged as a parameter missing a default")
+		if strings.Contains(d.Message, "inline ':=' default") || d.Code == "datasource_default_required" {
+			t.Errorf("defaultless data source parameter must not be flagged: %s", d.Message)
 		}
 	}
 }
