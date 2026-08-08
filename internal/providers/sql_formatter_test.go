@@ -1298,10 +1298,10 @@ func TestSQLFormatter_ListaggOnOverflow(t *testing.T) {
 // --- KEEP (DENSE_RANK ...) ---
 
 func TestSQLFormatter_KeepDenseRank(t *testing.T) {
-	// Issue #132: KEEP (...) gets the WITHIN GROUP treatment — the compound
-	// stays glued to its aggregate, the paren contents (DENSE_RANK
-	// FIRST/LAST ORDER BY ...) stay inline, and KEEP itself is cased as a
-	// keyword instead of lowercased like an identifier.
+	// sql-canonical-compact-reference §3.5: KEEP (...) gets the WITHIN GROUP
+	// treatment — the compound stays glued to its aggregate, the paren
+	// contents (DENSE_RANK FIRST/LAST ORDER BY ...) stay inline, and KEEP
+	// itself is cased as a keyword instead of lowercased like an identifier.
 	runSQLLayoutCases(t, []struct{ name, input, want string }{
 		{
 			name:  "short_inline_with_casing",
