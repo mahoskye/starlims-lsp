@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`raiseerror_in_catch` diagnostic (#142).** From the RaiseError
+  placement doctrine (ssl-style-guide#36): a `RaiseError(` call whose
+  nearest enclosing `:TRY` section is a `:CATCH` block warns — the error
+  handler must not become the thing that crashes. Raise-only helpers,
+  `:TRY`-body raises, and nested handlers stay silent.
+- **`execfunction_class_target` diagnostic (#143).** Cross-file check:
+  an `ExecFunction` dispatch string that resolves through the workspace
+  index to class files only errors — class files have no script entry
+  point and their methods are not invokable this way
+  (ssl-style-guide#42). Conservative by design: any resolution mix with
+  ordinary scripts stays quiet, and workspace-less consumers
+  (`--validate`) skip the check.
+- **Element data refresh.** Vendored reference/meta pick up the
+  error-handling and logging sweeps: RaiseError/GetLastSSLError/CATCH
+  doctrine content in hover, ExecFunction and DoProc class-file caveats,
+  operator titles with symbols, corrected RunSQL return semantics
+  (caveats coverage 363→400 elements, best practices 409→458).
+- **`:DECLARE` initializer diagnostic (#138).** `:DECLARE x := 1;` was
+  silently accepted even though authoritative SSL permits only a
+  comma-separated identifier list — class-level "constants" declared
+  this way are never assigned at runtime. Each inline `:=` in a
+  `:DECLARE` statement is now an error (`declare_initializer`), in
+  every context: procedure locals, script level, class fields, and
+  data-source files.
+- **`--validate --ds` flag.** Declares stdin content a data-source
+  document, since piped input has no `.ds` extension to detect; SQL-mode
+  suppression and the data-source rule set then apply.
+
+### Changed
+- **`prefer_exitcase` accepts `:RETURN` terminators (#139).** A `:CASE`/
+  `:OTHERWISE` clause whose final statement is `:RETURN` no longer
+  demands an unreachable `:EXITCASE`. Final-statement position only — a
+  conditional `:RETURN` mid-clause still flags, since fall-through past
+  it remains possible.
+
+### Fixed
+- **SQL formatter: `KEEP (DENSE_RANK ...)` (#132).** `KEEP` now cases as
+  a keyword, the compound stays glued to its aggregate with contents
+  inline (the WITHIN GROUP treatment), and a following `OVER (...)`
+  window spec anchors at the aggregate's column instead of a broken
+  continuation line.
+- **SQL formatter: split SQL-string assignments converge (#140).** A
+  line break between `:=` and a detected SQL string, or between the
+  string and its `;`, was preserved forever, so layout depended on how
+  the input happened to be split. Those seams now rejoin before layout:
+  short SQL lands inline (`sSQL := "SELECT 1";`), long SQL reflows to
+  the canonical rule-F shape. Non-SQL strings keep their line breaks.
+- **`--validate` false positives on `.ds` files (#141).** The CLI fed
+  tokens straight to diagnostic collection, bypassing the SQL-mode
+  data-source classification the editor path already had — so every SSL
+  check fired on the SQL body of `.ds` files (`dot_property_access` on
+  `table.column` names, bare `AND`/`OR`, missing semicolons). The CLI
+  now routes through the same classification: plain-SQL data sources
+  produce no diagnostics, and the hybrid `:PARAMETERS`-then-SQL shape
+  keeps checks on its header only. This also fixes the downstream
+  `ssl_diagnose` MCP tool once it picks up this release.
+
 ## [0.14.1] - 2026-07-25
 
 ### Changed
