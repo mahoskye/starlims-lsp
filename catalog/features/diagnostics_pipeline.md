@@ -59,6 +59,20 @@ history:
       even though the editor path suppressed them. --validate now routes
       through the same text-path classification, and a --ds flag marks
       stdin content as a data source (stdin has no URI to classify by).
+  - date: 2026-08-07
+    ref: "issues #147/#148, ssl-style-guide#48"
+    note: >-
+      Canonical optional header comment handled (schema
+      data_source_modules structure: header_comment precedes directives
+      and SQL): a data-source document that is only terminated SQL
+      comments and whitespace is SQL mode (banner-only stubs errored with
+      "SSL comments must end with a semicolon"), and hybrid header
+      detection now sees through leading terminated SQL comments (a
+      banner before :DSN previously reverted the whole file to SSL
+      parsing, silently skipping header checks). A header followed by no
+      body at all keeps header-only diagnostics. Also removed
+      datasource_default_required from the data-source check set
+      (defaultless :PARAMETERS is valid; spec fix in ssl-style-guide#48).
 issues: []
 ---
 
@@ -114,6 +128,22 @@ rules (those are `diag.*` entries).
   classification applies identically in every consumer: the editor path
   and the `--validate` CLI (issue #141). For `--validate --stdin`, where
   no URI exists, the `--ds` flag declares the content a data source.
+- Data-source header comments (issue #148): the schema's canonical
+  structure is `header_comment (optional)` → builder directives
+  (optional) → `:PARAMETERS` (optional) → SQL. Accordingly: a data-source
+  document containing only *terminated* SQL comments (`/* ... */`, `--`)
+  and whitespace is SQL mode — no diagnostics (banner-only stubs are
+  valid); and hybrid header detection ignores leading terminated SQL
+  comments before the first directive, masking them out of the header
+  text so header diagnostics keep their positions and the comment itself
+  produces none. An unterminated `/* text;` SSL comment never counts as a
+  SQL comment — such content keeps its SSL diagnostics. A recognized
+  header followed by an empty body (directives-only stub) keeps
+  header-only diagnostics.
+- The data-source check set does not require inline `:PARAMETERS`
+  defaults: `:PARAMETERS p1;` is valid data-source syntax (issue #147,
+  ssl-style-guide#48; the former `datasource_default_required` rule is
+  removed).
 - A panic in any diagnostic check MUST NOT crash the server: it is
   recovered, the stack trace is logged to stderr, and a single
   error-severity diagnostic with Code `internal_error` and Source `ssl-lsp`
@@ -133,9 +163,12 @@ rules (those are `diag.*` entries).
 - A10: Given a data-source document containing only a SQL statement (optionally preceded by `--` or `/* */` SQL comments), when diagnostics are collected, then the result is empty — no SSL diagnostic (dot_property_access or otherwise) fires on SQL syntax.
 - A11: Given a data-source document containing SSL code, when diagnostics are collected, then SSL and data-source diagnostics are produced exactly as before — SQL mode only activates on SQL content.
 - A12: Given a non-data-source document whose content is a SQL statement, when diagnostics are collected, then SSL diagnostics still run — SQL-mode classification is scoped to data-source files.
-- A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or an inline-defaults `:PARAMETERS` statement followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
+- A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or a `:PARAMETERS` statement (inline `:=` defaults optional) followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
 - A14: Given a `.ds` (or `.ds.txt`) file whose content is plain SQL or the hybrid header-then-SQL shape, when it is validated via the `--validate` CLI file path, then the result matches the editor path — no diagnostic fires on SQL content, header lines keep their checks — and an SSL-content `.ds` file keeps the full data-source diagnostic set.
 - A15: Given `--validate --stdin --ds`, when stdin content is validated, then it is classified as a data-source document (SQL-mode suppression and data-source rules apply); without `--ds`, stdin content is treated as an ordinary SSL document.
+- A16: Given a data-source document containing only terminated SQL comments (`/* banner */`, `--` lines) and whitespace, when diagnostics are collected, then the result is empty; a document whose comment is the unterminated SSL form (`/* text;`) is NOT comment-classified and keeps SSL diagnostics.
+- A17: Given a data-source document whose builder-directive / `:PARAMETERS` header is preceded by a terminated `/* ... */` comment, when diagnostics are collected, then hybrid detection still applies — no diagnostic fires on the comment or the SQL body, header lines keep their SSL and data-source checks at unshifted positions.
+- A18: Given a data-source document containing a recognized header (optionally preceded by a terminated comment) and nothing after it, when diagnostics are collected, then header lines keep their checks and no comment-related diagnostic fires.
 
 ## Rationale
 
@@ -158,7 +191,12 @@ editor usable and makes bug reports actionable. SQL-mode data sources
 looser keyword sniff so an SSL data source can never be misclassified:
 SSL leading comments (`/* text;`) swallow the rest of the file when
 SQL-lexed, and SSL keywords fail the command-keyword check — absent
-certainty, the file keeps its SSL diagnostics.
+certainty, the file keeps its SSL diagnostics. Header-comment handling
+(#148) keys off the same distinction in the other direction: only
+*terminated* comments are transparent, because a terminated `/* ... */`
+banner is definitionally a SQL comment while the SSL form has no `*/` —
+so comment-only classification and header masking can never hide SSL
+content from its diagnostics.
 
 ## Known gaps
 

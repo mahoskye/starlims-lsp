@@ -1,8 +1,8 @@
 ---
 id: diag.datasource_default_required
-title: Data source parameter missing its inline default
+title: Data source parameter missing its inline default (removed — premise was wrong)
 kind: diagnostic
-status: active
+status: removed
 authority: authoritative
 schema_ref: module_structure.data_source_modules.lint_rules.datasource_default_required
 default_severity: error
@@ -10,8 +10,7 @@ severity_overridable: true
 suppressible: true
 spec_options:
   is_data_source_file: true
-tests:
-  - internal/providers/providers_test.go
+tests: []
 history:
   - date: 2026-03-30
     ref: "commit f6e78ef"
@@ -22,45 +21,43 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
-issues: []
+  - date: 2026-08-07
+    ref: "issue #147, ssl-style-guide#48"
+    note: >-
+      Removed. The rule's premise was wrong: the data source builder
+      accepts `:PARAMETERS p1;` with no inline default (confirmed against
+      runtime behavior), so flagging every defaultless parameter as an
+      error false-flagged valid production .ds files. The rule faithfully
+      implemented the style-guide schema's `default_required: true`, which
+      is being corrected in ssl-style-guide#48. Constant, check, and tests
+      deleted.
+issues: ["#147"]
 ---
 
 ## Behavior
 
-Data-source-only rule (the file must be detected as a data source — URI
-ending in `.ds` or `.ds.txt`; the spec fences run with
-`is_data_source_file: true`). Flags each parameter name in a `:PARAMETERS`
-statement that is not immediately followed by an inline `:=` default value.
-Expected data source syntax is `:PARAMETERS p1 := val1, p2 := val2;`. One
-diagnostic per defaultless parameter, ranged on the parameter name.
+Removed. The rule flagged each parameter name in a data-source
+`:PARAMETERS` statement that was not immediately followed by an inline
+`:=` default value, at error severity — but the data source builder does
+not require a default per parameter: `:PARAMETERS p1;` is valid and in
+active production use. The style-guide schema's
+`data_source_modules.parameters.default_required: true`, which this rule
+enforced, is itself the error (spec fix tracked in ssl-style-guide#48).
 
-It must NOT flag:
+Inline `:=` defaults remain the correct way to express a default when one
+is wanted, and the complementary rule
+[`no_default_statements_in_datasource`](no_default_statements_in_datasource.md)
+(the `:DEFAULT`-statement form is an error in data source files) is
+unaffected — its correctness is an open question on ssl-style-guide#48,
+and it stays active until answered.
 
-- parameters that carry an inline `:=` default — the default value itself is
-  consumed whole (identifiers inside it, such as function calls, are never
-  mistaken for parameter names);
-- anything in ordinary (non-data-source) SSL files, where `:PARAMETERS`
-  without inline defaults is the normal form and defaults belong in
-  `:DEFAULT` statements.
-
-## Examples
-
-### Flags
-
-```ssl
-:PARAMETERS dtStart, sStatus := "A";
-```
-
-### Does not flag
-
-```ssl
-:PARAMETERS dtStart := Today(), sStatus := "A";
-```
+If the schema correction lands as "defaults recommended but optional", a
+future advisory/style rule may be specced as a new `planned` entry; a
+mandatory-default error must not return.
 
 ## Rationale
 
-The data source builder executes `:PARAMETERS` declarations directly and
-requires every parameter to have an inline default; a missing default breaks
-the data source at runtime, hence error severity (f6e78ef). The complementary
-rule `no_default_statements_in_datasource` rejects the `:DEFAULT`-statement
-form in the same files, so together they force the inline syntax.
+The removal follows the `region_legacy` precedent: a rule whose premise
+is factually wrong about the runtime produces pure noise on correct code,
+and no severity level makes it acceptable. See history (2026-08-07) and
+issue #147 for the confirming evidence.
