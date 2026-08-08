@@ -14,8 +14,8 @@
       "returns": 12
     },
     "with_exceptions": 263,
-    "with_caveats": 363,
-    "with_best_practices": 409
+    "with_caveats": 400,
+    "with_best_practices": 458
   },
   "elements": [
     {
@@ -47,7 +47,7 @@
       "id": "ssl.function.aeval",
       "element_type": "function",
       "title": "AEval",
-      "summary": "Evaluate a code block for each array element and return the same array.",
+      "summary": "Evaluates a code block for each array element and returns the same array.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AEval.md",
       "exceptions": [
@@ -90,7 +90,7 @@
       "id": "ssl.function.aevala",
       "element_type": "function",
       "title": "AEvalA",
-      "summary": "Evaluate a code block for each selected array element and write the result back to the same array.",
+      "summary": "Evaluates a code block for each selected array element and writes the result back to the same array.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AEvalA.md",
       "exceptions": [
@@ -133,7 +133,7 @@
       "id": "ssl.function.afill",
       "element_type": "function",
       "title": "AFill",
-      "summary": "Fill an array element range with the same value and return the same array.",
+      "summary": "Fills an array element range with the same value and returns the same array.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AFill.md",
       "exceptions": [
@@ -176,7 +176,7 @@
       "id": "ssl.function.alen",
       "element_type": "function",
       "title": "ALen",
-      "summary": "Return the number of elements in an array.",
+      "summary": "Returns the number of elements in an array.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ALen.md",
       "exceptions": [
@@ -203,7 +203,7 @@
       "id": "ssl.function.ascan",
       "element_type": "function",
       "title": "AScan",
-      "summary": "Return the index of the first array element that matches a value or condition.",
+      "summary": "Returns the index of the first array element that matches a value or condition.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AScan.md",
       "exceptions": [
@@ -246,7 +246,7 @@
       "id": "ssl.function.ascanexact",
       "element_type": "function",
       "title": "AScanExact",
-      "summary": "Return the index of the first array element that matches a value or condition exactly.",
+      "summary": "Returns the index of the first array element that matches a value or condition exactly.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AScanExact.md",
       "exceptions": [
@@ -364,7 +364,7 @@
       "id": "ssl.function.addproperty",
       "element_type": "function",
       "title": "AddProperty",
-      "summary": "Add one or more properties to an object.",
+      "summary": "Adds one or more properties to an object.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AddProperty.md",
       "exceptions": [
@@ -405,7 +405,7 @@
       "id": "ssl.function.addtosession",
       "element_type": "function",
       "title": "AddToSession",
-      "summary": "Store a non-object, non-array value in the current session under a string key.",
+      "summary": "Stores a non-object, non-array value in the current session under a string key.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AddToSession.md",
       "exceptions": [
@@ -440,7 +440,7 @@
       "id": "ssl.function.alltrim",
       "element_type": "function",
       "title": "AllTrim",
-      "summary": "Remove leading and trailing space characters from a string.",
+      "summary": "Removes leading and trailing space characters from a string.",
       "doc_status": "published",
       "source_path": "content/reference/functions/AllTrim.md",
       "exceptions": [
@@ -557,7 +557,7 @@
       "id": "ssl.function.arraynew",
       "element_type": "function",
       "title": "ArrayNew",
-      "summary": "Create a new array with up to three dimensions.",
+      "summary": "Creates a new array with up to three dimensions.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ArrayNew.md",
       "exceptions": [
@@ -592,7 +592,7 @@
       "id": "ssl.function.arraytotvp",
       "element_type": "function",
       "title": "ArrayToTVP",
-      "summary": "Convert a one-dimensional array into a table-valued parameter object.",
+      "summary": "Converts a one-dimensional array into a table-valued parameter object.",
       "doc_status": "published",
       "source_path": "content/reference/functions/ArrayToTVP.md",
       "exceptions": [
@@ -654,7 +654,7 @@
       "id": "ssl.function.asc",
       "element_type": "function",
       "title": "Asc",
-      "summary": "Return the character code of the first character in a string.",
+      "summary": "Returns the character code of the first character in a string.",
       "doc_status": "published",
       "source_path": "content/reference/functions/Asc.md",
       "exceptions": [
@@ -2451,6 +2451,7 @@
         }
       ],
       "caveats": [
+        "DoProc is a compile-time error inside class methods — every name form is rejected, not just same-class calls. Use Me:MethodName() or Base:MethodName() instead.",
         "One-segment names are resolved case-insensitively in the current script.",
         "Three-segment names are passed into the executor path instead of local method lookup."
       ],
@@ -4185,6 +4186,7 @@
         }
       ],
       "caveats": [
+        "A class file is not a runnable target: it has no script entry point, so a two-segment path naming a class file fails at runtime, and a three-segment path does not invoke its methods. Create the object with CreateUdObject and call the method on the instance instead.",
         "If the function name is misspelled, empty, or references a non-existent target, a runtime error is thrown with little context.",
         "All type validation is deferred to the time of invocation, so incorrect argument types or counts are only caught at runtime."
       ],
@@ -4197,7 +4199,8 @@
         "dont": [
           "Allow untrusted input to determine the function name or arguments without validation.",
           "Omit the second argument or provide a non-array value when the target expects arguments.",
-          "Assume all calls will succeed or ignore errors from dynamic invocation."
+          "Assume all calls will succeed or ignore errors from dynamic invocation.",
+          "Use ExecFunction to run a class file or call a class method — create the object with CreateUdObject and call the method on the instance."
         ]
       }
     },
@@ -4478,7 +4481,7 @@
       ],
       "caveats": [
         "Input JSON objects become SSLExpando instances and do not implement all methods of a standard SSL object.",
-        "Extra whitespace and line breaks are tolerated by the parser, but stray text before or after valid JSON raises an error."
+        "Extra whitespace and line breaks in the JSON are tolerated, but stray text before or after valid JSON raises an error."
       ],
       "best_practices": {
         "do": [
@@ -5473,7 +5476,7 @@
         "do": [
           "Call GetLastSQLError() immediately after the failing database operation or inside the matching :CATCH block.",
           "Check for NIL before reading properties from the returned object.",
-          "Use FormatSqlErrorMessage when you need a display-ready message, and inspect SQLState, GenCode, or Sql when you need structured diagnostics."
+          "Use FormatSqlErrorMessage when you need a human-readable message, and inspect SQLState, GenCode, or Sql when you need structured diagnostics."
         ],
         "dont": [
           "Assume a value is always returned. A later database call may leave you with NIL or a different SQL error state.",
@@ -5502,7 +5505,7 @@
         "dont": [
           "Assume the function creates a default error object when no error exists. It returns NIL.",
           "Keep reusing the same stored error after you have finished handling it.",
-          "Show raw diagnostic detail to end users unless that level of detail is appropriate for the situation."
+          "Pass raw diagnostic detail through to end users unless that level of detail is appropriate for the situation."
         ]
       }
     },
@@ -6148,8 +6151,8 @@
       ],
       "caveats": [
         "IIf is a normal function call. Its arguments are evaluated before the function returns either vTrueValue or vFalseValue.",
-        "The compiler validates IIf calls specially and raises a compile-time error when the call does not contain exactly three arguments.",
-        "The compiler can warn when the second or third argument is not a constant or a variable name."
+        "An IIf call must contain exactly three arguments; any other count is a compile-time error.",
+        "A compile-time warning can be raised when the second or third argument is not a constant or a variable name."
       ],
       "best_practices": {
         "do": [
@@ -6637,6 +6640,7 @@
         }
       ],
       "caveats": [
+        "Despite its name, LCase does **not** lowercase a string. Use Lower (or the culture-aware LLower) to convert a string to lowercase.",
         "LCase can return different value types depending on the selected expression.",
         "Only the selected branch is executed.",
         "Whitespace-only sFalseValue is treated the same as an empty false branch and returns \"\".",
@@ -8455,20 +8459,23 @@
       "exceptions": [
         {
           "trigger": "sMessage is NIL.",
-          "message": "Error message cannot be null."
+          "message": "RaiseError(): error message cannot be null."
         }
       ],
       "caveats": [],
       "best_practices": {
         "do": [
+          "Place RaiseError directly inside the :TRY block whose :CATCH handles it, so the raise can never escape.",
+          "Catch every raised error at an entry-point boundary with :TRY / :CATCH, so failures come back as logged messages and return values instead of server errors.",
+          "Mark raise-only helper procedures /*@private; so they cannot be invoked without the entry point that catches them.",
           "Raise clear messages that explain what failed and why.",
-          "Supply sLocation and nErrorCode when callers or logs need to identify the failing operation precisely.",
-          "Re-raise caught errors with oInnerException when you need to add context without losing the original failure."
+          "Supply sLocation and nErrorCode when callers or logs need to identify the failing operation precisely."
         ],
         "dont": [
+          "Call RaiseError inside :CATCH — the error handler must never become the thing that crashes.",
+          "Let a raised error escape the outermost procedure — an uncaught error fails the invocation and surfaces as a server error to the end user.",
           "Use RaiseError for routine status reporting or non-fatal branching, because it stops normal execution.",
-          "Pass vague messages such as \"failed\" or \"error\", because they make diagnosis harder after the error is caught.",
-          "Drop the original error when wrapping a failure, because that removes useful details from the error chain."
+          "Pass vague messages such as \"failed\" or \"error\", because they make diagnosis harder after the error is caught."
         ]
       }
     },
@@ -8845,7 +8852,7 @@
         "do": [
           "Call ReturnLastSQLError() immediately after the failing database operation or inside the matching :CATCH block.",
           "Check for NIL before reading properties from the returned object.",
-          "Use FormatSqlErrorMessage when you need a display-ready string, and inspect members such as Description, SQLState, GenCode, or Sql when you need structured diagnostics."
+          "Use FormatSqlErrorMessage when you need a human-readable string, and inspect members such as Description, SQLState, GenCode, or Sql when you need structured diagnostics."
         ],
         "dont": [
           "Assume a value is always returned. A later database call may leave you with NIL or a different SQL error state.",
@@ -9992,7 +9999,7 @@
         "dont": [
           "Assume SigFig returns a numeric value. It returns formatted text, which can affect later calculations.",
           "Pass NIL for any argument. The function raises an error instead of supplying defaults.",
-          "Rely on undocumented standard names. The verified implementation only branches on FDA, EPA, and ISO.",
+          "Rely on undocumented standard names. Only FDA, EPA, and ISO are recognized.",
           "Use SigFig as a drop-in replacement for every ordinary rounding need when plain numeric rounding is sufficient."
         ]
       }
@@ -10409,7 +10416,7 @@
         "dont": [
           "Assume the returned string always uses one fixed format. If the configured time format changes, the returned string changes with it.",
           "Use Time() when you need a date-time value for calculations or elapsed-time logic.",
-          "Call Time() repeatedly inside one logical action if all displayed messages should show the same time."
+          "Call Time() repeatedly inside one logical action if all logged messages should show the same time."
         ]
       }
     },
@@ -12141,7 +12148,7 @@
       "source_path": "content/reference/classes/WebServices.md",
       "exceptions": [],
       "caveats": [
-        "This page documents the factory only. The returned clients and the objects they surface in turn (HttpRequest, HttpResponse, HttpException, SoapResponse, SoapParameters) live in the Returns section."
+        "This page documents the factory only. The returned clients and the objects they surface in turn (HttpRequest, HttpResponse, HttpException, SoapResponse, SoapParameters) live in the Obtained Objects section."
       ],
       "best_practices": {
         "do": [
@@ -12239,6 +12246,7 @@
         "A :CATCH block may be empty, but the preceding :TRY body must contain at least one statement.",
         ":CATCH handles all errors from that :TRY block; you cannot declare multiple typed catches.",
         "If the :TRY block has no :CATCH, the error propagates unless another outer handler intercepts it.",
+        "Do not rely on :CATCH running when the procedure also contains a legacy :ERROR/:RESUME handler — in observed runtime behavior the legacy handler intercepts the error first and :CATCH is bypassed. See Error Handling.",
         "Keywords are case-sensitive and must be written in uppercase."
       ],
       "best_practices": {
@@ -12527,6 +12535,7 @@
       "exceptions": [],
       "caveats": [
         ":ERROR is legacy scope-based handling for the current procedure or method. It is not a clause inside :TRY.",
+        "Do not combine :ERROR with :TRY/:CATCH in the same procedure. In observed runtime behavior, a legacy :ERROR handler can intercept an error raised inside a :TRY block before the :CATCH clause runs, so the :CATCH logic never executes. See Error Handling.",
         ":RESUME changes the flow to resume-mode handling for subsequent statements. Use it only when continuing is safe.",
         "If no handled error occurs, the :ERROR body is skipped."
       ],
@@ -12966,7 +12975,8 @@
       "caveats": [
         ":RESUME must appear in a procedure that also contains an :ERROR handler.",
         ":RESUME does not retry the failing statement. Execution continues with the next statement after the error.",
-        "If later statements keep failing and the handler does not resolve the problem, the procedure can continue producing repeated errors."
+        "If later statements keep failing and the handler does not resolve the problem, the procedure can continue producing repeated errors.",
+        "Do not combine :RESUME with :TRY/:CATCH in the same procedure. In observed runtime behavior the legacy handler intercepts errors raised inside a :TRY block before :CATCH runs, and :RESUME then continues execution after the failed statement — including inside the :TRY body, bypassing the :CATCH logic entirely. See Error Handling."
       ],
       "best_practices": {
         "do": [
@@ -13078,6 +13088,7 @@
         "The :TRY body must contain at least one statement.",
         "A :FINALLY block must also contain at least one statement when present.",
         ":CATCH does not declare an exception variable; retrieve the current error with GetLastSSLError().",
+        "A legacy :ERROR/:RESUME handler in the same procedure can intercept errors raised inside the :TRY body before :CATCH runs — do not mix the two patterns. See Error Handling.",
         "Keywords are case-sensitive and must be written in uppercase."
       ],
       "best_practices": {
@@ -13125,354 +13136,774 @@
     {
       "id": "ssl.operator.add-assign",
       "element_type": "operator",
-      "title": "add-assign",
+      "title": "+= (add-assign)",
       "summary": "Updates a variable, property, or array element in place by applying + and then storing the result back into the left side.",
       "doc_status": "published",
       "source_path": "content/reference/operators/add-assign.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "+= uses the same type rules as +; it does not add any extra coercion.",
+        "date += number adds days. To move a date backward, use a negative number or subtract-assign (-=).",
+        "A left operand type that does not support + raises a runtime error.",
+        "A valid left operand type with an unsupported right operand raises a runtime error for an invalid operand."
+      ],
+      "best_practices": {
+        "do": [
+          "Use += for in-place numeric totals, counters, and similar accumulators.",
+          "Use += when repeatedly appending to a string in several steps.",
+          "Convert values explicitly before concatenation, such as LimsString(nCount)."
+        ],
+        "dont": [
+          "Rely on implicit coercion such as string-plus-number. Unsupported type pairs raise runtime errors.",
+          "Use += with arrays, objects, booleans, or other unsupported operand types.",
+          "Use += when a full assignment expression would be clearer to the reader."
+        ]
+      }
     },
     {
       "id": "ssl.operator.and",
       "element_type": "operator",
-      "title": "and",
+      "title": ".AND. (and)",
       "summary": "Combines two boolean expressions and returns .T. only when both are .T..",
       "doc_status": "published",
       "source_path": "content/reference/operators/and.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        ".AND. is a logical operator. Use boolean expressions on both sides.",
+        "Only the right operand is skipped. Any side effects in the left operand still happen.",
+        ".AND. is not the integer bitwise AND operator. For bitwise integer operations, use _AND(a, b)."
+      ],
+      "best_practices": {
+        "do": [
+          "Put the cheapest or most likely-false condition on the left so the right side is skipped more often.",
+          "Use .AND. to guard operations that would fail on missing data, such as ! Empty(oSample) .AND. oSample:Status == \"COMPLETE\".",
+          "Add parentheses when mixing .AND. with .OR. to make grouping obvious."
+        ],
+        "dont": [
+          "Put an expensive lookup on the left when a simple flag check could reject the condition first.",
+          "Access a property, method, or array element on the left and expect a later condition to protect it. The left operand always runs.",
+          "Rely on readers to infer precedence in a long mixed logical expression. Group it explicitly."
+        ]
+      }
     },
     {
       "id": "ssl.operator.assignment",
       "element_type": "operator",
-      "title": "assignment",
+      "title": ":= (assignment)",
       "summary": "Stores a value in a variable, object property, or array element and evaluates to the assigned value.",
       "doc_status": "published",
       "source_path": "content/reference/operators/assignment.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Invalid targets raise a compile-time error: Assignment: invalid left-hand side ....",
+        "Assigning to an undeclared variable can raise the runtime error Variable [name] is undefined!.",
+        "Compound operators such as add-assign (+=), subtract-assign (-=), multiply-assign (*=), divide-assign (/=), modulo-assign (%=), and power-assign (^=) are separate operators that combine an operation with assignment."
+      ],
+      "best_practices": {
+        "do": [
+          "Put assignments on their own lines when they represent a distinct step in the logic.",
+          "Use assignment to update variables, properties, and array elements directly instead of rebuilding surrounding state unnecessarily.",
+          "Use chained assignment only when every target should receive the exact same value."
+        ],
+        "dont": [
+          "Assign to undeclared variables and assume SSL will always create them for you. In normal code, undeclared targets can raise a runtime error.",
+          "Hide important state changes inside dense expressions when a standalone assignment would be clearer.",
+          "Assume aCopy := aOriginal; creates an independent array or object. Both names can still refer to the same underlying value."
+        ]
+      }
     },
     {
       "id": "ssl.operator.bang",
       "element_type": "operator",
-      "title": "bang",
+      "title": "! (bang)",
       "summary": "Performs boolean negation, returning the opposite boolean value.",
       "doc_status": "published",
       "source_path": "content/reference/operators/bang.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "! is a prefix unary operator, not a postfix operator.",
+        "Double negation such as !!bFlag is valid and evaluates back to the original boolean value.",
+        "! is different from the bitwise _NOT() function, which is for integer bit patterns rather than boolean logic."
+      ],
+      "best_practices": {
+        "do": [
+          "Use ! for concise boolean negation in conditions such as ! Empty(oSample).",
+          "Wrap compound expressions in parentheses, such as !(bReady .AND. bReleased).",
+          "Follow the surrounding codebase style when choosing between ! and .NOT.."
+        ],
+        "dont": [
+          "Use ! on strings, numbers, arrays, objects, or dates. It only supports boolean operands.",
+          "Rely on readers to infer grouping in longer expressions. Add parentheses around the expression being negated.",
+          "Treat ! as a general-purpose truthiness operator. SSL does not coerce non-boolean values here."
+        ]
+      }
     },
     {
       "id": "ssl.operator.decrement",
       "element_type": "operator",
-      "title": "decrement",
+      "title": "-- (decrement)",
       "summary": "Decreases a number variable by one, trims trailing spaces in strings, or subtracts days from a date depending on operand type.",
       "doc_status": "published",
       "source_path": "content/reference/operators/decrement.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use prefix form (--variable) when the decremented value is needed immediately in further computations.",
+          "Decrement dates when you need to step backward by one day.",
+          "Apply -- only to supported value types (numbers, strings, dates)."
+        ],
+        "dont": [
+          "Assume postfix (variable--) also returns the updated value. The postfix form returns the original before decrementing.",
+          "Use -- on arrays, objects, booleans, or expression results. Unsupported usage raises errors.",
+          "Use -- when a non-unit decrement is needed. Use subtract-assign (-=) instead."
+        ]
+      }
     },
     {
       "id": "ssl.operator.divide-assign",
       "element_type": "operator",
-      "title": "divide-assign",
+      "title": "/= (divide-assign)",
       "summary": "Divides a numeric value by another numeric value and stores the quotient back in the left operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/divide-assign.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Check that the divisor is numeric and not 0 before using /= when the input is not trusted.",
+          "Use /= when you are updating the same numeric variable in place."
+        ],
+        "dont": [
+          "Assume SSL will coerce strings, arrays, objects, dates, or NIL into numbers for /=.",
+          "Use /= when the divisor may be 0 or may come from mixed-type input without validation."
+        ]
+      }
     },
     {
       "id": "ssl.operator.divide",
       "element_type": "operator",
-      "title": "divide",
+      "title": "/ (divide)",
       "summary": "Divides the left number by the right number and returns the result as a number.",
       "doc_status": "published",
       "source_path": "content/reference/operators/divide.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Always verify that the right operand is not zero before dividing.",
+          "Ensure both operands are numeric before applying division.",
+          "Use / when you need a quotient rather than a remainder or an in-place update."
+        ],
+        "dont": [
+          "Assume SSL will coerce strings, dates, arrays, objects, or NIL into numbers for division.",
+          "Divide when the right operand may be 0. A zero divisor raises a runtime error and stops the expression.",
+          "Use / when you need the remainder. Use modulo for that case."
+        ]
+      }
     },
     {
       "id": "ssl.operator.dollar",
       "element_type": "operator",
-      "title": "dollar",
+      "title": "$ (dollar)",
       "summary": "Tests whether the left string is found within the right operand as a substring.",
       "doc_status": "published",
       "source_path": "content/reference/operators/dollar.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "An empty string as the left operand (\"\" $ sValue) always returns .T. since every string contains the empty string."
+      ],
+      "best_practices": {
+        "do": [
+          "Make sure both operands are strings before using $.",
+          "Double-check the order — the substring you want to find goes on the **left**, the string to search goes on the **right**.",
+          "Convert non-string values explicitly with LimsString(...) before using $.",
+          "Wrap $ in :TRY / :CATCH when operand types cannot be guaranteed."
+        ],
+        "dont": [
+          "Assume $ will silently fall back to .F. for numbers, arrays, or objects. Non-string operands raise runtime errors.",
+          "Reverse operand order out of habit from other languages. The substring is always on the left.",
+          "Rely on $ to convert the right operand for you. Convert explicitly first if that is the behavior you need."
+        ]
+      }
     },
     {
       "id": "ssl.operator.double-star-power",
       "element_type": "operator",
-      "title": "double-star-power",
+      "title": "** (double-star-power)",
       "summary": "Raises one number to the exponent of another number.",
       "doc_status": "published",
       "source_path": "content/reference/operators/double-star-power.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Fractional exponents are allowed, so x ** 0.5 can be used for square-root style calculations."
+      ],
+      "best_practices": {
+        "do": [
+          "Use ** only when both operands are numeric values.",
+          "Use parentheses to make exponent chains and fractional exponents easier to read."
+        ],
+        "dont": [
+          "Assume chained exponentiation runs left to right. ** is right-associative.",
+          "Pass strings, arrays, objects, or other non-numeric values to **. SSL raises a runtime error instead of coercing them."
+        ]
+      }
     },
     {
       "id": "ssl.operator.equals",
       "element_type": "operator",
-      "title": "equals",
+      "title": "= (equals)",
       "summary": "Compares two values for equality, using prefix matching for strings, exact matching for numbers, booleans, and dates, and reference equality for arrays and objects.",
       "doc_status": "published",
       "source_path": "content/reference/operators/equals.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "String comparison is case-sensitive and uses prefix semantics, not exact-match semantics.",
+        "\"\" = \"abc\" is .F., but \"abc\" = \"\" is .T. because an empty right operand always matches.",
+        "Left operand is a code block: raises == : Cannot compare to a code block. The observed message begins with == : even though the operator written is =; a code block on the right side against a string left operand returns .F. instead of raising."
+      ],
+      "best_practices": {
+        "do": [
+          "Use = for string prefix checks only when prefix matching is the intended behavior.",
+          "Check operand types before using = in dynamic code paths.",
+          "Use strict-equals when the comparison must reject prefixes."
+        ],
+        "dont": [
+          "Use = for exact string equality. = treats an empty right operand as a match and accepts prefixes.",
+          "Assume = performs type coercion. Comparing numbers, dates, or booleans to incompatible types raises runtime errors.",
+          "Assume arrays or objects are compared by content. = only checks whether both operands reference the same instance."
+        ]
+      }
     },
     {
       "id": "ssl.operator.greater-than-or-equal",
       "element_type": "operator",
-      "title": "greater-than-or-equal",
+      "title": ">= (greater-than-or-equal)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is greater than or equal to the right operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/greater-than-or-equal.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use >= when equality should pass along with greater values.",
+          "Make sure both operands are the same supported type before comparing.",
+          "Treat string comparisons as case-sensitive invariant ordering, not as user-locale sorting."
+        ],
+        "dont": [
+          "Use greater-than (>) when the boundary value should also pass. Use >= for inclusive checks.",
+          "Compare unlike types such as a number and a string. That raises a runtime error instead of returning a boolean value.",
+          "Rely on >= to perform implicit type conversion. Convert values explicitly before comparing them."
+        ]
+      }
     },
     {
       "id": "ssl.operator.greater-than",
       "element_type": "operator",
-      "title": "greater-than",
+      "title": "> (greater-than)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is strictly greater than the right operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/greater-than.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Either operand being NIL raises a runtime error instead of returning a boolean.",
+        "String comparisons are case-sensitive and culture-invariant, which can give results that differ from end-user alphabetical expectations."
+      ],
+      "best_practices": {
+        "do": [
+          "Use > only with matching supported types: number, date, or string.",
+          "Use greater-than-or-equal when the boundary value should also pass.",
+          "Validate or normalize input before comparing dynamic values."
+        ],
+        "dont": [
+          "Rely on implicit type conversion between strings, numbers, or dates. > raises a runtime error for mismatched types.",
+          "Use > when equality should pass. Use greater-than-or-equal for inclusive checks.",
+          "Assume string ordering follows user-locale rules. SSL uses case-sensitive invariant ordering."
+        ]
+      }
     },
     {
       "id": "ssl.operator.hash",
       "element_type": "operator",
-      "title": "hash",
+      "title": "# (hash)",
       "summary": "Returns .T. when two values are not equal and .F. when they are equal.",
       "doc_status": "published",
       "source_path": "content/reference/operators/hash.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "NIL only equals another NIL; NIL # \"anything\" is .T..",
+        "String comparisons are case-sensitive."
+      ],
+      "best_practices": {
+        "do": [
+          "Use # or != for testing inequality of supported types.",
+          "Validate operand types before using #, or wrap the comparison in :TRY / :CATCH when types are not guaranteed.",
+          "Walk the structure yourself when you need a deep content comparison for arrays and objects."
+        ],
+        "dont": [
+          "Assume # and != behave differently. They are full aliases with identical logic.",
+          "Assume # silently returns .T. for any type mismatch. Only a string-on-left path behaves that way; numeric, date, and boolean left operands with incompatible rights raise a runtime error.",
+          "Assume # walks array or object contents. It only compares references."
+        ]
+      }
     },
     {
       "id": "ssl.operator.increment",
       "element_type": "operator",
-      "title": "increment",
+      "title": "++ (increment)",
       "summary": "Increases a number variable by one, modifying its value in place.",
       "doc_status": "published",
       "source_path": "content/reference/operators/increment.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use ++ for concise incrementing of loop counters or numeric accumulators.",
+          "Use the prefix form (++variable) when the incremented value is needed immediately in the same expression."
+        ],
+        "dont": [
+          "Use ++ on non-variable or non-numeric values. Only variables holding numbers can be incremented.",
+          "Assume prefix and postfix always behave identically inside expressions. Prefix returns the new value; postfix returns the old value."
+        ]
+      }
     },
     {
       "id": "ssl.operator.less-than-or-equal",
       "element_type": "operator",
-      "title": "less-than-or-equal",
+      "title": "<= (less-than-or-equal)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is less than or equal to the right operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/less-than-or-equal.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Either operand being NIL raises a runtime error instead of returning a boolean value.",
+        "String comparisons are case-sensitive and culture-invariant, which can give results that differ from end-user alphabetical expectations."
+      ],
+      "best_practices": {
+        "do": [
+          "Use <= when equality should pass along with lower values.",
+          "Make sure both operands are the same supported type before comparing.",
+          "Treat string comparisons as case-sensitive invariant ordering, not as user-locale sorting."
+        ],
+        "dont": [
+          "Use less-than when the boundary value should also pass. Use <= for inclusive checks.",
+          "Compare unlike types such as a number and a string. That raises a runtime error instead of returning a boolean value.",
+          "Rely on <= to perform implicit type conversion. Convert values explicitly before comparing them."
+        ]
+      }
     },
     {
       "id": "ssl.operator.less-than",
       "element_type": "operator",
-      "title": "less-than",
+      "title": "< (less-than)",
       "summary": "Compares two values of the same supported type and returns .T. when the left operand is strictly less than the right operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/less-than.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Comparing a value against NIL raises a runtime error instead of returning a boolean value.",
+        "String comparisons are case-sensitive and culture-invariant, which can give results that differ from end-user alphabetical expectations."
+      ],
+      "best_practices": {
+        "do": [
+          "Use < only with matching supported types: number, date, or string.",
+          "Use less-than-or-equal when the boundary value should also pass.",
+          "Validate or normalize input before comparing dynamic values."
+        ],
+        "dont": [
+          "Rely on implicit type conversion between strings, numbers, and dates. < raises a runtime error for mismatched types.",
+          "Use < when equality should pass. Use less-than-or-equal for inclusive checks.",
+          "Assume string ordering follows user-locale rules. SSL uses case-sensitive invariant ordering."
+        ]
+      }
     },
     {
       "id": "ssl.operator.minus",
       "element_type": "operator",
-      "title": "minus",
+      "title": "- (minus)",
       "summary": "Subtracts numbers, trims trailing spaces before string concatenation, or performs date arithmetic depending on operand types.",
       "doc_status": "published",
       "source_path": "content/reference/operators/minus.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "For strings, only trailing space characters on the left operand are trimmed; leading spaces and the right operand are left unchanged."
+      ],
+      "best_practices": {
+        "do": [
+          "Use - for exact numeric subtraction when both operands are numbers.",
+          "Use - between strings when you want the left operand's trailing spaces removed before concatenation.",
+          "Subtract a number from a date to move backward by that many days.",
+          "Subtract one date from another when you need the day difference as a number."
+        ],
+        "dont": [
+          "Expect - to remove characters or substrings from a string. For strings, it only trims trailing spaces from the left operand and then appends the right operand.",
+          "Rely on implicit coercion between strings, numbers, and dates. Unsupported operand pairs raise a runtime error.",
+          "Expect date - date to return a date. That form returns a numeric day difference."
+        ]
+      }
     },
     {
       "id": "ssl.operator.modulo-assign",
       "element_type": "operator",
-      "title": "modulo-assign",
+      "title": "%= (modulo-assign)",
       "summary": "Updates a numeric variable, property, or array element in place by applying % and storing the remainder back into the left side.",
       "doc_status": "published",
       "source_path": "content/reference/operators/modulo-assign.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "The sign of the remainder follows the left operand. For example, -7 %= 3 leaves the value as -1."
+      ],
+      "best_practices": {
+        "do": [
+          "Use %= when you want the variable itself to become its remainder.",
+          "Guard or validate the divisor before using %= when NaN is not acceptable.",
+          "Normalize negative results explicitly when using %= for wraparound logic."
+        ],
+        "dont": [
+          "%= only accepts number operands; using it with strings, booleans, arrays, or objects raises a runtime error.",
+          "%= does not guarantee a positive result. Negative left operands produce negative remainders.",
+          "Applying %= directly to a 1-based array index can produce 0, which is an invalid index. Normalize the result before using it in array access."
+        ]
+      }
     },
     {
       "id": "ssl.operator.modulo",
       "element_type": "operator",
-      "title": "modulo",
+      "title": "% (modulo)",
       "summary": "Calculates the remainder after dividing one number by another.",
       "doc_status": "published",
       "source_path": "content/reference/operators/modulo.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Tests such as x % 2 == 1 are not reliable for negative odd numbers because -3 % 2 evaluates to -1."
+      ],
+      "best_practices": {
+        "do": [
+          "Guard the divisor before using % when NaN would be an invalid result.",
+          "Normalize negative remainders explicitly when using % for wraparound logic.",
+          "Use parentheses for clarity in compound arithmetic expressions."
+        ],
+        "dont": [
+          "% does not guarantee a non-negative result. The sign follows the sign of the left operand.",
+          "% 0 does not raise a divide-by-zero error; it yields NaN. Guard that case explicitly.",
+          "% only accepts numeric operands; using it with strings, booleans, arrays, objects, or NIL raises a runtime error."
+        ]
+      }
     },
     {
       "id": "ssl.operator.multiply-assign",
       "element_type": "operator",
-      "title": "multiply-assign",
+      "title": "*= (multiply-assign)",
       "summary": "Multiplies a numeric value by another numeric value and stores the product back in the left operand.",
       "doc_status": "published",
       "source_path": "content/reference/operators/multiply-assign.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "The left side must be assignable. An expression on the left side causes a compile-time error."
+      ],
+      "best_practices": {
+        "do": [
+          "Use *= when updating the same numeric target in place.",
+          "Validate uncertain inputs before applying *= if either side might not be numeric.",
+          "Use *= inside loops when repeatedly scaling a value or array element."
+        ],
+        "dont": [
+          "*= only accepts number operands; using it with strings, dates, arrays, objects, or booleans raises a runtime error.",
+          "Implicit type conversion from text, NIL, or mixed-type values is not performed.",
+          "The left side must be an assignable target. Expressions such as (nValue + 1) *= 2; are invalid."
+        ]
+      }
     },
     {
       "id": "ssl.operator.multiply",
       "element_type": "operator",
-      "title": "multiply",
+      "title": "* (multiply)",
       "summary": "Multiplies one number by another number and returns the product.",
       "doc_status": "published",
       "source_path": "content/reference/operators/multiply.md",
       "exceptions": [],
       "caveats": [],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Ensure both operands are numeric before using *.",
+          "Use parentheses when multiplication appears in a longer expression and readability matters.",
+          "Convert non-numeric values explicitly before multiplying when the source data may vary."
+        ],
+        "dont": [
+          "* only accepts number operands; using it with strings, dates, arrays, objects, booleans, or NIL raises a runtime error.",
+          "Assume SSL will coerce text such as \"5\" into a number for *.",
+          "Rely on readers to infer precedence in dense arithmetic. Add parentheses when the grouping is important."
+        ]
+      }
     },
     {
       "id": "ssl.operator.not-equals-legacy",
       "element_type": "operator",
-      "title": "not-equals-legacy",
+      "title": "<> (not-equals-legacy)",
       "summary": "Returns .T. when two values are not equal under SSL's strict inequality rules.",
       "doc_status": "published",
       "source_path": "content/reference/operators/not-equals-legacy.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Code block left operand raises Cannot compare to a code block."
+      ],
+      "best_practices": {
+        "do": [
+          "Use <> only when legacy code style or compatibility makes that form the clearer choice.",
+          "Guard dynamic values before comparing when operand types may vary at runtime.",
+          "Walk the structure yourself when a deep content comparison is needed for arrays and objects."
+        ],
+        "dont": [
+          "Use <> in new code when != is the clearer house style.",
+          "Assume <> is the opposite of loose string matching with =. It negates strict equality instead.",
+          "Expect <> to coerce numbers, booleans, or dates to other types automatically."
+        ]
+      }
     },
     {
       "id": "ssl.operator.not-equals",
       "element_type": "operator",
-      "title": "not-equals",
+      "title": "!= (not-equals)",
       "summary": "Returns .T. when two values are not strictly equal under SSL equality rules.",
       "doc_status": "published",
       "source_path": "content/reference/operators/not-equals.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Code block left operand raises Cannot compare to a code block."
+      ],
+      "best_practices": {
+        "do": [
+          "Use != in new code when you need strict inequality.",
+          "Guard dynamic values before comparing when the runtime types may differ.",
+          "Walk the structure yourself when a deep content comparison is needed for arrays and objects."
+        ],
+        "dont": [
+          "Use != when you want string prefix behavior. != negates strict equality, not =.",
+          "Assume != coerces numbers, booleans, or dates to other types automatically.",
+          "Mix !=, <>, and # in the same code path without a style reason."
+        ]
+      }
     },
     {
       "id": "ssl.operator.not",
       "element_type": "operator",
-      "title": "not",
+      "title": ".NOT. (not)",
       "summary": "Performs boolean negation, returning .T. for .F. and .F. for .T..",
       "doc_status": "published",
       "source_path": "content/reference/operators/not.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        ".NOT. is a prefix unary operator, not a postfix operator.",
+        "Double negation such as .NOT. .NOT. bFlag is valid and evaluates back to the original boolean value."
+      ],
+      "best_practices": {
+        "do": [
+          "Use .NOT. for clear boolean negation in conditions such as .NOT. bIsReleased.",
+          "Wrap compound expressions in parentheses: .NOT. (bReady .AND. bReleased).",
+          "Keep .NOT. for boolean logic only; convert or compare values to booleans before negating."
+        ],
+        "dont": [
+          "Apply .NOT. to strings, numbers, arrays, objects, or dates. It only supports boolean operands.",
+          "Rely on readers to infer grouping in longer expressions. Add parentheses around the expression being negated.",
+          "Confuse .NOT. with _NOT(), which is the bitwise integer operation rather than logical negation."
+        ]
+      }
     },
     {
       "id": "ssl.operator.or",
       "element_type": "operator",
-      "title": "or",
+      "title": ".OR. (or)",
       "summary": "Combines two boolean expressions and returns .T. when either operand is .T..",
       "doc_status": "published",
       "source_path": "content/reference/operators/or.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Either operand being non-boolean raises a runtime error."
+      ],
+      "best_practices": {
+        "do": [
+          "Put the cheapest or most likely-true condition on the left so the right side is skipped more often.",
+          "Use .OR. for fallback checks where one successful condition is enough, such as bIsLocal .OR. bHasRemoteAccess.",
+          "Add parentheses when mixing .OR. with .AND. to make grouping obvious."
+        ],
+        "dont": [
+          "Use .OR. with strings, numbers, arrays, objects, dates, or NIL. It only supports boolean operands.",
+          "Put required side-effect code on the right and expect it always to run. A true left operand skips it.",
+          "Use .OR. when every condition must pass. That is an .AND. case instead."
+        ]
+      }
     },
     {
       "id": "ssl.operator.plus",
       "element_type": "operator",
-      "title": "plus",
+      "title": "+ (plus)",
       "summary": "Adds numbers, concatenates strings, or adds days to dates depending on operand types.",
       "doc_status": "published",
       "source_path": "content/reference/operators/plus.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "An empty date on the left produces an empty date result."
+      ],
+      "best_practices": {
+        "do": [
+          "Confirm operand types before using +, especially in dynamic code.",
+          "Use + only for the supported pairs: number + number, string + string, and date + number.",
+          "Convert values explicitly before concatenation: LimsString(nCount) or DToC(dDate).",
+          "Keep the date on the left side for date arithmetic."
+        ],
+        "dont": [
+          "Rely on implicit coercion such as \"Count: \" + nCount. Unsupported type pairs raise a runtime error.",
+          "Use + with arrays, objects, booleans, or other unsupported operand types.",
+          "Assume number + date works the same as date + number. Date addition is only defined with the date on the left."
+        ]
+      }
     },
     {
       "id": "ssl.operator.power-assign",
       "element_type": "operator",
-      "title": "power-assign",
+      "title": "^= (power-assign)",
       "summary": "Raises a numeric value to a numeric power and stores the result back into the left side.",
       "doc_status": "published",
       "source_path": "content/reference/operators/power-assign.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "The left side must be assignable. Expressions such as (nValue + 1) ^= 2; are invalid."
+      ],
+      "best_practices": {
+        "do": [
+          "Use ^= when updating the same numeric target in place.",
+          "Use ^= inside loops when repeatedly applying the same exponentiation pattern.",
+          "Use parentheses in the right-side power expression when evaluation order needs to be explicit."
+        ],
+        "dont": [
+          "^= only accepts number operands; using it with strings, dates, arrays, objects, or booleans raises a runtime error.",
+          "Assume SSL will coerce text or NIL into numbers for ^=.",
+          "Use a non-assignable expression on the left side."
+        ]
+      }
     },
     {
       "id": "ssl.operator.power",
       "element_type": "operator",
-      "title": "power",
+      "title": "^ (power)",
       "summary": "Raises one number to the exponent of another number.",
       "doc_status": "published",
       "source_path": "content/reference/operators/power.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Exponentiation by a negative or fractional number yields non-integer results, which may not match integer math expectations.",
+        "NIL is not treated as 0 or 1; using it as an operand raises a runtime error."
+      ],
+      "best_practices": {
+        "do": [
+          "Use ^ or ** consistently in your codebase; they are exact aliases.",
+          "Validate operand types before exponentiating.",
+          "Use parentheses to clarify complex exponentiation expressions."
+        ],
+        "dont": [
+          "Mix ^ and ** without reason. Both are strict aliases, so mixing them adds noise without changing behavior.",
+          "Rely on implicit type coercion for non-numeric inputs. The operator only supports numeric operands.",
+          "Assume left-to-right evaluation for chained exponents. SSL evaluates exponentiation from the right."
+        ]
+      }
     },
     {
       "id": "ssl.operator.shift-left",
       "element_type": "operator",
-      "title": "shift-left",
+      "title": "<< (shift-left)",
       "summary": "Shifts the bits of one integer number to the left by the number of positions specified by another integer number.",
       "doc_status": "published",
       "source_path": "content/reference/operators/shift-left.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "If either operand is numeric but not an integer, SSL raises Invalid operand(s). Expected integers."
+      ],
+      "best_practices": {
+        "do": [
+          "Validate or normalize values so both operands are integer numbers before shifting.",
+          "Use << for masks, flags, and encoded numeric values where bit position matters.",
+          "Keep the shift count explicit so the intent of the bit layout is easy to read."
+        ],
+        "dont": [
+          "Pass decimal numbers or values from dynamic input without checking them first. Fractional operands raise a runtime error.",
+          "Use << as a substitute for general arithmetic when bitwise intent is not part of the logic.",
+          "Assume the operator validates whether a shift count is sensible for your business rule. It only enforces numeric integer operands."
+        ]
+      }
     },
     {
       "id": "ssl.operator.shift-right",
       "element_type": "operator",
-      "title": "shift-right",
+      "title": ">> (shift-right)",
       "summary": "Shifts the bits of one integer number to the right by the number of positions specified by another integer number.",
       "doc_status": "published",
       "source_path": "content/reference/operators/shift-right.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "If either operand is numeric but not an integer, SSL raises Invalid operand(s). Expected integers."
+      ],
+      "best_practices": {
+        "do": [
+          "Validate or normalize values so both operands are integer numbers before shifting.",
+          "Use >> for masks, flags, and packed numeric values where bit position matters.",
+          "Keep the shift count explicit so the intent of the bit layout is easy to read."
+        ],
+        "dont": [
+          "Pass decimal numbers or values from dynamic input without checking them first. Fractional operands raise a runtime error.",
+          "Use >> as a substitute for general arithmetic when bitwise intent is not part of the logic.",
+          "Assume the operator validates whether a shift count is sensible for your business rule. It only enforces numeric integer operands."
+        ]
+      }
     },
     {
       "id": "ssl.operator.strict-equals",
       "element_type": "operator",
-      "title": "strict-equals",
+      "title": "== (strict-equals)",
       "summary": "Returns .T. when two values are strictly equal under SSL equality rules.",
       "doc_status": "published",
       "source_path": "content/reference/operators/strict-equals.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Code block left operand raises Cannot compare to a code block."
+      ],
+      "best_practices": {
+        "do": [
+          "Use == for exact string equality and exact value checks.",
+          "Use == when you intentionally want reference equality for arrays or objects.",
+          "Guard dynamic values before comparing when runtime types may differ."
+        ],
+        "dont": [
+          "Use == when you want string prefix behavior. Use equals for that case.",
+          "Assume == compares arrays or objects by content. It only checks whether both operands reference the same instance.",
+          "Assume == coerces numbers, booleans, or dates to other types automatically."
+        ]
+      }
     },
     {
       "id": "ssl.operator.subtract-assign",
       "element_type": "operator",
-      "title": "subtract-assign",
+      "title": "-= (subtract-assign)",
       "summary": "Updates a variable, property, or array element in place by applying - and then storing the result back into the left side.",
       "doc_status": "published",
       "source_path": "content/reference/operators/subtract-assign.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "A non-assignable left side is rejected before the update is performed.",
+        "For strings, only trailing space characters on the left operand are trimmed. Leading spaces and the right operand are left unchanged.",
+        "date -= date changes the stored value to a number, so a later date-specific operation on that same target will no longer behave as a date operation."
+      ],
+      "best_practices": {
+        "do": [
+          "Use -= for in-place numeric decrements, totals, and countdown values.",
+          "Use -= with strings only when you specifically want trailing spaces removed from the left string before appending.",
+          "Use a separate target or an explicit temporary when date -= date would make the code clearer."
+        ],
+        "dont": [
+          "Rely on implicit coercion such as string-minus-number or date-minus-string. Unsupported type pairs raise errors.",
+          "Treat -= on strings as character removal. For strings, it trims trailing spaces from the left operand and then appends the right operand.",
+          "Forget that date -= date stores a number, not a date, back into the left target."
+        ]
+      }
     },
     {
       "id": "ssl.literal.false",
@@ -13482,8 +13913,20 @@
       "doc_status": "published",
       "source_path": "content/reference/literals/false.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        ".F. = 0 raises a runtime error. Use Empty() or a type check for safe zero-like tests.",
+        ".F. is different from NIL and the empty string."
+      ],
+      "best_practices": {
+        "do": [
+          "Use .F. wherever a boolean false is required, especially in conditionals and flag logic.",
+          "Explicitly pass .F. as arguments for boolean parameters."
+        ],
+        "dont": [
+          "Use .F. as a substitute for NIL or empty string when you mean \"missing data.\" .F. is a concrete boolean, not absence, even though Empty returns .T..",
+          "Compare .F. directly to 0 or 1. This raises a runtime error, not a boolean result."
+        ]
+      }
     },
     {
       "id": "ssl.literal.nil",
@@ -13493,8 +13936,21 @@
       "doc_status": "published",
       "source_path": "content/reference/literals/nil.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "LimsString(NIL) returns the string \"NIL\"."
+      ],
+      "best_practices": {
+        "do": [
+          "Use NIL to intentionally indicate \"no value\" rather than an empty string.",
+          "Compare explicitly to NIL when an API uses NIL as a sentinel result.",
+          "Use Empty() when you want to treat both NIL and \"\" as \"no value.\""
+        ],
+        "dont": [
+          "Assume a freshly declared variable is NIL. Variables from :DECLARE start as empty string, not NIL.",
+          "Use = \"\" to check for absence when NIL is also possible. NIL = \"\" is .F.; use Empty() instead.",
+          "Use NIL when you really mean boolean false. NIL and .F. are different values."
+        ]
+      }
     },
     {
       "id": "ssl.literal.true",
@@ -13504,8 +13960,21 @@
       "doc_status": "published",
       "source_path": "content/reference/literals/true.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "User input arrives as strings — \"TRUE\" is not the same as .T. unless explicitly converted."
+      ],
+      "best_practices": {
+        "do": [
+          "Use .T. to clearly represent positive or true conditions.",
+          "Explicitly pass .T. as arguments for boolean parameters.",
+          "Use .T. with .F. for toggling and switching state."
+        ],
+        "dont": [
+          "Assign 1 or any other numeric value when a boolean is required. SSL has strict boolean typing.",
+          "Assume \"truthy\" values (non-empty strings, non-zero numbers) behave like .T. in comparisons. SSL does not have truthy/falsy semantics.",
+          "Use string representations (\"TRUE\", \"true\") in boolean operations. They are strings, not booleans."
+        ]
+      }
     },
     {
       "id": "ssl.type.array",
@@ -13516,9 +13985,25 @@
       "source_path": "content/reference/types/array.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET list object when no SSL-side member matches (e.g. aValues:Count). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET list object when no SSL-side member matches (e.g. aValues:Count). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error.",
+        "aValues[1] is the first element. aValues[0] is invalid.",
+        "Invalid positions for RemoveAt, InsertAt, or index access raise runtime errors.",
+        "Arrays can hold mixed value types, so validate or normalize element types before doing arithmetic or exact comparisons.",
+        "clone() deep-copies nested arrays and other contained values instead of reusing the same references.",
+        "ToJson() returns JSON array text and emits null for NIL entries."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use 1-based loops such as :FOR nIndex := 1 :TO ALen(aValues); when iterating arrays.",
+          "Check IsEmpty() or Count before indexing when the array may be empty.",
+          "Use clone() before changing a copied array when the original must remain unchanged."
+        ],
+        "dont": [
+          "Assume arrays are 0-based. That causes off-by-one bugs because SSL arrays start at 1.",
+          "Use fractional index values. Array indexing requires integers and raises an error for non-integer indexes.",
+          "Assume nested arrays are flattened automatically. Treat each nested array as its own ordered collection."
+        ]
+      }
     },
     {
       "id": "ssl.type.boolean",
@@ -13529,9 +14014,20 @@
       "source_path": "content/reference/types/boolean.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET Boolean object when no SSL-side member matches (e.g. bFlag:ToString()). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET Boolean object when no SSL-side member matches (e.g. bFlag:ToString()). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use .T. and .F. explicitly for assignments, comparisons, and return values.",
+          "Use .NOT. or ! when you mean logical negation.",
+          "Use == when you want exact equality, even though = and == behave the same for booleans."
+        ],
+        "dont": [
+          "Use Empty as an \"initialized\" check. On booleans it behaves like negation, not presence testing.",
+          "Compare booleans directly to numbers or strings such as .F. = 0 or .T. = \"true\". Those comparisons raise runtime errors.",
+          "Use non-boolean values where boolean operators expect .T. or .F.."
+        ]
+      }
     },
     {
       "id": "ssl.type.codeblock",
@@ -13541,8 +14037,21 @@
       "doc_status": "published",
       "source_path": "content/reference/types/codeblock.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "clone() copies the code block value, but it does not create a separate procedure."
+      ],
+      "best_practices": {
+        "do": [
+          "Use a code block when you need a small reusable expression that fits naturally inline.",
+          "Keep code blocks expression-based and move multi-step logic into a procedure.",
+          "Check IsEmpty() before evaluation when a code block may not have been initialized."
+        ],
+        "dont": [
+          "Compare code blocks with =, ==, or !=. Code blocks do not support equality checks and the comparison raises a runtime error.",
+          "Use code blocks for multi-statement workflows. SSL code blocks are single-expression values, not miniature procedures.",
+          "Treat a code block like an array or string. [] access and indexed assignment are not supported."
+        ]
+      }
     },
     {
       "id": "ssl.type.date",
@@ -13553,9 +14062,22 @@
       "source_path": "content/reference/types/date.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET DateTime object when no SSL-side member matches (e.g. dValue:AddMonths(2)). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET DateTime object when no SSL-side member matches (e.g. dValue:AddMonths(2)). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Check IsEmpty() before using a date in business rules or display logic.",
+          "Use + and - with numeric day offsets instead of converting dates to strings.",
+          "Use date-to-date subtraction when you need a day count.",
+          "Format output explicitly with ToString() or DToC when the display format matters."
+        ],
+        "dont": [
+          "Treat a date like a string or number for comparison logic. Use the date comparison operators directly.",
+          "Assume an empty date behaves like a real scheduled value. Validate with IsEmpty() first.",
+          "Use [] indexing on a date. Dates are scalar values, not collections.",
+          "Assume ToJson() and ToString() produce the same output. ToJson() is for JSON serialization, not user-facing display."
+        ]
+      }
     },
     {
       "id": "ssl.type.netobject",
@@ -13566,9 +14088,24 @@
       "source_path": "content/reference/types/netobject.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET wrapped object when no SSL-side member matches (e.g. oNet:AnyMember(...)). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET wrapped object when no SSL-side member matches (e.g. oNet:AnyMember(...)). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error.",
+        "GetProperty(), SetProperty(), IsProperty(), and Invoke() raise a null-reference error when the wrapped value is null and the target member is not static.",
+        "Invalid property names raise an error from GetProperty() or SetProperty(). Invalid method names raise an error from Invoke().",
+        "IsProperty() checks fields and properties, not methods.",
+        "IsEmpty() only checks whether the wrapped reference is null. It does not inspect row counts, collection lengths, or other content."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Call IsEmpty() and IsProperty() before accessing a property on a netobject whose wrapped value may be null or whose schema may vary.",
+          "Use SetProperty() only for members that already exist on the wrapped value.",
+          "Use ToJson() only when you know the wrapped value is a DataSet."
+        ],
+        "dont": [
+          "Call GetProperty() or Invoke() blindly when the value might be null or the member might not exist. Null wrapped values raise a null-reference error, and invalid member names raise an error.",
+          "Assume numeric indexing is always SSL-style 1-based. Wrapped collections use their own indexing behavior.",
+          "Treat netobject like a dynamic SSL object that supports AddProperty(). It cannot add new members to the wrapped value."
+        ]
+      }
     },
     {
       "id": "ssl.type.number",
@@ -13579,9 +14116,22 @@
       "source_path": "content/reference/types/number.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET numeric object when no SSL-side member matches (e.g. nValue:ToString(\"F2\")). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET numeric object when no SSL-side member matches (e.g. nValue:ToString(\"F2\")). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use numeric operators directly for arithmetic and numeric comparisons.",
+          "Use == when you want exact equality and want your code to read consistently across types.",
+          "Check IsInt or IsInt64 before doing shifts or bitwise work on values that may contain fractions.",
+          "Convert explicitly with LimsString or ToString() when building user-facing text."
+        ],
+        "dont": [
+          "Write bitwise logic with &, |, or ^ as bitwise operators. In SSL, bitwise work uses _AND(), _OR(), _XOR(), _NOT(), and the shift operators << and >>.",
+          "Concatenate strings and numbers directly with +. Convert the number first.",
+          "Use fractional values with shifts or bitwise built-ins. They require integer-valued operands.",
+          "Treat numbers like arrays or strings. Numeric values are scalar and are not indexable."
+        ]
+      }
     },
     {
       "id": "ssl.type.object",
@@ -13591,8 +14141,25 @@
       "doc_status": "published",
       "source_path": "content/reference/types/object.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Reading a missing property raises a runtime error with the message Property not found: <name>.",
+        "AddProperty() validates the property name and initializes the new property to \"\".",
+        "IsEmpty() is not a property-count check for objects."
+      ],
+      "best_practices": {
+        "do": [
+          "Use colon member access such as oContext:sampleId for normal reads and writes on dynamic objects.",
+          "Check IsProperty() before reading optional members that may not exist.",
+          "Use clone() before changing a copied dynamic object when the original must stay unchanged.",
+          "Set XmlType before Serialize() when the XML root name matters to downstream code."
+        ],
+        "dont": [
+          "Assume missing properties return an empty value. Reading an unknown property raises an error.",
+          "Treat object members like array indexes. Objects do not support direct indexing of their own properties.",
+          "Assume every object value supports clone() in the same way. The reliable deep-clone behavior is on dynamic objects created with CreateLocal() or CreateUdObject().",
+          "Set XmlType to a non-string value. That raises an error."
+        ]
+      }
     },
     {
       "id": "ssl.type.string",
@@ -13603,9 +14170,22 @@
       "source_path": "content/reference/types/string.md",
       "exceptions": [],
       "caveats": [
-        "Member access with : forwards to the underlying .NET String object when no SSL-side member matches (e.g. sValue:EndsWith(\"suffix\")). An unmatched member is legitimate .NET passthrough, not an error — tools must never flag it as an unknown member (style guide dotnet_member_passthrough)."
+        "Member access with : forwards to the underlying .NET String object when no SSL-side member matches (e.g. sValue:EndsWith(\"suffix\")). A member that is not listed on this page can still be valid — it resolves against the .NET object at runtime instead of raising an unknown-member error."
       ],
-      "best_practices": {}
+      "best_practices": {
+        "do": [
+          "Use == when you need exact string equality.",
+          "Use = only when you intentionally want prefix behavior.",
+          "Use IsEmpty() when a value may be blank or whitespace-only.",
+          "Remember that sValue[1] is the first character, not sValue[0]."
+        ],
+        "dont": [
+          "Assume only double quotes are valid string literals. SSL also accepts single-quoted and bracketed string literals.",
+          "Use = when you mean exact equality. It can return .T. for prefixes such as \"LOGGED\" = \"LOG\".",
+          "Assume $ reads left-to-right like many other contains APIs. In SSL, the left operand is the text being searched for inside the right operand.",
+          "Treat strings like arrays you can modify in place by index. String index assignment is not supported."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.access-modifiers",
@@ -13615,8 +14195,23 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/access-modifiers.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "A blank line between the modifier and :PROCEDURE breaks the association; the modifier will not apply to the procedure.",
+        "Access modifiers inside :CLASS blocks are silently ignored with no compile error.",
+        "The modifier applies only to the single procedure immediately following it."
+      ],
+      "best_practices": {
+        "do": [
+          "Put /*@private; on the line immediately before :PROCEDURE with no blank lines between them.",
+          "Use /*@protected; for shared utilities that inheriting scripts need but external callers should not access.",
+          "Default to public only when external invocation is intentional."
+        ],
+        "dont": [
+          "Place access modifiers inside :CLASS blocks; they are silently ignored there.",
+          "Add spaces between /* and @.",
+          "Use uppercase letters in the modifier name (/*@Private; is not recognized)."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.base",
@@ -13626,8 +14221,24 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/base.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Base must be written as member access: Base:MethodName() or Base:FieldName. It cannot be used as a standalone expression.",
+        "A missing base method is a compile-time error.",
+        "Base field access is limited to members available on the parent type.",
+        "Base outside a :CLASS method raises a compile-time error."
+      ],
+      "best_practices": {
+        "do": [
+          "Use Base:MethodName() when you are extending inherited behavior rather than replacing it completely.",
+          "Call Base:Constructor() in a derived constructor when the parent class needs initialization.",
+          "Keep Base usage focused on places where the parent implementation is clearly part of the design."
+        ],
+        "dont": [
+          "Use Base when Me:MethodName() is the intended polymorphic call path. Base skips the derived override.",
+          "Assume a derived member name automatically exists on the parent class too. Base only works with members available on the parent type.",
+          "Scatter Base calls through unrelated logic. Overuse makes inheritance behavior harder to follow."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.code-block",
@@ -13637,8 +14248,25 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/code-block.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Code blocks contain a single expression, not multiple statements.",
+        "At least one bound variable is required between the pipes; {|| ...} is not valid.",
+        "Comparing code blocks directly is not supported.",
+        "Executing a code block with missing required parameters results in a runtime error.",
+        "Outer variables referenced inside a code block are captured by reference. Changes to those variables in the outer scope are visible inside later Eval calls."
+      ],
+      "best_practices": {
+        "do": [
+          "Use code blocks for behavior that will be used as a parameter, returned, or deferred for later execution.",
+          "Clearly declare all parameters needed within the code block head.",
+          "Use code blocks to avoid repetition in higher-order functions."
+        ],
+        "dont": [
+          "Define long or complex business logic directly inside code blocks. Code blocks are single expressions; delegate larger logic to named procedures.",
+          "Rely implicitly on outer variables unless intentional. Making dependencies explicit enhances clarity and minimizes accidental reliance on external state.",
+          "Copy and paste similar logic instead of abstracting it with a code block."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.code-organization",
@@ -13648,8 +14276,21 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/code-organization.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "An unclosed /* region has no effect on execution but may confuse editor folding.",
+        ":REGION / :ENDREGION keywords are **not** the same as comment regions. They are a legacy construct used for storing and retrieving named text blocks via GetRegion and GetRegionEx. See REGION and ENDREGION for details."
+      ],
+      "best_practices": {
+        "do": [
+          "Use Title Case for region names (e.g., Validation Helpers, Database Operations).",
+          "Nest regions for logical sub-sections within larger areas.",
+          "Keep region names short and descriptive so the code-folding panel is easy to scan."
+        ],
+        "dont": [
+          "Confuse /* region comment markers with the :REGION / :ENDREGION keywords — those are a separate construct for storing named text blocks.",
+          "Use regions as a substitute for splitting genuinely unrelated logic into separate scripts."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.constructor",
@@ -13659,8 +14300,24 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/constructor.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Constructor is meaningful only as the fixed constructor declaration name inside :CLASS.",
+        ":RETURN value; inside a constructor causes a compile-time error.",
+        "Constructors run during object creation; they are not invoked like ordinary methods.",
+        "If no constructor is declared, SSL provides an implicit parameterless one."
+      ],
+      "best_practices": {
+        "do": [
+          "Keep constructor work focused on initialization and input validation.",
+          "Initialize fields that later methods depend on.",
+          "Fail early when required constructor arguments are missing or invalid."
+        ],
+        "dont": [
+          "Instantiate a user-defined class with MyClass{}. That brace form is for built-in classes, not :CLASS files.",
+          "Call Base:Constructor() when the base constructor is parameterless. SSL already emits that call automatically.",
+          "Return a value from a constructor. :RETURN value; is a compile-time error."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.me",
@@ -13670,8 +14327,24 @@
       "doc_status": "published",
       "source_path": "content/reference/special-forms/me.md",
       "exceptions": [],
-      "caveats": [],
-      "best_practices": {}
+      "caveats": [
+        "Using Me outside a class method body results in a compile-time error.",
+        "Me is case-insensitive, but Me is the canonical spelling in documentation and examples.",
+        "Fields referenced through Me can resolve from the current class or an ancestor class.",
+        "A missing Me:MethodName() target is a compile-time error."
+      ],
+      "best_practices": {
+        "do": [
+          "Use Me to access fields and methods within class method bodies.",
+          "Use Me:Method(args) to call other methods on the same instance.",
+          "Use Me to disambiguate when a parameter or local variable shadows an instance field."
+        ],
+        "dont": [
+          "Use Me in standalone procedures, global scope, or outside a class. It produces a compile-time error.",
+          "Use DoProc(\"MethodName\") from inside a class method. Call sibling methods with Me:MethodName() instead.",
+          "Assume Me:MethodName() will succeed for a missing method. Invalid method calls fail at compile time."
+        ]
+      }
     },
     {
       "id": "ssl.special_form.request",

@@ -657,10 +657,10 @@ var GeneratedClassDetails = map[string]ClassDetails{
 			},
 			{
 				Signature:   "SSLRegex{sPattern, bCaseSensitive}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching |",
+				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching. Omitting this parameter gives case-sensitive matching. |",
 				Parameters: []FunctionParameter{
 					{Name: "sPattern", Type: "string", Required: true, Description: "Regular expression pattern to store"},
-					{Name: "bCaseSensitive", Type: "boolean", Required: false, Description: ".T. for case-sensitive matching, .F. for case-insensitive matching"},
+					{Name: "bCaseSensitive", Type: "boolean", Required: false, Description: ".T. for case-sensitive matching, .F. for case-insensitive matching. Omitting this parameter gives case-sensitive matching."},
 				},
 			},
 		},
