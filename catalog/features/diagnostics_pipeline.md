@@ -84,6 +84,15 @@ history:
       content). Bare `;` statement separators in a SQL-mode body now warn
       with datasource_sql_semicolon — the one semicolon case the schema
       leaves undefined.
+  - date: 2026-08-08
+    ref: "ssl-style-guide#51/#53"
+    note: >-
+      datasource_undeclared_placeholder added to the SQL-body check set:
+      the schema's new body_parameters section makes @name a first-class
+      token in SQL data-source bodies, so a placeholder with no matching
+      :PARAMETERS declaration warns (it is not substituted and fails at
+      execute time), with structural exclusions for @@ system functions
+      and DECLARE-scripted bodies.
 issues: []
 ---
 
@@ -182,6 +191,7 @@ rules (those are `diag.*` entries).
 - A18: Given a data-source document containing a recognized header (optionally preceded by a terminated comment) and nothing after it, when diagnostics are collected, then header lines keep their checks and no comment-related diagnostic fires.
 - A19: Given a SQL data-source body whose column or table names collide with SQL builtin-function names (`set FORMAT = …`, `delete from FORMAT`), or whose SQL comments and quoted string literals contain semicolons (`'all;msoffice->pdf'`), when diagnostics are collected, then the document classifies as SQL mode and no diagnostic fires on any of it.
 - A20: Given a SQL-mode data-source body containing a `;` outside comments and string literals, when diagnostics are collected, then exactly one `datasource_sql_semicolon` warning fires per such semicolon at its position (offset past the header in the hybrid shape, whose own `;` terminators never flag); the warning honors rule overrides and never fires outside data-source files.
+- A21: Given a SQL-mode data-source body containing a `@name` placeholder outside comments and string literals with no case-insensitive match among the header's `:PARAMETERS` names (all placeholders, when there is no header), when diagnostics are collected, then a `datasource_undeclared_placeholder` warning fires on the placeholder's span; `@@` system functions, declared placeholders, unused declared parameters, and `DECLARE`-scripted bodies stay silent.
 
 ## Rationale
 

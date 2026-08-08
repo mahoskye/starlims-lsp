@@ -119,24 +119,31 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	if opts.IsDataSourceFile {
 		// A comment-only stub (a terminated /* banner */ and nothing else)
 		// is the schema's header_comment shape, not SSL — no SSL
-		// diagnostics (feature.diagnostics_pipeline A16, issue #148). The
-		// only check that runs on a whole-document SQL body is the bare
-		// statement-separator warning (issue #154).
+		// diagnostics (feature.diagnostics_pipeline A16, issue #148). A
+		// whole-document SQL body gets only the SQL-body checks: the bare
+		// statement-separator warning (issue #154) and the undeclared
+		// @name placeholder check (with no header, no names are
+		// declared).
 		if IsSQLDocument(text) || IsSQLCommentOnly(text) {
-			return applyRuleOverrides(checkDataSourceSQLSemicolons(text, 0), opts.RuleOverrides)
+			return applyRuleOverrides(append(
+				checkDataSourceSQLSemicolons(text, 0),
+				checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides)
 		}
 		// Hybrid sql_data_source shape: builder directives / :PARAMETERS
 		// header — optionally preceded by a terminated header comment,
 		// which SplitDataSourceHeader masks to blanks — followed by raw
 		// SQL, or by nothing (directives-only stub). The header keeps its
-		// SSL and data-source checks; the SQL body gets only the
-		// statement-separator warning (issue #154), offset past the
-		// header. The header is a position-preserving prefix of the
-		// document, so diagnostic ranges line up unchanged (issues #104,
-		// #148).
+		// SSL and data-source checks; the SQL body gets only the SQL-body
+		// checks — the statement-separator warning (issue #154) and the
+		// undeclared @name placeholder check against the header's
+		// :PARAMETERS names — offset past the header. The header is a
+		// position-preserving prefix of the document, so diagnostic
+		// ranges line up unchanged (issues #104, #148).
 		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && (IsSQLDocument(body) || strings.TrimSpace(body) == "") {
-			sqlBodyDiagnostics = applyRuleOverrides(
-				checkDataSourceSQLSemicolons(body, strings.Count(header, "\n")), opts.RuleOverrides)
+			offset := strings.Count(header, "\n")
+			sqlBodyDiagnostics = applyRuleOverrides(append(
+				checkDataSourceSQLSemicolons(body, offset),
+				checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides)
 			text = header
 		}
 	}
