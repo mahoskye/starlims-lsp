@@ -93,6 +93,17 @@ history:
       :PARAMETERS declaration warns (it is not substituted and fails at
       execute time), with structural exclusions for @@ system functions
       and DECLARE-scripted bodies.
+  - date: 2026-08-08
+    ref: "issue #153"
+    note: >-
+      SQL-vs-SSL classification inverted for data-source files: a .ds file
+      is SQL by default and SSL only when its body (header split off)
+      carries a strong SSL marker — a non-directive colon keyword, a `:=`
+      assignment, or a leading unterminated `/*` comment. The former
+      structural-SQL detector rejected valid queries it could not tell from
+      English prose (a SELECT list with implicit column aliases), leaking
+      SSL diagnostics like bare_logical_operator onto legitimate SQL `and`.
+      A22 pins both directions.
 issues: []
 ---
 
@@ -136,13 +147,19 @@ rules (those are `diag.*` entries).
   false positives out of the box; a marker deeper in the file MUST NOT
   activate endpoint mode.
 - SQL-mode data-source classification: a document classified as a data
-  source by URI (`.ds` / `.ds.txt`) whose content is a plain SQL statement
-  produces NO diagnostics — every SSL check would false-flag SQL syntax
-  (`table.column` qualified names, bare `AND`/`OR`, statements without
-  `;`). Content is SQL-classified when, after ignoring whitespace, SQL
-  comments, and optimizer hints, the first token is a SQL command keyword
-  and the statement passes the same structural validation the formatter's
-  embedded-SQL detection uses. A data-source document whose content is SSL
+  source by URI (`.ds` / `.ds.txt`) is SQL by default and produces NO SSL
+  diagnostics — every SSL check would false-flag SQL syntax (`table.column`
+  qualified names, bare `AND`/`OR`, statements without `;`). A `.ds` file
+  classifies as SSL only when its body — the document with any leading
+  builder-directive / `:PARAMETERS` header split off — carries a strong SSL
+  marker: a non-directive colon keyword (`:DECLARE`, `:IF`, `:RETURN`, …;
+  `:PARAMETERS` and the builder directives are excluded), a `:=`
+  assignment, or an unterminated `/* … ` SSL comment leading the document.
+  SQL never uses `:KEYWORD` syntax or a bare `:=`, so any such marker is
+  decisive evidence of SSL; conversely, a SQL query that fails strict
+  statement validation (for example a SELECT list with implicit column
+  aliases, `col alias`) still classifies as SQL because it carries no
+  marker (issue #153). A data-source document whose body carries a marker
   keeps the full data-source diagnostic set, and a non-data-source
   document is never SQL-classified regardless of content. The
   classification applies identically in every consumer: the editor path
@@ -192,6 +209,7 @@ rules (those are `diag.*` entries).
 - A19: Given a SQL data-source body whose column or table names collide with SQL builtin-function names (`set FORMAT = …`, `delete from FORMAT`), or whose SQL comments and quoted string literals contain semicolons (`'all;msoffice->pdf'`), when diagnostics are collected, then the document classifies as SQL mode and no diagnostic fires on any of it.
 - A20: Given a SQL-mode data-source body containing a `;` outside comments and string literals, when diagnostics are collected, then exactly one `datasource_sql_semicolon` warning fires per such semicolon at its position (offset past the header in the hybrid shape, whose own `;` terminators never flag); the warning honors rule overrides and never fires outside data-source files.
 - A21: Given a SQL-mode data-source body containing a `@name` placeholder outside comments and string literals with no case-insensitive match among the header's `:PARAMETERS` names (all placeholders, when there is no header), when diagnostics are collected, then a `datasource_undeclared_placeholder` warning fires on the placeholder's span; `@@` system functions, declared placeholders, unused declared parameters, and `DECLARE`-scripted bodies stay silent.
+- A22: Given a `.ds` data-source document whose SQL body carries no strong SSL marker — a SELECT whose list uses implicit column aliases (`col alias`), or any query that fails strict SQL-statement validation — when diagnostics are collected, then it classifies as SQL mode and no SSL diagnostic (`bare_logical_operator` on lowercase `and`/`or`, `dot_property_access` on `table.column`, or otherwise) fires; conversely, a `.ds` body carrying a strong SSL marker (a non-directive colon keyword, a `:=` assignment, or a leading unterminated `/* …` comment) classifies as SSL and keeps the full data-source diagnostic set, so a bare `and` in SSL code still flags `bare_logical_operator` (issue #153).
 
 ## Rationale
 
@@ -210,16 +228,27 @@ change diagnostic behavior. Panic recovery (5814391, v0.7.1) exists because
 a single misbehaving check previously took down the whole server ("all
 goroutines are asleep"); one loud `internal_error` diagnostic keeps the
 editor usable and makes bug reports actionable. SQL-mode data sources
-(#77) reuse the formatter's structural SQL detection rather than a
-looser keyword sniff so an SSL data source can never be misclassified:
-SSL leading comments (`/* text;`) swallow the rest of the file when
-SQL-lexed, and SSL keywords fail the command-keyword check — absent
-certainty, the file keeps its SSL diagnostics. Header-comment handling
-(#148) keys off the same distinction in the other direction: only
-*terminated* comments are transparent, because a terminated `/* ... */`
-banner is definitionally a SQL comment while the SSL form has no `*/` —
-so comment-only classification and header masking can never hide SSL
-content from its diagnostics.
+(#77) originally reused the formatter's structural SQL detection —
+first-token-is-a-command-keyword plus statement validation — to decide
+SQL vs SSL. That detector is tuned to reject English prose inside SSL
+string literals, so it has false negatives on real queries: a SELECT list
+with implicit column aliases (`col alias`) is indistinguishable from prose
+(`the samples`) and failed validation, leaking SSL diagnostics like
+`bare_logical_operator` onto a legitimate SQL `and` (#153). The fix
+inverts the default (#153): a `.ds` file is overwhelmingly a SQL data
+source, so it is SQL unless its body carries a *strong SSL marker* — a
+construct SQL never contains. Because the SSL lexer emits a keyword token
+only off a leading colon and SQL has no `:KEYWORD` syntax or bare `:=`, a
+non-directive colon keyword or a body `:=` is decisive and cheap to detect
+(strings and comments are consumed as single tokens, so a marker inside
+them does not count). The one SSL keyword that is also a header directive,
+`:PARAMETERS`, and its inline `:=` defaults are excluded by splitting the
+header off first. Header-comment handling (#148) supplies the last marker:
+only a *terminated* `/* ... */` is a SQL comment, so an unterminated
+leading `/*` — detected by masking terminated leading comments and seeing
+whether a bare `/*` remains, which sidesteps the SSL lexer's habit of
+stopping a comment at the first `;` — marks SSL and keeps its
+comment-termination diagnostic.
 
 ## Known gaps
 

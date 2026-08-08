@@ -117,34 +117,38 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// applyRuleOverrides on both SQL-mode paths below.
 	var sqlBodyDiagnostics []Diagnostic
 	if opts.IsDataSourceFile {
-		// A comment-only stub (a terminated /* banner */ and nothing else)
-		// is the schema's header_comment shape, not SSL — no SSL
-		// diagnostics (feature.diagnostics_pipeline A16, issue #148). A
-		// whole-document SQL body gets only the SQL-body checks: the bare
-		// statement-separator warning (issue #154) and the undeclared
-		// @name placeholder check (with no header, no names are
-		// declared).
-		if IsSQLDocument(text) || IsSQLCommentOnly(text) {
-			return applyRuleOverrides(append(
-				checkDataSourceSQLSemicolons(text, 0),
-				checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides)
-		}
-		// Hybrid sql_data_source shape: builder directives / :PARAMETERS
-		// header — optionally preceded by a terminated header comment,
-		// which SplitDataSourceHeader masks to blanks — followed by raw
-		// SQL, or by nothing (directives-only stub). The header keeps its
-		// SSL and data-source checks; the SQL body gets only the SQL-body
-		// checks — the statement-separator warning (issue #154) and the
-		// undeclared @name placeholder check against the header's
-		// :PARAMETERS names — offset past the header. The header is a
-		// position-preserving prefix of the document, so diagnostic
-		// ranges line up unchanged (issues #104, #148).
-		if header, body := SplitDataSourceHeader(text); strings.TrimSpace(header) != "" && (IsSQLDocument(body) || strings.TrimSpace(body) == "") {
-			offset := strings.Count(header, "\n")
-			sqlBodyDiagnostics = applyRuleOverrides(append(
-				checkDataSourceSQLSemicolons(body, offset),
-				checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides)
-			text = header
+		// A data-source file is SQL by default and only stays in SSL mode
+		// when its body carries a strong SSL marker (issue #153): a
+		// non-directive colon keyword or a `:=` assignment, or the document
+		// leads with an unterminated SSL comment. The directive /
+		// :PARAMETERS header is split off first so its keywords and inline
+		// `:=` defaults never read as SSL. Plain SQL (A10), a comment-only
+		// stub (A16), and the hybrid header-then-SQL shapes all lack those
+		// markers and route here; a real SSL data source (A11) has one and
+		// falls through to the full SSL pipeline below.
+		header, body := SplitDataSourceHeader(text)
+		if !hasStrongSSLMarker(body) && !hasUnterminatedLeadingBlockComment(text) {
+			if strings.TrimSpace(header) != "" {
+				// Hybrid shape: the directive / :PARAMETERS header keeps its
+				// SSL and data-source checks; the SQL body gets only the
+				// SQL-body checks — the statement-separator warning (issue
+				// #154) and the undeclared @name placeholder check against
+				// the header's :PARAMETERS names — offset past the header.
+				// The header is a position-preserving prefix, so ranges line
+				// up unchanged (issues #104, #148).
+				offset := strings.Count(header, "\n")
+				sqlBodyDiagnostics = applyRuleOverrides(append(
+					checkDataSourceSQLSemicolons(body, offset),
+					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides)
+				text = header
+			} else {
+				// Whole-document SQL body (or a comment-only stub): no SSL
+				// diagnostics, only the SQL-body checks. With no header, no
+				// @name placeholders are declared.
+				return applyRuleOverrides(append(
+					checkDataSourceSQLSemicolons(text, 0),
+					checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides)
+			}
 		}
 	}
 

@@ -47,6 +47,72 @@ oFilter.Value := sStatus;
 	}
 }
 
+// A SQL data source whose SELECT list uses implicit column aliases
+// (`col alias`, no AS) — a shape that defeats strict SQL-statement
+// validation — still classifies as SQL because a .ds file is SQL unless
+// its body carries a strong SSL marker. Its lowercase `and`, dotted column
+// names, and joins must not draw any SSL diagnostic, and in particular not
+// bare_logical_operator. [spec feature.diagnostics_pipeline/A22] (issue #153)
+func TestGetDiagnostics_SQLDataSource_ImplicitAliasesStaySQL(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	// Whole-document SQL body: only the SQL-body checks may fire. Here the
+	// @patOrigRec placeholder is undeclared (no :PARAMETERS header), so the
+	// sole diagnostic is datasource_undeclared_placeholder — never an SSL
+	// diagnostic on the `and` predicate.
+	body := `SELECT p.ORIGREC PatientId, v.VISITDATE VisitDate
+FROM PATIENTS p
+INNER JOIN VISITS v ON v.PATID = p.ORIGREC
+WHERE p.STATUS = 'A'
+and PATIENTS.ORIGREC = @patOrigRec
+ORDER BY v.VISITDATE`
+	for _, d := range GetDiagnostics(body, opts) {
+		if d.Source == "ssl-lsp" && d.Code != CodeDatasourceUndeclaredPlaceholder {
+			t.Errorf("no SSL diagnostic should fire on an implicit-alias SQL data source, got %s: %s", d.Code, d.Message)
+		}
+		if d.Code == CodeBareLogicalOperator {
+			t.Errorf("issue #153: bare_logical_operator must not fire on SQL `and`: %+v", d)
+		}
+	}
+
+	// Hybrid shape: a :PARAMETERS header declares the placeholder, so the
+	// implicit-alias body draws no diagnostic at all.
+	hybrid := `:PARAMETERS patOrigRec;
+
+SELECT p.ORIGREC PatientId
+FROM PATIENTS p
+WHERE p.STATUS = 'A' and PATIENTS.ORIGREC = @patOrigRec`
+	if diags := GetDiagnostics(hybrid, opts); len(diags) != 0 {
+		t.Errorf("hybrid implicit-alias data source with declared placeholder should be clean, got %+v", diags)
+	}
+}
+
+// A `.ds` file whose lowercase `and` appears in an SSL script — not SQL —
+// still draws bare_logical_operator: the body carries strong SSL markers
+// (colon keywords and `:=`), so it classifies as SSL. This is the inverse
+// of the issue #153 case and pins that the SQL default does not swallow
+// genuine SSL. [spec feature.diagnostics_pipeline/A22] (issue #153)
+func TestGetDiagnostics_SSLDataSource_BareAndStillFlags(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	ssl := `:PARAMETERS pStatus;
+:DECLARE aOut;
+:IF pStatus == "A" and Len(pStatus) > 0;
+	aOut := 1;
+:ENDIF;`
+	found := false
+	for _, d := range GetDiagnostics(ssl, opts) {
+		if d.Code == CodeBareLogicalOperator {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("bare `and` in an SSL-marker-bearing .ds must still flag bare_logical_operator")
+	}
+}
+
 // SQL content outside a data-source file still gets SSL diagnostics —
 // SQL-mode classification is scoped to data-source files.
 // [spec feature.diagnostics_pipeline/A12]
@@ -316,6 +382,10 @@ func TestIsSQLModeDataSource(t *testing.T) {
 		bannerComment + "SELECT sample_id FROM samples WHERE sample_status = @sStatus\n",
 		bannerComment + ":DSN := conn;\nSELECT sample_id FROM samples\n",
 		bannerComment + ":DSN := conn;\n:PARAMETERS sStatus;\n",
+		// Implicit column aliases defeat strict SQL validation but carry no
+		// SSL marker, so a .ds file with them is still SQL (issue #153).
+		"SELECT p.ORIGREC PatientId FROM PATIENTS p WHERE p.STATUS = 'A' and p.ORIGREC = @p\n",
+		":PARAMETERS p;\nSELECT o.ordno OrderNo FROM orders o WHERE o.x = @p and o.y = 1\n",
 	}
 	for _, c := range sqlMode {
 		if !IsSQLModeDataSource(c) {
@@ -327,6 +397,11 @@ func TestIsSQLModeDataSource(t *testing.T) {
 		":PARAMETERS sStatus := \"A\";\n:DECLARE aRes;\naRes := SQLExecute(\"SELECT 1 FROM DUAL\");\n",
 		":DSN := conn;\n:DECLARE nX;\nnX := 1;\n",
 		":PROCEDURE P;\n:ENDPROC;\n",
+		// No colon keyword, but the body's `:=` assignment is a strong SSL
+		// marker (issue #153; the A11 shape).
+		":PARAMETERS sStatus;\noFilter.Value := sStatus;\n",
+		// Unterminated SSL comment leads the document (A16).
+		"/* not closed the SQL way\n",
 	}
 	for _, c := range sslMode {
 		if IsSQLModeDataSource(c) {
