@@ -109,6 +109,18 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:CLASS ValidationClient;
+:PROCEDURE CheckInput;
+	:PARAMETERS oInput;
+	:DECLARE bResult;
+	bResult := ExecFunction("ValidateProperties", {oInput});
+	:RETURN bResult;
+:ENDPROC;
+```
+
 ## Rationale
 
 The schema rule (`lints.compile_errors.doproc_in_class`, section level
