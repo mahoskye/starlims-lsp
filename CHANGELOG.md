@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-07
+
+Clears the whole open-issue backlog (#132, #138–#143) in one batch:
+three new diagnostics — including the first cross-file one — two
+formatter fixes, data-source parity for the `--validate` CLI, and an
+element-data refresh carrying the upstream error-handling doctrine.
+Downstream consumers pick this up via ssl-style-guide#34 (MCP binaries,
+`ssl_diagnose --ds` wiring) and vs-code-ssl-formatter#90 (extension).
+
 ### Added
 - **`raiseerror_in_catch` diagnostic (#142).** From the RaiseError
   placement doctrine (ssl-style-guide#36): a `RaiseError(` call whose
