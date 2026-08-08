@@ -751,13 +751,14 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 	// Issue #56: skip dots inside :INCLUDE module paths. These can be deep
 	// (e.g. :INCLUDE A.B.C.D;) and the lexer breaks them into Unknown
 	// chunks like ".B.", so a single-token lookback is insufficient. Track
-	// :INCLUDE statement scope explicitly.
+	// :INCLUDE statement scope explicitly. :INHERIT qualified base names
+	// (:INHERIT Category.ScriptName;) get the same exemption (issue #149).
 	inInclude := false
 
 	for i, token := range tokens {
 		if token.Type == lexer.TokenKeyword {
 			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-			if normalized == "INCLUDE" {
+			if normalized == "INCLUDE" || normalized == "INHERIT" {
 				inInclude = true
 				continue
 			}
@@ -972,14 +973,22 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		// Check if preceded by an identifier (array variable)
+		// Check if preceded by an identifier (array variable). If that
+		// identifier is itself reached through colon member access
+		// (dataSet:Tables[0]), the value may be a 0-based .NET collection,
+		// so the diagnostic downgrades to a warning (issue #152).
 		hasPrecedingIdent := false
+		afterMemberAccess := false
 		for j := i - 1; j >= 0; j-- {
 			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
 				continue
 			}
 			if tokens[j].Type == lexer.TokenIdentifier {
 				hasPrecedingIdent = true
+				if k := previousSignificantTokenIndex(tokens, j-1); k >= 0 &&
+					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":" {
+					afterMemberAccess = true
+				}
 			}
 			break
 		}
@@ -1002,10 +1011,16 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 			}
 			if foundZero && tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "]" {
 				// Found [0] pattern
+				severity := SeverityError
+				message := "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element."
+				if afterMemberAccess {
+					severity = SeverityWarning
+					message = "Index 0 on a ':' member access may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
+				}
 				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityError,
+					Severity: severity,
 					Range:    tokenToRange(*zeroToken),
-					Message:  "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.",
+					Message:  message,
 					Source:   "ssl-lsp",
 					Code:     CodeZeroBasedArrayIndex,
 				})
@@ -1535,13 +1550,21 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 				continue
 			}
 			if tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "(" {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityError,
-					Range:    tokenToRange(token),
-					Message:  "DoProc is a compile-time error inside class methods — all forms are rejected. Use Me:MethodName() / Base:MethodName() instead.",
-					Source:   "ssl-lsp",
-					Code:     CodeDoProcInClass,
-				})
+				// Only a string-literal target without a '.' qualifier is
+				// provably a class-local/base call; qualified
+				// "Category.Script.Procedure" references to deployed
+				// procedures are valid inside class methods, and
+				// non-literal targets are not provable (issue #151,
+				// ssl-style-guide#49).
+				if isUnqualifiedStringTarget(tokens, j+1) {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  "Unqualified DoProc targets are a compile-time error inside class methods. Use Me:MethodName() / Base:MethodName(), or a fully qualified \"Category.Script.Procedure\" reference for a deployed procedure.",
+						Source:   "ssl-lsp",
+						Code:     CodeDoProcInClass,
+					})
+				}
 			}
 			break
 		}
@@ -2187,6 +2210,19 @@ func isHungarianExemptName(name string) bool {
 	}
 
 	return false
+}
+
+// isUnqualifiedStringTarget reports whether the first significant token at
+// or after idx is a string literal whose content has no '.' qualifier — the
+// provably class-local DoProc target form. Qualified
+// "Category.Script.Procedure" literals and non-literal targets return false
+// (issue #151, ssl-style-guide#49).
+func isUnqualifiedStringTarget(tokens []lexer.Token, idx int) bool {
+	arg := nextSignificantTokenIndex(tokens, idx)
+	if arg < 0 || tokens[arg].Type != lexer.TokenString {
+		return false
+	}
+	return !strings.Contains(tokens[arg].Text, ".")
 }
 
 func tokenInProcedureRange(token lexer.Token, procedures []parser.ProcedureInfo) bool {
@@ -4784,10 +4820,12 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 			continue
 		}
 
-		// Detect :INCLUDE keyword and skip until semicolon (Issue #56)
+		// Detect :INCLUDE (issue #56) / :INHERIT (issue #149) keywords and
+		// skip until semicolon — their dotted paths are module references,
+		// not variable uses.
 		if token.Type == lexer.TokenKeyword {
 			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-			if normalized == "INCLUDE" {
+			if normalized == "INCLUDE" || normalized == "INHERIT" {
 				inInclude = true
 				continue
 			}

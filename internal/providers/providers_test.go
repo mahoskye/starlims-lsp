@@ -1946,12 +1946,66 @@ func TestGetDiagnostics_DoProcInClassMethod(t *testing.T) {
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DoProc is a compile-time error inside class methods") {
+		if d.Code == CodeDoProcInClass {
+			if !strings.Contains(d.Message, "Unqualified DoProc targets") {
+				t.Errorf("unexpected message: %s", d.Message)
+			}
 			return
 		}
 	}
 
 	t.Fatal("expected DoProc-in-class diagnostic")
+}
+
+func TestGetDiagnostics_DoProcInClassMethod_QualifiedAndUnprovableTargetsAllowed(t *testing.T) {
+	// Qualified "Category.Script.Procedure" references are valid inside
+	// class methods, and non-literal targets are not provable — neither may
+	// flag (issue #151, ssl-style-guide#49).
+	cases := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "qualified DoProc target",
+			code: `:CLASS ValidationClient;
+:PROCEDURE CheckInput;
+	:PARAMETERS oInput;
+	:DECLARE bResult;
+	bResult := DoProc("API_Helper.ValidationHelper.ValidateProperties", {oInput});
+	:RETURN bResult;
+:ENDPROC;`,
+		},
+		{
+			name: "variable DoProc target",
+			code: `:CLASS ValidationClient;
+:PROCEDURE CheckInput;
+	:DECLARE sTarget, bResult;
+	sTarget := BuildTargetName();
+	bResult := DoProc(sTarget, {});
+	:RETURN bResult;
+:ENDPROC;`,
+		},
+		{
+			name: "qualified ExecFunction target",
+			code: `:CLASS ValidationClient;
+:PROCEDURE CheckInput;
+	:PARAMETERS oInput;
+	:DECLARE bResult;
+	bResult := ExecFunction("API_Helper.ValidationHelper.ValidateProperties", {oInput});
+	:RETURN bResult;
+:ENDPROC;`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, d := range GetDiagnostics(tc.code, DefaultDiagnosticOptions()) {
+				if d.Code == CodeDoProcInClass {
+					t.Errorf("must not flag: %s", d.Message)
+				}
+			}
+		})
+	}
 }
 
 func TestGetDiagnostics_ConstructorReturnValue(t *testing.T) {
@@ -2867,6 +2921,66 @@ func TestGetDiagnostics_DotPropertyAccess_IncludePathSkipped_DeepPath(t *testing
 				}
 			}
 		})
+	}
+}
+
+func TestGetDiagnostics_DotPropertyAccess_InheritQualifiedNameSkipped(t *testing.T) {
+	// :INHERIT requires the qualified-name syntax (schema
+	// classes.signature.inherit); its dots are path separators, not
+	// property access (issue #149).
+	cases := []string{
+		`:CLASS RestApiUsers;
+:INHERIT RestApi.RestApiBase;`,
+		`:CLASS Widget;
+:INHERIT Framework.UI.WidgetBase;`,
+	}
+	for _, text := range cases {
+		t.Run(text, func(t *testing.T) {
+			for _, d := range GetDiagnostics(text, DefaultDiagnosticOptions()) {
+				if d.Code == CodeDotPropertyAccess {
+					t.Errorf("dot_property_access should not fire inside :INHERIT: %s", d.Message)
+				}
+			}
+		})
+	}
+
+	// Ordinary dot property access after the :INHERIT statement still flags.
+	text := `:CLASS RestApiUsers;
+:INHERIT RestApi.RestApiBase;
+:PROCEDURE GetUsers;
+	:DECLARE x, oEmail;
+	oEmail := Email{};
+	x := oEmail.Subject;
+:ENDPROC;`
+	found := false
+	for _, d := range GetDiagnostics(text, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDotPropertyAccess {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("dot_property_access should still fire outside :INHERIT")
+	}
+}
+
+func TestGetDiagnostics_UndeclaredVariable_InheritNameSkipped(t *testing.T) {
+	// Identifiers inside :INHERIT qualified base names are module
+	// references, not variable uses (issue #149; same mechanism as the
+	// :INCLUDE exemption, issue #56).
+	text := `:CLASS RestApiUsers;
+:INHERIT RestApi.RestApiBase;
+:PROCEDURE GetUsers;
+	:DECLARE aOut;
+	aOut := {};
+	:RETURN aOut;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	for _, d := range GetDiagnostics(text, opts) {
+		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "RestApi'") {
+			t.Errorf(":INHERIT base name should not be flagged as undeclared: %s", d.Message)
+		}
 	}
 }
 
@@ -4412,6 +4526,39 @@ func TestGetDiagnostics_ZeroBasedArrayIndex(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("expected zero-index diagnostic, got: %v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
+	// [0] on a value reached through colon member access may be a 0-based
+	// .NET collection: warning, not error (issue #152). Chained access
+	// behaves the same.
+	cases := []struct {
+		name string
+		code string
+	}{
+		{name: "member access", code: `oTable := dataSet:Tables[0];`},
+		{name: "chained member access", code: `oCol := dataSet:Tables:Columns[0];`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			found := false
+			for _, d := range GetDiagnostics(tc.code, DefaultDiagnosticOptions()) {
+				if d.Code == CodeZeroBasedArrayIndex {
+					found = true
+					if d.Severity != SeverityWarning {
+						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					}
+					if !strings.Contains(d.Message, ".NET") {
+						t.Errorf("message should mention .NET collections: %s", d.Message)
+					}
+				}
+			}
+			if !found {
+				t.Error("expected zero-index warning on member-access subscript")
 			}
 		})
 	}
@@ -7166,9 +7313,11 @@ func TestGetDiagnostics_StringExactEquality_NoWarning(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_DoProcInsideClass_AllFormsRejected(t *testing.T) {
-	// Source of truth: ssl_agent_instructions.md rule #5:
-	// "DoProc is a compile-time error inside class methods — all forms are rejected"
+func TestGetDiagnostics_DoProcInsideClass_UnqualifiedRejected(t *testing.T) {
+	// Unqualified DoProc targets are a compile-time error inside class
+	// methods (diag.doproc_in_class; narrowed from "all forms are
+	// rejected" by issue #151 / ssl-style-guide#49 — qualified
+	// "Category.Script.Procedure" targets are valid).
 	text := `:CLASS MyClass;
 :PROCEDURE DoWork;
 DoProc("Helper");
@@ -7180,12 +7329,12 @@ DoProc("Helper");
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DoProc is a compile-time error inside class methods") {
+		if d.Code == CodeDoProcInClass {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected diagnostic about DoProc being a compile-time error inside class methods")
+		t.Error("expected diagnostic for unqualified DoProc target inside class method")
 	}
 }
 

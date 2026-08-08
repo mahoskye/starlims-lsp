@@ -31,6 +31,13 @@ history:
       qualified names in plain-SQL .ds files were the reported false
       positive. Suppression happens at the pipeline level
       (feature.diagnostics_pipeline A10-A12), not in this check.
+  - date: 2026-08-08
+    ref: "issue #149"
+    note: >-
+      False positive fixed: qualified base names in :INHERIT declarations
+      (`:INHERIT Category.ScriptName;`) are required syntax per the schema
+      (classes.signature.inherit), not property access. Exempted through
+      the terminating `;`, same mechanism as :INCLUDE (issue #56).
 issues: []
 ---
 
@@ -48,6 +55,10 @@ It must NOT flag:
 - colon member access (`oEmail:Subject`);
 - dots inside `:INCLUDE` module paths, however deep (`:INCLUDE A.B.C.D;`) —
   the whole statement through its terminating `;` is exempt (issue #56);
+- dots inside `:INHERIT` qualified base names
+  (`:INHERIT Category.ScriptName;`) — the schema documents both bare and
+  qualified forms as accepted (classes.signature.inherit), so the whole
+  statement through its terminating `;` is exempt (issue #149);
 - dotted logical operators and boolean literals (`.AND.`, `.OR.`, `.T.`,
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
@@ -85,6 +96,15 @@ names there never reach this check.
 ```ssl
 :INCLUDE Framework.Core.Utils.Strings;
 :PROCEDURE Demo;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:CLASS RestApiUsers;
+:INHERIT RestApi.RestApiBase;
+:PROCEDURE GetUsers;
 :ENDPROC;
 ```
 
