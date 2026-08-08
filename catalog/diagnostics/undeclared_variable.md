@@ -49,6 +49,12 @@ history:
       Identifiers inside :INHERIT qualified base names are not variable
       references — same exemption mechanism as :INCLUDE paths. (The
       :CLASS name itself still false-flags; filed separately.)
+  - date: 2026-08-08
+    ref: "issue #155"
+    note: >-
+      The identifier following :CLASS is the class-name declaration, not a
+      variable use — same skip-until-semicolon mechanism as :INCLUDE and
+      :INHERIT. Closes the exemption noted in the #149 entry above.
 issues: []
 ---
 
@@ -59,8 +65,9 @@ a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration in
 scope, reported once per scope.
 
 Treated as declared, never flagged: built-in function and class names,
-`Me`/`Base` forms, identifiers inside `:INCLUDE` paths and `:INHERIT`
-qualified base names (issue #149), names listed in
+`Me`/`Base` forms, identifiers inside `:INCLUDE` paths, `:INHERIT`
+qualified base names (issue #149), the `:CLASS` name itself
+(issue #155), names listed in
 `ssl.diagnostics.globals`, names declared by the file's resolved
 `:INCLUDE` targets (the include declaration closure,
 `feature.cross_file_resolution` A18-A19 — `:INCLUDE` splices the included
@@ -112,6 +119,17 @@ resolve) the check is single-file, exactly as before.
 	:DECLARE sName;
 	sName := "abc";
 	sName:SomeRandomDotNetMethod();
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:CLASS RestApiUsers;
+:PROCEDURE GetUsers;
+	:DECLARE aOut;
+	aOut := {};
+	:RETURN aOut;
 :ENDPROC;
 ```
 

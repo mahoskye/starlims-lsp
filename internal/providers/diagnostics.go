@@ -4826,7 +4826,9 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 	// Track which undeclared variables we've already reported (once per scope)
 	reported := make(map[string]bool)
 
-	// Track if we're inside an :INCLUDE statement (Issue #56)
+	// Track if we're inside an :INCLUDE / :INHERIT / :CLASS statement whose
+	// identifiers are declarations or module references, not variable uses
+	// (issues #56, #149, #155).
 	inInclude := false
 
 	// Process tokens
@@ -4838,12 +4840,13 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 			continue
 		}
 
-		// Detect :INCLUDE (issue #56) / :INHERIT (issue #149) keywords and
-		// skip until semicolon — their dotted paths are module references,
-		// not variable uses.
+		// Detect :INCLUDE (issue #56) / :INHERIT (issue #149) / :CLASS
+		// (issue #155) keywords and skip until semicolon — the identifiers
+		// that follow are module references (:INCLUDE, :INHERIT) or the
+		// class-name declaration (:CLASS), not variable uses.
 		if token.Type == lexer.TokenKeyword {
 			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-			if normalized == "INCLUDE" || normalized == "INHERIT" {
+			if normalized == "INCLUDE" || normalized == "INHERIT" || normalized == "CLASS" {
 				inInclude = true
 				continue
 			}

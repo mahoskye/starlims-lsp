@@ -2996,6 +2996,47 @@ func TestGetDiagnostics_UndeclaredVariable_InheritNameSkipped(t *testing.T) {
 	}
 }
 
+func TestGetDiagnostics_UndeclaredVariable_ClassNameSkipped(t *testing.T) {
+	// The identifier after :CLASS is the class-name declaration, not a
+	// variable use — same exemption mechanism as :INCLUDE paths (#56) and
+	// :INHERIT base names (#149). Issue #155.
+	text := `:CLASS RestApiUsers;
+:PROCEDURE GetUsers;
+	:DECLARE aOut;
+	aOut := {};
+	:RETURN aOut;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	for _, d := range GetDiagnostics(text, opts) {
+		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "RestApiUsers") {
+			t.Errorf(":CLASS name should not be flagged as undeclared (issue #155): %s", d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_UndeclaredVariable_ClassNameSkipped_OrdinaryStillFlags(t *testing.T) {
+	// The :CLASS exemption must not suppress genuine undeclared uses
+	// elsewhere in the class file.
+	text := `:CLASS RestApiUsers;
+:PROCEDURE GetUsers;
+	nTotal := nMissing + 1;
+:ENDPROC;`
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	found := false
+	for _, d := range GetDiagnostics(text, opts) {
+		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "nMissing") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("ordinary undeclared variable should still flag in a :CLASS file (issue #155)")
+	}
+}
+
 // Issue #2: 'Me' should be recognized as a built-in identifier
 func TestGetDiagnostics_UndeclaredVariable_MeRecognized(t *testing.T) {
 	text := `:CLASS MyClass;
