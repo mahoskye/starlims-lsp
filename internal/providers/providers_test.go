@@ -3076,7 +3076,9 @@ result := Calculate(result);
 			(strings.Contains(d.Message, "MyCustomProc") || strings.Contains(d.Message, "Calculate")) {
 			t.Errorf("direct custom calls should not be treated as undeclared variables: %s", d.Message)
 		}
-		if strings.Contains(d.Message, "Custom procedures cannot be called directly") {
+		// Issue #167: unknown callables now warn rather than error, but the
+		// direct_procedure_call code still fires.
+		if d.Code == CodeDirectProcedureCall {
 			foundDirectCallDiagnostic = true
 		}
 	}
@@ -5331,6 +5333,47 @@ func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
 		if strings.Contains(d.Message, "':DEFAULT' must appear immediately after ':PARAMETERS'") {
 			t.Errorf("unexpected DEFAULT placement diagnostic: %s", d.Message)
 		}
+	}
+}
+
+// Issue #167: direct-call severity is tiered — an in-file procedure called
+// directly is a provable misuse (error); an unknown bare callable may be an
+// uncataloged vendor built-in (warning).
+func TestGetDiagnostics_DirectProcedureCall_TieredSeverity(t *testing.T) {
+	inFile := `:PROCEDURE MyHelper;
+:ENDPROC;
+:PROCEDURE Main;
+:DECLARE result;
+result := MyHelper();
+:ENDPROC;`
+
+	found := false
+	for _, d := range GetDiagnostics(inFile, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDirectProcedureCall {
+			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity for in-file direct call, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected direct_procedure_call for in-file direct call")
+	}
+
+	unknown := `:DECLARE s;
+s := LimsCleanUp();`
+
+	found = false
+	for _, d := range GetDiagnostics(unknown, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDirectProcedureCall {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for unknown bare callable, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected direct_procedure_call warning for unknown bare callable")
 	}
 }
 
