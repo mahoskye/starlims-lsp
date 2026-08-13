@@ -271,7 +271,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for assignment to global variables.
 	// Always runs to catch writes to built-in predefined globals (e.g. MYUSERNAME).
 	// Also enforces user-configured globals when provided.
-	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
+	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, variables, opts.GlobalVariables)...)
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
@@ -4749,8 +4749,18 @@ func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
 // checkGlobalAssignment checks for assignment to global variables.
 // Global variables are pre-declared and should not be assigned to.
 // Always checks SSLPredefinedGlobals (e.g. MYUSERNAME); also checks user-configured globals.
-func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic {
+// An in-file declaration (:DECLARE/:PARAMETERS/:PUBLIC) suppresses the check
+// for that name (issue #169): a declared local that happens to collide with a
+// status keyword (loop variable iS vs IS) is the author's own variable, and a
+// :PUBLIC declaration marks this file as the initializer that creates the
+// global — "globals are read-only" holds for consumers, not the declarer.
+func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo, globals []string) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	declaredSet := make(map[string]bool)
+	for _, v := range declared {
+		declaredSet[strings.ToUpper(v.Name)] = true
+	}
 
 	// Build a case-insensitive set of global variable names.
 	// Always include built-in predefined globals and status keywords.
@@ -4776,6 +4786,12 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 
 		// Check if this identifier is a global
 		if !globalSet[strings.ToUpper(token.Text)] {
+			continue
+		}
+
+		// Declared in this file — the author's own variable, or the
+		// initializer script that creates the global (issue #169).
+		if declaredSet[strings.ToUpper(token.Text)] {
 			continue
 		}
 

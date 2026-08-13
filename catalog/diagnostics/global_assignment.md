@@ -29,6 +29,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code global_assignment assigned.
+  - date: 2026-08-12
+    ref: "issue #169"
+    note: >-
+      In-file declarations now suppress the check: the token-stream match
+      ignored :DECLARE/:PARAMETERS/:PUBLIC, so a declared local that
+      case-insensitively collides with a status keyword (loop variable iS
+      vs IS) flagged, and a system-init script assigning the :PUBLIC
+      global it just created flagged — the read-only premise holds for
+      consumers, not the declarer.
 issues: []
 ---
 
@@ -50,7 +59,13 @@ It must NOT flag:
 - reads of a global (`sUser := MYUSERNAME;`);
 - assignment to any identifier not in the set — ordinary locals, even
   undeclared ones (that is `undeclared_variable`'s job);
-- comparisons (`==`, `=`) against a global — only `:=` triggers.
+- comparisons (`==`, `=`) against a global — only `:=` triggers;
+- assignment to a name declared in this file via `:DECLARE`,
+  `:PARAMETERS`, or `:PUBLIC` (issue #169): a declared local colliding
+  with a status keyword is the author's own variable (`iS` vs `IS`), and
+  a file declaring `:PUBLIC MYUSERNAME;` is the initializer that creates
+  the global — read-only applies to consumers, not the declarer (the
+  `:PUBLIC` line still gets its own `limit_public_vars` warning).
 
 ## Examples
 
@@ -78,6 +93,22 @@ sUser := MYUSERNAME;
 ```ssl
 :DECLARE sStatus, bMatch;
 bMatch := sStatus == Pending;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE iS, aSeg;
+aSeg := {1,2};
+:FOR iS := 1 :TO Len(aSeg);
+:NEXT;
+```
+
+### Does not flag
+
+```ssl
+:PUBLIC MYUSERNAME;
+MYUSERNAME := "system";
 ```
 
 ## Rationale
