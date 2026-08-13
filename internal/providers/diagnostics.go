@@ -2845,17 +2845,35 @@ func checkExecFunctionClassTargets(tokens []lexer.Token, classTargets []string) 
 	return diagnostics
 }
 
+// paramScope tracks one open :PROCEDURE or :BEGININLINECODE block for
+// checkParameterPlacement: whether the scope is still eligible for a
+// leading :PARAMETERS statement.
+type paramScope struct {
+	kind    string // "PROCEDURE" or "BEGININLINECODE"
+	waiting bool   // no statement seen yet — :PARAMETERS still allowed
+}
+
 // checkParameterPlacement enforces that procedure-level :PARAMETERS statements
-// appear immediately after :PROCEDURE and that script-level :PARAMETERS appears
-// before top-level executable statements (leading procedures are allowed).
+// appear immediately after :PROCEDURE (likewise :BEGININLINECODE, whose named
+// blocks take their own :PARAMETERS list — issue #168) and that script-level
+// :PARAMETERS appears before top-level executable statements (leading
+// procedures are allowed). :INCLUDE never counts as a statement at any level:
+// it is resolved as a textual paste before the file runs, and the style
+// guide's include_early rule wants it before :PARAMETERS (issue #168).
 func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	startOfStatement := true
-	procedureDepth := 0
-	waitingForProcedureParameters := false
-	seenProcedureBodyStatement := false
+	var scopes []paramScope
 	seenTopLevelStatement := false
+
+	markStatement := func() {
+		if len(scopes) > 0 {
+			scopes[len(scopes)-1].waiting = false
+		} else {
+			seenTopLevelStatement = true
+		}
+	}
 
 	for _, token := range tokens {
 		if token.Type == lexer.TokenWhitespace {
@@ -2882,11 +2900,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		startOfStatement = false
 
 		if token.Type != lexer.TokenKeyword {
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 			continue
 		}
 
@@ -2894,30 +2908,29 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 
 		switch normalized {
 		case "PROCEDURE":
-			procedureDepth++
-			waitingForProcedureParameters = true
-			seenProcedureBodyStatement = false
-		case "ENDPROC":
-			if procedureDepth > 0 {
-				procedureDepth--
+			scopes = append(scopes, paramScope{kind: "PROCEDURE", waiting: true})
+		case "BEGININLINECODE":
+			scopes = append(scopes, paramScope{kind: "BEGININLINECODE", waiting: true})
+		case "ENDPROC", "ENDINLINECODE":
+			if len(scopes) > 0 {
+				scopes = scopes[:len(scopes)-1]
 			}
-			if procedureDepth == 0 {
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
-			}
+		case "INCLUDE":
+			// Structurally transparent for placement purposes: a paste-time
+			// directive, not an executable statement (issue #168).
 		case "PARAMETERS":
-			if procedureDepth > 0 {
-				if !waitingForProcedureParameters || seenProcedureBodyStatement {
+			if len(scopes) > 0 {
+				top := &scopes[len(scopes)-1]
+				if !top.waiting {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityError,
 						Range:    tokenToRange(token),
-						Message:  "':PARAMETERS' must appear immediately after ':PROCEDURE'",
+						Message:  fmt.Sprintf("':PARAMETERS' must appear immediately after ':%s'", top.kind),
 						Source:   "ssl-lsp",
 						Code:     CodeParametersFirst,
 					})
 				}
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
+				top.waiting = false
 			} else if seenTopLevelStatement {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
@@ -2928,12 +2941,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 				})
 			}
 		default:
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-				waitingForProcedureParameters = false
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 		}
 
 		if token.Type == lexer.TokenPunctuation && token.Text == ";" {

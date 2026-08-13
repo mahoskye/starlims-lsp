@@ -5375,6 +5375,56 @@ func TestGetDiagnostics_ParameterPlacement_MultiLineParametersWithInlineComments
 	}
 }
 
+// Issue #168: :INCLUDE is a paste-time directive, not a statement — the
+// include-then-parameters pattern (include_early) must not flag.
+func TestGetDiagnostics_ParameterPlacement_IncludeBeforeParametersAllowed(t *testing.T) {
+	code := `:INCLUDE Enterprise_Server.UserAuthentication;
+:PARAMETERS psUser;
+:RETURN psUser;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first after :INCLUDE: %s", d.Message)
+		}
+	}
+}
+
+// Issue #168: a :BEGININLINECODE block is a :PARAMETERS scope of its own —
+// its leading :PARAMETERS is valid regardless of earlier script statements,
+// while a non-leading one flags against the block.
+func TestGetDiagnostics_ParameterPlacement_InlineCodeScope(t *testing.T) {
+	valid := `:DECLARE x;
+x := 1;
+:BEGININLINECODE Calc;
+:PARAMETERS a;
+:RETURN a;
+:ENDINLINECODE;`
+
+	for _, d := range GetDiagnostics(valid, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first for leading :PARAMETERS in inline-code block: %s", d.Message)
+		}
+	}
+
+	invalid := `:BEGININLINECODE Calc;
+:DECLARE b;
+:PARAMETERS a;
+:ENDINLINECODE;`
+
+	found := false
+	for _, d := range GetDiagnostics(invalid, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			found = true
+			if !strings.Contains(d.Message, ":BEGININLINECODE") {
+				t.Errorf("expected message to name :BEGININLINECODE, got %s", d.Message)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected parameters_first for non-leading :PARAMETERS in inline-code block")
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
