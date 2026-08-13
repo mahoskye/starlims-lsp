@@ -2863,9 +2863,12 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT prevent
-			// :PARAMETERS from being accepted after :PROCEDURE.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither prevent
+			// :PARAMETERS from being accepted after :PROCEDURE nor end the
+			// enclosing statement: an inline comment mid-way through a
+			// multi-line :PARAMETERS list must not make the next parameter
+			// register as a body/top-level statement (issue #170). Only `;`
+			// ends a statement.
 			continue
 		}
 
@@ -2957,9 +2960,11 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT break
-			// the :PARAMETERS -> :DEFAULT sequence.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither break the
+			// :PARAMETERS -> :DEFAULT sequence nor end the enclosing
+			// statement: an inline comment mid-way through a multi-line
+			// :PARAMETERS list must not make the next parameter look like a
+			// new statement (issue #170). Only `;` ends a statement.
 			continue
 		}
 

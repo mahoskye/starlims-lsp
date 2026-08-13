@@ -5334,6 +5334,47 @@ func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
 	}
 }
 
+// Issue #170: an inline comment mid-way through a multi-line :PARAMETERS
+// list must not end the statement — the following :DEFAULT is still
+// immediately after the (single) :PARAMETERS statement.
+func TestGetDiagnostics_DefaultPlacement_MultiLineParametersWithInlineComments(t *testing.T) {
+	code := `:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DEFAULT uP2, "";
+:RETURN uP0;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeDefaultAfterParameters {
+			t.Errorf("unexpected default_after_parameters on comment-split :PARAMETERS list: %s", d.Message)
+		}
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first on comment-split :PARAMETERS list: %s", d.Message)
+		}
+	}
+}
+
+// Issue #170 (procedure variant): the comment-split :PARAMETERS list inside
+// a :PROCEDURE must not register its later parameters as body statements.
+func TestGetDiagnostics_ParameterPlacement_MultiLineParametersWithInlineComments(t *testing.T) {
+	code := `:PROCEDURE Demo;
+:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DECLARE nCount;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first on comment-split :PARAMETERS list: %s", d.Message)
+		}
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
