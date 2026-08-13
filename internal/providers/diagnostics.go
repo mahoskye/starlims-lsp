@@ -271,7 +271,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for assignment to global variables.
 	// Always runs to catch writes to built-in predefined globals (e.g. MYUSERNAME).
 	// Also enforces user-configured globals when provided.
-	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
+	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, variables, opts.GlobalVariables)...)
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
@@ -983,13 +983,54 @@ func checkCreateUdObjectBuiltinClassMisuse(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// netDerivedRHS reports whether an assignment's right-hand side (starting
+// after the `:=`, ending at the statement's `;`) produces a value from the
+// .NET interop surface: a colon member call (oInt:ToByteArray()) or a
+// LimsNetConnect/LimsNetCast result. Such values may be 0-based collections
+// (issue #166).
+func netDerivedRHS(tokens []lexer.Token, start int) bool {
+	for j := start; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			break
+		}
+		if t.Type == lexer.TokenPunctuation && t.Text == ":" {
+			return true
+		}
+		if t.Type == lexer.TokenIdentifier {
+			upper := strings.ToUpper(t.Text)
+			if upper == "LIMSNETCONNECT" || upper == "LIMSNETCAST" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // checkZeroBasedArrayIndex detects [0] array access patterns.
 // SSL arrays are 1-based, so index 0 is invalid.
 // Gotcha #5 in gotchas.md.
 func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
+	// Most recent assignment per variable (file order): true when the RHS
+	// was .NET-derived, making a later [0] on that variable plausibly valid
+	// (issue #166: aBytes := oInt:ToByteArray(); aBytes[0]).
+	netDerived := make(map[string]bool)
+
 	for i, token := range tokens {
+		// Track `ident := RHS;` assignments (property assignments
+		// obj:Prop := ... track the object's member, not a variable — skip).
+		if token.Type == lexer.TokenIdentifier {
+			if n := nextSignificantTokenIndex(tokens, i+1); n >= 0 &&
+				tokens[n].Type == lexer.TokenOperator && tokens[n].Text == ":=" {
+				if k := previousSignificantTokenIndex(tokens, i-1); !(k >= 0 &&
+					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":") {
+					netDerived[strings.ToUpper(token.Text)] = netDerivedRHS(tokens, n+1)
+				}
+			}
+		}
+
 		// Look for '[' punctuation
 		if token.Type != lexer.TokenPunctuation || token.Text != "[" {
 			continue
@@ -997,8 +1038,9 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 
 		// Check if preceded by an identifier (array variable). If that
 		// identifier is itself reached through colon member access
-		// (dataSet:Tables[0]), the value may be a 0-based .NET collection,
-		// so the diagnostic downgrades to a warning (issue #152).
+		// (dataSet:Tables[0]), or its most recent assignment was
+		// .NET-derived (issue #166), the value may be a 0-based .NET
+		// collection, so the diagnostic downgrades to a warning (issue #152).
 		hasPrecedingIdent := false
 		afterMemberAccess := false
 		for j := i - 1; j >= 0; j-- {
@@ -1007,6 +1049,9 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 			}
 			if tokens[j].Type == lexer.TokenIdentifier {
 				hasPrecedingIdent = true
+				if netDerived[strings.ToUpper(tokens[j].Text)] {
+					afterMemberAccess = true
+				}
 				if k := previousSignificantTokenIndex(tokens, j-1); k >= 0 &&
 					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":" {
 					afterMemberAccess = true
@@ -1037,7 +1082,7 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 				message := "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element."
 				if afterMemberAccess {
 					severity = SeverityWarning
-					message = "Index 0 on a ':' member access may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
+					message = "Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
 				}
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: severity,
@@ -1340,8 +1385,18 @@ func checkProcedureDeclarationSyntax(tokens []lexer.Token) []Diagnostic {
 // checkDirectProcedureCalls detects attempts to call procedures directly.
 // SSL requires DoProc("name", {params}) or ExecFunction("Module.name", {params}).
 // Gotcha #1 in gotchas.md.
+// Severity is tiered (issue #167): calling a procedure declared in this file
+// is a definite misuse (error); an unknown bare callable cannot be
+// distinguished from a vendor built-in missing from the published inventory
+// (SetLocationSQLServer, LimsCleanUp, SetAMPM in SYSTEMINIT-era stock
+// scripts), so it warns instead.
 func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	inFileProcs := make(map[string]bool)
+	for _, proc := range p.ExtractProcedures(ast) {
+		inFileProcs[strings.ToUpper(proc.Name)] = true
+	}
 
 	for i, token := range tokens {
 		if token.Type != lexer.TokenIdentifier {
@@ -1396,10 +1451,18 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 				}
 
 				if !isDeclaration {
+					severity := SeverityError
+					message := fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text)
+					if !inFileProcs[upperName] {
+						// Unknown callable: possibly an uncataloged vendor
+						// built-in rather than a custom procedure (issue #167).
+						severity = SeverityWarning
+						message = fmt.Sprintf("'%s' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.", token.Text)
+					}
 					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
+						Severity: severity,
 						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text),
+						Message:  message,
 						Source:   "ssl-lsp",
 						Code:     CodeDirectProcedureCall,
 					})
@@ -2541,6 +2604,46 @@ func checkMissingOtherwise(tokens []lexer.Token) []Diagnostic {
 
 // checkBareLogicalOperators checks for AND, OR, NOT without enclosing periods.
 // SSL requires .AND., .OR., .NOT. - bare operators are an error.
+// operandEnd reports whether a token can end an operand expression — the
+// left-hand side a binary operator would attach to.
+func operandEnd(t lexer.Token) bool {
+	switch t.Type {
+	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString, lexer.TokenCodeBlock:
+		return true
+	case lexer.TokenKeyword:
+		// Dot-wrapped literals (.T., .F.) and NIL end an operand; control
+		// keywords (:IF, :DECLARE, ...) do not.
+		return strings.HasPrefix(t.Text, ".") || strings.EqualFold(t.Text, "NIL")
+	case lexer.TokenPunctuation:
+		return t.Text == ")" || t.Text == "]" || t.Text == "}"
+	}
+	return false
+}
+
+// operandStart reports whether a token can begin an operand expression —
+// the right-hand side a logical operator would attach to.
+func operandStart(t lexer.Token) bool {
+	switch t.Type {
+	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString, lexer.TokenCodeBlock:
+		return true
+	case lexer.TokenKeyword:
+		return strings.HasPrefix(t.Text, ".") || strings.EqualFold(t.Text, "NIL")
+	case lexer.TokenPunctuation:
+		return t.Text == "(" || t.Text == "{"
+	case lexer.TokenOperator:
+		// A prefix operator opens an operand: !x, .NOT. x.
+		return t.Text == "!" || strings.EqualFold(t.Text, ".NOT.")
+	}
+	return false
+}
+
+// checkBareLogicalOperators flags bare And/Or/Not used as logical operators —
+// SSL's logical operators exist only in dotted form (.AND., .OR., .NOT.).
+// A bare And/Or/Not in an identifier slot is a legal identifier (issue #165:
+// WSDL-generated proxy classes declare members named And/Or), so the check
+// fires only in expression-operator positions: And/Or between two operands,
+// Not as a prefix before an operand. Declaration lists, member access, and
+// assignment targets never flag.
 func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -2551,22 +2654,55 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 		"NOT": ".NOT.",
 	}
 
-	for _, token := range tokens {
+	for i, token := range tokens {
 		// Only check identifiers - the lexer tokenizes bare AND/OR/NOT as identifiers
 		if token.Type != lexer.TokenIdentifier {
 			continue
 		}
 
 		upper := strings.ToUpper(token.Text)
-		if correct, isBare := bareOperators[upper]; isBare {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
-				Source:   "ssl-lsp",
-				Code:     CodeBareLogicalOperator,
-			})
+		correct, isBare := bareOperators[upper]
+		if !isBare {
+			continue
 		}
+
+		prevIdx := previousSignificantTokenIndex(tokens, i-1)
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+
+		var prev, next lexer.Token
+		if prevIdx >= 0 {
+			prev = tokens[prevIdx]
+		}
+		if nextIdx >= 0 {
+			next = tokens[nextIdx]
+		}
+
+		// Member access (obj:And) is an identifier slot, never an operator.
+		if prev.Type == lexer.TokenPunctuation && prev.Text == ":" {
+			continue
+		}
+
+		operatorPosition := false
+		if upper == "NOT" {
+			// Prefix position: an operand follows and no operand precedes
+			// (`x Not y` is not a NOT expression; `Not := 1` has no operand).
+			operatorPosition = nextIdx >= 0 && operandStart(next) && !(prevIdx >= 0 && operandEnd(prev))
+		} else {
+			// Infix position: operands on both sides.
+			operatorPosition = prevIdx >= 0 && operandEnd(prev) &&
+				nextIdx >= 0 && operandStart(next)
+		}
+		if !operatorPosition {
+			continue
+		}
+
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeBareLogicalOperator,
+		})
 	}
 
 	return diagnostics
@@ -2902,17 +3038,35 @@ func checkExecFunctionClassTargets(tokens []lexer.Token, classTargets []string) 
 	return diagnostics
 }
 
+// paramScope tracks one open :PROCEDURE or :BEGININLINECODE block for
+// checkParameterPlacement: whether the scope is still eligible for a
+// leading :PARAMETERS statement.
+type paramScope struct {
+	kind    string // "PROCEDURE" or "BEGININLINECODE"
+	waiting bool   // no statement seen yet — :PARAMETERS still allowed
+}
+
 // checkParameterPlacement enforces that procedure-level :PARAMETERS statements
-// appear immediately after :PROCEDURE and that script-level :PARAMETERS appears
-// before top-level executable statements (leading procedures are allowed).
+// appear immediately after :PROCEDURE (likewise :BEGININLINECODE, whose named
+// blocks take their own :PARAMETERS list — issue #168) and that script-level
+// :PARAMETERS appears before top-level executable statements (leading
+// procedures are allowed). :INCLUDE never counts as a statement at any level:
+// it is resolved as a textual paste before the file runs, and the style
+// guide's include_early rule wants it before :PARAMETERS (issue #168).
 func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	startOfStatement := true
-	procedureDepth := 0
-	waitingForProcedureParameters := false
-	seenProcedureBodyStatement := false
+	var scopes []paramScope
 	seenTopLevelStatement := false
+
+	markStatement := func() {
+		if len(scopes) > 0 {
+			scopes[len(scopes)-1].waiting = false
+		} else {
+			seenTopLevelStatement = true
+		}
+	}
 
 	for _, token := range tokens {
 		if token.Type == lexer.TokenWhitespace {
@@ -2920,9 +3074,12 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT prevent
-			// :PARAMETERS from being accepted after :PROCEDURE.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither prevent
+			// :PARAMETERS from being accepted after :PROCEDURE nor end the
+			// enclosing statement: an inline comment mid-way through a
+			// multi-line :PARAMETERS list must not make the next parameter
+			// register as a body/top-level statement (issue #170). Only `;`
+			// ends a statement.
 			continue
 		}
 
@@ -2936,11 +3093,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		startOfStatement = false
 
 		if token.Type != lexer.TokenKeyword {
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 			continue
 		}
 
@@ -2948,30 +3101,29 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 
 		switch normalized {
 		case "PROCEDURE":
-			procedureDepth++
-			waitingForProcedureParameters = true
-			seenProcedureBodyStatement = false
-		case "ENDPROC":
-			if procedureDepth > 0 {
-				procedureDepth--
+			scopes = append(scopes, paramScope{kind: "PROCEDURE", waiting: true})
+		case "BEGININLINECODE":
+			scopes = append(scopes, paramScope{kind: "BEGININLINECODE", waiting: true})
+		case "ENDPROC", "ENDINLINECODE":
+			if len(scopes) > 0 {
+				scopes = scopes[:len(scopes)-1]
 			}
-			if procedureDepth == 0 {
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
-			}
+		case "INCLUDE":
+			// Structurally transparent for placement purposes: a paste-time
+			// directive, not an executable statement (issue #168).
 		case "PARAMETERS":
-			if procedureDepth > 0 {
-				if !waitingForProcedureParameters || seenProcedureBodyStatement {
+			if len(scopes) > 0 {
+				top := &scopes[len(scopes)-1]
+				if !top.waiting {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityError,
 						Range:    tokenToRange(token),
-						Message:  "':PARAMETERS' must appear immediately after ':PROCEDURE'",
+						Message:  fmt.Sprintf("':PARAMETERS' must appear immediately after ':%s'", top.kind),
 						Source:   "ssl-lsp",
 						Code:     CodeParametersFirst,
 					})
 				}
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
+				top.waiting = false
 			} else if seenTopLevelStatement {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
@@ -2982,12 +3134,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 				})
 			}
 		default:
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-				waitingForProcedureParameters = false
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 		}
 
 		if token.Type == lexer.TokenPunctuation && token.Text == ";" {
@@ -3014,9 +3161,11 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT break
-			// the :PARAMETERS -> :DEFAULT sequence.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither break the
+			// :PARAMETERS -> :DEFAULT sequence nor end the enclosing
+			// statement: an inline comment mid-way through a multi-line
+			// :PARAMETERS list must not make the next parameter look like a
+			// new statement (issue #170). Only `;` ends a statement.
 			continue
 		}
 
@@ -4793,8 +4942,18 @@ func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
 // checkGlobalAssignment checks for assignment to global variables.
 // Global variables are pre-declared and should not be assigned to.
 // Always checks SSLPredefinedGlobals (e.g. MYUSERNAME); also checks user-configured globals.
-func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic {
+// An in-file declaration (:DECLARE/:PARAMETERS/:PUBLIC) suppresses the check
+// for that name (issue #169): a declared local that happens to collide with a
+// status keyword (loop variable iS vs IS) is the author's own variable, and a
+// :PUBLIC declaration marks this file as the initializer that creates the
+// global — "globals are read-only" holds for consumers, not the declarer.
+func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo, globals []string) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	declaredSet := make(map[string]bool)
+	for _, v := range declared {
+		declaredSet[strings.ToUpper(v.Name)] = true
+	}
 
 	// Build a case-insensitive set of global variable names.
 	// Always include built-in predefined globals and status keywords.
@@ -4820,6 +4979,12 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 
 		// Check if this identifier is a global
 		if !globalSet[strings.ToUpper(token.Text)] {
+			continue
+		}
+
+		// Declared in this file — the author's own variable, or the
+		// initializer script that creates the global (issue #169).
+		if declaredSet[strings.ToUpper(token.Text)] {
 			continue
 		}
 

@@ -27,6 +27,16 @@ history:
       value may be a .NET collection with zero-based indexing, so the
       diagnostic downgrades to a warning with .NET-aware wording. Bare
       identifiers (`aValues[0]`) keep the error.
+  - date: 2026-08-12
+    ref: "issue #166"
+    note: >-
+      .NET-derivation tracking added: a bare identifier whose most recent
+      assignment's RHS is a colon member call or a
+      LimsNetConnect/LimsNetCast result (aBytes := oInt:ToByteArray();
+      aBytes[0]) also downgrades to the warning — indexing such values
+      with [0] is correct code on 0-based .NET collections. Unrelated
+      bare identifiers keep the error; a later non-.NET reassignment
+      restores it.
 issues: []
 ---
 
@@ -38,14 +48,21 @@ identifier and whose bracketed content is exactly the literal `0`
 1-based (ssl-style-guide: `language.arrays: one_based`), so index 0 can
 never address a native SSL element. The range covers the `0` literal.
 
-Severity is contextual (issue #152): when the subscripted identifier is
-itself preceded by the colon member-access punctuation (`:`), as in
-`dataSet:Tables[0]` or chained `object:Property[0]`, the indexed value is
-reached through object member access and may be a .NET collection, which
-is 0-based — the diagnostic is a warning whose message says zero-based
-indexing may be valid for .NET collections. A bare identifier subscript
-(`aValues[0]`) is a native SSL array access and stays an error. The
-diagnostic code is the same in both contexts.
+Severity is contextual (issues #152/#166): the diagnostic is a warning —
+whose message says zero-based indexing may be valid for .NET collections —
+when the indexed value is plausibly .NET-derived:
+
+- the subscripted identifier is itself preceded by the colon member-access
+  punctuation (`:`), as in `dataSet:Tables[0]` or chained
+  `object:Property[0]` (issue #152); or
+- the identifier's most recent assignment (file order) has a right-hand
+  side containing a colon member call or a `LimsNetConnect`/`LimsNetCast`
+  call, as in `aBytes := oInt:ToByteArray(); ... aBytes[0]` (issue #166).
+  A later reassignment from a non-.NET RHS restores the error.
+
+Any other bare identifier subscript (`aValues[0]`) is a native SSL array
+access and stays an error. The diagnostic code is the same in all
+contexts.
 
 The rule is deliberately literal-only and must NOT flag:
 
@@ -70,6 +87,15 @@ sFirst := aItems[0];
 :DECLARE dataSet, oTable;
 dataSet := GetDataSet();
 oTable := dataSet:Tables[0];
+```
+
+### Flags
+
+```ssl
+:DECLARE oInt, aBytes, bZero;
+oInt := LimsNetConnect("System", "System.Numerics.BigInteger");
+aBytes := oInt:ToByteArray();
+bZero := aBytes[0] == 0;
 ```
 
 ### Does not flag
@@ -103,6 +129,10 @@ access are different (issue #152): SSL code routinely holds .NET objects
 whose collections (`dataSet:Tables[0]`) are legitimately 0-based, so an
 error there is a false positive — but a warning is kept because the
 member could still be a native SSL array and the reader deserves the
-nudge. Restricting the match to the exact literal keeps the guarantee
+nudge. The derived-variable extension (issue #166) follows the same
+reasoning one assignment further: 0-vs-1 basing is not statically
+decidable without type flow, so a cheap last-assignment heuristic picks
+warning over error for exactly the values that flow from the .NET
+surface. Restricting the match to the exact literal keeps the guarantee
 airtight: everything short of provable (computed indices, variables) is
 left alone, which the variable and expression fences pin.

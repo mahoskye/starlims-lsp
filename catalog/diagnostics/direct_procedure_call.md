@@ -24,6 +24,16 @@ history:
     note: >-
       Malformed declarations ("PROCEDURE Name(" / ":PROCEDURE Name(") now
       report procedure_declaration_syntax instead of double-firing this rule.
+  - date: 2026-08-12
+    ref: "issue #167"
+    note: >-
+      Severity tiered: stock vendor scripts call built-ins absent from the
+      published inventory (SetLocationSQLServer, LimsCleanUp, SetAMPM —
+      the largest post-region corpus failure bucket, 90 files), and the
+      flat error misdiagnosed the inventory gap as a syntax error. Calling
+      a procedure declared in this file keeps the error (definite misuse);
+      an unknown bare callable warns with wording that names both
+      possibilities.
 issues: []
 ---
 
@@ -33,8 +43,20 @@ Flags an identifier followed by `(` when the name is not a built-in SSL
 function or class — the shape of a C-style direct call, which SSL does not
 support. Custom procedures must be dispatched via `DoProc("Name", {args})`,
 `ExecFunction("Module.Name", {args})`, or `Me:`/`Base:` inside classes. The
-range covers the called identifier. The rule is shape-based: it does not
-require the name to match a declared procedure in the file.
+range covers the called identifier.
+
+Severity is tiered (issue #167):
+
+- **Error** when the called name matches a `:PROCEDURE` declared in this
+  file — dispatch bypass is then provable, and the message prescribes the
+  DoProc/ExecFunction/Me: alternatives.
+- **Warning** otherwise: an unknown bare callable cannot be distinguished
+  from a vendor built-in missing from the published function inventory
+  (stock SYSTEMINIT/IMPEXP_FRAMEWORK-era scripts call
+  `SetLocationSQLServer`, `LimsCleanUp`, `SetAMPM`), so the message names
+  both readings instead of asserting a syntax error. The diagnostic code
+  is the same in both tiers; per-rule overrides and suppression apply as
+  usual for teams that want the strict or silent behavior.
 
 It must NOT flag:
 
@@ -94,6 +116,13 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Flags
+
+```ssl
+:DECLARE s;
+s := LimsCleanUp();
+```
+
 ## Rationale
 
 Direct calls are gotcha #1 for developers arriving from C-style languages:
@@ -105,3 +134,8 @@ shape to its own rule so users see a syntax message rather than a misleading
 dispatch message. The colon-member fence pins DECISIONS.md D10 (issue
 #22): built-in value types forward unmatched `:` members to .NET at
 runtime, so member calls are legitimate dispatch, never C-style calls.
+The warning tier (issue #167) applies the same positive-knowledge
+principle as D10 to bare calls: an error is only asserted where the
+misuse is provable (the target procedure is visible in this file); an
+unknown name gets a nudge, not a rejection, because the published
+inventory is known to be incomplete for legacy vendor built-ins.
