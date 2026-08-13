@@ -25,6 +25,7 @@ type DiagnosticDetail struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Source   string `json:"source"`
+	Code     string `json:"code,omitempty"`
 }
 
 // runValidate handles the --validate CLI mode.
@@ -225,6 +226,7 @@ func validateContent(name string, content string, isDataSource bool) DiagnosticO
 			Severity: severity,
 			Message:  diag.Message,
 			Source:   diag.Source,
+			Code:     diag.Code,
 		})
 	}
 
