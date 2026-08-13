@@ -838,6 +838,28 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			}
 		}
 
+		// Region bodies are opaque payload (issue #164): pass through
+		// verbatim — no reindent, no semicolon enforcement, no SQL reflow.
+		// The token carries its own leading newline from the header line.
+		if token.Type == lexer.TokenRegionBody {
+			if state.pendingComment != nil {
+				state.builder.WriteString("  ")
+				state.builder.WriteString(state.pendingComment.Text)
+				state.pendingComment = nil
+			}
+			state.pendingStatementBreak = false
+			state.builder.WriteString(token.Text)
+			if idx := strings.LastIndex(token.Text, "\n"); idx >= 0 {
+				state.currentLineLen = len(token.Text) - idx - 1
+			} else {
+				state.currentLineLen += len(token.Text)
+			}
+			state.lineStart = strings.HasSuffix(token.Text, "\n")
+			state.prevToken = token
+			state.lastNonWSToken = token
+			continue
+		}
+
 		state.updateForKeyword(token)
 		state.updateParenDepth(token)
 		state.flushPendingStatementBreak(token)
@@ -960,6 +982,11 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 
 	// Already have a semicolon
 	if lastToken.Text == ";" {
+		return false
+	}
+
+	// Never append a semicolon to raw region-body text (issue #164).
+	if lastToken.Type == lexer.TokenRegionBody {
 		return false
 	}
 

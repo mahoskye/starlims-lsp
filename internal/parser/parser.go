@@ -642,6 +642,12 @@ func (p *Parser) groupStatements(tokens []lexer.Token) []*Node {
 		} else if token.Type == lexer.TokenComment {
 			statements = append(statements, p.createNode([]lexer.Token{token}))
 			currentTokens = nil
+		} else if token.Type == lexer.TokenRegionBody {
+			// A region body is opaque payload, not part of the following
+			// :ENDREGION statement — isolate it so block-end detection still
+			// sees :ENDREGION as the statement's first significant token.
+			statements = append(statements, p.createNode([]lexer.Token{token}))
+			currentTokens = nil
 		}
 	}
 

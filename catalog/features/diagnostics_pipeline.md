@@ -11,6 +11,7 @@ config:
 tests:
   - internal/providers/providers_test.go
   - internal/providers/sql_mode_test.go
+  - internal/providers/region_body_test.go
   - internal/server/server_test.go
   - cmd/starlims-lsp/validate_test.go
 history:
@@ -104,6 +105,17 @@ history:
       English prose (a SELECT list with implicit column aliases), leaking
       SSL diagnostics like bare_logical_operator onto legitimate SQL `and`.
       A22 pins both directions.
+  - date: 2026-08-12
+    ref: "issue #164"
+    note: >-
+      :REGION bodies made opaque at the lexer: the body between
+      `:REGION <name>;` and a line-leading `:ENDREGION` is one raw
+      TokenRegionBody token, so no SSL check ever tokenizes it. Stock
+      scripts storing HTML/JS/XML/SQL templates in regions were failing
+      validation (27% of corpus failures: dot_property_access on HTML
+      attributes, equals_vs_strict_equals on JS, etc.). The formatter
+      passes bodies through verbatim; unclosed_block still fires on a
+      region with no :ENDREGION.
 issues: []
 ---
 
@@ -181,6 +193,15 @@ rules (those are `diag.*` entries).
   defaults: `:PARAMETERS p1;` is valid data-source syntax (issue #147,
   ssl-style-guide#48; the former `datasource_default_required` rule is
   removed).
+- Region bodies are opaque payload (issue #164): the text between a
+  `:REGION <name>;` header and its line-leading `:ENDREGION` closer is
+  stored for `GetRegion()` retrieval, not executed, so the lexer captures
+  it as a single raw token and NO diagnostic ever fires on body content —
+  regions legitimately hold HTML, JavaScript, XML, and SQL templates. A
+  mid-line `:ENDREGION` is body text; only a line-leading one (optionally
+  indented) closes the region. A region with no closer consumes to EOF as
+  raw text and still reports `unclosed_block` on the `:REGION`. The
+  formatter emits bodies verbatim (no reindent, no semicolon enforcement).
 - A panic in any diagnostic check MUST NOT crash the server: it is
   recovered, the stack trace is logged to stderr, and a single
   error-severity diagnostic with Code `internal_error` and Source `ssl-lsp`
@@ -210,6 +231,7 @@ rules (those are `diag.*` entries).
 - A20: Given a SQL-mode data-source body containing a `;` outside comments and string literals, when diagnostics are collected, then exactly one `datasource_sql_semicolon` warning fires per such semicolon at its position (offset past the header in the hybrid shape, whose own `;` terminators never flag); the warning honors rule overrides and never fires outside data-source files.
 - A21: Given a SQL-mode data-source body containing a `@name` placeholder outside comments and string literals with no case-insensitive match among the header's `:PARAMETERS` names (all placeholders, when there is no header), when diagnostics are collected, then a `datasource_undeclared_placeholder` warning fires on the placeholder's span; `@@` system functions, declared placeholders, unused declared parameters, and `DECLARE`-scripted bodies stay silent.
 - A22: Given a `.ds` data-source document whose SQL body carries no strong SSL marker — a SELECT whose list uses implicit column aliases (`col alias`), or any query that fails strict SQL-statement validation — when diagnostics are collected, then it classifies as SQL mode and no SSL diagnostic (`bare_logical_operator` on lowercase `and`/`or`, `dot_property_access` on `table.column`, or otherwise) fires; conversely, a `.ds` body carrying a strong SSL marker (a non-directive colon keyword, a `:=` assignment, or a leading unterminated `/* …` comment) classifies as SSL and keeps the full data-source diagnostic set, so a bare `and` in SSL code still flags `bare_logical_operator` (issue #153).
+- A23: Given a document whose `:REGION` body holds non-SSL payload (HTML with dotted attributes, JavaScript `&&`/`==`, 0-based indexing), when diagnostics are collected, then no diagnostic fires on any body line; a region missing its `:ENDREGION` still reports `unclosed_block`; and formatting the document leaves every body line byte-identical (issue #164).
 
 ## Rationale
 
