@@ -22,6 +22,14 @@ history:
     note: >-
       Stable diagnostic code assigned; this slug is the canonical example in
       the rule-override and suppression test suites.
+  - date: 2026-08-12
+    ref: "issue #170"
+    note: >-
+      Shared false positive fixed alongside diag.default_after_parameters:
+      a comment token mid-statement reset the statement tracker, so a
+      parameter after an inline comment in a multi-line :PARAMETERS list
+      registered as a body/top-level statement. Comments no longer touch
+      statement tracking — only `;` ends a statement.
 issues: []
 ---
 
@@ -48,6 +56,9 @@ It must NOT flag:
   statement of a script;
 - `:PARAMETERS` separated from `:PROCEDURE` only by comments — comments are
   structurally transparent and do not break adjacency;
+- statements following a multi-line `:PARAMETERS` list with inline
+  comments — a comment inside a statement does not end it, so the later
+  parameters are not statements of their own (issue #170);
 - anything in data-source files (`IsDataSourceFile`): the whole check is
   skipped there, since data-source scripts have their own statement rules.
 
@@ -86,6 +97,17 @@ nCount := nValue;
 :PROCEDURE Demo;
 /* explains the parameters below;
 :PARAMETERS nValue;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DECLARE nCount;
 :ENDPROC;
 ```
 
