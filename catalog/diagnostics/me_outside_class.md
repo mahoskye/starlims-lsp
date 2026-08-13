@@ -26,6 +26,15 @@ history:
       False positive fixed: identifiers preceded by the ':' member-access
       punctuation (oObj:Me) are exempt — that Me is a member name, not the
       self-reference.
+  - date: 2026-08-12
+    ref: "issue #171"
+    note: >-
+      Include-library downgrade added (option c from the issue): a file
+      consisting solely of :PROCEDURE blocks with no top-level statements
+      may be an :INCLUDE target of a class file, where its Me references
+      compile inside the :CLASS and are valid — single-file analysis
+      cannot tell, so such files warn instead of error. A workspace
+      include-graph reverse lookup remains a possible future upgrade.
 issues: ["#32"]
 ---
 
@@ -41,6 +50,16 @@ The class-context guard is deliberately coarse to avoid false positives:
 any `Me` on or after the line of the file's first `:CLASS` statement is
 accepted, without checking that it sits inside a method body (classes
 extend to end of file — there is no `:ENDCLASS`).
+
+Severity is contextual (issue #171): in a classless file consisting solely
+of `:PROCEDURE` blocks — comments and paste-time `:INCLUDE` directives
+allowed, no top-level statements — the diagnostic is a warning, because
+that is the shape of an include library whose procedures compile inside a
+`:CLASS` via `:INCLUDE` (stock ENTERPRISE_DB_OBJECTS pattern:
+`:CLASS TablesComparer; ... :INCLUDE Enterprise_DB_Objects.DTORelationsComparer;`).
+Any top-level statement (a `:DECLARE`, an assignment) makes the file a
+script and restores the error. The diagnostic code is the same in both
+tiers.
 
 It must NOT flag:
 
@@ -64,9 +83,22 @@ vResult := Me;
 
 ### Flags
 
+(warning tier — the file is an include-library shape, issue #171)
+
 ```ssl
 :PROCEDURE GetName;
 	:RETURN Me:sName;
+:ENDPROC;
+```
+
+### Flags
+
+(warning tier — include-library shape with parameters, issue #171)
+
+```ssl
+:PROCEDURE Compare;
+:PARAMETERS oOther;
+:RETURN Me:Name == oOther:Name;
 :ENDPROC;
 ```
 

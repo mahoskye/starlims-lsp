@@ -1836,6 +1836,51 @@ func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, c
 	return diagnostics
 }
 
+// isProcedureLibraryFile reports whether the file consists solely of
+// :PROCEDURE blocks (plus comments and paste-time :INCLUDE directives) with
+// no top-level statements — the shape of an include library whose procedures
+// are compiled into a class via :INCLUDE (issue #171).
+func isProcedureLibraryFile(tokens []lexer.Token) bool {
+	depth := 0
+	sawProcedure := false
+	startOfStatement := true
+	for _, t := range tokens {
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment || t.Type == lexer.TokenEOF {
+			continue
+		}
+		if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			startOfStatement = true
+			continue
+		}
+		if !startOfStatement {
+			continue
+		}
+		startOfStatement = false
+		if t.Type != lexer.TokenKeyword {
+			if depth == 0 {
+				return false
+			}
+			continue
+		}
+		switch strings.ToUpper(strings.TrimPrefix(t.Text, ":")) {
+		case "PROCEDURE":
+			sawProcedure = true
+			depth++
+		case "ENDPROC":
+			if depth > 0 {
+				depth--
+			}
+		case "INCLUDE":
+			// Paste-time directive, fine at top level of a library.
+		default:
+			if depth == 0 {
+				return false
+			}
+		}
+	}
+	return sawProcedure
+}
+
 // checkClassReferenceForms validates source-of-truth rules for Me and Base.
 func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
@@ -1860,6 +1905,8 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	isProcedureLibrary := classToken == nil && isProcedureLibraryFile(tokens)
+
 	for i := 0; i < len(tokens); i++ {
 		token := tokens[i]
 		if token.Type != lexer.TokenIdentifier || isDeclarationIdentifier(tokens, i) {
@@ -1879,10 +1926,20 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 					continue
 				}
 			}
+			// A file of nothing but :PROCEDURE blocks may be an include
+			// library compiled into a class via :INCLUDE, where Me is valid
+			// at runtime — single-file analysis cannot tell, so warn instead
+			// of error (issue #171).
+			severity := SeverityError
+			message := "'Me' can only be used inside a ':CLASS' definition"
+			if classToken == nil && isProcedureLibrary {
+				severity = SeverityWarning
+				message = "'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'"
+			}
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
+				Severity: severity,
 				Range:    tokenToRange(token),
-				Message:  "'Me' can only be used inside a ':CLASS' definition",
+				Message:  message,
 				Source:   "ssl-lsp",
 				Code:     CodeMeOutsideClass,
 			})

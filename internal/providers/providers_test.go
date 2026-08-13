@@ -5579,6 +5579,45 @@ s := LimsCleanUp();`
 	}
 }
 
+// Issue #171: a classless file of solely :PROCEDURE blocks is the shape of
+// an :INCLUDE library compiled into a class — Me there warns instead of
+// erroring; a file with top-level statements keeps the error.
+func TestGetDiagnostics_MeOutsideClass_IncludeLibraryWarns(t *testing.T) {
+	library := `:PROCEDURE Compare;
+:PARAMETERS oOther;
+:RETURN Me:Name == oOther:Name;
+:ENDPROC;`
+
+	found := false
+	for _, d := range GetDiagnostics(library, DefaultDiagnosticOptions()) {
+		if d.Code == CodeMeOutsideClass {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity in include-library shape, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected me_outside_class warning in include-library shape")
+	}
+
+	script := `:DECLARE x;
+x := Me:Name;`
+
+	found = false
+	for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+		if d.Code == CodeMeOutsideClass {
+			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity with top-level statements, got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected me_outside_class error in script shape")
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
