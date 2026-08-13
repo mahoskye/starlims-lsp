@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-12
+
+A real-world-corpus false-positive batch: a validation run over ~5,200
+stock SSL files surfaced eight false-positive classes (issues #164–#171),
+all fixed here. The headline change makes `:REGION` bodies opaque at the
+lexer — alone responsible for 27% of corpus validation failures. Also
+emits stable rule codes in `--validate` JSON output (PR #172). Downstream
+consumers pick this up via the ssl-style-guide MCP binaries and
+vs-code-ssl-formatter extension bumps.
+
+### Added
+- **Stable rule codes in `--validate` JSON output.** Each diagnostic in the
+  CLI's JSON now carries its `code` slug alongside severity and message, so
+  corpus tooling can bucket failures by rule.
+
+### Changed
+- **`:REGION` bodies are opaque payload (#164).** The lexer captures
+  everything between `:REGION <name>;` and a line-leading `:ENDREGION` as a
+  single raw token: region bodies are stored text retrieved via
+  `GetRegion()`, not SSL, so no diagnostic ever fires on them and the
+  formatter passes them through verbatim. Stock scripts wrapping
+  HTML/JS/XML/SQL templates in regions — 27% of corpus validation failures —
+  now validate clean. An unclosed region still reports `unclosed_block`.
+- **`direct_procedure_call` severity is tiered (#167).** Calling a
+  `:PROCEDURE` declared in the same file keeps the error (dispatch bypass is
+  provable); an unknown bare callable warns instead — it cannot be
+  distinguished from a vendor built-in missing from the published inventory
+  (`SetLocationSQLServer`, `LimsCleanUp`, `SetAMPM` in stock scripts, the
+  largest post-region corpus bucket at 90 files).
+- **`me_outside_class` warns in include-library files (#171).** A classless
+  file consisting solely of `:PROCEDURE` blocks is the shape of an
+  `:INCLUDE` library compiled into a class, where `Me` is valid at runtime —
+  such files warn instead of erroring. Any top-level statement restores the
+  error.
+- **`zero_based_array_index` tracks .NET derivation (#166).** A variable
+  whose most recent assignment comes from a colon member call or a
+  `LimsNetConnect`/`LimsNetCast` result (`aBytes := oInt:ToByteArray();`)
+  downgrades a later `[0]` to the .NET warning introduced in #152. A
+  non-.NET reassignment restores the error.
+
+### Fixed
+- **`bare_logical_operator` on identifiers named And/Or/Not (#165).** The
+  check was position-blind; WSDL-generated proxy classes really do declare
+  members named `And`/`Or`. It now fires only in expression-operator
+  positions (`And`/`Or` between operands, `Not` as prefix) — declaration
+  lists, assignment targets, and member access never flag.
+- **Comments ended statements in placement checks (#170).** A comment token
+  mid-statement reset statement tracking in `default_after_parameters` and
+  `parameters_first`, so a multi-line `:PARAMETERS` list with inline
+  comments "ended" at the first comment and the following `:DEFAULT` (or the
+  remaining parameters) flagged. Only `;` ends a statement now.
+- **`parameters_first` contradicted `include_early` (#168).** `:INCLUDE`
+  counted as a top-level statement, flagging the include-then-parameters
+  pattern the style guide itself prescribes. It is a paste-time directive
+  and is now placement-transparent. `:BEGININLINECODE ... :ENDINLINECODE`
+  is also modeled as a scope: a named inline-code block's leading
+  `:PARAMETERS` is judged against the block, not the script.
+- **`global_assignment` ignored in-file declarations (#169).** A declared
+  local case-insensitively colliding with a status keyword (loop variable
+  `iS` vs `IS`) flagged, as did system-init scripts assigning the `:PUBLIC`
+  global they just created. An in-file `:DECLARE`/`:PARAMETERS`/`:PUBLIC`
+  declaration now suppresses the check for that name.
+
 ## [0.16.0] - 2026-08-08
 
 A SQL data-source hardening batch: two new data-source diagnostics, an
@@ -968,7 +1031,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.0...v0.14.1
