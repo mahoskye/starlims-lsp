@@ -3076,7 +3076,9 @@ result := Calculate(result);
 			(strings.Contains(d.Message, "MyCustomProc") || strings.Contains(d.Message, "Calculate")) {
 			t.Errorf("direct custom calls should not be treated as undeclared variables: %s", d.Message)
 		}
-		if strings.Contains(d.Message, "Custom procedures cannot be called directly") {
+		// Issue #167: unknown callables now warn rather than error, but the
+		// direct_procedure_call code still fires.
+		if d.Code == CodeDirectProcedureCall {
 			foundDirectCallDiagnostic = true
 		}
 	}
@@ -5536,9 +5538,6 @@ bZero := aBytes[0] == 0;`
 	}
 }
 
-		// Issue #167: unknown callables now warn rather than error, but the
-		// direct_procedure_call code still fires.
-		if d.Code == CodeDirectProcedureCall {
 // Issue #167: direct-call severity is tiered — an in-file procedure called
 // directly is a provable misuse (error); an unknown bare callable may be an
 // uncataloged vendor built-in (warning).
