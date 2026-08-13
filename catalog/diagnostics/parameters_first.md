@@ -22,6 +22,24 @@ history:
     note: >-
       Stable diagnostic code assigned; this slug is the canonical example in
       the rule-override and suppression test suites.
+  - date: 2026-08-12
+    ref: "issue #170"
+    note: >-
+      Shared false positive fixed alongside diag.default_after_parameters:
+      a comment token mid-statement reset the statement tracker, so a
+      parameter after an inline comment in a multi-line :PARAMETERS list
+      registered as a body/top-level statement. Comments no longer touch
+      statement tracking — only `;` ends a statement.
+  - date: 2026-08-12
+    ref: "issue #168"
+    note: >-
+      Two placement gaps fixed: (1) :INCLUDE no longer counts as a
+      statement at any level — it is a paste-time directive, and the style
+      guide's include_early rule wants it before :PARAMETERS, so the two
+      rules contradicted each other on the include-then-parameters pattern
+      (55+ corpus files); (2) :BEGININLINECODE ... :ENDINLINECODE is now a
+      scope like :PROCEDURE — a named inline-code block's leading
+      :PARAMETERS is judged against the block, not the script.
 issues: []
 ---
 
@@ -30,11 +48,14 @@ issues: []
 Enforces `:PARAMETERS` placement at two levels, one emit site each, both
 `error` severity with the range on the `:PARAMETERS` keyword:
 
-- **Procedure level**: a `:PARAMETERS` inside a `:PROCEDURE` body flags
-  unless it is the first statement after `:PROCEDURE`. Any earlier
-  statement in the body — including a `:DECLARE` or a previous
-  `:PARAMETERS` — disqualifies it (message: `':PARAMETERS' must appear
-  immediately after ':PROCEDURE'`).
+- **Block level**: a `:PARAMETERS` inside a `:PROCEDURE` body flags unless
+  it is the first statement after `:PROCEDURE`. Any earlier statement in
+  the body — including a `:DECLARE` or a previous `:PARAMETERS` —
+  disqualifies it (message: `':PARAMETERS' must appear immediately after
+  ':PROCEDURE'`). `:BEGININLINECODE ... :ENDINLINECODE` is the same kind
+  of scope (issue #168): a named inline-code block stored for
+  `GetInlineCode()` takes its own leading `:PARAMETERS`, judged against
+  the block with the analogous message naming `:BEGININLINECODE`.
 - **Script level**: a top-level `:PARAMETERS` flags once any top-level
   executable statement has been seen. Leading `:PROCEDURE ... :ENDPROC`
   blocks do not count as top-level statements, so a script may define
@@ -48,6 +69,15 @@ It must NOT flag:
   statement of a script;
 - `:PARAMETERS` separated from `:PROCEDURE` only by comments — comments are
   structurally transparent and do not break adjacency;
+- statements following a multi-line `:PARAMETERS` list with inline
+  comments — a comment inside a statement does not end it, so the later
+  parameters are not statements of their own (issue #170);
+- `:PARAMETERS` after `:INCLUDE` statements, at script level or inside a
+  block — `:INCLUDE` is resolved as a textual paste before the file runs
+  and never counts as a statement here, matching the style guide's
+  include_early rule (issue #168);
+- a `:PARAMETERS` opening a `:BEGININLINECODE` block, regardless of what
+  precedes the block in the script (issue #168);
 - anything in data-source files (`IsDataSourceFile`): the whole check is
   skipped there, since data-source scripts have their own statement rules.
 
@@ -87,6 +117,45 @@ nCount := nValue;
 /* explains the parameters below;
 :PARAMETERS nValue;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DECLARE nCount;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:INCLUDE Enterprise_Server.UserAuthentication;
+:PARAMETERS psUser;
+:RETURN psUser;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE x;
+x := 1;
+:BEGININLINECODE Calc;
+:PARAMETERS a;
+:RETURN a;
+:ENDINLINECODE;
+```
+
+### Flags
+
+```ssl
+:BEGININLINECODE Calc;
+:DECLARE b;
+:PARAMETERS a;
+:ENDINLINECODE;
 ```
 
 ### Does not flag
