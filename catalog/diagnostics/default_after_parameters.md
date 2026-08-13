@@ -17,6 +17,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when every diagnostic gained a Code.
+  - date: 2026-08-12
+    ref: "issue #170"
+    note: >-
+      False positive fixed: a comment token mid-statement reset the
+      statement tracker even though the enclosing statement's `;` had not
+      been seen, so a multi-line :PARAMETERS list with inline comments
+      "ended" at the first comment and the following :DEFAULT flagged.
+      Comment transparency now means comments never touch statement
+      tracking — only `;` ends a statement.
 issues: []
 ---
 
@@ -37,7 +46,9 @@ It must NOT flag:
 - a run of several consecutive `:DEFAULT` statements after one
   `:PARAMETERS`;
 - comments (including whole comment lines) between `:PARAMETERS` and
-  `:DEFAULT`.
+  `:DEFAULT`;
+- a `:DEFAULT` after a multi-line `:PARAMETERS` list carrying inline
+  comments — a comment inside a statement does not end it (issue #170).
 
 ## Examples
 
@@ -69,6 +80,16 @@ It must NOT flag:
 /* fallback when the caller omits the argument;
 :DEFAULT nValue, 1;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DEFAULT uP2, "";
+:RETURN uP0;
 ```
 
 ## Rationale

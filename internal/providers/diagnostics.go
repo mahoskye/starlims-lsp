@@ -271,7 +271,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for assignment to global variables.
 	// Always runs to catch writes to built-in predefined globals (e.g. MYUSERNAME).
 	// Also enforces user-configured globals when provided.
-	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, opts.GlobalVariables)...)
+	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, variables, opts.GlobalVariables)...)
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
@@ -2918,17 +2918,35 @@ func checkExecFunctionClassTargets(tokens []lexer.Token, classTargets []string) 
 	return diagnostics
 }
 
+// paramScope tracks one open :PROCEDURE or :BEGININLINECODE block for
+// checkParameterPlacement: whether the scope is still eligible for a
+// leading :PARAMETERS statement.
+type paramScope struct {
+	kind    string // "PROCEDURE" or "BEGININLINECODE"
+	waiting bool   // no statement seen yet — :PARAMETERS still allowed
+}
+
 // checkParameterPlacement enforces that procedure-level :PARAMETERS statements
-// appear immediately after :PROCEDURE and that script-level :PARAMETERS appears
-// before top-level executable statements (leading procedures are allowed).
+// appear immediately after :PROCEDURE (likewise :BEGININLINECODE, whose named
+// blocks take their own :PARAMETERS list — issue #168) and that script-level
+// :PARAMETERS appears before top-level executable statements (leading
+// procedures are allowed). :INCLUDE never counts as a statement at any level:
+// it is resolved as a textual paste before the file runs, and the style
+// guide's include_early rule wants it before :PARAMETERS (issue #168).
 func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	startOfStatement := true
-	procedureDepth := 0
-	waitingForProcedureParameters := false
-	seenProcedureBodyStatement := false
+	var scopes []paramScope
 	seenTopLevelStatement := false
+
+	markStatement := func() {
+		if len(scopes) > 0 {
+			scopes[len(scopes)-1].waiting = false
+		} else {
+			seenTopLevelStatement = true
+		}
+	}
 
 	for _, token := range tokens {
 		if token.Type == lexer.TokenWhitespace {
@@ -2936,9 +2954,12 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT prevent
-			// :PARAMETERS from being accepted after :PROCEDURE.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither prevent
+			// :PARAMETERS from being accepted after :PROCEDURE nor end the
+			// enclosing statement: an inline comment mid-way through a
+			// multi-line :PARAMETERS list must not make the next parameter
+			// register as a body/top-level statement (issue #170). Only `;`
+			// ends a statement.
 			continue
 		}
 
@@ -2952,11 +2973,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 		startOfStatement = false
 
 		if token.Type != lexer.TokenKeyword {
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 			continue
 		}
 
@@ -2964,30 +2981,29 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 
 		switch normalized {
 		case "PROCEDURE":
-			procedureDepth++
-			waitingForProcedureParameters = true
-			seenProcedureBodyStatement = false
-		case "ENDPROC":
-			if procedureDepth > 0 {
-				procedureDepth--
+			scopes = append(scopes, paramScope{kind: "PROCEDURE", waiting: true})
+		case "BEGININLINECODE":
+			scopes = append(scopes, paramScope{kind: "BEGININLINECODE", waiting: true})
+		case "ENDPROC", "ENDINLINECODE":
+			if len(scopes) > 0 {
+				scopes = scopes[:len(scopes)-1]
 			}
-			if procedureDepth == 0 {
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
-			}
+		case "INCLUDE":
+			// Structurally transparent for placement purposes: a paste-time
+			// directive, not an executable statement (issue #168).
 		case "PARAMETERS":
-			if procedureDepth > 0 {
-				if !waitingForProcedureParameters || seenProcedureBodyStatement {
+			if len(scopes) > 0 {
+				top := &scopes[len(scopes)-1]
+				if !top.waiting {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityError,
 						Range:    tokenToRange(token),
-						Message:  "':PARAMETERS' must appear immediately after ':PROCEDURE'",
+						Message:  fmt.Sprintf("':PARAMETERS' must appear immediately after ':%s'", top.kind),
 						Source:   "ssl-lsp",
 						Code:     CodeParametersFirst,
 					})
 				}
-				waitingForProcedureParameters = false
-				seenProcedureBodyStatement = false
+				top.waiting = false
 			} else if seenTopLevelStatement {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
@@ -2998,12 +3014,7 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 				})
 			}
 		default:
-			if procedureDepth > 0 && waitingForProcedureParameters {
-				seenProcedureBodyStatement = true
-				waitingForProcedureParameters = false
-			} else if procedureDepth == 0 {
-				seenTopLevelStatement = true
-			}
+			markStatement()
 		}
 
 		if token.Type == lexer.TokenPunctuation && token.Text == ";" {
@@ -3030,9 +3041,11 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if token.Type == lexer.TokenComment {
-			// Comments are structurally transparent — they should NOT break
-			// the :PARAMETERS -> :DEFAULT sequence.
-			startOfStatement = true
+			// Comments are structurally transparent — they neither break the
+			// :PARAMETERS -> :DEFAULT sequence nor end the enclosing
+			// statement: an inline comment mid-way through a multi-line
+			// :PARAMETERS list must not make the next parameter look like a
+			// new statement (issue #170). Only `;` ends a statement.
 			continue
 		}
 
@@ -4809,8 +4822,18 @@ func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
 // checkGlobalAssignment checks for assignment to global variables.
 // Global variables are pre-declared and should not be assigned to.
 // Always checks SSLPredefinedGlobals (e.g. MYUSERNAME); also checks user-configured globals.
-func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic {
+// An in-file declaration (:DECLARE/:PARAMETERS/:PUBLIC) suppresses the check
+// for that name (issue #169): a declared local that happens to collide with a
+// status keyword (loop variable iS vs IS) is the author's own variable, and a
+// :PUBLIC declaration marks this file as the initializer that creates the
+// global — "globals are read-only" holds for consumers, not the declarer.
+func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo, globals []string) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	declaredSet := make(map[string]bool)
+	for _, v := range declared {
+		declaredSet[strings.ToUpper(v.Name)] = true
+	}
 
 	// Build a case-insensitive set of global variable names.
 	// Always include built-in predefined globals and status keywords.
@@ -4836,6 +4859,12 @@ func checkGlobalAssignment(tokens []lexer.Token, globals []string) []Diagnostic 
 
 		// Check if this identifier is a global
 		if !globalSet[strings.ToUpper(token.Text)] {
+			continue
+		}
+
+		// Declared in this file — the author's own variable, or the
+		// initializer script that creates the global (issue #169).
+		if declaredSet[strings.ToUpper(token.Text)] {
 			continue
 		}
 

@@ -5334,6 +5334,137 @@ func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
 	}
 }
 
+// Issue #170: an inline comment mid-way through a multi-line :PARAMETERS
+// list must not end the statement — the following :DEFAULT is still
+// immediately after the (single) :PARAMETERS statement.
+func TestGetDiagnostics_DefaultPlacement_MultiLineParametersWithInlineComments(t *testing.T) {
+	code := `:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DEFAULT uP2, "";
+:RETURN uP0;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeDefaultAfterParameters {
+			t.Errorf("unexpected default_after_parameters on comment-split :PARAMETERS list: %s", d.Message)
+		}
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first on comment-split :PARAMETERS list: %s", d.Message)
+		}
+	}
+}
+
+// Issue #170 (procedure variant): the comment-split :PARAMETERS list inside
+// a :PROCEDURE must not register its later parameters as body statements.
+func TestGetDiagnostics_ParameterPlacement_MultiLineParametersWithInlineComments(t *testing.T) {
+	code := `:PROCEDURE Demo;
+:PARAMETERS uP0, /* dsName;
+ uP1, /* filter;
+ uP2;
+:DECLARE nCount;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first on comment-split :PARAMETERS list: %s", d.Message)
+		}
+	}
+}
+
+// Issue #168: :INCLUDE is a paste-time directive, not a statement — the
+// include-then-parameters pattern (include_early) must not flag.
+func TestGetDiagnostics_ParameterPlacement_IncludeBeforeParametersAllowed(t *testing.T) {
+	code := `:INCLUDE Enterprise_Server.UserAuthentication;
+:PARAMETERS psUser;
+:RETURN psUser;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first after :INCLUDE: %s", d.Message)
+		}
+	}
+}
+
+// Issue #168: a :BEGININLINECODE block is a :PARAMETERS scope of its own —
+// its leading :PARAMETERS is valid regardless of earlier script statements,
+// while a non-leading one flags against the block.
+func TestGetDiagnostics_ParameterPlacement_InlineCodeScope(t *testing.T) {
+	valid := `:DECLARE x;
+x := 1;
+:BEGININLINECODE Calc;
+:PARAMETERS a;
+:RETURN a;
+:ENDINLINECODE;`
+
+	for _, d := range GetDiagnostics(valid, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			t.Errorf("unexpected parameters_first for leading :PARAMETERS in inline-code block: %s", d.Message)
+		}
+	}
+
+	invalid := `:BEGININLINECODE Calc;
+:DECLARE b;
+:PARAMETERS a;
+:ENDINLINECODE;`
+
+	found := false
+	for _, d := range GetDiagnostics(invalid, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			found = true
+			if !strings.Contains(d.Message, ":BEGININLINECODE") {
+				t.Errorf("expected message to name :BEGININLINECODE, got %s", d.Message)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected parameters_first for non-leading :PARAMETERS in inline-code block")
+	}
+}
+
+// Issue #169: an in-file declaration suppresses global_assignment — a
+// declared local colliding case-insensitively with a status keyword is the
+// author's own variable, and a :PUBLIC declarer is the initializer script.
+func TestGetDiagnostics_GlobalAssignment_DeclaredLocalCollidingWithStatusKeyword(t *testing.T) {
+	code := `:DECLARE iS, aSeg;
+aSeg := {1,2};
+:FOR iS := 1 :TO Len(aSeg);
+:NEXT;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			t.Errorf("unexpected global_assignment on declared local: %s", d.Message)
+		}
+	}
+}
+
+// Issue #169: the file declaring :PUBLIC <global> is its initializer and may
+// assign it; a file without the declaration still flags.
+func TestGetDiagnostics_GlobalAssignment_PublicDeclarerMayAssign(t *testing.T) {
+	declared := `:PUBLIC MYUSERNAME;
+MYUSERNAME := "system";`
+
+	for _, d := range GetDiagnostics(declared, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			t.Errorf("unexpected global_assignment in :PUBLIC initializer: %s", d.Message)
+		}
+	}
+
+	undeclared := `MYUSERNAME := "someone";`
+	found := false
+	for _, d := range GetDiagnostics(undeclared, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected global_assignment without an in-file declaration")
+	}
+}
+
 // Issue #165: bare And/Or/Not in identifier slots (declarations, assignment
 // targets, member access) are legal identifiers — WSDL-generated proxy
 // classes declare such members. Only operator positions flag.
