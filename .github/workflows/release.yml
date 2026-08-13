@@ -82,9 +82,25 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Release notes come from the tag's CHANGELOG.md section. Downstream
+      # consumers (ssl-style-guide MCP pickup tooling) read the release
+      # body, so an empty-notes release breaks their update flow.
+      - name: Extract changelog section for release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            /^## \[/ {flag=0}
+            flag' CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "No CHANGELOG.md section found for ${VERSION}" >&2
+            exit 1
+          fi
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v3
         with:
+          body_path: release-notes.md
           files: |
             dist/*
             THIRD-PARTY-NOTICES.md
