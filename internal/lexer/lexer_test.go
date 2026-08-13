@@ -1544,3 +1544,99 @@ func TestLexer_DotOperatorFallbackDoesNotSwallow(t *testing.T) {
 		t.Errorf("expected <= and 20 to survive after failed dot scan, got %v", texts)
 	}
 }
+
+// Issue #164: :REGION bodies are opaque payload retrieved via GetRegion()
+// and must lex as a single raw TokenRegionBody, not as SSL.
+func TestLexer_RegionBodyRawText(t *testing.T) {
+	input := ":REGION Html;\n<div onclick=\"if(a && b[0] != null) x.go();\">a.b</div>\n:ENDREGION;\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var body *Token
+	var sawEndRegion bool
+	for i := range tokens {
+		tk := &tokens[i]
+		if tk.Type == TokenRegionBody {
+			if body != nil {
+				t.Fatalf("expected exactly one region body token, got a second: %+v", tk)
+			}
+			body = tk
+		}
+		if tk.Type == TokenKeyword && strings.EqualFold(tk.Text, ":ENDREGION") {
+			sawEndRegion = true
+		}
+	}
+	if body == nil {
+		t.Fatal("expected a TokenRegionBody token")
+	}
+	want := "\n<div onclick=\"if(a && b[0] != null) x.go();\">a.b</div>\n"
+	if body.Text != want {
+		t.Errorf("region body text: want %q got %q", want, body.Text)
+	}
+	if !sawEndRegion {
+		t.Error("expected :ENDREGION to survive as a keyword token")
+	}
+}
+
+// Issue #164: a mid-line :ENDREGION is body text; only a line-leading one
+// (optionally indented) terminates the region.
+func TestLexer_RegionBodyMidLineEndRegionIsText(t *testing.T) {
+	input := ":REGION T;\nsay :ENDREGION here\n\t:endregion;\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var body *Token
+	for i := range tokens {
+		if tokens[i].Type == TokenRegionBody {
+			body = &tokens[i]
+		}
+	}
+	if body == nil {
+		t.Fatal("expected a TokenRegionBody token")
+	}
+	if !strings.Contains(body.Text, "say :ENDREGION here") {
+		t.Errorf("mid-line :ENDREGION should stay in the body, got %q", body.Text)
+	}
+	if strings.Contains(body.Text, ":endregion;") {
+		t.Errorf("line-leading :endregion should terminate the body, got %q", body.Text)
+	}
+}
+
+// Issue #164: an unterminated region consumes to EOF as raw text — the
+// unclosed_block diagnostic (not the lexer) reports the missing closer.
+func TestLexer_RegionBodyUnterminatedRunsToEOF(t *testing.T) {
+	input := ":REGION T;\nraw a.b\nmore\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var body *Token
+	for i := range tokens {
+		if tokens[i].Type == TokenRegionBody {
+			body = &tokens[i]
+		}
+	}
+	if body == nil {
+		t.Fatal("expected a TokenRegionBody token")
+	}
+	if body.Text != "\nraw a.b\nmore\n" {
+		t.Errorf("unterminated body should run to EOF, got %q", body.Text)
+	}
+}
+
+// Issue #164: a same-line close (`:REGION X; :ENDREGION;`) yields no body
+// token and both keywords lex normally.
+func TestLexer_RegionSameLineCloseHasNoBody(t *testing.T) {
+	input := ":REGION X; :ENDREGION;\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var kws []string
+	for _, tk := range tokens {
+		if tk.Type == TokenRegionBody {
+			t.Fatalf("expected no region body token, got %q", tk.Text)
+		}
+		if tk.Type == TokenKeyword {
+			kws = append(kws, strings.ToUpper(tk.Text))
+		}
+	}
+	joined := strings.Join(kws, "|")
+	if joined != ":REGION|:ENDREGION" {
+		t.Errorf("expected :REGION and :ENDREGION keywords, got %v", kws)
+	}
+}

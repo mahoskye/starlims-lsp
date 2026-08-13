@@ -38,6 +38,13 @@ history:
       (`:INHERIT Category.ScriptName;`) are required syntax per the schema
       (classes.signature.inherit), not property access. Exempted through
       the terminating `;`, same mechanism as :INCLUDE (issue #56).
+  - date: 2026-08-12
+    ref: "issue #164"
+    note: >-
+      No longer reaches :REGION bodies: region payload (HTML/JS/XML/SQL
+      templates retrieved via GetRegion()) is captured as one raw token at
+      the lexer, suppression shared by every check
+      (feature.diagnostics_pipeline A23).
 issues: []
 ---
 
@@ -62,7 +69,9 @@ It must NOT flag:
 - dotted logical operators and boolean literals (`.AND.`, `.OR.`, `.T.`,
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
-- a leading `.name` with no preceding identifier.
+- a leading `.name` with no preceding identifier;
+- anything inside a `:REGION` body — region payload is opaque text, never
+  lexed as SSL (issue #164, feature.diagnostics_pipeline).
 
 Like every SSL check, it does not run at all in SQL-mode data-source
 documents — plain-SQL `.ds` files are suppressed at the pipeline level
@@ -117,6 +126,16 @@ names there never reach this check.
 		bOk := .T.;
 	:ENDIF;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PARAMETERS psName;
+:REGION Html;
+<div onclick="if(a && b[0] != null) frames[0].go();">x.y.z</div>
+:ENDREGION;
+:RETURN GetRegion("Html");
 ```
 
 ## Rationale

@@ -23,6 +23,7 @@ const (
 	TokenCodeBlock
 	TokenUnknown
 	TokenEOF
+	TokenRegionBody
 )
 
 // String returns the string representation of a TokenType.
@@ -50,6 +51,8 @@ func (t TokenType) String() string {
 		return "Unknown"
 	case TokenEOF:
 		return "EOF"
+	case TokenRegionBody:
+		return "RegionBody"
 	default:
 		return "Unknown"
 	}
@@ -88,6 +91,11 @@ func (l *Lexer) Tokenize() []Token {
 	l.pos = 0
 	l.line = 1
 	l.column = 1
+
+	// inRegionHeader is true between a `:REGION` keyword and the `;` that
+	// ends its header statement; that `;` switches the lexer into raw-text
+	// mode for the region body (issue #164).
+	inRegionHeader := false
 
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
@@ -145,6 +153,24 @@ func (l *Lexer) Tokenize() []Token {
 
 		default:
 			tokens = append(tokens, l.readUnknown())
+		}
+
+		// Region bodies are opaque payload retrieved via GetRegion() — they
+		// must not lex as SSL (issue #164). After the header's terminating
+		// `;`, consume raw text until a line-leading `:ENDREGION`.
+		last := tokens[len(tokens)-1]
+		switch {
+		case last.Type == TokenKeyword && strings.EqualFold(last.Text, ":REGION"):
+			inRegionHeader = true
+		case inRegionHeader && last.Type == TokenWhitespace && strings.Contains(last.Text, "\n"):
+			// Header never got its `;` on this line — bail out of region
+			// handling rather than guess where the body starts.
+			inRegionHeader = false
+		case inRegionHeader && last.Type == TokenPunctuation && last.Text == ";":
+			inRegionHeader = false
+			if body, ok := l.readRegionBody(); ok {
+				tokens = append(tokens, body)
+			}
 		}
 	}
 
@@ -493,6 +519,76 @@ func (l *Lexer) readCodeBlock() Token {
 	return Token{Type: TokenCodeBlock, Text: text.String(), Line: line, Column: col, Offset: start}
 }
 
+// readRegionBody consumes the raw text of a :REGION body: everything from
+// the current position up to (but not including) the line that carries the
+// closing :ENDREGION. The terminator must be line-leading — only whitespace
+// may precede it on its line — matching how region bodies are captured for
+// GetRegion(). With no terminator the body runs to EOF (the unclosed-block
+// check still fires on the missing :ENDREGION). Returns ok=false when the
+// body is empty (e.g. `:REGION X; :ENDREGION;` on one line).
+func (l *Lexer) readRegionBody() (Token, bool) {
+	start := l.pos
+	line := l.line
+	col := l.column
+
+	end := -1
+	// runStart marks where the current run of leading whitespace began — the
+	// line start, or the body start for text on the header line itself. The
+	// body is cut there so the terminator line's indentation lexes normally.
+	runStart := l.pos
+	atLineLead := true
+	for i := l.pos; i < len(l.input); i++ {
+		c := l.input[i]
+		if c == '\n' {
+			atLineLead = true
+			runStart = i + 1
+			continue
+		}
+		if !atLineLead {
+			continue
+		}
+		if c == ' ' || c == '\t' || c == '\r' {
+			continue
+		}
+		if l.matchesEndRegion(i) {
+			end = runStart
+			break
+		}
+		atLineLead = false
+	}
+	if end < 0 {
+		end = len(l.input)
+	}
+	if end <= start {
+		return Token{}, false
+	}
+
+	var text strings.Builder
+	for l.pos < end {
+		text.WriteRune(l.input[l.pos])
+		l.advance()
+	}
+	return Token{Type: TokenRegionBody, Text: text.String(), Line: line, Column: col, Offset: start}, true
+}
+
+// matchesEndRegion reports whether the input at i starts a `:ENDREGION`
+// keyword (case-insensitive, not a prefix of a longer identifier).
+func (l *Lexer) matchesEndRegion(i int) bool {
+	const kw = ":ENDREGION"
+	if i+len(kw) > len(l.input) {
+		return false
+	}
+	for j := 0; j < len(kw); j++ {
+		if unicode.ToUpper(l.input[i+j]) != rune(kw[j]) {
+			return false
+		}
+	}
+	if i+len(kw) < len(l.input) && l.isIdentifierPart(l.input[i+len(kw)]) {
+		return false
+	}
+	return true
+}
+
 func (l *Lexer) readUnknown() Token {
 	start := l.pos
 	line := l.line
@@ -592,7 +688,7 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 
 		if inToken {
 			switch token.Type {
-			case TokenString, TokenCodeBlock:
+			case TokenString, TokenCodeBlock, TokenRegionBody:
 				return ContextString
 			case TokenComment:
 				return ContextComment
