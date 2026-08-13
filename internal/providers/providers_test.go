@@ -5334,6 +5334,41 @@ func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
 	}
 }
 
+// Issue #166: a variable whose most recent assignment is .NET-derived
+// (colon member call or LimsNetConnect/LimsNetCast result) downgrades a
+// later [0] subscript to the .NET warning; unrelated variables keep the
+// error, and a non-.NET reassignment restores it.
+func TestGetDiagnostics_ZeroBasedIndex_NetDerivedVariableWarns(t *testing.T) {
+	code := `:DECLARE oInt, aBytes, bZero;
+oInt := LimsNetConnect("System", "System.Numerics.BigInteger");
+aBytes := oInt:ToByteArray();
+bZero := aBytes[0] == 0;`
+
+	found := false
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeZeroBasedArrayIndex {
+			found = true
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity on .NET-derived [0], got %v", d.Severity)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected zero_based_array_index warning on .NET-derived [0]")
+	}
+
+	reassigned := `:DECLARE oInt, aBytes, bZero;
+aBytes := oInt:ToByteArray();
+aBytes := {1,2};
+bZero := aBytes[0] == 0;`
+
+	for _, d := range GetDiagnostics(reassigned, DefaultDiagnosticOptions()) {
+		if d.Code == CodeZeroBasedArrayIndex && d.Severity != SeverityError {
+			t.Errorf("expected error severity after non-.NET reassignment, got %v", d.Severity)
+		}
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
