@@ -1385,8 +1385,18 @@ func checkProcedureDeclarationSyntax(tokens []lexer.Token) []Diagnostic {
 // checkDirectProcedureCalls detects attempts to call procedures directly.
 // SSL requires DoProc("name", {params}) or ExecFunction("Module.name", {params}).
 // Gotcha #1 in gotchas.md.
+// Severity is tiered (issue #167): calling a procedure declared in this file
+// is a definite misuse (error); an unknown bare callable cannot be
+// distinguished from a vendor built-in missing from the published inventory
+// (SetLocationSQLServer, LimsCleanUp, SetAMPM in SYSTEMINIT-era stock
+// scripts), so it warns instead.
 func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	inFileProcs := make(map[string]bool)
+	for _, proc := range p.ExtractProcedures(ast) {
+		inFileProcs[strings.ToUpper(proc.Name)] = true
+	}
 
 	for i, token := range tokens {
 		if token.Type != lexer.TokenIdentifier {
@@ -1441,10 +1451,18 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 				}
 
 				if !isDeclaration {
+					severity := SeverityError
+					message := fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text)
+					if !inFileProcs[upperName] {
+						// Unknown callable: possibly an uncataloged vendor
+						// built-in rather than a custom procedure (issue #167).
+						severity = SeverityWarning
+						message = fmt.Sprintf("'%s' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.", token.Text)
+					}
 					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
+						Severity: severity,
 						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text),
+						Message:  message,
 						Source:   "ssl-lsp",
 						Code:     CodeDirectProcedureCall,
 					})
