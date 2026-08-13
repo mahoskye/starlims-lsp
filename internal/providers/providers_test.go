@@ -5334,6 +5334,46 @@ func TestGetDiagnostics_DefaultPlacement_ValidSyntax(t *testing.T) {
 	}
 }
 
+// Issue #169: an in-file declaration suppresses global_assignment — a
+// declared local colliding case-insensitively with a status keyword is the
+// author's own variable, and a :PUBLIC declarer is the initializer script.
+func TestGetDiagnostics_GlobalAssignment_DeclaredLocalCollidingWithStatusKeyword(t *testing.T) {
+	code := `:DECLARE iS, aSeg;
+aSeg := {1,2};
+:FOR iS := 1 :TO Len(aSeg);
+:NEXT;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			t.Errorf("unexpected global_assignment on declared local: %s", d.Message)
+		}
+	}
+}
+
+// Issue #169: the file declaring :PUBLIC <global> is its initializer and may
+// assign it; a file without the declaration still flags.
+func TestGetDiagnostics_GlobalAssignment_PublicDeclarerMayAssign(t *testing.T) {
+	declared := `:PUBLIC MYUSERNAME;
+MYUSERNAME := "system";`
+
+	for _, d := range GetDiagnostics(declared, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			t.Errorf("unexpected global_assignment in :PUBLIC initializer: %s", d.Message)
+		}
+	}
+
+	undeclared := `MYUSERNAME := "someone";`
+	found := false
+	for _, d := range GetDiagnostics(undeclared, DefaultDiagnosticOptions()) {
+		if d.Code == CodeGlobalAssignment {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected global_assignment without an in-file declaration")
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
