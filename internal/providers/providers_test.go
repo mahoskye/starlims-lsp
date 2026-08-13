@@ -5465,6 +5465,42 @@ MYUSERNAME := "system";`
 	}
 }
 
+// Issue #165: bare And/Or/Not in identifier slots (declarations, assignment
+// targets, member access) are legal identifiers — WSDL-generated proxy
+// classes declare such members. Only operator positions flag.
+func TestGetDiagnostics_BareLogicalOperator_IdentifierSlotsAllowed(t *testing.T) {
+	code := `:DECLARE And, Or, oProxy, x;
+And := 1;
+Or := 2;
+x := oProxy:And;
+x := oProxy:Not(3);`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeBareLogicalOperator {
+			t.Errorf("unexpected bare_logical_operator in identifier slot: %s", d.Message)
+		}
+	}
+}
+
+// Issue #165: genuine operator positions still flag after the narrowing.
+func TestGetDiagnostics_BareLogicalOperator_OperatorPositionsStillFlag(t *testing.T) {
+	code := `:DECLARE a, b, c;
+c := a And b;
+c := a Or .T.;
+:IF Not a;
+:ENDIF;`
+
+	count := 0
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeBareLogicalOperator {
+			count++
+		}
+	}
+	if count != 3 {
+		t.Errorf("expected 3 bare_logical_operator diagnostics, got %d", count)
+	}
+}
+
 // --- checkUnusedVariables tests ---
 
 func TestGetDiagnostics_UnusedVariable_Basic(t *testing.T) {
