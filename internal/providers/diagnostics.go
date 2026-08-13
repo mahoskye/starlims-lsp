@@ -2484,6 +2484,46 @@ func checkMissingOtherwise(tokens []lexer.Token) []Diagnostic {
 
 // checkBareLogicalOperators checks for AND, OR, NOT without enclosing periods.
 // SSL requires .AND., .OR., .NOT. - bare operators are an error.
+// operandEnd reports whether a token can end an operand expression — the
+// left-hand side a binary operator would attach to.
+func operandEnd(t lexer.Token) bool {
+	switch t.Type {
+	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString, lexer.TokenCodeBlock:
+		return true
+	case lexer.TokenKeyword:
+		// Dot-wrapped literals (.T., .F.) and NIL end an operand; control
+		// keywords (:IF, :DECLARE, ...) do not.
+		return strings.HasPrefix(t.Text, ".") || strings.EqualFold(t.Text, "NIL")
+	case lexer.TokenPunctuation:
+		return t.Text == ")" || t.Text == "]" || t.Text == "}"
+	}
+	return false
+}
+
+// operandStart reports whether a token can begin an operand expression —
+// the right-hand side a logical operator would attach to.
+func operandStart(t lexer.Token) bool {
+	switch t.Type {
+	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString, lexer.TokenCodeBlock:
+		return true
+	case lexer.TokenKeyword:
+		return strings.HasPrefix(t.Text, ".") || strings.EqualFold(t.Text, "NIL")
+	case lexer.TokenPunctuation:
+		return t.Text == "(" || t.Text == "{"
+	case lexer.TokenOperator:
+		// A prefix operator opens an operand: !x, .NOT. x.
+		return t.Text == "!" || strings.EqualFold(t.Text, ".NOT.")
+	}
+	return false
+}
+
+// checkBareLogicalOperators flags bare And/Or/Not used as logical operators —
+// SSL's logical operators exist only in dotted form (.AND., .OR., .NOT.).
+// A bare And/Or/Not in an identifier slot is a legal identifier (issue #165:
+// WSDL-generated proxy classes declare members named And/Or), so the check
+// fires only in expression-operator positions: And/Or between two operands,
+// Not as a prefix before an operand. Declaration lists, member access, and
+// assignment targets never flag.
 func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -2494,22 +2534,55 @@ func checkBareLogicalOperators(tokens []lexer.Token) []Diagnostic {
 		"NOT": ".NOT.",
 	}
 
-	for _, token := range tokens {
+	for i, token := range tokens {
 		// Only check identifiers - the lexer tokenizes bare AND/OR/NOT as identifiers
 		if token.Type != lexer.TokenIdentifier {
 			continue
 		}
 
 		upper := strings.ToUpper(token.Text)
-		if correct, isBare := bareOperators[upper]; isBare {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
-				Source:   "ssl-lsp",
-				Code:     CodeBareLogicalOperator,
-			})
+		correct, isBare := bareOperators[upper]
+		if !isBare {
+			continue
 		}
+
+		prevIdx := previousSignificantTokenIndex(tokens, i-1)
+		nextIdx := nextSignificantTokenIndex(tokens, i+1)
+
+		var prev, next lexer.Token
+		if prevIdx >= 0 {
+			prev = tokens[prevIdx]
+		}
+		if nextIdx >= 0 {
+			next = tokens[nextIdx]
+		}
+
+		// Member access (obj:And) is an identifier slot, never an operator.
+		if prev.Type == lexer.TokenPunctuation && prev.Text == ":" {
+			continue
+		}
+
+		operatorPosition := false
+		if upper == "NOT" {
+			// Prefix position: an operand follows and no operand precedes
+			// (`x Not y` is not a NOT expression; `Not := 1` has no operand).
+			operatorPosition = nextIdx >= 0 && operandStart(next) && !(prevIdx >= 0 && operandEnd(prev))
+		} else {
+			// Infix position: operands on both sides.
+			operatorPosition = prevIdx >= 0 && operandEnd(prev) &&
+				nextIdx >= 0 && operandStart(next)
+		}
+		if !operatorPosition {
+			continue
+		}
+
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  fmt.Sprintf("Use '%s' instead of '%s' for logical operations in SSL", correct, token.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeBareLogicalOperator,
+		})
 	}
 
 	return diagnostics
