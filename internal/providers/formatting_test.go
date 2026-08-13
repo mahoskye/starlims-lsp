@@ -2591,3 +2591,32 @@ func TestFormatDocument_BuiltinCasingDefaultPascalCase(t *testing.T) {
 		t.Errorf("strings/comments must stay untouched:\n%s", out)
 	}
 }
+
+// Issue #164: region bodies are opaque payload — the formatter passes them
+// through verbatim (no reindent, no semicolon enforcement, no SQL reflow)
+// and the result is idempotent.
+func TestFormatDocument_RegionBodyVerbatim(t *testing.T) {
+	input := ":PROCEDURE P;\n:REGION Html;\n  <div onclick=\"if(a && b[0]) x.go()\">\n      raw   spacing kept\n  </div>\n:ENDREGION;\n:RETURN GetRegion(\"Html\");\n:ENDPROC;\n"
+
+	opts := DefaultFormattingOptions()
+	edits := FormatDocument(input, opts)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+	formatted := edits[0].NewText
+
+	for _, line := range []string{
+		"  <div onclick=\"if(a && b[0]) x.go()\">",
+		"      raw   spacing kept",
+		"  </div>",
+	} {
+		if !strings.Contains(formatted, line+"\n") {
+			t.Errorf("region body line not preserved verbatim:\nwant line %q\ngot:\n%s", line, formatted)
+		}
+	}
+
+	second := FormatDocument(formatted, opts)
+	if len(second) == 1 && second[0].NewText != formatted {
+		t.Errorf("region formatting not idempotent:\n--- first ---\n%s\n--- second ---\n%s", formatted, second[0].NewText)
+	}
+}
