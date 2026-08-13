@@ -983,13 +983,54 @@ func checkCreateUdObjectBuiltinClassMisuse(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// netDerivedRHS reports whether an assignment's right-hand side (starting
+// after the `:=`, ending at the statement's `;`) produces a value from the
+// .NET interop surface: a colon member call (oInt:ToByteArray()) or a
+// LimsNetConnect/LimsNetCast result. Such values may be 0-based collections
+// (issue #166).
+func netDerivedRHS(tokens []lexer.Token, start int) bool {
+	for j := start; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			break
+		}
+		if t.Type == lexer.TokenPunctuation && t.Text == ":" {
+			return true
+		}
+		if t.Type == lexer.TokenIdentifier {
+			upper := strings.ToUpper(t.Text)
+			if upper == "LIMSNETCONNECT" || upper == "LIMSNETCAST" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // checkZeroBasedArrayIndex detects [0] array access patterns.
 // SSL arrays are 1-based, so index 0 is invalid.
 // Gotcha #5 in gotchas.md.
 func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
+	// Most recent assignment per variable (file order): true when the RHS
+	// was .NET-derived, making a later [0] on that variable plausibly valid
+	// (issue #166: aBytes := oInt:ToByteArray(); aBytes[0]).
+	netDerived := make(map[string]bool)
+
 	for i, token := range tokens {
+		// Track `ident := RHS;` assignments (property assignments
+		// obj:Prop := ... track the object's member, not a variable — skip).
+		if token.Type == lexer.TokenIdentifier {
+			if n := nextSignificantTokenIndex(tokens, i+1); n >= 0 &&
+				tokens[n].Type == lexer.TokenOperator && tokens[n].Text == ":=" {
+				if k := previousSignificantTokenIndex(tokens, i-1); !(k >= 0 &&
+					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":") {
+					netDerived[strings.ToUpper(token.Text)] = netDerivedRHS(tokens, n+1)
+				}
+			}
+		}
+
 		// Look for '[' punctuation
 		if token.Type != lexer.TokenPunctuation || token.Text != "[" {
 			continue
@@ -997,8 +1038,9 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 
 		// Check if preceded by an identifier (array variable). If that
 		// identifier is itself reached through colon member access
-		// (dataSet:Tables[0]), the value may be a 0-based .NET collection,
-		// so the diagnostic downgrades to a warning (issue #152).
+		// (dataSet:Tables[0]), or its most recent assignment was
+		// .NET-derived (issue #166), the value may be a 0-based .NET
+		// collection, so the diagnostic downgrades to a warning (issue #152).
 		hasPrecedingIdent := false
 		afterMemberAccess := false
 		for j := i - 1; j >= 0; j-- {
@@ -1007,6 +1049,9 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 			}
 			if tokens[j].Type == lexer.TokenIdentifier {
 				hasPrecedingIdent = true
+				if netDerived[strings.ToUpper(tokens[j].Text)] {
+					afterMemberAccess = true
+				}
 				if k := previousSignificantTokenIndex(tokens, j-1); k >= 0 &&
 					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":" {
 					afterMemberAccess = true
@@ -1037,7 +1082,7 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 				message := "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element."
 				if afterMemberAccess {
 					severity = SeverityWarning
-					message = "Index 0 on a ':' member access may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
+					message = "Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
 				}
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: severity,
