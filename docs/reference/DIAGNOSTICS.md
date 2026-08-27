@@ -50,6 +50,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
 | `execfunction_class_target` | ExecFunction targets a class file | error | authoritative | active | [diag.execfunction_class_target](../../catalog/diagnostics/execfunction_class_target.md) |
 | `execfunction_missing_quotes` | Unquoted namespace path in ExecFunction/DoProc | error | tool | active | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
+| `exitcase_after_return` | Unreachable :EXITCASE after a branch-level :RETURN | hint | tool | active | [diag.exitcase_after_return](../../catalog/diagnostics/exitcase_after_return.md) |
 | `exitfor_in_finally` | :EXITFOR inside a :FINALLY block | error | authoritative | active | [diag.exitfor_in_finally](../../catalog/diagnostics/exitfor_in_finally.md) |
 | `exitfor_outside_loop` | EXITFOR outside a FOR loop | error | authoritative | active | [diag.exitfor_outside_loop](../../catalog/diagnostics/exitfor_outside_loop.md) |
 | `exitwhile_in_finally` | EXITWHILE inside a FINALLY block | error | authoritative | active | [diag.exitwhile_in_finally](../../catalog/diagnostics/exitwhile_in_finally.md) |
@@ -64,6 +65,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
+| `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
 | `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
@@ -77,6 +79,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `mismatched_block_end` | Block end keyword does not match the open block | error | tool | active | [diag.mismatched_block_end](../../catalog/diagnostics/mismatched_block_end.md) |
 | `mismatched_delimiter` | Closing delimiter does not match the open one | error | tool | active | [diag.mismatched_delimiter](../../catalog/diagnostics/mismatched_delimiter.md) |
 | `missing_otherwise` | BEGINCASE without an OTHERWISE clause | hint | tool | active | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
+| `mixed_error_handling_families` | Legacy :ERROR/:RESUME mixed with :TRY/:CATCH in one procedure | warning | tool | active | [diag.mixed_error_handling_families](../../catalog/diagnostics/mixed_error_handling_families.md) |
 | `mixed_type_operator` | Mixed operand types in a '+' operation | warning | tool | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
 | `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | warning | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
 | `negative_logic` | Negated IF condition with an ELSE branch | hint | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
@@ -101,6 +104,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `sql_injection` | String concatenation in a SQL call argument | warning | advisory | active | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
 | `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
+| `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
 | `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
 | `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
 | `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | tool | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |

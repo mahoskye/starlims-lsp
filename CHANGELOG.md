@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`step_zero_literal` (#199).** Warns on a `:FOR` loop whose `:STEP` is a
+  provable literal zero (`0`, `0.0`, `-0`) — the loop variable never
+  advances, so the loop cannot terminate once entered. Variable or
+  expression steps are left alone.
+- **`exitcase_after_return` (#190).** Hints on an `:EXITCASE` that
+  immediately follows a branch-level `:RETURN` inside a `:BEGINCASE` —
+  the `:RETURN` already leaves the procedure, so the `:EXITCASE` is
+  unreachable. A common generated/refactored pattern given the guidance
+  to end every `:CASE` with `:EXITCASE`.
+- **`mixed_error_handling_families` (#191).** Warns when a procedure
+  combines the legacy `:ERROR;`/`:RESUME;` marker statements with
+  structured `:TRY`/`:CATCH` — the legacy handler can intercept a raised
+  error before the `:CATCH` sees it. Statement-position detection only:
+  `:ERROR` in expression position (`LimsString(:ERROR)` in a handler, a
+  corpus-observed pattern) does not count as the legacy family.
+- **`invalid_limstypeex_comparison` (#187).** Errors on a comparison
+  (`=`, `==`, `!=`, either operand order) between `LimsTypeEx(...)` and a
+  string literal outside its fixed result set (NIL, STRING, NUMERIC,
+  LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE) — such a guard is
+  provably dead; the chronic bug is `"NUMBER"` for `"NUMERIC"`.
+
 ## [0.17.0] - 2026-08-12
 
 A real-world-corpus false-positive batch: a validation run over ~5,200
