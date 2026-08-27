@@ -104,6 +104,8 @@ interface SQLFormattingOptions {
 interface DiagnosticOptions {
   hungarianNotation: boolean;
   unusedVariables: boolean;
+  unicodeLiteralPrefix: boolean;
+  collateJustification: boolean;
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
@@ -628,7 +630,41 @@ an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
 { "ssl.diagnostics.endpointPatterns": ["**/endpoints/**", "**/*.srvscr"] }
 ```
 
-### 5.8 Suppression comments (in-file)
+### 5.8 ssl.diagnostics.unicodeLiteralPrefix
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+When enabled, hints on `N'...'` Unicode literal prefixes in embedded SQL
+(code `unicode_literal_prefix`, issue #196). Opt-in because whether the
+prefix is needed is a schema property (NVARCHAR columns) the LSP cannot
+see.
+
+```json
+{ "ssl.diagnostics.unicodeLiteralPrefix": true }
+```
+
+### 5.9 ssl.diagnostics.collateJustification
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+When enabled, hints on `COLLATE` in embedded SQL when no comment directly
+precedes the containing statement (code `unjustified_collate`, issue
+#197). Opt-in because "justification comment above" is a team convention,
+not a runtime rule.
+
+```json
+{ "ssl.diagnostics.collateJustification": true }
+```
+
+### 5.10 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,
@@ -957,6 +993,8 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
+| `ssl.diagnostics.unicodeLiteralPrefix` | `false` |
+| `ssl.diagnostics.collateJustification` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |

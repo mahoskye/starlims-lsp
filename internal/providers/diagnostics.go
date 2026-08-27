@@ -69,6 +69,14 @@ type DiagnosticOptions struct {
 	// ambients (not declared, not flagged as undeclared, not assignable).
 	IsEndpointFile bool
 
+	// CheckUnicodeLiteralPrefix enables the opt-in unicode_literal_prefix
+	// style rule (issue #196): flag N'...' literals in embedded SQL.
+	CheckUnicodeLiteralPrefix bool
+	// CheckCollateJustification enables the opt-in unjustified_collate
+	// style rule (issue #197): flag COLLATE in embedded SQL when no
+	// comment directly precedes the containing statement.
+	CheckCollateJustification bool
+
 	// IncludeDeclaredVariables carries variable names declared by the
 	// file's resolved :INCLUDE targets (full-splice semantics, supplied by
 	// the server's workspace closure — spec
@@ -299,6 +307,13 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
+	diagnostics = append(diagnostics, checkRunSQLNonDML(tokens)...)
+	if opts.CheckUnicodeLiteralPrefix {
+		diagnostics = append(diagnostics, checkUnicodeLiteralPrefix(tokens)...)
+	}
+	if opts.CheckCollateJustification {
+		diagnostics = append(diagnostics, checkCollateJustification(tokens)...)
+	}
 	diagnostics = append(diagnostics, checkProcedureDeclarationSyntax(tokens)...)
 	diagnostics = append(diagnostics, checkDirectProcedureCalls(tokens, ast, p)...)
 	diagnostics = append(diagnostics, checkMissingQuotesInExecFunction(tokens)...)
@@ -6258,6 +6273,177 @@ func checkInvalidLimsTypeExComparison(tokens []lexer.Token) []Diagnostic {
 			}
 		}
 	}
+
+	return diagnostics
+}
+
+// sqlCallFirstArgStrings iterates call sites of the recognized embedded-SQL
+// functions (SQLExecute plus the positional family) and yields the string
+// tokens that make up each call's first argument — including the pieces of a
+// concatenated SQL string. yield receives the call's function-name token
+// index and the string token index.
+func sqlCallFirstArgStrings(tokens []lexer.Token, funcFilter func(string) bool, yield func(callIdx, strIdx int)) {
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier || !funcFilter(strings.ToUpper(token.Text)) {
+			continue
+		}
+		openIdx := nextSignificantTokenIndex(tokens, i+1)
+		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
+			continue
+		}
+		argStarts, argEnds, _ := parseTopLevelCallArguments(tokens, openIdx)
+		if len(argStarts) == 0 || argStarts[0] < 0 {
+			continue
+		}
+		for j := argStarts[0]; j <= argEnds[0]; j++ {
+			if tokens[j].Type == lexer.TokenString {
+				yield(i, j)
+			}
+		}
+	}
+}
+
+// stripLeadingSQLComments removes leading whitespace, `--` line comments,
+// and `/* */` block comments from a SQL string so the first real keyword
+// can be inspected.
+func stripLeadingSQLComments(s string) string {
+	for {
+		s = strings.TrimLeft(s, " \t\r\n")
+		switch {
+		case strings.HasPrefix(s, "--"):
+			nl := strings.IndexByte(s, '\n')
+			if nl < 0 {
+				return ""
+			}
+			s = s[nl+1:]
+		case strings.HasPrefix(s, "/*"):
+			end := strings.Index(s, "*/")
+			if end < 0 {
+				return ""
+			}
+			s = s[end+2:]
+		default:
+			return s
+		}
+	}
+}
+
+var (
+	sqlDMLVerbPattern       = regexp.MustCompile(`(?i)\b(insert|update|delete|merge)\b`)
+	sqlSelectIntoPattern    = regexp.MustCompile(`(?i)\binto\b`)
+	unicodePrefixPattern    = regexp.MustCompile(`(?i)\bN'`)
+	collateKeywordPattern   = regexp.MustCompile(`(?i)\bcollate\b`)
+	leadingSQLWordExtractor = regexp.MustCompile(`^[A-Za-z]+`)
+)
+
+// checkRunSQLNonDML flags RunSQL calls whose SQL string is a result-returning
+// statement (diag.runsql_non_dml, issue #195): RunSQL is for DML; a query
+// whose first keyword is SELECT or WITH should use a result-returning API
+// (LSearch/LSelect/GetDataSet/...) instead. SELECT ... INTO and WITH-wrapped
+// DML are left alone — those write.
+func checkRunSQLNonDML(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	sqlCallFirstArgStrings(tokens, func(name string) bool { return name == "RUNSQL" }, func(callIdx, strIdx int) {
+		// Only the first string piece of the argument decides — the
+		// statement's leading keyword lives there.
+		if prev := previousSignificantTokenIndex(tokens, strIdx-1); prev >= 0 && tokens[prev].Type == lexer.TokenString {
+			return
+		}
+		content := stripLeadingSQLComments(unquoteSSLString(tokens[strIdx].Text))
+		word := strings.ToUpper(leadingSQLWordExtractor.FindString(content))
+		if word != "SELECT" && word != "WITH" {
+			return
+		}
+		// A SELECT ... INTO writes; a WITH wrapping INSERT/UPDATE/DELETE/
+		// MERGE writes. Both are legitimate RunSQL statements. The full
+		// argument (all concatenated pieces) is consulted for the guard.
+		full := content
+		for j := strIdx + 1; j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenString {
+				full += " " + unquoteSSLString(tokens[j].Text)
+			}
+			if tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ")") {
+				break
+			}
+		}
+		if word == "SELECT" && sqlSelectIntoPattern.MatchString(full) {
+			return
+		}
+		if word == "WITH" && sqlDMLVerbPattern.MatchString(full) {
+			return
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(tokens[strIdx]),
+			Message:  fmt.Sprintf("RunSQL is for DML statements - this '%s' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead", word),
+			Source:   "ssl-lsp",
+			Code:     CodeRunSQLNonDML,
+		})
+	})
+
+	return diagnostics
+}
+
+// checkUnicodeLiteralPrefix flags N'...' Unicode literal prefixes in
+// embedded SQL (diag.unicode_literal_prefix, issue #196). Opt-in style
+// rule: most schemas don't need the prefix and it creeps in via
+// copy-paste. One diagnostic per string token.
+func checkUnicodeLiteralPrefix(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
+		if !unicodePrefixPattern.MatchString(unquoteSSLString(tokens[strIdx].Text)) {
+			return
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityHint,
+			Range:    tokenToRange(tokens[strIdx]),
+			Message:  "Unicode literal prefix N'...' in embedded SQL - drop the prefix unless the target column genuinely requires it",
+			Source:   "ssl-lsp",
+			Code:     CodeUnicodeLiteralPrefix,
+		})
+	})
+
+	return diagnostics
+}
+
+// checkCollateJustification flags COLLATE in embedded SQL when no comment
+// directly precedes the containing statement (diag.unjustified_collate,
+// issue #197). Opt-in style rule: forcing collation is occasionally
+// necessary but should carry a documented reason; an unexplained COLLATE
+// is usually cargo-culted.
+func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
+		if !collateKeywordPattern.MatchString(unquoteSSLString(tokens[strIdx].Text)) {
+			return
+		}
+		// Justified when a comment sits between the previous statement's
+		// terminator and this statement's first token.
+		justified := false
+		for j := callIdx - 1; j >= 0; j-- {
+			t := tokens[j]
+			if t.Type == lexer.TokenComment {
+				justified = true
+				break
+			}
+			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+		}
+		if justified {
+			return
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityHint,
+			Range:    tokenToRange(tokens[strIdx]),
+			Message:  "COLLATE in embedded SQL without a justification comment - document why the forced collation is needed in a comment directly above this statement",
+			Source:   "ssl-lsp",
+			Code:     CodeUnjustifiedCollate,
+		})
+	})
 
 	return diagnostics
 }

@@ -9248,3 +9248,106 @@ func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDiagnostics_RunSQLNonDMLFlagged(t *testing.T) {
+	// diag.runsql_non_dml (issue #195): SELECT/WITH through RunSQL
+	// discards the result; leading SQL comments are stripped first.
+	code := `:PROCEDURE Main;
+RunSQL("SELECT STATUS FROM SAMPLES WHERE ID = ?", "CONN", {1});
+RunSQL("/* fetch */ WITH recent AS (SELECT ID FROM SAMPLES) SELECT * FROM recent", "CONN");
+runsql("-- note
+select 1", "CONN");
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeRunSQLNonDML {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 3 || lines[0] != 1 || lines[1] != 2 || lines[2] != 3 {
+		t.Fatalf("expected runsql_non_dml on lines 1, 2, 3 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_RunSQLNonDMLNotFlagged(t *testing.T) {
+	// DML, SELECT INTO, WITH-wrapped DML, non-literal SQL, and SELECT via
+	// the result-returning APIs are all out of scope.
+	code := `:PROCEDURE Main;
+:DECLARE aRows, sSql;
+RunSQL("UPDATE SAMPLES SET STATUS = ? WHERE ID = ?", "CONN", {"DONE", 1});
+RunSQL("SELECT ID, STATUS INTO ARCHIVE_SAMPLES FROM SAMPLES", "CONN");
+RunSQL("WITH done AS (SELECT ID FROM SAMPLES WHERE DONE = 1) UPDATE SAMPLES SET ARCHIVED = 1 WHERE ID IN (SELECT ID FROM done)", "CONN");
+RunSQL(sSql, "CONN");
+aRows := LSelect("SELECT STATUS FROM SAMPLES WHERE ID = ?", "", "CONN", {1});
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeRunSQLNonDML {
+			t.Errorf("unexpected runsql_non_dml at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_UnicodeLiteralPrefixOptIn(t *testing.T) {
+	// diag.unicode_literal_prefix (issue #196): off by default; when
+	// enabled, flags N'...' in SQL-function arguments only.
+	code := `:PROCEDURE Main;
+:DECLARE sMsg;
+SQLExecute("UPDATE SAMPLES SET NOTE = N'checked' WHERE ID = ?nId?");
+sMsg := "PLAN'N'GO";
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeUnicodeLiteralPrefix {
+			t.Fatalf("unicode_literal_prefix fired with the setting off: %s", d.Message)
+		}
+	}
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUnicodeLiteralPrefix = true
+	var lines []int
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeUnicodeLiteralPrefix {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 2 {
+		t.Fatalf("expected unicode_literal_prefix on line 2 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_UnjustifiedCollateOptIn(t *testing.T) {
+	// diag.unjustified_collate (issue #197): off by default; when
+	// enabled, a comment directly above the statement justifies, and
+	// COLLATERAL does not match.
+	code := `:PROCEDURE Main;
+:DECLARE aRows, aOk, aSub;
+aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+/* server default is case-sensitive so the report must sort case-insensitively;
+aOk := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN");
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeUnjustifiedCollate {
+			t.Fatalf("unjustified_collate fired with the setting off: %s", d.Message)
+		}
+	}
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckCollateJustification = true
+	var lines []int
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeUnjustifiedCollate {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 2 {
+		t.Fatalf("expected unjustified_collate on line 2 only (0-indexed), got %v", lines)
+	}
+}

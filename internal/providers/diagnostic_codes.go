@@ -129,4 +129,7 @@ const (
 	CodeExitCaseAfterReturn         = "exitcase_after_return"
 	CodeMixedErrorHandlingFamilies  = "mixed_error_handling_families"
 	CodeInvalidLimsTypeExComparison = "invalid_limstypeex_comparison"
+	CodeRunSQLNonDML                = "runsql_non_dml"
+	CodeUnicodeLiteralPrefix        = "unicode_literal_prefix"
+	CodeUnjustifiedCollate          = "unjustified_collate"
 )
