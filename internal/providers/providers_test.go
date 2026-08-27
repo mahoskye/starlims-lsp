@@ -9026,3 +9026,225 @@ func TestUnqualifiedFieldAssignment_CompoundOperatorFlagged(t *testing.T) {
 		t.Fatalf("compound assignment should be flagged, got %+v", diags)
 	}
 }
+
+func TestGetDiagnostics_StepZeroLiteralFlagged(t *testing.T) {
+	// diag.step_zero_literal (issue #199): a provable literal zero step,
+	// with or without sign or decimal point, cannot terminate.
+	code := `:PROCEDURE Demo;
+:DECLARE i;
+:FOR i := 1 :TO 10 :STEP 0;
+:NEXT;
+:FOR i := 1 :TO 10 :STEP 0.0;
+:NEXT;
+:FOR i := 1 :TO 10 :STEP -0;
+:NEXT;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeStepZeroLiteral {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 3 || lines[0] != 2 || lines[1] != 4 || lines[2] != 6 {
+		t.Fatalf("expected step_zero_literal on lines 2, 4, 6 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_StepZeroLiteralNotFlagged(t *testing.T) {
+	// Non-zero literals and non-literal steps are out of scope — a
+	// variable step is not provable even when it is zero at runtime.
+	code := `:PROCEDURE Demo;
+:DECLARE i, nStep;
+nStep := 0;
+:FOR i := 1 :TO 10 :STEP 0.5;
+:NEXT;
+:FOR i := 10 :TO 1 :STEP -1;
+:NEXT;
+:FOR i := 1 :TO 10 :STEP nStep;
+:NEXT;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeStepZeroLiteral {
+			t.Errorf("unexpected step_zero_literal at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_ExitCaseAfterReturnFlagged(t *testing.T) {
+	// diag.exitcase_after_return (issue #190): :EXITCASE directly after a
+	// branch-level :RETURN is unreachable; ranged on the :EXITCASE. A
+	// comment between the two statements does not break the pairing.
+	code := `:PROCEDURE Grade;
+:PARAMETERS nScore;
+:BEGINCASE;
+:CASE nScore > 90;
+	:RETURN Pad("A", 2);
+	:EXITCASE;
+:CASE nScore > 80;
+	:RETURN "B";
+	/* dead code below;
+	:EXITCASE;
+:OTHERWISE;
+	:RETURN "C";
+:ENDCASE;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeExitCaseAfterReturn {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 2 || lines[0] != 5 || lines[1] != 9 {
+		t.Fatalf("expected exitcase_after_return on lines 5 and 9 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_ExitCaseAfterReturnNotFlagged(t *testing.T) {
+	// Ordinary :EXITCASE use, :RETURN as the branch's last statement, and
+	// :RETURN outside any :BEGINCASE are all out of scope.
+	code := `:PROCEDURE Grade;
+:PARAMETERS nScore;
+:DECLARE sGrade;
+:BEGINCASE;
+:CASE nScore > 90;
+	sGrade := "A";
+	:EXITCASE;
+:OTHERWISE;
+	:RETURN "B";
+:ENDCASE;
+:RETURN sGrade;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeExitCaseAfterReturn {
+			t.Errorf("unexpected exitcase_after_return at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_MixedErrorHandlingFamiliesFlagged(t *testing.T) {
+	// diag.mixed_error_handling_families (issue #191): both families in
+	// one procedure span; ranged on the later family's first token.
+	code := `:PROCEDURE Process;
+:ERROR;
+	:RESUME;
+:TRY;
+	DoWork();
+:CATCH;
+	LogIt();
+:ENDTRY;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var found []Diagnostic
+	for _, d := range diagnostics {
+		if d.Code == CodeMixedErrorHandlingFamilies {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 1 || found[0].Range.Start.Line != 3 {
+		t.Fatalf("expected one mixed_error_handling_families on line 3 (0-indexed), got %+v", found)
+	}
+}
+
+func TestGetDiagnostics_MixedErrorHandlingFamiliesNotFlagged(t *testing.T) {
+	// One family per procedure — including the two families split across
+	// different procedures of the same file — is fine. `:ERROR` in
+	// expression position inside a :CATCH is not the legacy family.
+	code := `:PROCEDURE Expression;
+:DECLARE sResult;
+:TRY;
+	DoWork();
+:CATCH;
+	sResult := "Error: " + LimsString(:ERROR);
+:ENDTRY;
+:ENDPROC;
+:PROCEDURE LegacyOnly;
+:ERROR;
+	:RESUME;
+:ENDPROC;
+:PROCEDURE ModernOnly;
+:TRY;
+	DoWork();
+:CATCH;
+	LogIt();
+:ENDTRY;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeMixedErrorHandlingFamilies {
+			t.Errorf("unexpected mixed_error_handling_families at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_InvalidLimsTypeExComparisonFlagged(t *testing.T) {
+	// diag.invalid_limstypeex_comparison (issue #187): literals outside
+	// the fixed result set flag in both operand orders; ranged on the
+	// string literal.
+	code := `:PROCEDURE Check;
+:PARAMETERS uValue;
+:IF LimsTypeEx(uValue) == "NUMBER";
+	:RETURN .T.;
+:ENDIF;
+:IF "INTEGER" = limstypeex(uValue);
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(Pad(uValue, 2)) != "BOOL";
+	:RETURN .T.;
+:ENDIF;
+:RETURN .F.;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeInvalidLimsTypeExComparison {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 3 || lines[0] != 2 || lines[1] != 5 || lines[2] != 8 {
+		t.Fatalf("expected invalid_limstypeex_comparison on lines 2, 5, 8 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
+	// Valid result strings in any casing and non-literal comparands are
+	// out of scope.
+	code := `:PROCEDURE Check;
+:PARAMETERS uValue, sExpected;
+:IF LimsTypeEx(uValue) == "NUMERIC";
+	:RETURN .T.;
+:ENDIF;
+:IF limstypeex(uValue) = "string";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) == sExpected;
+	:RETURN .T.;
+:ENDIF;
+:RETURN LimsTypeEx(uValue) != "SSLVALUE";
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeInvalidLimsTypeExComparison {
+			t.Errorf("unexpected invalid_limstypeex_comparison at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}

@@ -125,4 +125,8 @@ const (
 	CodeSqlInjection                = "sql_injection"
 	CodeClassNameCollision          = "class_name_collision"
 	CodeUnqualifiedFieldAssignment  = "unqualified_field_assignment"
+	CodeStepZeroLiteral             = "step_zero_literal"
+	CodeExitCaseAfterReturn         = "exitcase_after_return"
+	CodeMixedErrorHandlingFamilies  = "mixed_error_handling_families"
+	CodeInvalidLimsTypeExComparison = "invalid_limstypeex_comparison"
 )

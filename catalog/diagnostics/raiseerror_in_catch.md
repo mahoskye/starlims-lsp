@@ -18,6 +18,15 @@ history:
       ssl-style-guide#36 (schema error_handling.raise_error_doctrine):
       never call RaiseError inside :CATCH — the error handler must not
       become the thing that crashes.
+  - date: 2026-08-27
+    ref: "issue #192"
+    note: >-
+      Runtime semantics corrected after verification: :CATCH compiles to a
+      plain catch block, so RaiseError inside :CATCH escapes that :TRY
+      entirely — it reaches an outer handler if one exists, and only fails
+      the current request as a Server Error when uncaught (the process and
+      other requests continue). Behavior and severity unchanged; rationale
+      reworded.
 issues: []
 ---
 
@@ -110,9 +119,13 @@ It must NOT flag:
 The doctrine (ssl-style-guide#36, schema `error_handling.raise_error_doctrine`)
 is explicit: the error handler must not become the thing that crashes — a
 raise from `:CATCH` escapes the very structure that was supposed to contain
-the failure, and if nothing above catches it the invocation surfaces to the
-end user as a server error. Warning rather than error because the schema
-carries this as doctrine (guidance), not a compile error; `severity_overridable`
+the failure. Runtime verification (issue #192) pinned the exact semantics:
+`:CATCH` compiles to a plain catch block, so the raise silently bypasses the
+enclosing try's own catch; it reaches an *outer* handler if one exists, and
+when uncaught it fails the current request as a Server Error (the process
+and other requests continue). Warning rather than error because an outer
+handler can legitimately catch the raise and the schema carries this as
+doctrine (guidance), not a compile error; `severity_overridable`
 lets teams promote it. Sibling doctrine items ("raise only inside `:TRY`",
 "ClearLastSSLError after handling") were considered and rejected as
 diagnostics — too noisy / unknowable cross-file (issue #142) — and live in

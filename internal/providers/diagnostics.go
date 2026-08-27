@@ -251,6 +251,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkErrorHandlerStructure(tokens)...)
 	diagnostics = append(diagnostics, checkCatchClauseForm(tokens)...)
 	diagnostics = append(diagnostics, checkRaiseErrorInCatch(tokens)...)
+	diagnostics = append(diagnostics, checkMixedErrorHandlingFamilies(tokens)...)
+	diagnostics = append(diagnostics, checkExitCaseAfterReturn(tokens)...)
 	diagnostics = append(diagnostics, checkExecFunctionClassTargets(tokens, opts.ClassFileDispatchTargets)...)
 	diagnostics = append(diagnostics, checkForLoopNumericLiterals(tokens, typeInfo)...)
 	diagnostics = append(diagnostics, checkLoopAndFinallyControl(tokens)...)
@@ -306,6 +308,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkClassReferenceForms(tokens)...)
 	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
+	diagnostics = append(diagnostics, checkStepZeroLiteral(tokens)...)
+	diagnostics = append(diagnostics, checkInvalidLimsTypeExComparison(tokens)...)
 	diagnostics = append(diagnostics, checkRegionEndMismatch(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
@@ -5975,6 +5979,283 @@ func checkClassNameCollision(tokens []lexer.Token) []Diagnostic {
 				})
 			}
 			break
+		}
+	}
+
+	return diagnostics
+}
+
+// checkStepZeroLiteral flags a :FOR loop whose :STEP is a literal zero
+// (diag.step_zero_literal, issue #199): a zero step never advances the loop
+// variable, so the loop cannot terminate once entered. Only provable
+// literals flag — an optional +/- sign followed by a numeric literal whose
+// value is zero; a variable or expression step is left alone.
+func checkStepZeroLiteral(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		if !strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "STEP") {
+			continue
+		}
+		idx := nextSignificantTokenIndex(tokens, i+1)
+		if idx < 0 {
+			continue
+		}
+		if tokens[idx].Type == lexer.TokenOperator && (tokens[idx].Text == "-" || tokens[idx].Text == "+") {
+			idx = nextSignificantTokenIndex(tokens, idx+1)
+			if idx < 0 {
+				continue
+			}
+		}
+		if tokens[idx].Type != lexer.TokenNumber {
+			continue
+		}
+		if strings.Trim(strings.ReplaceAll(tokens[idx].Text, ".", ""), "0") != "" {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(tokens[idx]),
+			Message:  "':STEP 0' never advances the loop variable - the ':FOR' loop cannot terminate once entered",
+			Source:   "ssl-lsp",
+			Code:     CodeStepZeroLiteral,
+		})
+	}
+
+	return diagnostics
+}
+
+// checkExitCaseAfterReturn flags an :EXITCASE that immediately follows a
+// branch-level :RETURN statement inside a :BEGINCASE structure
+// (diag.exitcase_after_return, issue #190): the :RETURN already leaves the
+// procedure, so the :EXITCASE is unreachable. The pair is a common
+// generated/refactored pattern because general guidance says to end every
+// :CASE with :EXITCASE.
+func checkExitCaseAfterReturn(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	caseDepth := 0
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
+		case "BEGINCASE":
+			caseDepth++
+		case "ENDCASE":
+			if caseDepth > 0 {
+				caseDepth--
+			}
+		case "RETURN":
+			if caseDepth == 0 {
+				continue
+			}
+			// Find the end of the :RETURN statement — the terminating
+			// semicolon at top nesting level.
+			parenDepth, braceDepth, bracketDepth := 0, 0, 0
+			end := -1
+			for j := i + 1; j < len(tokens); j++ {
+				t := tokens[j]
+				if t.Type != lexer.TokenPunctuation {
+					continue
+				}
+				switch t.Text {
+				case "(":
+					parenDepth++
+				case ")":
+					parenDepth--
+				case "{":
+					braceDepth++
+				case "}":
+					braceDepth--
+				case "[":
+					bracketDepth++
+				case "]":
+					bracketDepth--
+				case ";":
+					if parenDepth == 0 && braceDepth == 0 && bracketDepth == 0 {
+						end = j
+					}
+				}
+				if end >= 0 {
+					break
+				}
+			}
+			if end < 0 {
+				continue
+			}
+			nextIdx := nextSignificantTokenIndex(tokens, end+1)
+			if nextIdx < 0 || tokens[nextIdx].Type != lexer.TokenKeyword {
+				continue
+			}
+			if !strings.EqualFold(strings.TrimPrefix(tokens[nextIdx].Text, ":"), "EXITCASE") {
+				continue
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityHint,
+				Range:    tokenToRange(tokens[nextIdx]),
+				Message:  "Unreachable ':EXITCASE' - the preceding ':RETURN' already leaves the procedure",
+				Source:   "ssl-lsp",
+				Code:     CodeExitCaseAfterReturn,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// checkMixedErrorHandlingFamilies flags a procedure that combines the legacy
+// :ERROR/:RESUME handler family with structured :TRY/:CATCH handling
+// (diag.mixed_error_handling_families, issue #191): the legacy handler can
+// intercept a raised error before the :CATCH sees it, producing confusing
+// control flow that is rarely intentional. One diagnostic per span, ranged
+// on the first token of whichever family appears later. Tokens outside any
+// :PROCEDURE (top-level script code) are treated as one span of their own.
+func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// spanLegacy/spanStructured track the first occurrence of each family
+	// in the current span; -1 means not seen yet.
+	legacyIdx, structuredIdx := -1, -1
+	flush := func() {
+		if legacyIdx >= 0 && structuredIdx >= 0 {
+			later := legacyIdx
+			if structuredIdx > later {
+				later = structuredIdx
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(tokens[later]),
+				Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure",
+				Source:   "ssl-lsp",
+				Code:     CodeMixedErrorHandlingFamilies,
+			})
+		}
+		legacyIdx, structuredIdx = -1, -1
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
+		case "PROCEDURE":
+			flush()
+		case "ENDPROC":
+			flush()
+		case "ERROR", "RESUME":
+			// Only the marker-statement forms `:ERROR;` / `:RESUME;` are
+			// legacy handlers. `:ERROR` also appears in expression position
+			// (e.g. `LimsString(:ERROR)` inside a :CATCH, corpus-observed) —
+			// that is not the legacy family.
+			if legacyIdx >= 0 {
+				continue
+			}
+			if n := nextSignificantTokenIndex(tokens, i+1); n >= 0 &&
+				tokens[n].Type == lexer.TokenPunctuation && tokens[n].Text == ";" {
+				legacyIdx = i
+			}
+		case "TRY", "CATCH":
+			if structuredIdx < 0 {
+				structuredIdx = i
+			}
+		}
+	}
+	flush()
+
+	return diagnostics
+}
+
+// validLimsTypeExResults is the complete result set of LimsTypeEx.
+var validLimsTypeExResults = map[string]bool{
+	"NIL": true, "STRING": true, "NUMERIC": true, "LOGIC": true,
+	"DATE": true, "ARRAY": true, "CODEBLOCK": true, "OBJECT": true,
+	"SSLVALUE": true,
+}
+
+// checkInvalidLimsTypeExComparison flags a comparison between a
+// LimsTypeEx(...) call and a string literal outside the function's fixed
+// result set (diag.invalid_limstypeex_comparison, issue #187): LimsTypeEx
+// returns exactly one of NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY,
+// CODEBLOCK, OBJECT, SSLVALUE, so a guard against any other literal (the
+// chronic one is "NUMBER") can never pass. Both operand orders are checked.
+func checkInvalidLimsTypeExComparison(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	isComparison := func(idx int) bool {
+		if idx < 0 || tokens[idx].Type != lexer.TokenOperator {
+			return false
+		}
+		switch tokens[idx].Text {
+		case "=", "==", "!=":
+			return true
+		}
+		return false
+	}
+	flagIfInvalid := func(strIdx int) {
+		literal := strings.ToUpper(strings.TrimSpace(unquoteSSLString(tokens[strIdx].Text)))
+		if validLimsTypeExResults[literal] {
+			return
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(tokens[strIdx]),
+			Message:  fmt.Sprintf("LimsTypeEx never returns %q - this comparison can never be true. Valid results: NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE", strings.TrimSpace(unquoteSSLString(tokens[strIdx].Text))),
+			Source:   "ssl-lsp",
+			Code:     CodeInvalidLimsTypeExComparison,
+		})
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier || !strings.EqualFold(token.Text, "LimsTypeEx") {
+			continue
+		}
+		openIdx := nextSignificantTokenIndex(tokens, i+1)
+		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
+			continue
+		}
+
+		// Forward order: LimsTypeEx(...) <op> "literal".
+		depth := 0
+		closeIdx := -1
+		for j := openIdx; j < len(tokens); j++ {
+			if tokens[j].Type != lexer.TokenPunctuation {
+				continue
+			}
+			switch tokens[j].Text {
+			case "(":
+				depth++
+			case ")":
+				depth--
+				if depth == 0 {
+					closeIdx = j
+				}
+			}
+			if closeIdx >= 0 {
+				break
+			}
+		}
+		if closeIdx >= 0 {
+			opIdx := nextSignificantTokenIndex(tokens, closeIdx+1)
+			if isComparison(opIdx) {
+				strIdx := nextSignificantTokenIndex(tokens, opIdx+1)
+				if strIdx >= 0 && tokens[strIdx].Type == lexer.TokenString {
+					flagIfInvalid(strIdx)
+					continue
+				}
+			}
+		}
+
+		// Reversed order: "literal" <op> LimsTypeEx(...).
+		opIdx := previousSignificantTokenIndex(tokens, i-1)
+		if isComparison(opIdx) {
+			strIdx := previousSignificantTokenIndex(tokens, opIdx-1)
+			if strIdx >= 0 && tokens[strIdx].Type == lexer.TokenString {
+				flagIfInvalid(strIdx)
+			}
 		}
 	}
 
