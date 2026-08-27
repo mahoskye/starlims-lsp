@@ -43,6 +43,11 @@ type SignatureHelpSettings struct {
 type DiagnosticsSettings struct {
 	HungarianNotation *bool              `json:"hungarianNotation"`
 	UnusedVariables   *bool              `json:"unusedVariables"`
+	// UnicodeLiteralPrefix / CollateJustification toggle the opt-in
+	// embedded-SQL style rules unicode_literal_prefix (issue #196) and
+	// unjustified_collate (issue #197). Both default off.
+	UnicodeLiteralPrefix *bool `json:"unicodeLiteralPrefix"`
+	CollateJustification *bool `json:"collateJustification"`
 	HungarianPrefixes *[]string          `json:"hungarianPrefixes"`
 	Globals           *[]string          `json:"globals"`
 	MaxBlockDepth     *int               `json:"maxBlockDepth"`
@@ -467,6 +472,8 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		diagnostics := clientSettings.SSL.Diagnostics
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
 		applyOptional(&s.settings.Diagnostics.CheckUnusedVars, diagnostics.UnusedVariables)
+		applyOptional(&s.settings.Diagnostics.CheckUnicodeLiteralPrefix, diagnostics.UnicodeLiteralPrefix)
+		applyOptional(&s.settings.Diagnostics.CheckCollateJustification, diagnostics.CollateJustification)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)

@@ -99,6 +99,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `region_legacy` | REGION keyword flagged as legacy (removed — premise was wrong) | info | tool | removed | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
 | `return_from_constructor` | Return from a constructor (never implemented) | error | tool | removed | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
+| `runsql_non_dml` | RunSQL called with a result-returning statement | warning | tool | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
 | `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
@@ -111,6 +112,8 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
 | `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
 | `undeclared_variable` | Use of an undeclared variable | warning | tool | active | [diag.undeclared_variable](../../catalog/diagnostics/undeclared_variable.md) |
+| `unicode_literal_prefix` | N'...' Unicode literal prefix in embedded SQL | hint | style_only | active | [diag.unicode_literal_prefix](../../catalog/diagnostics/unicode_literal_prefix.md) |
+| `unjustified_collate` | COLLATE in embedded SQL without a justification comment | hint | style_only | active | [diag.unjustified_collate](../../catalog/diagnostics/unjustified_collate.md) |
 | `unknown_keyword` | Unknown colon-prefixed keyword | warning | tool | active | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
 | `unknown_token` | Unknown token | warning | tool | active | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
 | `unmatched_block_end` | Block-end keyword with no open block | error | tool | active | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |

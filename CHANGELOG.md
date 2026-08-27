@@ -23,6 +23,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error before the `:CATCH` sees it. Statement-position detection only:
   `:ERROR` in expression position (`LimsString(:ERROR)` in a handler, a
   corpus-observed pattern) does not count as the legacy family.
+- **`runsql_non_dml` (#195).** Warns on a `RunSQL` call whose SQL begins
+  (after stripping leading SQL comments) with `SELECT` or `WITH` — the
+  result is silently discarded; use a result-returning API instead.
+  `SELECT ... INTO` and `WITH`-wrapped DML are recognized as writes and
+  left alone.
+- **`unicode_literal_prefix` (#196).** Opt-in
+  (`ssl.diagnostics.unicodeLiteralPrefix`, default off): hints on `N'...'`
+  Unicode literal prefixes in embedded SQL.
+- **`unjustified_collate` (#197).** Opt-in
+  (`ssl.diagnostics.collateJustification`, default off): hints on
+  `COLLATE` in embedded SQL when no comment directly precedes the
+  containing statement.
 - **`invalid_limstypeex_comparison` (#187).** Errors on a comparison
   (`=`, `==`, `!=`, either operand order) between `LimsTypeEx(...)` and a
   string literal outside its fixed result set (NIL, STRING, NUMERIC,
