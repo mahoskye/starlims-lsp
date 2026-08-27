@@ -106,6 +106,8 @@ interface DiagnosticOptions {
   unusedVariables: boolean;
   unicodeLiteralPrefix: boolean;
   collateJustification: boolean;
+  spacedSkipCommas: boolean;
+  visibilityAnnotationUsage: boolean;
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
@@ -664,7 +666,42 @@ not a runtime rule.
 { "ssl.diagnostics.collateJustification": true }
 ```
 
-### 5.10 Suppression comments (in-file)
+### 5.10 ssl.diagnostics.spacedSkipCommas
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+When enabled, warns on skip-comma pairs written with whitespace between
+the commas (`, ,`) — valid syntax, but the adjacent form `,,` is the
+preferred style (code `spaced_skip_commas`, issue #193). Opt-in because
+the spacing is a stylistic preference.
+
+```json
+{ "ssl.diagnostics.spacedSkipCommas": true }
+```
+
+### 5.11 ssl.diagnostics.visibilityAnnotationUsage
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+When enabled, hints on every effective `/*@private;` / `/*@protected;`
+annotation (code `visibility_annotation_usage`, issue #198) for teams
+that prefer procedures unannotated. Annotations already flagged by the
+always-on `visibility_annotation` rule (class no-op, misplacement) are
+not double-reported.
+
+```json
+{ "ssl.diagnostics.visibilityAnnotationUsage": true }
+```
+
+### 5.12 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,
@@ -995,6 +1032,8 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.diagnostics.hungarianNotation` | `false` |
 | `ssl.diagnostics.unicodeLiteralPrefix` | `false` |
 | `ssl.diagnostics.collateJustification` | `false` |
+| `ssl.diagnostics.spacedSkipCommas` | `false` |
+| `ssl.diagnostics.visibilityAnnotationUsage` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |

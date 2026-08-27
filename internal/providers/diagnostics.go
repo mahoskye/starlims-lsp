@@ -76,6 +76,15 @@ type DiagnosticOptions struct {
 	// style rule (issue #197): flag COLLATE in embedded SQL when no
 	// comment directly precedes the containing statement.
 	CheckCollateJustification bool
+	// CheckSpacedSkipCommas enables the opt-in spaced_skip_commas style
+	// rule (issue #193): flag `, ,` skip-comma pairs written with
+	// whitespace between them — valid syntax, adjacent `,,` preferred.
+	CheckSpacedSkipCommas bool
+	// CheckVisibilityAnnotationUsage enables the opt-in
+	// visibility_annotation_usage style rule (issue #198): flag every
+	// effective /*@private; //*@protected; annotation for teams that
+	// prefer procedures unannotated.
+	CheckVisibilityAnnotationUsage bool
 
 	// IncludeDeclaredVariables carries variable names declared by the
 	// file's resolved :INCLUDE targets (full-splice semantics, supplied by
@@ -268,6 +277,11 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNotPreferredOperators(tokens)...)
 	diagnostics = append(diagnostics, checkLiteralTypeSafety(tokens, typeInfo)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
+	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens)...)
+	if opts.CheckSpacedSkipCommas {
+		diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens)...)
+	}
+	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
 	procedures := p.ExtractProcedures(ast)
 	diagnostics = append(diagnostics, checkProcedureParameterCounts(procedures)...)
@@ -275,7 +289,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkRedeclaredVariables(tokens)...)
 	diagnostics = append(diagnostics, checkNestedIIF(tokens)...)
 	diagnostics = append(diagnostics, checkNegativeLogic(tokens)...)
-	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens)...)
+	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens, opts.CheckVisibilityAnnotationUsage)...)
 	diagnostics = append(diagnostics, checkNilMethodCalls(tokens)...)
 
 	// Check for assignment to global variables.
@@ -4720,7 +4734,11 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 // checkVisibilityAnnotations validates /*@private; and /*@protected; annotations.
 // These annotations must appear on their own line before :PROCEDURE.
 // Per the style guide, they have NO effect on class methods (only script procedures).
-func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
+// flagUsage additionally emits the opt-in visibility_annotation_usage hint
+// (issue #198) on every annotation the base rule leaves alone, for teams
+// that prefer procedures unannotated. Exactly one of the two rules speaks
+// per annotation.
+func checkVisibilityAnnotations(tokens []lexer.Token, flagUsage bool) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	inClass := false
@@ -4757,12 +4775,14 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 		}
 
 		// Check that it's followed by :PROCEDURE
+		misplaced := false
 		nextIdx := nextSignificantTokenIndex(tokens, i+1)
 		if nextIdx >= 0 {
 			nextToken := tokens[nextIdx]
 			if nextToken.Type == lexer.TokenKeyword {
 				normalized := strings.ToUpper(strings.TrimPrefix(nextToken.Text, ":"))
 				if normalized != "PROCEDURE" {
+					misplaced = true
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityWarning,
 						Range:    tokenToRange(token),
@@ -4772,6 +4792,15 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 					})
 				}
 			}
+		}
+		if flagUsage && !misplaced {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityHint,
+				Range:    tokenToRange(token),
+				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' - this team convention prefers procedures unannotated", content),
+				Source:   "ssl-lsp",
+				Code:     CodeVisibilityAnnotationUsage,
+			})
 		}
 	}
 
@@ -6444,6 +6473,203 @@ func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
 			Code:     CodeUnjustifiedCollate,
 		})
 	})
+
+	return diagnostics
+}
+
+// checkTrailingSkipCommas flags skip-commas immediately preceding a call's
+// closing parenthesis (diag.trailing_skip_commas, issue #193): trailing
+// skipped arguments are unnecessary — the runtime pads missing trailing
+// arguments with NIL, so `Foo(a,,)` is `Foo(a)`. The range covers the
+// comma run.
+func checkTrailingSkipCommas(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+		openIdx := nextSignificantTokenIndex(tokens, i+1)
+		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
+			continue
+		}
+		depth := 0
+		closeIdx := -1
+		for j := openIdx; j < len(tokens); j++ {
+			if tokens[j].Type != lexer.TokenPunctuation {
+				continue
+			}
+			switch tokens[j].Text {
+			case "(":
+				depth++
+			case ")":
+				depth--
+				if depth == 0 {
+					closeIdx = j
+				}
+			}
+			if closeIdx >= 0 {
+				break
+			}
+		}
+		if closeIdx < 0 {
+			continue
+		}
+		// Collect the run of commas directly before the close paren.
+		firstComma, lastComma := -1, -1
+		for j := previousSignificantTokenIndex(tokens, closeIdx-1); j > openIdx; j = previousSignificantTokenIndex(tokens, j-1) {
+			if tokens[j].Type != lexer.TokenPunctuation || tokens[j].Text != "," {
+				break
+			}
+			if lastComma < 0 {
+				lastComma = j
+			}
+			firstComma = j
+		}
+		if firstComma < 0 {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityHint,
+			Range: Range{
+				Start: tokenToRange(tokens[firstComma]).Start,
+				End:   tokenToRange(tokens[lastComma]).End,
+			},
+			Message: "Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them",
+			Source:  "ssl-lsp",
+			Code:    CodeTrailingSkipCommas,
+		})
+	}
+
+	return diagnostics
+}
+
+// checkSpacedSkipCommas flags skip-comma pairs written with whitespace
+// between them (diag.spaced_skip_commas, issue #193). Opt-in style rule:
+// `, ,` is valid syntax, but the adjacent form `,,` makes the skipped
+// argument visually deliberate. One diagnostic per run of spaced commas.
+func checkSpacedSkipCommas(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i].Type != lexer.TokenPunctuation || tokens[i].Text != "," {
+			continue
+		}
+		// Extend a run of commas where at least one adjacent pair has
+		// whitespace (and nothing else) between the commas.
+		last := i
+		spaced := false
+		for j := last + 1; j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenWhitespace {
+				continue
+			}
+			if tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "," {
+				if j > last+1 {
+					spaced = true
+				}
+				last = j
+				continue
+			}
+			break
+		}
+		if !spaced {
+			i = last
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range: Range{
+				Start: tokenToRange(tokens[i]).Start,
+				End:   tokenToRange(tokens[last]).End,
+			},
+			Message: "Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate",
+			Source:  "ssl-lsp",
+			Code:    CodeSpacedSkipCommas,
+		})
+		i = last
+	}
+
+	return diagnostics
+}
+
+// checkFormatArgNotArray flags sFmt:Format calls whose replacement values
+// are not passed as a single array (diag.format_arg_not_array, issue #194):
+// Format takes ONE array holding every replacement value, even for a single
+// placeholder. Hungarian-heuristic detection (see #184 for the typed
+// future): the receiver must be an s-prefixed identifier, and the second
+// argument must be a provably-scalar single token — a string, a number, or
+// an identifier without the array prefix. Calls with more than two
+// arguments flag unconditionally.
+func checkFormatArgNotArray(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	hungarianPrefix := func(name string) byte {
+		trimmed := strings.TrimLeft(name, "_")
+		if trimmed == "" {
+			return 0
+		}
+		return byte(unicode.ToLower(rune(trimmed[0])))
+	}
+	// The receiver must have the full Hungarian string shape — `s` followed
+	// by an uppercase letter (sFmt, sMsg). A bare initial `s` is not
+	// enough: `String:Format(...)` is the .NET String class, whose Format
+	// is legitimately variadic (corpus-observed).
+	isHungarianStringName := func(name string) bool {
+		trimmed := strings.TrimLeft(name, "_")
+		if len(trimmed) < 2 || (trimmed[0] != 's' && trimmed[0] != 'S') {
+			return false
+		}
+		return unicode.IsUpper(rune(trimmed[1]))
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier || !strings.EqualFold(token.Text, "Format") {
+			continue
+		}
+		colonIdx := previousSignificantTokenIndex(tokens, i-1)
+		if colonIdx < 0 || tokens[colonIdx].Type != lexer.TokenPunctuation || tokens[colonIdx].Text != ":" {
+			continue
+		}
+		recvIdx := previousSignificantTokenIndex(tokens, colonIdx-1)
+		if recvIdx < 0 || tokens[recvIdx].Type != lexer.TokenIdentifier || !isHungarianStringName(tokens[recvIdx].Text) {
+			continue
+		}
+		openIdx := nextSignificantTokenIndex(tokens, i+1)
+		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
+			continue
+		}
+		argStarts, argEnds, _ := parseTopLevelCallArguments(tokens, openIdx)
+		if len(argStarts) < 2 {
+			continue
+		}
+		flag := func(idx int) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(tokens[idx]),
+				Message:  fmt.Sprintf("%s:Format takes ONE array holding every replacement value - wrap the values in braces: %s:Format(template, {...})", tokens[recvIdx].Text, tokens[recvIdx].Text),
+				Source:   "ssl-lsp",
+				Code:     CodeFormatArgNotArray,
+			})
+		}
+		if len(argStarts) > 2 {
+			if argStarts[1] >= 0 {
+				flag(argStarts[1])
+			}
+			continue
+		}
+		start, end := argStarts[1], argEnds[1]
+		if start < 0 || start != end {
+			continue
+		}
+		switch tokens[start].Type {
+		case lexer.TokenString, lexer.TokenNumber:
+			flag(start)
+		case lexer.TokenIdentifier:
+			if hungarianPrefix(tokens[start].Text) != 'a' && !strings.EqualFold(tokens[start].Text, "NIL") {
+				flag(start)
+			}
+		}
+	}
 
 	return diagnostics
 }

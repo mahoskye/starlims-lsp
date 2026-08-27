@@ -48,6 +48,11 @@ type DiagnosticsSettings struct {
 	// unjustified_collate (issue #197). Both default off.
 	UnicodeLiteralPrefix *bool `json:"unicodeLiteralPrefix"`
 	CollateJustification *bool `json:"collateJustification"`
+	// SpacedSkipCommas / VisibilityAnnotationUsage toggle the opt-in
+	// style rules spaced_skip_commas (issue #193) and
+	// visibility_annotation_usage (issue #198). Both default off.
+	SpacedSkipCommas          *bool `json:"spacedSkipCommas"`
+	VisibilityAnnotationUsage *bool `json:"visibilityAnnotationUsage"`
 	HungarianPrefixes *[]string          `json:"hungarianPrefixes"`
 	Globals           *[]string          `json:"globals"`
 	MaxBlockDepth     *int               `json:"maxBlockDepth"`
@@ -474,6 +479,8 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.CheckUnusedVars, diagnostics.UnusedVariables)
 		applyOptional(&s.settings.Diagnostics.CheckUnicodeLiteralPrefix, diagnostics.UnicodeLiteralPrefix)
 		applyOptional(&s.settings.Diagnostics.CheckCollateJustification, diagnostics.CollateJustification)
+		applyOptional(&s.settings.Diagnostics.CheckSpacedSkipCommas, diagnostics.SpacedSkipCommas)
+		applyOptional(&s.settings.Diagnostics.CheckVisibilityAnnotationUsage, diagnostics.VisibilityAnnotationUsage)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)

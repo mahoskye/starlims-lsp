@@ -57,6 +57,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `exitwhile_outside_loop` | :EXITWHILE outside a :WHILE loop | error | authoritative | active | [diag.exitwhile_outside_loop](../../catalog/diagnostics/exitwhile_outside_loop.md) |
 | `finally_empty` | Empty :FINALLY block | error | tool | active | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
 | `for_numeric_values` | :FOR loop parts must be numeric | warning | style_only | active | [diag.for_numeric_values](../../catalog/diagnostics/for_numeric_values.md) |
+| `format_arg_not_array` | sFmt:Format called with a scalar instead of the values array | warning | tool | active | [diag.format_arg_not_array](../../catalog/diagnostics/format_arg_not_array.md) |
 | `global_assignment` | Assignment to a global variable | error | tool | active | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
 | `hungarian_notation` | Missing Hungarian notation prefix | warning | advisory | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
 | `identifier_too_long` | Identifier exceeds style-guide length limit | info | tool | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
@@ -103,9 +104,11 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
+| `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | warning | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
 | `sql_injection` | String concatenation in a SQL call argument | warning | advisory | active | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
 | `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
 | `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
+| `trailing_skip_commas` | Trailing skip-commas before a call's closing parenthesis | hint | tool | active | [diag.trailing_skip_commas](../../catalog/diagnostics/trailing_skip_commas.md) |
 | `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
 | `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
 | `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | tool | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
@@ -121,4 +124,5 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | tool | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
 | `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | tool | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
+| `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | hint | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
 | `zero_based_array_index` | Array indexed with literal 0 | error | tool | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

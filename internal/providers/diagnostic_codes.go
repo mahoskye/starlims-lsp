@@ -132,4 +132,8 @@ const (
 	CodeRunSQLNonDML                = "runsql_non_dml"
 	CodeUnicodeLiteralPrefix        = "unicode_literal_prefix"
 	CodeUnjustifiedCollate          = "unjustified_collate"
+	CodeTrailingSkipCommas          = "trailing_skip_commas"
+	CodeSpacedSkipCommas            = "spaced_skip_commas"
+	CodeFormatArgNotArray           = "format_arg_not_array"
+	CodeVisibilityAnnotationUsage   = "visibility_annotation_usage"
 )

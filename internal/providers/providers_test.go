@@ -9351,3 +9351,175 @@ aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN"
 		t.Fatalf("expected unjustified_collate on line 2 only (0-indexed), got %v", lines)
 	}
 }
+
+func TestGetDiagnostics_TrailingSkipCommasFlagged(t *testing.T) {
+	// diag.trailing_skip_commas (issue #193): comma runs directly before
+	// a call's ')' are unnecessary — the runtime NIL-pads trailing args.
+	code := `:PROCEDURE Main;
+:DECLARE x;
+x := DoProc("Helper", {1},,);
+CallMe(1,);
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeTrailingSkipCommas {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 2 || lines[0] != 2 || lines[1] != 3 {
+		t.Fatalf("expected trailing_skip_commas on lines 2 and 3 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_TrailingSkipCommasNotFlagged(t *testing.T) {
+	// Interior skips are positional placeholders; array literals are out
+	// of scope entirely (a trailing comma there changes the array).
+	code := `:PROCEDURE Main;
+:DECLARE x, aList;
+CallMe(1,, 3);
+x := DoProc("Helper", {1});
+aList := {1, 2,};
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeTrailingSkipCommas {
+			t.Errorf("unexpected trailing_skip_commas at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_SpacedSkipCommasOptIn(t *testing.T) {
+	// diag.spaced_skip_commas (issue #193): off by default; when enabled,
+	// flags `, ,` runs once and leaves adjacent `,,` and ordinary
+	// separators alone.
+	code := `:PROCEDURE Main;
+CallMe(1, , 3);
+CallMe(1,, 3);
+CallMe(1, 2, 3);
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeSpacedSkipCommas {
+			t.Fatalf("spaced_skip_commas fired with the setting off: %s", d.Message)
+		}
+	}
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckSpacedSkipCommas = true
+	var lines []int
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeSpacedSkipCommas {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 1 {
+		t.Fatalf("expected spaced_skip_commas on line 1 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_FormatArgNotArrayFlagged(t *testing.T) {
+	// diag.format_arg_not_array (issue #194): scalar single-token second
+	// argument on an s-prefixed receiver; >2 args flags unconditionally.
+	code := `:PROCEDURE Greet;
+:PARAMETERS sFirst, sLast;
+:DECLARE sFmt, sMsg;
+sFmt := "{0} {1}";
+sMsg := sFmt:Format("Hello {0}", sFirst);
+sMsg := sFmt:Format("N {0}", 42);
+sMsg := sFmt:Format("{0} {1}", sFirst, sLast);
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	for _, d := range diagnostics {
+		if d.Code == CodeFormatArgNotArray {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 3 || lines[0] != 4 || lines[1] != 5 || lines[2] != 6 {
+		t.Fatalf("expected format_arg_not_array on lines 4, 5, 6 (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_FormatArgNotArrayNotFlagged(t *testing.T) {
+	// Array literal, a-prefixed identifier, multi-token expressions, NIL,
+	// non-s receivers, and single-argument calls are all out of scope.
+	code := `:PROCEDURE Greet;
+:PARAMETERS sName;
+:DECLARE sFmt, sMsg, aArgs, oDoc, sOut;
+sFmt := "Hello {0}";
+aArgs := {sName};
+sMsg := sFmt:Format("Hello {0}", {sName});
+sMsg := sFmt:Format("Hello {0}", aArgs);
+sMsg := sFmt:Format("Hello {0}", oDoc:aList);
+sMsg := sFmt:Format("Hello {0}", NIL);
+sMsg := sFmt:Format(sName);
+sOut := oDoc:Format("plain", "utf-8");
+sOut := String:Format("Completed in {0:N3}s - {1}", 12, sName);
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeFormatArgNotArray {
+			t.Errorf("unexpected format_arg_not_array at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}
+
+func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
+	// diag.visibility_annotation_usage (issue #198): off by default; when
+	// enabled, hints on effective annotations only — a class-file
+	// annotation keeps its visibility_annotation warning and gets no hint.
+	script := `/*@private;
+:PROCEDURE Helper;
+:RETURN 1;
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+		if d.Code == CodeVisibilityAnnotationUsage {
+			t.Fatalf("visibility_annotation_usage fired with the setting off: %s", d.Message)
+		}
+	}
+
+	opts := DefaultDiagnosticOptions()
+	opts.CheckVisibilityAnnotationUsage = true
+	var hits int
+	for _, d := range GetDiagnostics(script, opts) {
+		if d.Code == CodeVisibilityAnnotationUsage {
+			hits++
+			if d.Range.Start.Line != 0 {
+				t.Errorf("expected hint on line 0, got %d", d.Range.Start.Line)
+			}
+		}
+	}
+	if hits != 1 {
+		t.Fatalf("expected one visibility_annotation_usage hint, got %d", hits)
+	}
+
+	classFile := `:CLASS Widget;
+
+/*@private;
+:PROCEDURE Helper;
+:RETURN 1;
+:ENDPROC;`
+
+	var usage, noop int
+	for _, d := range GetDiagnostics(classFile, opts) {
+		switch d.Code {
+		case CodeVisibilityAnnotationUsage:
+			usage++
+		case CodeVisibilityAnnotation:
+			noop++
+		}
+	}
+	if usage != 0 || noop != 1 {
+		t.Fatalf("class file: expected 0 usage hints and 1 visibility_annotation warning, got %d and %d", usage, noop)
+	}
+}
