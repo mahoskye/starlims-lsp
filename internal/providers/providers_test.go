@@ -9523,3 +9523,51 @@ func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
 		t.Fatalf("class file: expected 0 usage hints and 1 visibility_annotation warning, got %d and %d", usage, noop)
 	}
 }
+
+func TestGetDiagnostics_BuiltinExcessArgumentsFlagged(t *testing.T) {
+	// diag.builtin_excess_arguments (issue #200): surplus args beyond the
+	// inventory arity flag, ranged on the surplus span.
+	code := `:PROCEDURE Main;
+:DECLARE sPrefix, sText, nExtra, sNow;
+sPrefix := Left(sText, 10, nExtra);
+sNow := LimsTime(Today());
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var found []Diagnostic
+	for _, d := range diagnostics {
+		if d.Code == CodeBuiltinExcessArguments {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 2 || found[0].Range.Start.Line != 2 || found[1].Range.Start.Line != 3 {
+		t.Fatalf("expected builtin_excess_arguments on lines 2 and 3 (0-indexed), got %+v", found)
+	}
+	if !strings.Contains(found[0].Message, "at most 2") {
+		t.Errorf("expected Left's accepted count in message, got %q", found[0].Message)
+	}
+}
+
+func TestGetDiagnostics_BuiltinExcessArgumentsNotFlagged(t *testing.T) {
+	// In-arity calls, nested calls, variadic Eval, qualified method
+	// calls, unknown functions, and trailing skip-commas stay silent.
+	code := `:PROCEDURE Main;
+:DECLARE sPrefix, sText, oDoc, sOut, fnAdd, nSum;
+sPrefix := Left(sText, 10);
+sPrefix := AllTrim(Upper(Left(sText, 10)));
+sOut := oDoc:Left("custom", "method", "args");
+fnAdd := {|a, b, c, d, e| a + b + c + d + e};
+nSum := Eval(fnAdd, 1, 2, 3, 4, 5);
+nSum := MyOwnHelper(1, 2, 3, 4, 5, 6, 7, 8);
+sPrefix := Left(sText, 10,);
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	for _, d := range diagnostics {
+		if d.Code == CodeBuiltinExcessArguments {
+			t.Errorf("unexpected builtin_excess_arguments at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+}

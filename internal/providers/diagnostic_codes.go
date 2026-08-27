@@ -136,4 +136,5 @@ const (
 	CodeSpacedSkipCommas            = "spaced_skip_commas"
 	CodeFormatArgNotArray           = "format_arg_not_array"
 	CodeVisibilityAnnotationUsage   = "visibility_annotation_usage"
+	CodeBuiltinExcessArguments      = "builtin_excess_arguments"
 )

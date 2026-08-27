@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every effective `/*@private;`//`/*@protected;` annotation for teams
   that prefer procedures unannotated; never double-reports annotations
   the always-on `visibility_annotation` rule already flags.
+- **`builtin_excess_arguments` (#200).** Warns on a builtin call passing
+  more arguments than the element inventory's signature accepts — the
+  SSL compiler silently drops the surplus (never evaluated), so wrong
+  arity survives indefinitely. Variadic and unknown-arity builtins never
+  flag; `:`-qualified method calls are excluded.
 - **`invalid_limstypeex_comparison` (#187).** Errors on a comparison
   (`=`, `==`, `!=`, either operand order) between `LimsTypeEx(...)` and a
   string literal outside its fixed result set (NIL, STRING, NUMERIC,
