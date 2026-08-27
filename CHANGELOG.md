@@ -35,6 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`ssl.diagnostics.collateJustification`, default off): hints on
   `COLLATE` in embedded SQL when no comment directly precedes the
   containing statement.
+- **`trailing_skip_commas` (#193).** Hints on skip-commas immediately
+  before a call's `)` — the runtime NIL-pads missing trailing arguments,
+  so they add nothing. Interior skips (positional placeholders) and array
+  literals are untouched.
+- **`spaced_skip_commas` (#193).** Opt-in
+  (`ssl.diagnostics.spacedSkipCommas`, default off): warns on `, ,`
+  skip-comma pairs written with whitespace between them; the adjacent
+  `,,` form is the preferred style.
+- **`format_arg_not_array` (#194).** Warns when `sFmt:Format` receives a
+  provably scalar second argument (or more than two arguments) — Format
+  takes ONE array holding every replacement value. Hungarian-heuristic on
+  both sides; `String:Format` (.NET, legitimately variadic) is excluded.
+- **`visibility_annotation_usage` (#198).** Opt-in
+  (`ssl.diagnostics.visibilityAnnotationUsage`, default off): hints on
+  every effective `/*@private;`//`/*@protected;` annotation for teams
+  that prefer procedures unannotated; never double-reports annotations
+  the always-on `visibility_annotation` rule already flags.
 - **`invalid_limstypeex_comparison` (#187).** Errors on a comparison
   (`=`, `==`, `!=`, either operand order) between `LimsTypeEx(...)` and a
   string literal outside its fixed result set (NIL, STRING, NUMERIC,
