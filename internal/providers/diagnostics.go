@@ -282,6 +282,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens)...)
 	}
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens)...)
+	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
 	procedures := p.ExtractProcedures(ast)
 	diagnostics = append(diagnostics, checkProcedureParameterCounts(procedures)...)
@@ -6669,6 +6670,109 @@ func checkFormatArgNotArray(tokens []lexer.Token) []Diagnostic {
 				flag(start)
 			}
 		}
+	}
+
+	return diagnostics
+}
+
+// builtinMaxArity maps lowercase builtin names to the maximum argument
+// count their published signature accepts. Functions whose signature is
+// variadic ("..."), unparseable, or absent are NOT in the map — unknown
+// arity must never flag. Built once from both signature sources: the
+// generated signature string (counts optional [x] parameters) and the
+// curated parameter list, taking the larger of the two.
+var builtinMaxArity = buildBuiltinMaxArity()
+
+func buildBuiltinMaxArity() map[string]int {
+	arity := make(map[string]int, len(constants.GeneratedFunctionSummaries))
+	for lower, meta := range constants.GeneratedFunctionSummaries {
+		sig := meta.Signature
+		open := strings.IndexByte(sig, '(')
+		close := strings.LastIndexByte(sig, ')')
+		if open < 0 || close <= open {
+			continue
+		}
+		inner := strings.TrimSpace(sig[open+1 : close])
+		if strings.Contains(inner, "...") {
+			continue
+		}
+		count := 0
+		if inner != "" {
+			depth := 0
+			count = 1
+			for _, r := range inner {
+				switch r {
+				case '(', '[', '{':
+					depth++
+				case ')', ']', '}':
+					depth--
+				case ',':
+					if depth == 0 {
+						count++
+					}
+				}
+			}
+		}
+		if curated, ok := constants.SSLFunctionSignatures[lower]; ok && len(curated.Parameters) > count {
+			count = len(curated.Parameters)
+		}
+		arity[lower] = count
+	}
+	return arity
+}
+
+// checkBuiltinExcessArguments flags builtin calls that pass more arguments
+// than the builtin's published signature accepts
+// (diag.builtin_excess_arguments, issue #200): the SSL compiler silently
+// drops surplus arguments — they are never evaluated and produce no
+// warning — so `Left(sText, 10, nExtra)` compiles cleanly and behaves as
+// `Left(sText, 10)`. The range spans the surplus arguments.
+func checkBuiltinExcessArguments(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+		maxArgs, known := builtinMaxArity[strings.ToLower(token.Text)]
+		if !known {
+			continue
+		}
+		// A `:`-qualified name is a method call on some object, not the
+		// builtin (oDoc:Left(...) is the object's Left).
+		if prev := previousSignificantTokenIndex(tokens, i-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+			continue
+		}
+		openIdx := nextSignificantTokenIndex(tokens, i+1)
+		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
+			continue
+		}
+		argStarts, argEnds, _ := parseTopLevelCallArguments(tokens, openIdx)
+		if len(argStarts) <= maxArgs {
+			continue
+		}
+		// Anchor on the first surplus argument; a skipped (-1) surplus
+		// argument anchors on the whole call name instead.
+		anchor := tokenToRange(token)
+		if argStarts[maxArgs] >= 0 {
+			anchor = Range{
+				Start: tokenToRange(tokens[argStarts[maxArgs]]).Start,
+				End:   tokenToRange(tokens[argEnds[len(argEnds)-1]]).End,
+			}
+		}
+		plural := "s"
+		if len(argStarts)-maxArgs == 1 {
+			plural = ""
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    anchor,
+			Message: fmt.Sprintf("'%s' accepts at most %d argument(s) - the compiler silently drops the surplus %d argument%s (never evaluated)",
+				constants.GeneratedFunctionSummaries[strings.ToLower(token.Text)].Title, maxArgs, len(argStarts)-maxArgs, plural),
+			Source: "ssl-lsp",
+			Code:   CodeBuiltinExcessArguments,
+		})
 	}
 
 	return diagnostics
