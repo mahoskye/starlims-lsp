@@ -6,8 +6,12 @@ status: active
 authority: advisory
 schema_ref: lints.style_rules.no_nested_ternaries
 default_severity: info
+config:
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:

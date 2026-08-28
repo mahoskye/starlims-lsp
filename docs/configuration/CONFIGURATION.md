@@ -108,6 +108,7 @@ interface DiagnosticOptions {
   collateJustification: boolean;
   spacedSkipCommas: boolean;
   visibilityAnnotationUsage: boolean;
+  infoDiagnostics: boolean;
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
@@ -701,7 +702,27 @@ not double-reported.
 { "ssl.diagnostics.visibilityAnnotationUsage": true }
 ```
 
-### 5.12 Suppression comments (in-file)
+### 5.12 ssl.diagnostics.infoDiagnostics
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
+
+Enables the info severity tier. Info diagnostics are advisory detail —
+style observations and idiom notes (loose vs strict equality, non-preferred
+operators, `{}` trailing arrays, C-style comment closers, ...) — aimed at
+assistant/LLM consumers and teams that want the full picture. They are
+dropped by default so the everyday surface stays errors/warnings/hints.
+A rule explicitly listed in `ssl.diagnostics.rules` always shows
+regardless of this gate. The `--validate` CLI mirrors this with `--info`.
+
+```json
+{ "ssl.diagnostics.infoDiagnostics": true }
+```
+
+### 5.13 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,
@@ -1034,6 +1055,7 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.diagnostics.collateJustification` | `false` |
 | `ssl.diagnostics.spacedSkipCommas` | `false` |
 | `ssl.diagnostics.visibilityAnnotationUsage` | `false` |
+| `ssl.diagnostics.infoDiagnostics` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |
