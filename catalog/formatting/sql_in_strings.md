@@ -79,6 +79,19 @@ history:
       of respaced, scalar-function names after '{fn' and SQL_* type
       names are uppercase, and escape interiors keep the author's
       identifier casing.
+  - date: 2026-08-28
+    ref: "issue #219 (style-review decisions)"
+    note: >-
+      2026-08-28 style-review decisions (issue #219, corpus owner):
+      identifierCase preserve|lower|upper added with preserve default
+      (force-folding is wrong on SQL Server CS collations and rewrites
+      the uppercase house style); 'compact' retired as a deprecated
+      alias for canonicalCompact; 'standard' now respects MaxLineLength
+      (proactive wrapping) with fixed one-level continuation indent
+      instead of open-paren alignment; rewrites always take the rule-F
+      multi-line form, never in-place padding; and the SELECT item after
+      a multi-line group starts a fresh continuation line so aliases
+      stay with their block (C3).
 issues: ["#81", "#82"]
 ---
 
@@ -104,8 +117,12 @@ are considered. Within the exception:
   and spacing (vs-code-ssl-formatter#64).
 - Single-line SQL that overflows the line, and any SQL string already
   containing newlines, is reflowed to the configured
-  `ssl.format.sql.style` / `ssl.format.sql.keywordCase` (defaults:
-  canonicalCompact, upper). The opening quote stays on the assignment line
+  `ssl.format.sql.style` / `ssl.format.sql.keywordCase` /
+  `ssl.format.sql.identifierCase` (defaults: canonicalCompact, upper,
+  preserve). A rewrite ALWAYS takes the rule-F multi-line form — a
+  changed string is never emitted as a padded single line (issue #219
+  decision: the string's runtime value changes only when real relayout
+  happens). The opening quote stays on the assignment line
   (rule F), the SQL starts on the next line with each clause indented by
   `ssl.format.sql.indentSize` spaces past the statement's base indent, and
   the closing quote lands on its own line at the base indent, glued to the

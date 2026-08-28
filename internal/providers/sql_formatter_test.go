@@ -941,37 +941,54 @@ func TestSQLFormatter_JoinOnMultipleConditions(t *testing.T) {
 
 // --- SQL keyword and identifier casing ---
 
-func TestSQLFormatter_IdentifierCasingLowercase(t *testing.T) {
-	// sql-canonical-compact-reference §1.24: identifiers lowercase
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
-
+func TestSQLFormatter_IdentifierCase(t *testing.T) {
+	// ssl.format.sql.identifierCase (issue #219 decision): default
+	// "preserve" — force-folding is dialect-conditional (SQL Server CS
+	// collations) and rewrites the corpus's uppercase house style;
+	// "lower" and "upper" remain as explicit opt-ins.
 	input := "SELECT OrderNo, TestCode FROM OrdTask WHERE Status = 1"
-	result := f.FormatSQL(input, "")
 
-	// Identifiers should be lowercased
-	if strings.Contains(result, "OrderNo") || strings.Contains(result, "TestCode") || strings.Contains(result, "OrdTask") {
-		t.Errorf("expected identifiers lowercased, got:\n%s", result)
+	cases := []struct {
+		mode string
+		want []string
+	}{
+		{"", []string{"OrderNo", "TestCode", "OrdTask"}}, // default preserve
+		{"preserve", []string{"OrderNo", "TestCode", "OrdTask"}},
+		{"lower", []string{"orderno", "testcode", "ordtask"}},
+		{"upper", []string{"ORDERNO", "TESTCODE", "ORDTASK"}},
 	}
-	// Keywords should be uppercased
-	if !strings.Contains(result, "SELECT") || !strings.Contains(result, "FROM") {
-		t.Errorf("expected keywords uppercased, got:\n%s", result)
+	for _, tc := range cases {
+		opts := DefaultSQLFormattingOptions()
+		opts.Style = "canonicalCompact"
+		if tc.mode != "" {
+			opts.IdentifierCase = tc.mode
+		}
+		result := NewSQLFormatter(opts).FormatSQL(input, "")
+		for _, w := range tc.want {
+			if !strings.Contains(result, w) {
+				t.Errorf("identifierCase=%q: expected %q in:\n%s", tc.mode, w, result)
+			}
+		}
+		if !strings.Contains(result, "SELECT") || !strings.Contains(result, "FROM") {
+			t.Errorf("identifierCase=%q: keywords must stay uppercased:\n%s", tc.mode, result)
+		}
 	}
 }
 
-// --- Compact style stays on one line ---
+// --- "compact" is a deprecated alias for canonicalCompact (issue #219) ---
 
-func TestSQLFormatter_CompactStyleSingleLine(t *testing.T) {
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "compact"
-	f := NewSQLFormatter(opts)
+func TestSQLFormatter_CompactAliasesCanonical(t *testing.T) {
+	input := "SELECT id, name FROM users WHERE status = 1 AND name = 'x'"
 
-	input := "SELECT id, name FROM users WHERE status = 1"
-	result := f.FormatSQL(input, "")
+	compact := DefaultSQLFormattingOptions()
+	compact.Style = "compact"
+	canonical := DefaultSQLFormattingOptions()
+	canonical.Style = "canonicalCompact"
 
-	if strings.Contains(result, "\n") {
-		t.Errorf("compact style should stay on one line for simple query, got:\n%s", result)
+	got := NewSQLFormatter(compact).FormatSQL(input, "")
+	want := NewSQLFormatter(canonical).FormatSQL(input, "")
+	if got != want {
+		t.Errorf("compact must alias canonicalCompact:\n--- compact ---\n%s\n--- canonical ---\n%s", got, want)
 	}
 }
 
@@ -1913,7 +1930,8 @@ func TestSQLFormatter_OverClauseFormatting(t *testing.T) {
 			want: "SELECT ROW_NUMBER() OVER (\n" +
 				"           PARTITION BY ordersection_name\n" +
 				"           ORDER BY testcode_sequences\n" +
-				"       ) AS rn, ordno\n" +
+				"       ) AS rn,\n" +
+				"       ordno\n" +
 				"FROM ordresult",
 		},
 		{
@@ -2518,7 +2536,8 @@ func TestSQLFormatter_OverClauseReviewRegressions(t *testing.T) {
 			want: "SELECT RATIO_TO_REPORT(resultvalue) OVER (\n" +
 				"           PARTITION BY testcode, analysisgroup\n" +
 				"           ORDER BY sampledate DESC, sampleno\n" +
-				"       ) AS ratio_share, ordno\n" +
+				"       ) AS ratio_share,\n" +
+				"       ordno\n" +
 				"FROM ordresult",
 		},
 	})

@@ -7,8 +7,14 @@ import (
 
 // SQLFormattingOptions configures SQL formatting.
 type SQLFormattingOptions struct {
-	Enabled          bool   // Enable SQL formatting
-	Style            string // "standard", "canonicalCompact", "compact", "expanded"
+	Enabled bool   // Enable SQL formatting
+	Style   string // "standard", "canonicalCompact", "expanded" ("compact" is a deprecated alias for canonicalCompact)
+	// IdentifierCase controls table/column/alias casing in reflowed SQL:
+	// "preserve" (default — safe on every dialect, including SQL Server
+	// case-sensitive collations, and matches the corpus's uppercase house
+	// style), "lower", or "upper". Double-quoted identifiers and ODBC
+	// escape interiors are always preserved (issues #217/#219).
+	IdentifierCase   string
 	KeywordCase      string // "upper", "lower", "preserve"
 	IndentSize       int    // Spaces per indent level
 	MaxLineLength    int    // Max line length for wrapping
@@ -27,6 +33,7 @@ func DefaultSQLFormattingOptions() SQLFormattingOptions {
 	return SQLFormattingOptions{
 		Enabled:          true,
 		Style:            "canonicalCompact",
+		IdentifierCase:   "preserve",
 		KeywordCase:      "upper",
 		IndentSize:       4,
 		MaxLineLength:    90,
@@ -93,6 +100,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// author's casing (never identifier-folded).
 	odbcDepth := 0
 	odbcExpect := "" // "marker" after '{', "fnname" after '{fn'
+	// C3 (issue #219): when a parenthesized group broke across lines
+	// (multi-line DECODE/CASE/function), the following comma-separated
+	// SELECT item starts a fresh continuation line instead of packing
+	// after the closing paren — the alias stays with its block, the next
+	// column stays findable.
+	parenBrokeInside := []bool{}
+	groupJustClosedMultiline := false
+	pendingItemBreak := false
 
 	subqueryParenDepths := make(map[int]bool)
 	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
@@ -344,6 +359,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			if style == "" {
 				style = "standard"
 			}
+			// "compact" produced an internally inconsistent half-multiline
+			// layout and is retired (issue #219 decision): it is accepted
+			// as a deprecated alias for canonicalCompact.
+			if style == "compact" {
+				style = "canonicalCompact"
+			}
 
 			// Break conditions for major clauses (all styles except compact)
 			if style != "compact" && SQLBreakBeforeKeywords[upperText] && t.Type == SQLTokenKeyword {
@@ -505,7 +526,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// the projection later and stranding pieces of it.
 			if !needsBreak && prev != nil && prev.Text == "," &&
 				inSelectColumns && parenDepth == 0 && f.opts.MaxLineLength > 0 &&
-				(style == "canonicalCompact" || style == "expanded") {
+				(style == "canonicalCompact" || style == "expanded" || style == "standard") {
 				end := f.projectionEndIndex(nonWSTokens, i)
 				projLen := f.projectionRenderLen(nonWSTokens, i, end)
 				spaceLen := 0
@@ -518,9 +539,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				}
 			}
 
-			// Proactive line wrapping (only for canonicalCompact and expanded)
+			// Proactive line wrapping — canonicalCompact, expanded, and
+			// (issue #219 decision) standard, which previously ignored
+			// MaxLineLength entirely and emitted 130+ column predicate
+			// lines.
 			if !needsBreak && prev != nil && f.opts.MaxLineLength > 0 &&
-				(style == "canonicalCompact" || style == "expanded") {
+				(style == "canonicalCompact" || style == "expanded" || style == "standard") {
 				spaceLen := 0
 				if f.shouldAddSpace(prev, &t, prevPrevToken) {
 					spaceLen = 1
@@ -562,7 +586,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					// Rule D: when wrapping inside a non-subquery argument list,
 					// hang-indent under the innermost opening '('.
 					hangCol := -1
-					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] {
+					if len(parenOpenCols) > 0 && !subqueryParenDepths[parenDepth] &&
+						style != "standard" {
+						// standard breaks-and-indents one fixed level
+						// instead of hanging under the open paren —
+						// paren-column alignment drifted continuations to
+						// ~column 70 (issue #219 decision).
 						hangCol = parenOpenCols[len(parenOpenCols)-1]
 					}
 					if closerIndent, ok := blockParens[parenDepth]; ok {
@@ -694,7 +723,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				if decodeBreaks && decodeArgCount%2 == 1 {
 					needsBreak = true
 					extraIndent = ""
-					if len(parenOpenCols) > 0 {
+					styleNow := f.opts.Style
+					if styleNow == "standard" {
+						// Fixed one-level indent for standard (issue #219);
+						// paren-column alignment stays the canonical look.
+						extraIndent = f.indentString
+					} else if len(parenOpenCols) > 0 {
 						spaces := parenOpenCols[len(parenOpenCols)-1] - len(baseIndent) - len(f.indentString)*parenDepth
 						if spaces < 0 {
 							spaces = 0
@@ -751,6 +785,21 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			needsBreak = true
 			pendingLineCommentBreak = false
 		}
+		// C3: the item after a multi-line group's comma starts fresh,
+		// aligned with the SELECT column continuation.
+		if pendingItemBreak && prev != nil && prev.Text == "," {
+			needsBreak = true
+			if extraIndent == "" {
+				extraIndent = strings.Repeat(" ", 7)
+			}
+			pendingItemBreak = false
+		}
+		if needsBreak {
+			if len(parenBrokeInside) > 0 {
+				parenBrokeInside[len(parenBrokeInside)-1] = true
+			}
+			groupJustClosedMultiline = false
+		}
 		if needsBreak {
 			if isSetOp {
 				result.WriteString("\n") // blank line before set operation
@@ -780,6 +829,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(" ")
 			currentLineLen++
 		}
+		if groupJustClosedMultiline {
+			if t.Text == "," && parenDepth == 0 && inSelectColumns {
+				pendingItemBreak = true
+				groupJustClosedMultiline = false
+			} else if t.Type != SQLTokenKeyword && t.Type != SQLTokenIdentifier && t.Text != ")" {
+				// anything other than the alias chain / comma / closer
+				// ends the window
+				groupJustClosedMultiline = false
+			}
+		}
 		tokStartCol := currentLineLen
 		result.WriteString(tokenText)
 		currentLineLen += len(tokenText)
@@ -791,6 +850,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// the calling function's start column so the OVER anchor resolves to
 		// the outer window function even mid-expression (issue #122).
 		if t.Text == "(" {
+			parenBrokeInside = append(parenBrokeInside, false)
 			parenOpenCols = append(parenOpenCols, currentLineLen)
 			funcCol := -1
 			if prev != nil && prev.Type == SQLTokenFunction {
@@ -804,6 +864,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 			parenFuncCols = append(parenFuncCols, funcCol)
 		} else if t.Text == ")" {
+			if len(parenBrokeInside) > 0 {
+				broke := parenBrokeInside[len(parenBrokeInside)-1]
+				parenBrokeInside = parenBrokeInside[:len(parenBrokeInside)-1]
+				if broke {
+					groupJustClosedMultiline = true
+					if len(parenBrokeInside) > 0 {
+						parenBrokeInside[len(parenBrokeInside)-1] = true
+					}
+				}
+			}
 			if len(parenOpenCols) > 0 {
 				parenOpenCols = parenOpenCols[:len(parenOpenCols)-1]
 			}
@@ -971,13 +1041,23 @@ func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
 		}
 	}
 
-	// Identifiers (table names, column names) stay lowercase,
-	// but preserve casing for double-quoted identifiers (external schema objects).
+	// Identifier casing follows ssl.format.sql.identifierCase — default
+	// "preserve": force-folding is dialect-conditional (wrong on SQL
+	// Server case-sensitive collations) and rewrites the corpus's
+	// uppercase house style (issue #219 decision). Double-quoted
+	// identifiers (external schema objects) are always preserved.
 	if t.Type == SQLTokenIdentifier {
 		if len(t.Text) >= 2 && t.Text[0] == '"' && t.Text[len(t.Text)-1] == '"' {
 			return t.Text
 		}
-		return strings.ToLower(t.Text)
+		switch f.opts.IdentifierCase {
+		case "lower":
+			return strings.ToLower(t.Text)
+		case "upper":
+			return strings.ToUpper(t.Text)
+		default: // "preserve"
+			return t.Text
+		}
 	}
 
 	return t.Text
@@ -1104,6 +1184,22 @@ func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseInd
 	}
 
 	formatted := f.FormatSQL(content, baseIndent+f.indentString)
+
+	// A rewrite always takes the rule-F multi-line form (issue #219
+	// decision): the old path emitted changed-but-single-line output
+	// inline, silently padding the string's runtime value with no layout
+	// gain. Unchanged content still returns inline.
+	if formatted != content && !strings.Contains(formatted, "\n") {
+		formatted = baseIndent + f.indentString + strings.TrimSpace(formatted)
+		var result strings.Builder
+		result.WriteByte(quoteChar)
+		result.WriteString("\n")
+		result.WriteString(formatted)
+		result.WriteString("\n")
+		result.WriteString(baseIndent)
+		result.WriteByte(closeChar)
+		return result.String()
+	}
 
 	// Check if formatting produced multi-line output
 	if strings.Contains(formatted, "\n") {
