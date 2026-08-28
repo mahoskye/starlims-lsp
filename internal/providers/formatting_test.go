@@ -2759,3 +2759,37 @@ func TestFormatDocument_SQLLineCommentForcesBreak(t *testing.T) {
 		}
 	}
 }
+
+// ODBC escapes are atomic spans (issue #217): '}' separates from a
+// following alias, the scalar-function name after {fn and SQL_* tokens
+// uppercase, interior identifiers keep the author's casing, and a
+// placeholder's interior — quoted content included — is never respaced.
+func TestFormatDocument_ODBCEscapesAndPlaceholders(t *testing.T) {
+	input := `aRows := SQLExecute("select {fn ifnull(sc.owner,'')} as owner, {fn convert(SC.ITEMID, SQL_VARCHAR)}itemid from limssourcecontrol sc where sc.owner = ?sUser? and sc.moddate > {fn timestampadd(SQL_TSI_DAY, -30, current_timestamp)} and sc.created = ?'<<username>>'?");`
+	got := input
+	if e := FormatDocument(input, DefaultFormattingOptions()); len(e) > 0 {
+		got = e[0].NewText
+	}
+	for _, want := range []string{
+		"{fn IFNULL(sc.owner, '')} AS owner",
+		"{fn CONVERT(SC.ITEMID, SQL_VARCHAR)} itemid",
+		"{fn TIMESTAMPADD(SQL_TSI_DAY, -30, current_timestamp)}",
+		"?'<<username>>'?",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	for _, bad := range []string{"}AS", "}itemid", "sql_varchar", "? '<<username>>' ?"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("found %q (should not appear) in:\n%s", bad, got)
+		}
+	}
+	again := got
+	if e := FormatDocument(got, DefaultFormattingOptions()); len(e) > 0 {
+		again = e[0].NewText
+	}
+	if again != got {
+		t.Errorf("not idempotent:\n%s\n--- pass2 ---\n%s", got, again)
+	}
+}
