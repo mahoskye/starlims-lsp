@@ -73,11 +73,11 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
 | `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
 | `label_keyword_form` | Label keyword written in the wrong case | error | tool | active | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
-| `limit_public_vars` | PUBLIC variables discouraged | warning | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
+| `limit_public_vars` | PUBLIC variables discouraged | info | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
 | `loop_in_finally` | LOOP inside a FINALLY block | error | authoritative | active | [diag.loop_in_finally](../../catalog/diagnostics/loop_in_finally.md) |
 | `loop_outside_loop` | :LOOP outside a :WHILE or :FOR loop | error | authoritative | active | [diag.loop_outside_loop](../../catalog/diagnostics/loop_outside_loop.md) |
-| `max_block_depth` | Block nesting exceeds the configured maximum depth | warning | advisory | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
-| `max_params_warning` | Procedure has too many parameters | warning | style_only | active | [diag.max_params_warning](../../catalog/diagnostics/max_params_warning.md) |
+| `max_block_depth` | Block nesting exceeds the configured maximum depth | info | advisory | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
+| `max_params_warning` | Procedure has too many parameters | info | style_only | active | [diag.max_params_warning](../../catalog/diagnostics/max_params_warning.md) |
 | `me_outside_class` | Me used outside a class definition | error | tool | active | [diag.me_outside_class](../../catalog/diagnostics/me_outside_class.md) |
 | `mismatched_block_end` | Block end keyword does not match the open block | error | tool | active | [diag.mismatched_block_end](../../catalog/diagnostics/mismatched_block_end.md) |
 | `mismatched_delimiter` | Closing delimiter does not match the open one | error | tool | active | [diag.mismatched_delimiter](../../catalog/diagnostics/mismatched_delimiter.md) |
@@ -85,7 +85,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `mixed_error_handling_families` | Legacy :ERROR/:RESUME mixed with :TRY/:CATCH in one procedure | warning | tool | active | [diag.mixed_error_handling_families](../../catalog/diagnostics/mixed_error_handling_families.md) |
 | `mixed_type_operator` | Mixed operand types in a '+' operation | warning | tool | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
 | `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | warning | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
-| `negative_logic` | Negated IF condition with an ELSE branch | hint | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
+| `negative_logic` | Negated IF condition with an ELSE branch | info | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
 | `nested_iif` | IIF call nested inside another IIF call | info | advisory | active | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
 | `nil_in_operations` | NIL literal in an arithmetic or string operation | warning | style_only | active | [diag.nil_in_operations](../../catalog/diagnostics/nil_in_operations.md) |
 | `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
@@ -106,7 +106,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
-| `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | warning | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
+| `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
 | `sql_injection` | String concatenation in a SQL call argument | warning | advisory | active | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
 | `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
 | `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
@@ -117,8 +117,8 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
 | `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
 | `undeclared_variable` | Use of an undeclared variable | warning | tool | active | [diag.undeclared_variable](../../catalog/diagnostics/undeclared_variable.md) |
-| `unicode_literal_prefix` | N'...' Unicode literal prefix in embedded SQL | hint | style_only | active | [diag.unicode_literal_prefix](../../catalog/diagnostics/unicode_literal_prefix.md) |
-| `unjustified_collate` | COLLATE in embedded SQL without a justification comment | hint | style_only | active | [diag.unjustified_collate](../../catalog/diagnostics/unjustified_collate.md) |
+| `unicode_literal_prefix` | N'...' Unicode literal prefix in embedded SQL | info | style_only | active | [diag.unicode_literal_prefix](../../catalog/diagnostics/unicode_literal_prefix.md) |
+| `unjustified_collate` | COLLATE in embedded SQL without a justification comment | info | style_only | active | [diag.unjustified_collate](../../catalog/diagnostics/unjustified_collate.md) |
 | `unknown_keyword` | Unknown colon-prefixed keyword | warning | tool | active | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
 | `unknown_token` | Unknown token | warning | tool | active | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
 | `unmatched_block_end` | Block-end keyword with no open block | error | tool | active | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |
@@ -126,5 +126,5 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | tool | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
 | `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | tool | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
-| `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | hint | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
+| `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
 | `zero_based_array_index` | Array indexed with literal 0 | error | tool | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

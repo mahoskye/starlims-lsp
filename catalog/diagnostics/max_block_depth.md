@@ -5,11 +5,13 @@ kind: diagnostic
 status: active
 authority: advisory
 schema_ref: lints.style_rules.limit_block_depth
-default_severity: warning
+default_severity: info
 config:
-  - ssl.diagnostics.maxBlockDepth
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
   - internal/providers/edge_test.go
@@ -25,6 +27,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-08-27
+    ref: "issue #208 discussion (info-tier expansion)"
+    note: >-
+      Moved warning -> info in the info-tier expansion: complexity
+      observation with a configurable threshold — advisory, not a bug.
+      Info is the opt-in advisory tier
+      (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
+      entries still promote or disable per rule.
 issues: []
 ---
 

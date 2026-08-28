@@ -5,11 +5,13 @@ kind: diagnostic
 status: active
 authority: style_only
 schema_ref: lints.coding_standards.limit_public_vars
-default_severity: warning
+default_severity: info
 config:
-  - ssl.diagnostics.rules
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:
@@ -21,6 +23,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-08-27
+    ref: "issue #208 discussion (info-tier expansion)"
+    note: >-
+      Moved warning -> info in the info-tier expansion: a stance on
+      shared state fired unconditionally — advisory, not actionable at
+      each site. Info is the opt-in advisory tier
+      (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
+      entries still promote or disable per rule.
 issues: []
 ---
 

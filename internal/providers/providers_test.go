@@ -2266,7 +2266,7 @@ func TestGetDiagnostics_IncludeAtTop(t *testing.T) {
 func TestGetDiagnostics_PublicVariablesDiscouraged(t *testing.T) {
 	text := `:PUBLIC gShared;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "risk namespace pollution") {
@@ -2282,7 +2282,7 @@ func TestGetDiagnostics_TooManyProcedureParameters(t *testing.T) {
 :PARAMETERS p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21;
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "more than 20 parameters") {
@@ -6796,7 +6796,7 @@ func TestGetDiagnostics_NegativeLogic(t *testing.T) {
 :ELSE;
     DoProc("HandleTrue");
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -9308,8 +9308,7 @@ sMsg := "PLAN'N'GO";
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckUnicodeLiteralPrefix = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeUnicodeLiteralPrefix {
@@ -9339,8 +9338,7 @@ aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN"
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckCollateJustification = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeUnjustifiedCollate {
@@ -9409,8 +9407,7 @@ CallMe(1, 2, 3);
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckSpacedSkipCommas = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeSpacedSkipCommas {
@@ -9488,8 +9485,7 @@ func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckVisibilityAnnotationUsage = true
+	opts := infoEnabledOptions()
 	var hits int
 	for _, d := range GetDiagnostics(script, opts) {
 		if d.Code == CodeVisibilityAnnotationUsage {
@@ -9648,5 +9644,48 @@ func TestGetDiagnostics_CStyleCommentCloser(t *testing.T) {
 	}
 	if len(lines) != 1 || lines[0] != 0 {
 		t.Fatalf("expected c_style_comment_closer on line 0 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_NilMethodCallQualifiedMembers(t *testing.T) {
+	// diag.nil_method_call (issue #207): qualified assignment must not
+	// register the bare name; qualified occurrences must not match; and
+	// tracking resets per procedure.
+	clean := `:CLASS Service;
+:DECLARE oClient;
+
+:PROCEDURE Cleanup;
+	Me:oClient := NIL;
+:ENDPROC;
+
+:PROCEDURE DoWork;
+	Me:oClient:Send(1);
+:ENDPROC;
+
+:PROCEDURE Use;
+	:DECLARE oConn;
+	oConn := NIL;
+:ENDPROC;
+
+:PROCEDURE Elsewhere;
+	:DECLARE oConn;
+	oConn := Me:Open();
+	oConn:Execute("cmd");
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(clean, DefaultDiagnosticOptions()) {
+		if d.Code == CodeNilMethodCall {
+			t.Errorf("unexpected nil_method_call at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+
+	// The genuine case still fires: bare local assigned NIL, then used.
+	flagged := `:PROCEDURE Demo;
+	:DECLARE oRec;
+	oRec := NIL;
+	oRec:Save();
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(flagged, DefaultDiagnosticOptions()), CodeNilMethodCall); got != 1 {
+		t.Fatalf("expected one nil_method_call for the bare-local case, got %d", got)
 	}
 }

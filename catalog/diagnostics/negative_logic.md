@@ -5,9 +5,13 @@ kind: diagnostic
 status: active
 authority: advisory
 schema_ref: lints.style_rules.prefer_positive_logic
-default_severity: hint
+default_severity: info
+config:
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:
@@ -20,6 +24,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-08-27
+    ref: "issue #208 discussion (info-tier expansion)"
+    note: >-
+      Moved hint -> info in the info-tier expansion: pure readability
+      preference. Info is the opt-in advisory tier
+      (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
+      entries still promote or disable per rule.
 issues: []
 ---
 
