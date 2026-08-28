@@ -9689,3 +9689,56 @@ func TestGetDiagnostics_NilMethodCallQualifiedMembers(t *testing.T) {
 		t.Fatalf("expected one nil_method_call for the bare-local case, got %d", got)
 	}
 }
+
+// The seven info-tier SQL advisories (issue #220, I1-I7): each fires on
+// its target shape, all are gated by the info tier, and the corpus-tuned
+// negatives hold.
+func TestGetDiagnostics_SQLAdvisories(t *testing.T) {
+	code := `a := SQLExecute("select o.ordno, o.folderno fno, nvl(t.s,'x') as st from orders o, ordtask t where o.ordno = t.ordno(+) and o.d > sysdate and o.g = getdate()");
+b := SQLExecute("select * from orders where ordno = ?nOrd?");
+c := SQLExecute("insert into t (a, who) values (?x?, ?'<<username>>'?)");
+d := RunSQL("update t set n = '" + sName + "' where id = ?", "C", {1});`
+
+	// Gated by default.
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if strings.HasPrefix(d.Code, "sql_") && d.Code != CodeSqlInjection {
+			t.Fatalf("advisory %s fired with the info tier off", d.Code)
+		}
+	}
+
+	got := map[string]int{}
+	for _, d := range GetDiagnostics(code, infoEnabledOptions()) {
+		got[d.Code]++
+	}
+	for _, want := range []string{
+		CodeSQLCommaJoin, CodeSQLLegacyOuterJoin, CodeSQLInconsistentAlias,
+		CodeSQLDialectMix, CodeSQLSelectStar, CodeSQLSuspectPlaceholder,
+		CodeSQLLiteralSplice,
+	} {
+		if got[want] == 0 {
+			t.Errorf("expected %s to fire", want)
+		}
+	}
+	if got[CodeSQLLiteralSplice] != 1 {
+		t.Errorf("sql_literal_splice must fire once per call, got %d", got[CodeSQLLiteralSplice])
+	}
+}
+
+func TestGetDiagnostics_SQLAdvisoriesNegatives(t *testing.T) {
+	// Corpus-tuned precision: literals/comments never trigger comma-join,
+	// count(*) is not select-star, ?'Y'? is an established idiom, ANSI
+	// joins and single-dialect statements stay silent.
+	code := `a := SQLExecute("select ordno, folderno from orders inner join ordtask on 1=1 where kind in ('a,b', 'c') -- from t1, t2
+");
+b := SQLExecute("select count(*) from orders where d > sysdate");
+c := SQLExecute("insert into t (flag) values (?'Y'?)");
+e := SQLExecute("select (qty + 1) total from orders");`
+
+	for _, d := range GetDiagnostics(code, infoEnabledOptions()) {
+		switch d.Code {
+		case CodeSQLCommaJoin, CodeSQLLegacyOuterJoin, CodeSQLSelectStar,
+			CodeSQLSuspectPlaceholder, CodeSQLDialectMix, CodeSQLLiteralSplice:
+			t.Errorf("unexpected %s at line %d: %s", d.Code, d.Range.Start.Line, d.Message)
+		}
+	}
+}
