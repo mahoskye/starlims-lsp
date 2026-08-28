@@ -2,8 +2,8 @@
 
 This document specifies all configuration options available in the starlims-lsp language server. It serves as the authoritative reference for client configuration.
 
-**Version:** 1.3  
-**Last Updated:** 2026-05-06  
+**Version:** 1.4  
+**Last Updated:** 2026-08-28  
 **Status:** Current
 
 ---
@@ -929,7 +929,7 @@ Uses all defaults.
     "format": {
       "sql": {
         "enabled": true,
-        "style": "compact",
+        "style": "expanded",
         "keywordCase": "lower"
       }
     }

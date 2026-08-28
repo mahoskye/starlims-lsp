@@ -3,6 +3,15 @@
 > Carved into issues (2026-08-28): H1→#215, H2 (+I4 pointer)→#216,
 > H3/H4/H5→#217, H6→#218, H7/H8/C1/C3→#219, I1–I6→#220; upstream
 > C1/C2 reference-doc challenge→ssl-style-guide#61.
+>
+> **Resolution (2026-08-28, same day):** every finding closed —
+> H1/H2→PR #222, H6→PR #223 (non-idempotent 1,008→0), H3/H4/H5→PR #224,
+> H7/H8/C1/C3→PR #225 (corpus-owner decisions: `identifierCase`
+> preserve, `compact` retired, `standard` reworked, rule-F rewrites),
+> I1–I7→PR #226 (with the I7 detection corpus-corrected: `?'Y'?`
+> quoted-literal placeholders are an established idiom, 271 uses; only
+> `<<…>>` template stacking flags). Final harness: 0 panics, 0 content
+> mutations, 0 formatting-introduced errors, 0 non-idempotent files.
 
 Adversarial review of `--format` / `textDocument/formatting` against a
 private production-representative corpus: 6,228 STARLIMS server scripts
