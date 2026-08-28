@@ -35,6 +35,11 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
   - Conservative inferred-type checks for `:FOR`, `NIL`, `$`, string `=`, and code-block comparison mistakes
   - SSL gotcha detection for direct procedure calls, dot-property access, zero-based arrays, assignment in conditions, and comment-semicolon hazards
   - Opt-in Hungarian notation warnings (configurable prefixes)
+  - An **opt-in info tier** (`ssl.diagnostics.infoDiagnostics`) of advisory
+    detail — style observations and SQL idiom notes (comma joins, `SELECT *`,
+    spliced literals, dialect mixes, …) aimed at assistant/LLM consumers and
+    teams that want the full picture; the default surface stays
+    errors/warnings/hints
 - **Rename Symbol** — variables within the document (scope-aware), procedures workspace-wide including their dispatch call sites
 - **Inlay Hints** for parameter names at call sites (configurable minimum parameter count)
 - **Document formatting** for SSL and embedded SQL
@@ -104,8 +109,30 @@ starlims-lsp --validate file1.ssl file2.ssl
 # Pipe content via stdin
 echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin
 
+# Include the opt-in info tier (advisory detail; see CONFIGURATION.md §5.8)
+starlims-lsp --validate --info script.ssl
+
 # Get validation-specific help
 starlims-lsp --validate --help
+```
+
+### Format Mode
+
+Format SSL files (and the SQL embedded in their strings) from the command
+line:
+
+```bash
+# Print formatted output
+starlims-lsp --format script.ssl
+
+# Rewrite files in place
+starlims-lsp --format --write script.ssl
+
+# CI gate: exit non-zero when any file is not already formatted
+starlims-lsp --format --check *.ssl
+
+# Get format-specific help
+starlims-lsp --format --help
 ```
 
 Output is a JSON array with diagnostics per file:

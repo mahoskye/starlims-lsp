@@ -844,7 +844,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 
 		// Check if this is an end-of-line comment (comment on same line as code)
 		if token.Type == lexer.TokenComment {
-			if isEndOfLineComment(token, state.lastNonWSToken, tokens, i) {
+			if isEndOfLineComment(token, state.lastNonWSToken) {
 				// Store this comment to be written before the next newline.
 				// A line can carry several consecutive EOL comments
 				// (`x := 1; /*old value; /*explanation;`) — merge rather
@@ -965,7 +965,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 
 // isEndOfLineComment checks if a comment token is an end-of-line comment
 // (a comment on the same line as code, following code).
-func isEndOfLineComment(comment lexer.Token, lastNonWSToken lexer.Token, tokens []lexer.Token, commentIndex int) bool {
+func isEndOfLineComment(comment lexer.Token, lastNonWSToken lexer.Token) bool {
 	// If no code was written yet, this is not an end-of-line comment
 	if lastNonWSToken.Type == 0 {
 		return false

@@ -22,8 +22,18 @@ The diagnostics provider analyzes SSL code and reports potential issues as squig
 |-------|----------|--------|----------|
 | Error | 1 | Red underline | Definite problems causing runtime errors |
 | Warning | 2 | Yellow underline | Potential issues or style violations |
-| Info | 3 | Blue underline | Informational hints |
-| Hint | 4 | Faint dots | Minor suggestions |
+| Info | 3 | Blue underline | **Opt-in advisory tier** — see below |
+| Hint | 4 | Faint dots | Minor suggestions with a one-keystroke fix |
+
+**The info tier is opt-in** (catalog decision D13): info-severity
+diagnostics are advisory detail — style observations and SQL idiom notes
+aimed at assistant/LLM consumers and teams that want the full picture —
+and are dropped unless `ssl.diagnostics.infoDiagnostics` is enabled
+(`--validate --info` on the CLI). A rule listed explicitly in
+`ssl.diagnostics.rules` always shows regardless of the gate, which is
+also the per-rule promotion path. Errors, warnings, and hints are never
+gated. The tier's membership is enumerated in
+[CONFIGURATION.md §5.8](../configuration/CONFIGURATION.md).
 
 ### 2.2 Implemented Diagnostics
 
@@ -102,6 +112,8 @@ These diagnostics are implemented but disabled by default:
 | Undeclared variables | Warning | Variable used without declaration (enable via `CheckUndeclaredVars`) |
 | Unused variables | Hint | Variable declared but never used (enable via `CheckUnusedVars`) |
 | SQL parameter validation | Warning | SQL `?param?` not matching declared variable (enable via `CheckSQLParams`) |
+| Hungarian notation | Warning | Prefix conventions (enable via `CheckHungarianNotation`) |
+| The entire info tier | Info | All info-severity rules, including the seven SQL advisories (enable via `ssl.diagnostics.infoDiagnostics`) |
 
 ### 2.4 Planned Diagnostics
 

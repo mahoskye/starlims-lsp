@@ -168,12 +168,12 @@ func isRenameableSymbol(word string, line, column int, text string, procedures [
 
 	// If we got here, it might be an undeclared variable or identifier
 	// Allow renaming if it looks like a user-defined identifier
-	return isUserDefinedIdentifier(word, text, line, column)
+	return isUserDefinedIdentifier(word)
 }
 
 // isUserDefinedIdentifier checks if the word appears to be a user-defined identifier
 // (not a keyword, built-in function, etc.)
-func isUserDefinedIdentifier(word string, text string, line, column int) bool {
+func isUserDefinedIdentifier(word string) bool {
 	// Must start with a letter or underscore
 	if len(word) == 0 {
 		return false

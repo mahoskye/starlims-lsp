@@ -59,6 +59,7 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 | `ssl.format.sql.enabled` | bool | `true` | Enable SQL formatting |
 | `ssl.format.sql.style` | string | `"canonicalCompact"` | Formatting style |
 | `ssl.format.sql.keywordCase` | string | `"upper"` | Keyword case transformation |
+| `ssl.format.sql.identifierCase` | string | `"preserve"` | Identifier casing: `preserve` (dialect-safe default), `lower`, `upper` |
 | `ssl.format.sql.indentSize` | int | `4` | Spaces per SQL indent |
 | `ssl.format.sql.maxLineLength` | int | `90` | Max line length for SQL |
 | `ssl.format.sql.detectSQLStrings` | bool | `true` | Auto-detect and format SQL-looking standalone strings |
@@ -67,10 +68,11 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 
 | Style | Description |
 |-------|-------------|
-| `standard` | Simple clause breaks |
+| `standard` | Clause breaks; wraps to the line limit with fixed-indent continuations |
 | `canonicalCompact` | Balanced with indented AND/OR (default) |
-| `compact` | Minimal breaks |
 | `expanded` | Each element on own line |
+
+(`compact` is a deprecated alias for `canonicalCompact` — retired 2026-08-28.)
 
 ---
 

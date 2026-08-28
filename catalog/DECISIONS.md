@@ -4,6 +4,39 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D14 — SQL conventions are dialect-aware; preserve before canonicalize (2026-08-28, issue #219, PR #225)
+
+Where a SQL canonicalization is safe on one target DBMS but not the
+other, the default is to preserve the author's text and offer the
+canonical form as opt-in. Concretely: identifier casing defaults to
+`preserve` (`ssl.format.sql.identifierCase`) because force-folding
+breaks queries on SQL Server case-sensitive collations while Oracle
+folds unquoted identifiers anyway; ODBC `{…}` escape interiors are
+never identifier-folded and `?…?` placeholders are byte-preserved
+whatever their interior (issue #217); and a detected-SQL string with an
+unbalanced quote count — a literal continued across concatenation — is
+never reformatted at all (issue #216). STARLIMS environments are
+specifically Oracle or specifically MSSQL (corpus owner), so
+dialect-conditional rewrites are correctness hazards, not style
+choices. Companion pruning: the `compact` style was retired as a
+deprecated alias for canonicalCompact — an internally inconsistent
+layout contract is worse than one fewer style.
+
+## D13 — Info severity is the opt-in advisory tier (2026-08-27, issue #208 discussion, PRs #212/#213)
+
+Info-severity diagnostics are advisory detail — style observations and
+idiom notes aimed at assistant/LLM consumers, which can be configured
+to run with the tier enabled and write better code — and are dropped by
+default (`ssl.diagnostics.infoDiagnostics: false`; `--validate --info`)
+so the everyday surface stays errors/warnings/hints. Consequences: an
+advisory rule ships as `default_severity: info` with NO dedicated
+boolean setting (four short-lived opt-in booleans were consolidated
+into the tier before ever releasing); an explicit
+`ssl.diagnostics.rules` entry bypasses the gate in both directions, so
+per-rule promotion is always available; hints are not gated. The
+sorting question for new rules is "actionable or advisory?" — advisory
+goes to info.
+
 ## D12 — Schema-canonical forms normalize by default (2026-07-23, issues #91/#92)
 
 Where the style-guide schema names one canonical spelling, the formatter
