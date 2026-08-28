@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The info severity tier is now opt-in** (`ssl.diagnostics.infoDiagnostics`,
+  default off; `--validate --info` on the CLI). Info diagnostics are
+  repositioned as advisory detail — style observations and idiom notes
+  aimed at assistant/LLM consumers and teams that want the full picture —
+  and are dropped by default so the everyday surface stays
+  errors/warnings/hints. A rule explicitly listed in
+  `ssl.diagnostics.rules` always shows regardless of the gate (including
+  rules remapped *to* info); that is also the per-rule promotion path.
+  Hints are not gated.
+- **Advisory rules moved into the info tier.** Four long-standing rules
+  reclassified from warning/hint to info because they are observations,
+  not actions: `max_block_depth` (complexity threshold),
+  `limit_public_vars` (shared-state stance, fires on every `:PUBLIC`),
+  `max_params_warning` (API-shape threshold), and `negative_logic`
+  (readability preference). Together with the nine already-info rules
+  and this release's additions, the tier holds eighteen rules —
+  enumerated in CONFIGURATION.md §5.8.
+- **`nil_method_call` understands qualification (#207).**
+  `Me:oClient := NIL` no longer registers the bare member name, a
+  `:`-qualified occurrence (`Me:oClient:Send()`) no longer matches
+  tracked locals, and tracking resets per procedure — a teardown can no
+  longer poison the whole file. Eliminated the production corpus's
+  single largest false-positive class (1,391 hits, 7.3% of the run).
+
 ### Added
 - **Expression-level AST (#184, milestone 1).** New lazy expression parser
   in `internal/parser` (`ParseExpression`,
@@ -22,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   corpora). `dev/exprcoverage` measures this and is the regression
   harness for future grammar work. No diagnostic behavior changes yet —
   consumers arrive in later milestones.
+- **`c_style_comment_closer` (#208 discussion).** Info-tier note on
+  comments closing `*/;` — valid, purely stylistic (SSL never sees the
+  `*/`; the `;` is the real terminator), but the `*/` encodes a wrong
+  mental model of where SSL comments end. The first rule designed for
+  the opt-in info tier.
 - **`step_zero_literal` (#199).** Warns on a `:FOR` loop whose `:STEP` is a
   provable literal zero (`0`, `0.0`, `-0`) — the loop variable never
   advances, so the loop cannot terminate once entered. Variable or
@@ -42,30 +72,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   result is silently discarded; use a result-returning API instead.
   `SELECT ... INTO` and `WITH`-wrapped DML are recognized as writes and
   left alone.
-- **`unicode_literal_prefix` (#196).** Opt-in
-  (`ssl.diagnostics.unicodeLiteralPrefix`, default off): hints on `N'...'`
-  Unicode literal prefixes in embedded SQL.
-- **`unjustified_collate` (#197).** Opt-in
-  (`ssl.diagnostics.collateJustification`, default off): hints on
-  `COLLATE` in embedded SQL when no comment directly precedes the
-  containing statement.
+- **`unicode_literal_prefix` (#196).** Info tier: notes `N'...'` Unicode
+  literal prefixes in embedded SQL.
+- **`unjustified_collate` (#197).** Info tier: notes `COLLATE` in
+  embedded SQL when no comment directly precedes the containing
+  statement.
 - **`trailing_skip_commas` (#193).** Hints on skip-commas immediately
   before a call's `)` — the runtime NIL-pads missing trailing arguments,
   so they add nothing. Interior skips (positional placeholders) and array
   literals are untouched.
-- **`spaced_skip_commas` (#193).** Opt-in
-  (`ssl.diagnostics.spacedSkipCommas`, default off): warns on `, ,`
-  skip-comma pairs written with whitespace between them; the adjacent
-  `,,` form is the preferred style.
+- **`spaced_skip_commas` (#193).** Info tier: notes `, ,` skip-comma
+  pairs written with whitespace between them; the adjacent `,,` form is
+  the preferred style. Promote via `ssl.diagnostics.rules` for the
+  originally proposed warning severity.
 - **`format_arg_not_array` (#194).** Warns when `sFmt:Format` receives a
   provably scalar second argument (or more than two arguments) — Format
   takes ONE array holding every replacement value. Hungarian-heuristic on
   both sides; `String:Format` (.NET, legitimately variadic) is excluded.
-- **`visibility_annotation_usage` (#198).** Opt-in
-  (`ssl.diagnostics.visibilityAnnotationUsage`, default off): hints on
-  every effective `/*@private;`//`/*@protected;` annotation for teams
-  that prefer procedures unannotated; never double-reports annotations
-  the always-on `visibility_annotation` rule already flags.
+- **`visibility_annotation_usage` (#198).** Info tier: notes every
+  effective `/*@private;`//`/*@protected;` annotation for teams that
+  prefer procedures unannotated; never double-reports annotations the
+  always-on `visibility_annotation` rule already flags.
 - **`builtin_excess_arguments` (#200).** Warns on a builtin call passing
   more arguments than the element inventory's signature accepts — the
   SSL compiler silently drops the surplus (never evaluated), so wrong

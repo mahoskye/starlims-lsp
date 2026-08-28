@@ -134,7 +134,7 @@ x := 1;
 :ENDIF;
 :ENDPROC;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	opts.MaxBlockDepth = 2
 
 	diagnostics := GetDiagnostics(text, opts)

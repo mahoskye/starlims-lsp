@@ -104,10 +104,7 @@ interface SQLFormattingOptions {
 interface DiagnosticOptions {
   hungarianNotation: boolean;
   unusedVariables: boolean;
-  unicodeLiteralPrefix: boolean;
-  collateJustification: boolean;
-  spacedSkipCommas: boolean;
-  visibilityAnnotationUsage: boolean;
+  infoDiagnostics: boolean;
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
@@ -632,7 +629,7 @@ an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
 { "ssl.diagnostics.endpointPatterns": ["**/endpoints/**", "**/*.srvscr"] }
 ```
 
-### 5.8 ssl.diagnostics.unicodeLiteralPrefix
+### 5.8 ssl.diagnostics.infoDiagnostics
 
 | Property | Value |
 |----------|-------|
@@ -640,68 +637,28 @@ an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
 | **Default** | `false` |
 | **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
 
-When enabled, hints on `N'...'` Unicode literal prefixes in embedded SQL
-(code `unicode_literal_prefix`, issue #196). Opt-in because whether the
-prefix is needed is a schema property (NVARCHAR columns) the LSP cannot
-see.
+Enables the info severity tier. Info diagnostics are advisory detail —
+style observations and idiom notes — aimed at assistant/LLM consumers
+and teams that want the full picture. They are dropped by default so the
+everyday surface stays errors/warnings/hints. A rule explicitly listed
+in `ssl.diagnostics.rules` always shows regardless of this gate (that is
+also the per-rule promotion path). The `--validate` CLI mirrors this
+with `--info`.
+
+Info-tier rules: `equals_vs_strict_equals`, `not_preferred_operator`,
+`empty_optional_param_array`, `identifier_too_long`,
+`complex_sql_placeholder`, `include_early`, `nested_iif`,
+`class_member_order`, `nil_not_empty_string`, `max_block_depth`,
+`limit_public_vars`, `max_params_warning`, `negative_logic`,
+`c_style_comment_closer`, `unicode_literal_prefix`,
+`unjustified_collate`, `spaced_skip_commas`,
+`visibility_annotation_usage`.
 
 ```json
-{ "ssl.diagnostics.unicodeLiteralPrefix": true }
+{ "ssl.diagnostics.infoDiagnostics": true }
 ```
 
-### 5.9 ssl.diagnostics.collateJustification
-
-| Property | Value |
-|----------|-------|
-| **Type** | `boolean` |
-| **Default** | `false` |
-| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
-
-When enabled, hints on `COLLATE` in embedded SQL when no comment directly
-precedes the containing statement (code `unjustified_collate`, issue
-#197). Opt-in because "justification comment above" is a team convention,
-not a runtime rule.
-
-```json
-{ "ssl.diagnostics.collateJustification": true }
-```
-
-### 5.10 ssl.diagnostics.spacedSkipCommas
-
-| Property | Value |
-|----------|-------|
-| **Type** | `boolean` |
-| **Default** | `false` |
-| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
-
-When enabled, warns on skip-comma pairs written with whitespace between
-the commas (`, ,`) — valid syntax, but the adjacent form `,,` is the
-preferred style (code `spaced_skip_commas`, issue #193). Opt-in because
-the spacing is a stylistic preference.
-
-```json
-{ "ssl.diagnostics.spacedSkipCommas": true }
-```
-
-### 5.11 ssl.diagnostics.visibilityAnnotationUsage
-
-| Property | Value |
-|----------|-------|
-| **Type** | `boolean` |
-| **Default** | `false` |
-| **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
-
-When enabled, hints on every effective `/*@private;` / `/*@protected;`
-annotation (code `visibility_annotation_usage`, issue #198) for teams
-that prefer procedures unannotated. Annotations already flagged by the
-always-on `visibility_annotation` rule (class no-op, misplacement) are
-not double-reported.
-
-```json
-{ "ssl.diagnostics.visibilityAnnotationUsage": true }
-```
-
-### 5.12 Suppression comments (in-file)
+### 5.9 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,
@@ -1030,10 +987,7 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
-| `ssl.diagnostics.unicodeLiteralPrefix` | `false` |
-| `ssl.diagnostics.collateJustification` | `false` |
-| `ssl.diagnostics.spacedSkipCommas` | `false` |
-| `ssl.diagnostics.visibilityAnnotationUsage` | `false` |
+| `ssl.diagnostics.infoDiagnostics` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |

@@ -7,9 +7,12 @@ authority: advisory
 schema_ref: lints.type_safety.nil_not_empty_string
 default_severity: info
 config:
+  - ssl.diagnostics.infoDiagnostics
   - ssl.diagnostics.rules
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:

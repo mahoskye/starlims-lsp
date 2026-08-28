@@ -19,6 +19,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-08-27
+    ref: "issue #207"
+    note: >-
+      Production-corpus FP class (1,391 hits, 7.3% of the whole run):
+      qualified member assignment `Me:oClient := NIL` in a teardown
+      registered the bare name and every later `Me:oClient:...` chain in
+      the file flagged. Qualification now excluded on both the tracking
+      and matching sides, and tracking resets per procedure.
 issues: []
 ---
 
@@ -37,7 +45,12 @@ warning severity, ranged on the NIL expression):
 
 Tracking is lexical, not flow-aware: assignments are replayed in token
 order regardless of branches, and only direct `var := NIL` /
-`var := other` statements participate.
+`var := other` statements participate. Tracking is scoped per procedure
+(reset at every `:PROCEDURE`/`:ENDPROC`) and covers bare locals only: a
+`:`-qualified target (`Me:oClient := NIL;`) is object state, not a
+local, and registers nothing; a `:`-qualified occurrence of a tracked
+name (`Me:oClient:Send(...)`) is a member in a chain, not the local,
+and never matches (issue #207).
 
 It must NOT flag:
 
@@ -47,7 +60,12 @@ It must NOT flag:
   (e.g. uninitialized parameters) — the rule only trusts explicit NIL
   assignments;
 - comparisons or assignments involving NIL without member access
-  (`:IF oRec = NIL;`, `oRec := NIL;`).
+  (`:IF oRec = NIL;`, `oRec := NIL;`);
+- member calls whose receiver is `:`-qualified even when the member name
+  matches a NIL-tracked local (`Me:oClient:Send()` after a bare
+  `oClient := NIL;`) — the member and the local are different storage;
+- uses in a different procedure than the NIL assignment — a teardown
+  procedure assigning NIL cannot poison its siblings (issue #207).
 
 ## Examples
 
@@ -83,6 +101,36 @@ oRecord := NIL;
 	oRecord := CreateUdObject("SampleRecord");
 :ENDIF;
 oRecord:Refresh();
+```
+
+### Does not flag
+
+```ssl
+:CLASS Service;
+:DECLARE oClient;
+
+:PROCEDURE Cleanup;
+	Me:oClient := NIL;
+:ENDPROC;
+
+:PROCEDURE DoWork;
+	Me:oClient:Send(1);
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Teardown;
+	:DECLARE oConn;
+	oConn := NIL;
+:ENDPROC;
+
+:PROCEDURE Use;
+	:DECLARE oConn;
+	oConn := OpenConnection();
+	oConn:Execute("cmd");
+:ENDPROC;
 ```
 
 ## Rationale

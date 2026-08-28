@@ -1874,7 +1874,7 @@ Branch("LABELSKIP");`
 func TestGetDiagnostics_EmptyTrailingArrayShouldBeOmitted(t *testing.T) {
 	text := `result := DoProc("MyProc", {});`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Omit the trailing empty array") {
 			return
@@ -2143,7 +2143,7 @@ func TestGetDiagnostics_ClassMemberOrder(t *testing.T) {
 :DECLARE sName;
 `
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Class members must be ordered as") {
@@ -2252,7 +2252,7 @@ func TestGetDiagnostics_IncludeAtTop(t *testing.T) {
 :ENDPROC;
 :INCLUDE File_Helpers.FileWork;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "should appear early in the file") {
@@ -2266,7 +2266,7 @@ func TestGetDiagnostics_IncludeAtTop(t *testing.T) {
 func TestGetDiagnostics_PublicVariablesDiscouraged(t *testing.T) {
 	text := `:PUBLIC gShared;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "risk namespace pollution") {
@@ -2282,7 +2282,7 @@ func TestGetDiagnostics_TooManyProcedureParameters(t *testing.T) {
 :PARAMETERS p01, p02, p03, p04, p05, p06, p07, p08, p09, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21;
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "more than 20 parameters") {
@@ -2297,7 +2297,7 @@ func TestGetDiagnostics_LooseStringEquality(t *testing.T) {
 	text := `:IF sName = "Test";
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "prefix matching") {
@@ -2312,7 +2312,7 @@ func TestGetDiagnostics_NilVsEmptyString(t *testing.T) {
 	text := `:IF NIL = "";
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "NIL is not the same as empty string") {
@@ -2329,7 +2329,7 @@ func TestGetDiagnostics_NilVsZeroAndFalse(t *testing.T) {
 :IF NIL = .F.;
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := 0
 	for _, d := range diagnostics {
@@ -5057,7 +5057,7 @@ func TestGetDiagnostics_ComplexSQLPlaceholder(t *testing.T) {
 	// and function calls are standard supported patterns.
 	code := `SQLExecute("SELECT * FROM T WHERE Code = ?sPrefix + sSuffix?");`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Complex expression") && d.Severity == SeverityInfo {
@@ -5274,7 +5274,7 @@ func TestGetDiagnostics_NotPreferredOperators(t *testing.T) {
 :IF y # 2;
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	foundLtGt := false
 	foundHash := false
@@ -6096,7 +6096,7 @@ func TestGetDiagnostics_IncludeMiddleOfFile(t *testing.T) {
 x := 1;
 :INCLUDE SomeLibrary;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "should appear early in the file") {
@@ -6141,7 +6141,7 @@ func TestGetDiagnostics_NotPreferredOperators_ValidNotEquals(t *testing.T) {
 func TestGetDiagnostics_EmptyTrailingArray_DoProc(t *testing.T) {
 	code := `DoProc("MyProc", {});`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Omit the trailing empty array") {
@@ -6155,7 +6155,7 @@ func TestGetDiagnostics_EmptyTrailingArray_DoProc(t *testing.T) {
 func TestGetDiagnostics_EmptyTrailingArray_ExecFunction(t *testing.T) {
 	code := `ExecFunction("Module.Proc", {});`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Omit the trailing empty array") {
@@ -6190,7 +6190,7 @@ func TestGetDiagnostics_VariableNameTooLong(t *testing.T) {
 	// Variable name exceeds 20 chars (excluding prefix)
 	code := `:DECLARE sThisIsAnExtremelyLongVariableNameThatExceedsLimit;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 20-character limit") {
@@ -6219,7 +6219,7 @@ func TestGetDiagnostics_ProcedureNameTooLong(t *testing.T) {
 	code := `:PROCEDURE ThisIsAnExtremelyLongProcedureName;
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 30-character limit") {
@@ -6482,7 +6482,7 @@ func TestGetDiagnostics_EmptyTrailingArray_GetDataSet(t *testing.T) {
 	text := `:DECLARE sSQL, sXml;
 sSQL := "SELECT * FROM Table";
 sXml := GetDataSet(sSQL, {});`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -6536,7 +6536,7 @@ func TestGetDiagnostics_ClassMemberOrder_DeclareBeforeInherit(t *testing.T) {
 :INHERIT BaseClass;
 :PROCEDURE DoWork;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -6579,7 +6579,7 @@ func TestGetDiagnostics_LooseStringEquality_PrefixMatch(t *testing.T) {
 sStatus := "Logged";
 :IF sStatus = "Log";
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -6762,7 +6762,7 @@ oObj:Method();`
 func TestGetDiagnostics_NestedIIF(t *testing.T) {
 	text := `:DECLARE sResult;
 sResult := IIF(bCond1, IIF(bCond2, "A", "B"), "C");`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -6796,7 +6796,7 @@ func TestGetDiagnostics_NegativeLogic(t *testing.T) {
 :ELSE;
     DoProc("HandleTrue");
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -7079,7 +7079,7 @@ func TestGetDiagnostics_ExitWhileOutsideWhile_Standalone(t *testing.T) {
 
 func TestGetDiagnostics_VariableNameLength_TooLong(t *testing.T) {
 	text := `:DECLARE sThisVariableNameIsWayTooLongForSSL;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -7095,7 +7095,7 @@ func TestGetDiagnostics_VariableNameLength_TooLong(t *testing.T) {
 func TestGetDiagnostics_ProcedureNameLength_TooLong(t *testing.T) {
 	text := `:PROCEDURE ThisIsAnExtremelyLongProcedureNameThatExceedsLimit;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	found := false
 	for _, d := range diagnostics {
@@ -7622,7 +7622,7 @@ func TestGetDiagnostics_StringEqualityPrefixMatch(t *testing.T) {
 	// "= operator for strings returns .T. if right operand is empty OR left starts with right"
 	text := `:IF sStatus = "Log";
 :ENDIF;`
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	found := false
@@ -7914,7 +7914,7 @@ func TestGetDiagnostics_BarePrefixEqualsStringStillWarns(t *testing.T) {
 	x := 1;
 :ENDIF;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	found := false
@@ -8624,7 +8624,7 @@ nA := 1;
 :IF nA <> 2;
 :ENDIF;
 :ENDPROC;`
-	diags := GetDiagnostics(nextLine, DefaultDiagnosticOptions())
+	diags := GetDiagnostics(nextLine, infoEnabledOptions())
 	got := codeCount(diags, CodeNotPreferredOperator)
 	if got != 1 {
 		t.Errorf("next-line directive should silence exactly one not_preferred_operator; got %d", got)
@@ -9308,8 +9308,7 @@ sMsg := "PLAN'N'GO";
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckUnicodeLiteralPrefix = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeUnicodeLiteralPrefix {
@@ -9339,8 +9338,7 @@ aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN"
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckCollateJustification = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeUnjustifiedCollate {
@@ -9409,8 +9407,7 @@ CallMe(1, 2, 3);
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckSpacedSkipCommas = true
+	opts := infoEnabledOptions()
 	var lines []int
 	for _, d := range GetDiagnostics(code, opts) {
 		if d.Code == CodeSpacedSkipCommas {
@@ -9488,8 +9485,7 @@ func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
 		}
 	}
 
-	opts := DefaultDiagnosticOptions()
-	opts.CheckVisibilityAnnotationUsage = true
+	opts := infoEnabledOptions()
 	var hits int
 	for _, d := range GetDiagnostics(script, opts) {
 		if d.Code == CodeVisibilityAnnotationUsage {
@@ -9569,5 +9565,127 @@ sPrefix := Left(sText, 10,);
 		if d.Code == CodeBuiltinExcessArguments {
 			t.Errorf("unexpected builtin_excess_arguments at line %d: %s", d.Range.Start.Line, d.Message)
 		}
+	}
+}
+
+// infoEnabledOptions returns defaults with the info tier enabled — used by
+// tests that exercise info-severity rules directly (the tier gate itself
+// is covered by TestGetDiagnostics_InfoTierOptIn).
+func infoEnabledOptions() DiagnosticOptions {
+	opts := DefaultDiagnosticOptions()
+	opts.IncludeInfoDiagnostics = true
+	return opts
+}
+
+// The info tier is opt-in: info diagnostics drop under defaults, deliver
+// with ssl.diagnostics.infoDiagnostics, and an explicit per-rule entry in
+// ssl.diagnostics.rules bypasses the gate in both directions.
+// [spec feature.diagnostics_pipeline/A27]
+func TestGetDiagnostics_InfoTierOptIn(t *testing.T) {
+	// equals_vs_strict_equals is a default-info rule.
+	code := `:PROCEDURE Demo;
+:PARAMETERS sName;
+:IF sName = "target";
+	:RETURN .T.;
+:ENDIF;
+:RETURN .F.;
+:ENDPROC;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeEqualsVsStrictEquals); got != 0 {
+		t.Errorf("default options should gate info diagnostics; got %d", got)
+	}
+	if got := codeCount(GetDiagnostics(code, infoEnabledOptions()), CodeEqualsVsStrictEquals); got == 0 {
+		t.Error("info tier enabled should deliver info diagnostics")
+	}
+
+	// Explicit rule entry bypasses the gate without enabling the tier.
+	pinned := DefaultDiagnosticOptions()
+	pinned.RuleOverrides = map[string]string{CodeEqualsVsStrictEquals: "info"}
+	if got := codeCount(GetDiagnostics(code, pinned), CodeEqualsVsStrictEquals); got == 0 {
+		t.Error("an explicitly configured rule should bypass the info gate")
+	}
+
+	// A warning rule remapped to info by explicit entry also stays.
+	remapped := DefaultDiagnosticOptions()
+	remapped.RuleOverrides = map[string]string{CodeRaiseErrorInCatch: "info"}
+	catchCode := `:PROCEDURE Demo;
+:TRY;
+	DoWork();
+:CATCH;
+	RaiseError("no");
+:ENDTRY;
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(catchCode, remapped), CodeRaiseErrorInCatch); got == 0 {
+		t.Error("a rule remapped to info by explicit entry should stay visible")
+	}
+
+	// Warnings and errors are never gated.
+	if got := codeCount(GetDiagnostics(catchCode, DefaultDiagnosticOptions()), CodeRaiseErrorInCatch); got == 0 {
+		t.Error("warning-severity diagnostics must not be gated")
+	}
+}
+
+// diag.c_style_comment_closer (issue #208 discussion): valid but
+// stylistic — info tier only.
+func TestGetDiagnostics_CStyleCommentCloser(t *testing.T) {
+	code := `/* short note */;
+/* plain comment;
+/* the sequence a*/
+:DECLARE nCount;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeCStyleCommentCloser); got != 0 {
+		t.Errorf("c_style_comment_closer should be silent under defaults; got %d", got)
+	}
+	var lines []int
+	for _, d := range GetDiagnostics(code, infoEnabledOptions()) {
+		if d.Code == CodeCStyleCommentCloser {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 0 {
+		t.Fatalf("expected c_style_comment_closer on line 0 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_NilMethodCallQualifiedMembers(t *testing.T) {
+	// diag.nil_method_call (issue #207): qualified assignment must not
+	// register the bare name; qualified occurrences must not match; and
+	// tracking resets per procedure.
+	clean := `:CLASS Service;
+:DECLARE oClient;
+
+:PROCEDURE Cleanup;
+	Me:oClient := NIL;
+:ENDPROC;
+
+:PROCEDURE DoWork;
+	Me:oClient:Send(1);
+:ENDPROC;
+
+:PROCEDURE Use;
+	:DECLARE oConn;
+	oConn := NIL;
+:ENDPROC;
+
+:PROCEDURE Elsewhere;
+	:DECLARE oConn;
+	oConn := Me:Open();
+	oConn:Execute("cmd");
+:ENDPROC;`
+
+	for _, d := range GetDiagnostics(clean, DefaultDiagnosticOptions()) {
+		if d.Code == CodeNilMethodCall {
+			t.Errorf("unexpected nil_method_call at line %d: %s", d.Range.Start.Line, d.Message)
+		}
+	}
+
+	// The genuine case still fires: bare local assigned NIL, then used.
+	flagged := `:PROCEDURE Demo;
+	:DECLARE oRec;
+	oRec := NIL;
+	oRec:Save();
+:ENDPROC;`
+	if got := codeCount(GetDiagnostics(flagged, DefaultDiagnosticOptions()), CodeNilMethodCall); got != 1 {
+		t.Fatalf("expected one nil_method_call for the bare-local case, got %d", got)
 	}
 }
