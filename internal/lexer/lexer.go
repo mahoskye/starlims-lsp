@@ -142,7 +142,7 @@ func (l *Lexer) Tokenize() []Token {
 		case l.isIdentifierStart(char):
 			tokens = append(tokens, l.readIdentifier())
 
-		case char == '{' && l.peek(1) == '|':
+		case char == '{' && l.leadsCodeBlock():
 			tokens = append(tokens, l.readCodeBlock())
 
 		case l.isOperatorChar(char):
@@ -183,6 +183,20 @@ func (l *Lexer) Tokenize() []Token {
 	})
 
 	return tokens
+}
+
+// leadsCodeBlock reports whether the `{` at the current position opens a
+// code-block literal. The canonical form is `{|params| body}`, but stock
+// code also writes the bar with interior spacing — `{ |X| ... }` — which
+// the runtime accepts (issue #206). Only same-line spaces/tabs may sit
+// between the brace and the bar; anything else is an array literal or
+// class instantiation.
+func (l *Lexer) leadsCodeBlock() bool {
+	i := 1
+	for l.peek(i) == ' ' || l.peek(i) == '\t' {
+		i++
+	}
+	return l.peek(i) == '|'
 }
 
 func (l *Lexer) peek(offset int) rune {

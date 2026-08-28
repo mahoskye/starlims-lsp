@@ -1640,3 +1640,34 @@ func TestLexer_RegionSameLineCloseHasNoBody(t *testing.T) {
 		t.Errorf("expected :REGION and :ENDREGION keywords, got %v", kws)
 	}
 }
+
+func TestLexer_SpacedCodeBlock(t *testing.T) {
+	// Issue #206: stock code writes code blocks with interior spacing —
+	// `{ |X| ... }` — which the runtime accepts. Both forms lex as one
+	// opaque TokenCodeBlock; a `{` not followed by a bar stays an array
+	// literal opener.
+	cases := []struct {
+		code      string
+		wantBlock bool
+	}{
+		{`AEval( aRows, {|x| x * 2} );`, true},
+		{`AEval( aRows, { |X| ArrayCalc(aOut, "MERGE", BuildArray(X)) } );`, true},
+		{`AEval( aRows, {  	|x| x} );`, true},
+		{`aList := {1, 2, 3};`, false},
+		{`aList := { "a", "b" };`, false},
+	}
+	for _, tc := range cases {
+		found := false
+		for _, tok := range NewLexer(tc.code).Tokenize() {
+			if tok.Type == TokenCodeBlock {
+				found = true
+				if !strings.HasPrefix(tok.Text, "{") || !strings.HasSuffix(tok.Text, "}") {
+					t.Errorf("%q: code block token not brace-delimited: %q", tc.code, tok.Text)
+				}
+			}
+		}
+		if found != tc.wantBlock {
+			t.Errorf("%q: TokenCodeBlock presence = %v, want %v", tc.code, found, tc.wantBlock)
+		}
+	}
+}
