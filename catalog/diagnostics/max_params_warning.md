@@ -5,11 +5,13 @@ kind: diagnostic
 status: active
 authority: style_only
 schema_ref: lints.class_rules.max_params_warning
-default_severity: warning
+default_severity: info
 config:
-  - ssl.diagnostics.rules
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:
@@ -21,6 +23,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-08-27
+    ref: "issue #208 discussion (info-tier expansion)"
+    note: >-
+      Moved hint -> info in the info-tier expansion: threshold-based
+      API-shape advice. Info is the opt-in advisory tier
+      (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
+      entries still promote or disable per rule.
 issues: []
 ---
 
