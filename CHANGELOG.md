@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Expression-level AST (#184, milestone 1).** New lazy expression parser
+  in `internal/parser` (`ParseExpression`,
+  `ExtractStatementExpressions`): precedence-climbing over the existing
+  token stream, grammar-faithful to `ssl-ebnf-grammar.md` (power
+  right-associative, unary binds tighter than power, member/call/
+  subscript/instantiation as postfix, skipped arguments explicit,
+  assignment-in-group idiom supported). Nothing runs during structural
+  parsing — trees are built on demand, and unresolvable regions degrade
+  to `ExprUnknown` silently. Corpus validation: 98.8% of 41,848
+  expression-bearing statements across 3,300 SSL files parse complete in
+  0.6s (remaining misses are non-SSL fragment content in documentation
+  corpora). `dev/exprcoverage` measures this and is the regression
+  harness for future grammar work. No diagnostic behavior changes yet —
+  consumers arrive in later milestones.
 - **`step_zero_literal` (#199).** Warns on a `:FOR` loop whose `:STEP` is a
   provable literal zero (`0`, `0.0`, `-0`) — the loop variable never
   advances, so the loop cannot terminate once entered. Variable or
