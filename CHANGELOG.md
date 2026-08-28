@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **SQL style decisions from the formatting review (#219,
+  corpus-owner-decided).** Four convention changes:
+  - `ssl.format.sql.identifierCase` added (`preserve` | `lower` |
+    `upper`), default **preserve** — force-folding identifiers is
+    dialect-conditional (it breaks queries on SQL Server case-sensitive
+    collations) and rewrote the corpus's uppercase house style; the old
+    always-lowercase behavior is now the `lower` opt-in. Double-quoted
+    identifiers and ODBC escape interiors are preserved regardless.
+  - The `compact` SQL style is retired: accepted as a deprecated alias
+    for `canonicalCompact` (its half-multiline output was internally
+    inconsistent).
+  - The `standard` style now respects `maxLineLength` (proactive
+    wrapping, previously 130+ column predicate lines) with fixed
+    one-level continuation indent instead of open-paren alignment
+    (DECODE arms no longer drift to column ~70).
+  - A rewrite of a detected-SQL string always takes the rule-F
+    multi-line form — never an in-place padded single line — so the
+    string's runtime value changes only when real relayout happens.
+  - canonicalCompact: the SELECT item following a multi-line group
+    (DECODE/CASE/window) starts a fresh continuation line, keeping the
+    alias with its block instead of packing after the closing paren.
+
 ### Fixed
 - **SQL formatter: ODBC escapes and placeholders are atomic (#217).**
   Three related defects: (1) the closing `}` of an `{fn …}` escape glued

@@ -86,6 +86,7 @@ type SQLFormatSettings struct {
 	Enabled          *bool   `json:"enabled"`
 	Style            *string `json:"style"`
 	KeywordCase      *string `json:"keywordCase"`
+	IdentifierCase   *string `json:"identifierCase"`
 	IndentSize       *int    `json:"indentSize"`
 	MaxLineLength    *int    `json:"maxLineLength"`
 	DetectSQLStrings *bool   `json:"detectSQLStrings"`
@@ -460,6 +461,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 			applyOptional(&s.settings.Formatting.SQL.Enabled, sql.Enabled)
 			applyOptional(&s.settings.Formatting.SQL.Style, sql.Style)
 			applyOptional(&s.settings.Formatting.SQL.KeywordCase, sql.KeywordCase)
+			applyOptional(&s.settings.Formatting.SQL.IdentifierCase, sql.IdentifierCase)
 			applyOptional(&s.settings.Formatting.SQL.IndentSize, sql.IndentSize)
 			applyOptional(&s.settings.Formatting.SQL.MaxLineLength, sql.MaxLineLength)
 			applyOptional(&s.settings.Formatting.SQL.DetectSQLStrings, sql.DetectSQLStrings)

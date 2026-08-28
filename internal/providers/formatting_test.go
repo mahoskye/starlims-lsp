@@ -2793,3 +2793,27 @@ func TestFormatDocument_ODBCEscapesAndPlaceholders(t *testing.T) {
 		t.Errorf("not idempotent:\n%s\n--- pass2 ---\n%s", got, again)
 	}
 }
+
+// A rewrite of a detected-SQL string always takes the rule-F multi-line
+// form — never an in-place padded single line (issue #219 decision).
+// Unchanged short strings stay inline byte-identical.
+func TestFormatDocument_SQLRewriteAlwaysRuleF(t *testing.T) {
+	// Deep SSL indent forces the overflow path for a single-line string.
+	input := ":IF a;\n:IF b;\n:IF c;\n\t\t\tsResult := SQLExecute(\"select   ordno,  folderno from orders where fldsts = 'Done' and dept = ?sDept?\");\n:ENDIF;\n:ENDIF;\n:ENDIF;"
+	got := input
+	if e := FormatDocument(input, DefaultFormattingOptions()); len(e) > 0 {
+		got = e[0].NewText
+	}
+	if strings.Contains(got, `" select`) || strings.Contains(got, `?sDept? "`) {
+		t.Errorf("padded single-line rewrite (should be rule-F multi-line):\n%s", got)
+	}
+	// Unchanged short SQL stays inline.
+	short := `x := SQLExecute("select 1 from dual");`
+	got2 := short
+	if e := FormatDocument(short, DefaultFormattingOptions()); len(e) > 0 {
+		got2 = e[0].NewText
+	}
+	if strings.TrimRight(got2, "\n") != short {
+		t.Errorf("short unchanged SQL should stay inline:\n%s", got2)
+	}
+}

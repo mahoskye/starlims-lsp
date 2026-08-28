@@ -94,8 +94,9 @@ interface FormattingOptions {
 
 interface SQLFormattingOptions {
   enabled: boolean;
-  style: "standard" | "canonicalCompact" | "compact" | "expanded";
+  style: "standard" | "canonicalCompact" | "expanded"; // "compact" = deprecated alias
   keywordCase: "upper" | "lower" | "preserve";
+  identifierCase: "preserve" | "lower" | "upper";
   indentSize: number;
   maxLineLength: number;
   detectSQLStrings: boolean;
@@ -335,20 +336,22 @@ When enabled, SQL strings passed to SQL functions are automatically formatted.
 |----------|-------|
 | **Type** | `string` |
 | **Default** | `"canonicalCompact"` |
-| **Values** | `"standard"`, `"canonicalCompact"`, `"compact"`, `"expanded"` |
+| **Values** | `"standard"`, `"canonicalCompact"`, `"expanded"` (`"compact"` is a deprecated alias for `canonicalCompact`) |
 | **File** | `internal/providers/sql_formatter.go:11,28` |
 
-SQL formatting style to apply.
+SQL formatting style to apply. `"compact"` was retired in the 2026-08-28
+style review (its half-multiline output was internally inconsistent) and
+is accepted as an alias for `canonicalCompact`.
 
 #### Style Comparison
 
-| Feature | standard | canonicalCompact | compact | expanded |
-|---------|----------|------------------|---------|----------|
-| Clause line breaks | Yes | Yes | No | Yes |
-| AND/OR indentation | No | Yes | No | Yes |
-| ON clause indentation | No | Yes | No | Yes |
-| Smart column wrapping | No | Yes | No | Yes |
-| Multi-column SELECT wrap | No | Yes | No | Always |
+| Feature | standard | canonicalCompact | expanded |
+|---------|----------|------------------|----------|
+| Clause line breaks | Yes | Yes | Yes |
+| AND/OR indentation | On overflow | Yes | Yes |
+| ON clause indentation | No | Yes | Yes |
+| Smart column wrapping | On overflow | Yes | Yes |
+| Multi-column SELECT wrap | On overflow | Yes | Always |
 
 #### Style Examples
 
@@ -376,11 +379,6 @@ WHERE active = 1
   AND status = 'open'
 ```
 
-**compact:**
-```sql
-SELECT id, name, email, phone, address FROM users INNER JOIN orders ON users.id = orders.user_id WHERE active = 1 AND status = 'open'
-```
-
 **expanded:**
 ```sql
 SELECT
@@ -396,7 +394,29 @@ WHERE active = 1
     AND status = 'open'
 ```
 
-### 4.3 ssl.format.sql.keywordCase
+### 4.3 ssl.format.sql.identifierCase
+
+| Property | Value |
+|----------|-------|
+| **Type** | `string` |
+| **Default** | `"preserve"` |
+| **Values** | `"preserve"`, `"lower"`, `"upper"` |
+| **File** | `internal/providers/sql_formatter.go` |
+
+Casing applied to table/column/alias identifiers in reflowed SQL.
+`"preserve"` (default) keeps the author's casing — the safe choice on
+every dialect: force-folding breaks queries on SQL Server case-sensitive
+collations, and the STARLIMS legacy corpus is uppercase-identifier
+dominant. `"lower"` gives the community-guide look (safe on Oracle and
+MSSQL CI collations only); `"upper"` matches the STARLIMS data
+dictionary. Double-quoted identifiers and ODBC `{…}` escape interiors
+are always preserved regardless of this setting.
+
+```json
+{ "ssl.format.sql.identifierCase": "preserve" }
+```
+
+### 4.4 ssl.format.sql.keywordCase
 
 | Property | Value |
 |----------|-------|
@@ -413,7 +433,7 @@ Case transformation for SQL keywords.
 | `"lower"` | `select`, `from`, `where` |
 | `"preserve"` | Keeps original case |
 
-### 4.4 ssl.format.sql.indentSize
+### 4.5 ssl.format.sql.indentSize
 
 | Property | Value |
 |----------|-------|
@@ -424,7 +444,7 @@ Case transformation for SQL keywords.
 
 Number of spaces per indentation level within SQL statements.
 
-### 4.5 ssl.format.sql.maxLineLength
+### 4.6 ssl.format.sql.maxLineLength
 
 | Property | Value |
 |----------|-------|
@@ -435,7 +455,7 @@ Number of spaces per indentation level within SQL statements.
 
 Maximum line length for SQL before wrapping. Used with `canonicalCompact` and `expanded` styles.
 
-### 4.6 ssl.format.sql.detectSQLStrings
+### 4.7 ssl.format.sql.detectSQLStrings
 
 | Property | Value |
 |----------|-------|
@@ -983,6 +1003,7 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.enabled` | `true` |
 | `ssl.format.sql.style` | `"canonicalCompact"` |
 | `ssl.format.sql.keywordCase` | `"upper"` |
+| `ssl.format.sql.identifierCase` | `"preserve"` |
 | `ssl.format.sql.indentSize` | `4` |
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
