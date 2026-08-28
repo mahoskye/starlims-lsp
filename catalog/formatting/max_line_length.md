@@ -32,6 +32,19 @@ history:
       its continuation line, and never on a line holding only
       indentation. Previously an over-long atomic string was moved below
       its assignment and every re-format grew a blank line.
+  - date: 2026-08-28
+    ref: "issue #218 (production-corpus idempotence)"
+    note: >-
+      Wrap fragments of a line that is already an expression
+      continuation (open delimiter at line start, operator-led, or
+      following a line ending in ':='/','/binary operator) stay at that
+      line's indent — the schema's fixed continuation_indent: 1 —
+      instead of one deeper, which the second pass flattened back (784
+      corpus files). The wrap engine also mirrors the stream's
+      lastNonWSToken by ignoring end-of-line comments when classifying
+      the next line, and the stream treats a trailing comma as statement
+      continuation so wrapped declaration lists (:DECLARE a, b, / c;)
+      keep their indent.
 issues: ["#85"]
 ---
 

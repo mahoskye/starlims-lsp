@@ -40,8 +40,13 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 	frozen := make([]bool, len(lines))
 	perLine := make(map[int][]lexer.Token)
 	var stack []byte
-	stackAtLine := make(map[int]int) // line index -> open '[' count at first token
+	stackAtLine := make(map[int]int)  // line index -> open '[' count at first token
+	delimsAtLine := make(map[int]int) // line index -> total open delimiters at first token
+	firstTokOfLine := make(map[int]lexer.Token)
+	lastTokBeforeLine := make(map[int]lexer.Token) // last significant token of any earlier line
 	openSubscripts := 0
+	var lastTok lexer.Token
+	haveLast := false
 
 	for _, t := range tokens {
 		if t.Type == lexer.TokenEOF || t.Type == lexer.TokenWhitespace {
@@ -50,6 +55,24 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 		li := t.Line - 1
 		if _, seen := stackAtLine[li]; !seen {
 			stackAtLine[li] = openSubscripts
+			delimsAtLine[li] = len(stack)
+			firstTokOfLine[li] = t
+			if haveLast {
+				lastTokBeforeLine[li] = lastTok
+			}
+		}
+		// Mirror the stream formatter's lastNonWSToken: an end-of-line
+		// comment (single-line, same line as preceding code) rides the
+		// pending-comment path there and never becomes the "last token" —
+		// the wrap engine's continuation detection must agree or
+		// `.OR. /*note;` lines hide the operator from the next line's
+		// classification (issue #218 residual). Everything else about the
+		// token (freeze, delimiters, per-line list) processes normally.
+		isEOLComment := t.Type == lexer.TokenComment && haveLast &&
+			lastTok.Line == t.Line && !strings.Contains(t.Text, "\n")
+		if !isEOLComment {
+			lastTok = t
+			haveLast = true
 		}
 		// A non-whitespace token spanning lines (multi-line string or
 		// comment, including reflowed SQL) freezes every line it touches.
@@ -85,7 +108,20 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 			out = append(out, line)
 			continue
 		}
-		wrapped := wrapOneLine(line, perLine[i], stackAtLine[i], opts)
+		// A line that is already an expression continuation — it starts
+		// inside an open delimiter, leads with a binary operator, or
+		// follows a line ending in ':=' or a binary operator — sits at the
+		// statement's fixed continuation level (schema
+		// continuation_indent: 1). Fresh wrap fragments of such a line
+		// stay at ITS indent; indenting one further produced a level the
+		// second pass flattened back, oscillating forever (issue #218,
+		// 784 corpus files).
+		isCont := delimsAtLine[i] > 0 ||
+			isContinuationOperator(firstTokOfLine[i]) ||
+			lastTokBeforeLine[i].Text == ":=" ||
+			lastTokBeforeLine[i].Text == "," ||
+			isContinuationOperator(lastTokBeforeLine[i])
+		wrapped := wrapOneLine(line, perLine[i], stackAtLine[i], isCont, opts)
 		out = append(out, wrapped...)
 	}
 	return strings.Join(out, "\n")
@@ -94,7 +130,7 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 // wrapOneLine splits a single over-long line at its break candidates.
 // inheritedSubscripts is the number of '[' delimiters already open when the
 // line starts (a source continuation inside an index expression).
-func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, opts FormattingOptions) []string {
+func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isContinuationLine bool, opts FormattingOptions) []string {
 	runes := []rune(line)
 
 	// Candidate rune positions (break BEFORE the token starting at pos).
@@ -133,6 +169,9 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, opts 
 
 	indent := leadingIndentString(line)
 	contIndent := indent + oneIndentLevel(opts)
+	if isContinuationLine {
+		contIndent = indent
+	}
 	contWidth := visualWidth(contIndent, opts)
 
 	// Spans between candidates; span 0 includes the line's indent.

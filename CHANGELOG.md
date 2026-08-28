@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Formatter is idempotent over the entire production corpus (#218).**
+  Format-twice differed on 1,008 of 5,136 corpus files; now zero. Five
+  root causes, each with a pinned regression: (1) comma-before-closer
+  spacing — the no-whitespace path wrote `,, )` while the whitespace
+  path suppressed to `,,)`, oscillating forever; (2) wrap fragments of a
+  line that is already a continuation indented one deeper than the
+  stream formatter's fixed continuation level and were flattened back
+  on the next pass; (3) trailing commas at delimiter depth 0 now count
+  as statement continuations, so wrapped `:DECLARE`/`:PARAMETERS` lists
+  keep their indent; (4) space before a captured end-of-line comment
+  compounded with the flush's two-space separator; (5) the wrap engine
+  now ignores end-of-line comments when classifying the next line,
+  matching the stream formatter. The sweep also surfaced a content
+  hazard, fixed here: **SQL `--` line comments in reflowed strings now
+  always end their output line** — the reflow was gluing following code
+  into the comment (`-- note` + `NOT EXISTS` → the DBMS reads the
+  predicate as comment text).
 - **Formatter: multiple end-of-line comments on one line all survive
   (#215).** The pending-EOL-comment slot merged by clobbering, silently
   deleting all but the last comment (`x := ""; /*old; /*note;` lost

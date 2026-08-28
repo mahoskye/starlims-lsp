@@ -429,9 +429,14 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		// past the line that opened the statement (lexical, not block
 		// depth: an :IF has already incremented s.indent for its body, but
 		// its condition's continuation belongs one past the :IF line).
+		// A trailing comma also continues the statement — declaration
+		// lists (`:DECLARE a, b, ⏎ c;`) have no delimiters, so without
+		// this the wrap engine's +1 fragment flattened to block indent on
+		// the second pass and oscillated (issue #218).
 		isContinuation := s.continuationIndent > 0 ||
 			isContinuationOperator(token) ||
 			s.lastNonWSToken.Text == ":=" ||
+			s.lastNonWSToken.Text == "," ||
 			isContinuationOperator(s.lastNonWSToken)
 		var totalIndent int
 		if isContinuation {
@@ -568,6 +573,15 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 				return true
 			}
 		}
+		// Suppress space before a same-line single-line comment: the
+		// pending-EOL-comment flush writes the canonical two-space
+		// separator itself, so source whitespace here compounded into a
+		// third space on the next pass (issue #218).
+		if next := findNextNonWS(tokens, index); next != nil &&
+			next.Type == lexer.TokenComment && !strings.Contains(next.Text, "\n") {
+			s.prevToken = token
+			return true
+		}
 		s.builder.WriteString(" ")
 		s.currentLineLen++
 	}
@@ -663,8 +677,13 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			return true
 		}
 		if index+1 < len(tokens) {
+			// No space before closing delimiters or ';' — the whitespace
+			// handler suppresses these when source whitespace exists, so
+			// the no-whitespace path must agree or the two forms oscillate
+			// between passes (`,,)` <-> `,, )`, issue #218).
 			next := tokens[index+1]
-			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF && next.Text != "," {
+			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF &&
+				next.Text != "," && !isCloseParen(next) && next.Text != ";" {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
