@@ -550,3 +550,91 @@ func TestGetDiagnostics_DataSourceUndeclaredPlaceholder(t *testing.T) {
 		t.Errorf("declare_in_content: expected one undeclared-placeholder warning, got %+v", hits)
 	}
 }
+
+// A banner closing `*/;` — the production idiom whose `;` doubles as the
+// SSL comment terminator — masks including the `;`, so header detection
+// still splits and the SQL body stays SQL. The corpus shape: boxed banner,
+// `:PARAMETERS` with inline := defaults, multi-line SELECT with qualified
+// columns, SQL and/or, and || concatenation.
+// [spec feature.diagnostics_pipeline/A24]
+func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	banner := "/*******************************************************\n" +
+		"Description.. : sample listing\n" +
+		"Author....... : someone\n" +
+		"*******************************************************/;\n"
+	sql := "SELECT s.SAMPLE_ID, s.STATUS, t.NAME || ' (' || t.CODE || ')'\n" +
+		"FROM SAMPLES s, TESTS t\n" +
+		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = ?sStatus? or s.RUSH = 'Y'\n"
+
+	clean := banner + ":PARAMETERS sStatus := \"Done\", nLimit := 100;\n\n" + sql
+	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
+		t.Errorf("expected no diagnostics for banner-*/; data source, got %+v", diags)
+	}
+
+	// Spaces before the `;` are the same idiom.
+	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus;\n\n" + sql
+	if diags := GetDiagnostics(spaced, opts); len(diags) != 0 {
+		t.Errorf("expected no diagnostics for banner-*/ ; data source, got %+v", diags)
+	}
+
+	// Header checks still run after the masked banner residue: a
+	// lowercase directive flags on its own line.
+	flagged := banner + ":parameters sStatus;\n\n" + sql
+	if diags := GetDiagnostics(flagged, opts); len(diags) == 0 {
+		t.Error("expected header checks to still run after a banner closing */;")
+	}
+}
+
+// `--` line comments interleaved between header statements are header
+// furniture when another header statement follows; a trailing comment run
+// before the body belongs to the body.
+// [spec feature.diagnostics_pipeline/A25]
+func TestGetDiagnostics_CommentsBetweenHeaderStatements(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	clean := ":DSN := DICTIONARY;\n:TABLENAME := PendingItems;\n\n" +
+		"--default UserName value MUST BE NIL\n" +
+		":PARAMETERS UserName := NIL;\n\n" +
+		"SELECT p.ITEM_ID FROM PENDING p WHERE p.USR = @UserName and p.DONE = 'N'\n"
+	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
+		t.Errorf("expected no diagnostics for comment-interleaved header, got %+v", diags)
+	}
+
+	header, _ := SplitDataSourceHeader(clean)
+	if !strings.Contains(header, "PARAMETERS") {
+		t.Errorf("header split stopped at the interleaved comment: %q", header)
+	}
+
+	// A comment run followed by SQL (not a header statement) stays with
+	// the body — the body must still start at the comment line.
+	trailing := ":DSN := DICTIONARY;\n--just a note about the query\nSELECT 1 FROM DUAL\n"
+	_, body := SplitDataSourceHeader(trailing)
+	if !strings.HasPrefix(strings.TrimSpace(body), "--just a note") {
+		t.Errorf("trailing comment should stay with the body, body = %q", body)
+	}
+}
+
+// A commented-out directive in the body is never a strong SSL marker; a
+// mid-line `--` does not blank marker detection.
+// [spec feature.diagnostics_pipeline/A26]
+func TestGetDiagnostics_CommentedOutDirectiveIsNotSSLMarker(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+
+	clean := ":PARAMETERS sFolderNo := '12345';\n" +
+		"--:PARAMETERS sFolderNo := '';\n" +
+		"SELECT f.FOLDER_NO, f.STATUS FROM FOLDERS f WHERE f.FOLDER_NO = ?sFolderNo?\n"
+	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
+		t.Errorf("expected SQL mode for body with commented-out directive, got %+v", diags)
+	}
+
+	// Mid-line `--` does not hide a genuine SSL marker on the same line.
+	ssl := ":PARAMETERS nCount;\n:DECLARE nTotal;\nnTotal := nCount - -1;\n:RETURN nTotal;\n"
+	if !hasStrongSSLMarker(ssl) {
+		t.Error("SSL body with mid-line dashes should keep its strong marker")
+	}
+}
