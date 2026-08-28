@@ -47,6 +47,19 @@ func maskLeadingSQLComments(content string) string {
 				return maskRange(content, i)
 			}
 			i += 2 + end + 2
+			// Production banners close `*/;` — the `;` is the SSL comment
+			// terminator, which SSL reads as part of the comment and SQL
+			// reads as an empty statement. Either way it is comment
+			// furniture, and left unmasked it aborted the header scan in
+			// SplitDataSourceHeader (issue #208, criterion A24). Consume
+			// it with any same-line spacing before it.
+			j := i
+			for j < len(content) && (content[j] == ' ' || content[j] == '\t') {
+				j++
+			}
+			if j < len(content) && content[j] == ';' {
+				i = j + 1
+			}
 		default:
 			return maskRange(content, i)
 		}
@@ -85,8 +98,11 @@ func IsSQLCommentOnly(content string) bool {
 // terminated SQL comments (the schema's optional header_comment) are
 // transparent: they are masked to blanks — positions preserved — so a
 // banner before the first directive neither defeats detection nor reaches
-// SSL diagnostics (issue #148). A header statement starts with one of the
-// known header keywords and runs through the line containing its
+// SSL diagnostics (issue #148). `--` line comments interleaved between
+// header statements are equally transparent when a further header
+// statement follows them (issue #208, criterion A25); trailing comments
+// before the body stay with the body. A header statement starts with one
+// of the known header keywords and runs through the line containing its
 // terminating semicolon; blank lines between header statements belong to
 // the header. Content that does not start with a header statement returns
 // header == "" and body == content unchanged.
@@ -101,17 +117,30 @@ func SplitDataSourceHeader(content string) (header, body string) {
 			i++
 			continue
 		}
-		if !strings.HasPrefix(trimmed, ":") {
-			break
-		}
-		word := trimmed[1:]
-		for j, r := range word {
-			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
-				word = word[:j]
+		if strings.HasPrefix(trimmed, "--") {
+			// A run of `--` comment lines belongs to the header only when
+			// another header statement follows it; otherwise it is body
+			// commentary. Masked so the header text never carries SQL
+			// comment syntax into SSL diagnostics.
+			j := i
+			for j < len(lines) {
+				t := strings.TrimSpace(lines[j])
+				if t == "" || strings.HasPrefix(t, "--") {
+					j++
+					continue
+				}
 				break
 			}
+			if j >= len(lines) || !isDataSourceHeaderLine(lines[j]) {
+				break
+			}
+			for k := i; k < j; k++ {
+				lines[k] = blankPreservingNewline(lines[k])
+			}
+			i = j
+			continue
 		}
-		if !dataSourceHeaderKeywords[strings.ToUpper(word)] {
+		if !isDataSourceHeaderLine(lines[i]) {
 			break
 		}
 		// Consume through the line holding the statement's semicolon.
@@ -129,6 +158,35 @@ func SplitDataSourceHeader(content string) (header, body string) {
 		return "", content
 	}
 	return strings.Join(lines[:end], ""), strings.Join(lines[end:], "")
+}
+
+// isDataSourceHeaderLine reports whether a line starts a builder-directive
+// or :PARAMETERS header statement.
+func isDataSourceHeaderLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, ":") {
+		return false
+	}
+	word := trimmed[1:]
+	for j, r := range word {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			word = word[:j]
+			break
+		}
+	}
+	return dataSourceHeaderKeywords[strings.ToUpper(word)]
+}
+
+// blankPreservingNewline replaces a line's content with spaces, keeping
+// its length and trailing newline so positions stay aligned.
+func blankPreservingNewline(line string) string {
+	b := []byte(line)
+	for i, c := range b {
+		if c != '\n' && c != '\r' {
+			b[i] = ' '
+		}
+	}
+	return string(b)
 }
 
 // hasStrongSSLMarker reports whether body contains a SQL-exclusive SSL
@@ -153,6 +211,18 @@ func SplitDataSourceHeader(content string) (header, body string) {
 // detected separately (hasUnterminatedLeadingBlockComment) because the SSL
 // lexer stops a `/*` at the first `;`, mis-reading SQL comments.
 func hasStrongSSLMarker(body string) bool {
+	// Line-leading `--` SQL comments are commentary, not code — a
+	// commented-out directive (`--:PARAMETERS p := '';`, corpus-observed)
+	// must not read as a `:=` marker (issue #208, criterion A26). Only the
+	// line-leading form is blanked: `--` mid-line is SSL's decrement
+	// operator territory and stays visible to the scan.
+	lines := strings.SplitAfter(body, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "--") {
+			lines[i] = blankPreservingNewline(line)
+		}
+	}
+	body = strings.Join(lines, "")
 	for _, t := range lexer.NewLexer(body).Tokenize() {
 		switch t.Type {
 		case lexer.TokenKeyword:
