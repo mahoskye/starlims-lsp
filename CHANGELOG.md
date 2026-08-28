@@ -115,6 +115,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single largest false-positive class (1,391 hits, 7.3% of the run).
 
 ### Added
+- **Seven info-tier SQL advisories (#220).** Observations about embedded
+  SQL that the formatter cannot act on, detected over the SQL lexer's
+  token stream (comments and character literals can never false-trigger)
+  and all gated by `ssl.diagnostics.infoDiagnostics`:
+  `sql_comma_join` (pre-ANSI comma joins — 486 corpus statements),
+  `sql_legacy_outer_join` (Oracle `(+)`), `sql_inconsistent_alias`
+  (mixed `AS`/bare aliases in one SELECT list), `sql_literal_splice`
+  (a `'…'` literal continued across concatenation — the formatter's
+  byte-preserve class and the injection surface; suggest `?param?`),
+  `sql_dialect_mix` (Oracle-only and MSSQL-only idioms in one
+  statement), `sql_select_star`, and `sql_suspect_placeholder`
+  (a `<<…>>` template marker stacked inside `?…?`; plain `?'Y'?`
+  quoted-literal placeholders are an established idiom — 271 corpus
+  uses — and never flag).
 - **Expression-level AST (#184, milestone 1).** New lazy expression parser
   in `internal/parser` (`ParseExpression`,
   `ExtractStatementExpressions`): precedence-climbing over the existing

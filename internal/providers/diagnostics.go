@@ -313,6 +313,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
 	diagnostics = append(diagnostics, checkRunSQLNonDML(tokens)...)
+	diagnostics = append(diagnostics, checkSQLAdvisories(tokens, opts)...)
 	diagnostics = append(diagnostics, checkUnicodeLiteralPrefix(tokens)...)
 	diagnostics = append(diagnostics, checkCollateJustification(tokens)...)
 	diagnostics = append(diagnostics, checkProcedureDeclarationSyntax(tokens)...)

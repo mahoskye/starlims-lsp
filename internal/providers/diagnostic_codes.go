@@ -138,4 +138,11 @@ const (
 	CodeVisibilityAnnotationUsage   = "visibility_annotation_usage"
 	CodeBuiltinExcessArguments      = "builtin_excess_arguments"
 	CodeCStyleCommentCloser         = "c_style_comment_closer"
+	CodeSQLCommaJoin                = "sql_comma_join"
+	CodeSQLLegacyOuterJoin          = "sql_legacy_outer_join"
+	CodeSQLInconsistentAlias        = "sql_inconsistent_alias"
+	CodeSQLLiteralSplice            = "sql_literal_splice"
+	CodeSQLDialectMix               = "sql_dialect_mix"
+	CodeSQLSelectStar               = "sql_select_star"
+	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
 )
