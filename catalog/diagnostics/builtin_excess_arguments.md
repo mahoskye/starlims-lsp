@@ -19,6 +19,20 @@ history:
       are never evaluated and produce no warning (only IIf enforces its
       count). Max-arity data derived from the ssl-style-guide element
       inventory.
+  - date: 2026-08-28
+    ref: "issue #210 (runtime verification)"
+    note: >-
+      Runtime-confirmed (issue #210, ArityProbe.ssl run 2026-08-28):
+      surplus arguments are dropped at COMPILE time — a side-effecting
+      surplus expression (DoProc call) never executed — and no
+      undocumented argument forms exist among the 15 corpus-contested
+      builtins (At has no start-position form, Time no date form, etc.;
+      SetUserPassword's 3-arg call drops its surplus too). Cross-checked
+      first against the runtime-validated signatures in the archived
+      documentation corpus's ssl-element-list.json validation blocks,
+      which matched the inventory on all 15. The 97 production hits are
+      genuine silent-drop bugs; the message's 'never evaluated' claim is
+      literal.
 issues: []
 ---
 
