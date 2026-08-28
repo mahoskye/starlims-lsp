@@ -118,7 +118,7 @@ not restate them.
 
 - A1: Given an unformatted SSL document, when `textDocument/formatting` is requested, then exactly one TextEdit spanning the full document is returned.
 - A2: Given a document where only lines N..M are requested, when range formatting runs, then the returned edit covers only those lines and the block's base indentation is preserved so text outside the range is unaffected.
-- A3: Given a document containing comments and non-SQL string literals, when formatted, then the comment text and string contents are byte-identical to the input.
+- A3: Given a document containing comments and non-SQL string literals, when formatted, then the comment text and string contents are byte-identical to the input — and every comment survives: a line carrying several consecutive end-of-line comments keeps all of them in order (issue #215; the pending-EOL-comment slot merged by clobbering, deleting all but the last).
 - A4: Given `SQLExecute("select ... from ...")` or an overflowing standalone SQL string with detection on, when formatted, then the string is reformatted by the SQL formatter per `ssl.format.sql.*`; and given a plain-English string, it MUST NOT be treated as SQL.
 - A5: Given `ssl.format.sql.enabled: false`, when a document with SQL strings is formatted, then no string literal content changes.
 - A6: Given the output of a previous format run under the same options, when formatted again, then the result is byte-identical.

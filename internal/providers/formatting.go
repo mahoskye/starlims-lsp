@@ -611,7 +611,7 @@ func (s *formatState) isDetectedSQLString(tok lexer.Token) bool {
 	if s.inSQLFunction && s.sqlArgCount > 0 {
 		return false
 	}
-	return IsSQLString(tok.Text[1 : len(tok.Text)-1])
+	return IsReformattableSQLString(tok.Text[1 : len(tok.Text)-1])
 }
 
 // findNextNonWS returns the next non-whitespace token starting from startIdx+1, or nil.
@@ -735,7 +735,7 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// Only format as SQL if the string actually looks like a SQL statement.
 	// Being inside a SQL function call (first argument) is not sufficient —
 	// the argument could be an error message or other non-SQL string.
-	shouldFormat := IsSQLString(innerContent)
+	shouldFormat := IsReformattableSQLString(innerContent)
 
 	if !shouldFormat {
 		return false
@@ -826,8 +826,15 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		// Check if this is an end-of-line comment (comment on same line as code)
 		if token.Type == lexer.TokenComment {
 			if isEndOfLineComment(token, state.lastNonWSToken, tokens, i) {
-				// Store this comment to be written before the next newline
+				// Store this comment to be written before the next newline.
+				// A line can carry several consecutive EOL comments
+				// (`x := 1; /*old value; /*explanation;`) — merge rather
+				// than clobber, or the earlier comment is silently deleted
+				// (issue #215).
 				commentCopy := token
+				if state.pendingComment != nil {
+					commentCopy.Text = state.pendingComment.Text + "  " + token.Text
+				}
 				state.pendingComment = &commentCopy
 				continue
 			}
@@ -1009,12 +1016,22 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 		return false
 	}
 
-	// Don't add after keywords that don't end statements (like :TO, :STEP)
+	// Don't add after keywords that don't end statements. :TO/:STEP are
+	// mid-:FOR continuations; the declaration keywords take an operand
+	// list that legitimately starts on the next line (`:PARAMETERS ⏎
+	// name1, name2;`, corpus-observed) — a forced semicolon truncates the
+	// statement and orphans the list (issue #216 review residual).
 	if lastToken.Type == lexer.TokenKeyword {
 		keyword := strings.ToUpper(strings.TrimPrefix(lastToken.Text, ":"))
 		nonStatementEndingKeywords := map[string]bool{
-			"TO":   true,
-			"STEP": true,
+			"TO":         true,
+			"STEP":       true,
+			"PARAMETERS": true,
+			"DECLARE":    true,
+			"PUBLIC":     true,
+			"DEFAULT":    true,
+			"INCLUDE":    true,
+			"INHERIT":    true,
 		}
 		if nonStatementEndingKeywords[keyword] {
 			return false
@@ -1282,16 +1299,44 @@ func firstKeyword(line string) string {
 // trimTrailingWhitespacePerLine removes trailing space/tab characters from
 // every line. Final newline (if any) is preserved.
 func trimTrailingWhitespacePerLine(text string) string {
-	hadTrailingNewline := strings.HasSuffix(text, "\n")
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t")
+	// String literals are user content (feature.formatting A3): a
+	// line-end that falls inside a multi-line string token must keep its
+	// trailing whitespace — trimming there rewrites string bytes (issue
+	// #216 review residual: 343 corpus files). Lex the output once and
+	// only trim line-ends outside string/code-block/region-body spans.
+	inLiteral := make(map[int]bool) // newline offset -> inside a literal
+	for _, tok := range lexer.NewLexer(text).Tokenize() {
+		switch tok.Type {
+		case lexer.TokenString, lexer.TokenCodeBlock, lexer.TokenRegionBody:
+			for j, r := range tok.Text {
+				if r == '\n' {
+					inLiteral[tok.Offset+j] = true
+				}
+			}
+		}
 	}
-	out := strings.Join(lines, "\n")
-	if hadTrailingNewline && !strings.HasSuffix(out, "\n") {
-		out += "\n"
+
+	var b strings.Builder
+	b.Grow(len(text))
+	lineStart := 0
+	runes := []rune(text)
+	// The lexer counts offsets in runes; walk runes so offsets line up.
+	for i := 0; i <= len(runes); i++ {
+		atEnd := i == len(runes)
+		if !atEnd && runes[i] != '\n' {
+			continue
+		}
+		line := string(runes[lineStart:i])
+		if atEnd || !inLiteral[i] {
+			line = strings.TrimRight(line, " \t")
+		}
+		b.WriteString(line)
+		if !atEnd {
+			b.WriteByte('\n')
+		}
+		lineStart = i + 1
 	}
-	return out
+	return b.String()
 }
 
 // capConsecutiveBlankLines collapses runs of N+1 or more blank lines (whitespace

@@ -53,6 +53,15 @@ history:
       happened to be split instead of converging on rule F / the
       fits-inline form. Single line breaks at those two seams now join
       before layout so every input reaches the same canonical shape.
+  - date: 2026-08-28
+    ref: "issue #216 (production-corpus formatting review H2)"
+    note: >-
+      Odd-quote guard added: concatenation-continued character literals
+      were being respaced inside the literal (newlines injected into
+      {d '...'} date escapes, IN/LIKE patterns gaining whitespace — one
+      corpus mutation surfaced as a new validation error). Detected-SQL
+      strings with an unbalanced single-quote count are now
+      byte-preserved.
 issues: ["#81", "#82"]
 ---
 
@@ -84,6 +93,14 @@ are considered. Within the exception:
   `ssl.format.sql.indentSize` spaces past the statement's base indent, and
   the closing quote lands on its own line at the base indent, glued to the
   trailing punctuation (rule E).
+- A string whose content holds an unbalanced (odd) number of single
+  quotes is byte-preserved even when it is detected as SQL: it ends or
+  begins inside an open SQL character literal continued across SSL
+  concatenation (`"… where d = {d '" + sDate + "'}"`), and any respacing
+  there rewrites literal content — broken ODBC `{d '…'}` escapes,
+  `IN ('`/`LIKE ('` patterns gaining whitespace (issue #216, production
+  corpus: 403 exposed files). Fragments are not statements; skipping
+  them loses nothing.
 - Strings not detected as SQL are byte-preserved regardless of settings.
   Detection is structural and rejects English prose even when it contains
   SQL trigger words: a run of three or more consecutive bare words, a
@@ -125,6 +142,19 @@ wrap guard; SQL-function default-value arguments are pinned by Go tests):
 sMsg := "Select the samples from the rack
 and update the status column";
 sMsgA := "Select the samples from the rack and update the status column before continuing with the run";
+```
+
+Concatenation-continued character literals (odd single-quote count) are
+byte-preserved even though the content is detected as SQL — respacing
+would rewrite the `{d '…'}` escape interior and the IN-list pattern
+(issue #216). Over-long lines of this shape may still wrap at the `+`
+(ordinary SSL wrapping); the string bytes themselves never change:
+
+### Idempotent
+
+```ssl
+sSql := "update runs set fromsampd = {d '" + sDate + "'} where sessionid = ?";
+sSql2 := "delete from quotedetails where product not in('" + sList + "')";
 ```
 
 A single-line SQL string that overflows 90 columns is reflowed by the SQL

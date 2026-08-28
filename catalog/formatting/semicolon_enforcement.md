@@ -29,6 +29,14 @@ history:
       Continuation lines after a trailing operator now take one level of
       continuation indent (see fmt.indent_style); the example here shows
       the indented form.
+  - date: 2026-08-28
+    ref: "issue #216 (production-corpus formatting review residual)"
+    note: >-
+      Declaration keywords (:PARAMETERS, :DECLARE, :PUBLIC, :DEFAULT,
+      :INCLUDE, :INHERIT) ending a line no longer receive a forced
+      semicolon — the operand list on the following lines is the same
+      statement; the forced ';' truncated it (5 default_after_parameters
+      errors materialized on one corpus file).
 issues: ["#38", "#89"]
 ---
 
@@ -119,6 +127,24 @@ nValue := 1
 ```ssl
 nValue := 1;
 ```
+
+A declaration keyword ending its line takes its operand list from the
+following lines — no semicolon is forced after the bare keyword, which
+would truncate the statement and orphan the list (production-corpus
+shape, issue #216 review residual):
+
+### Idempotent
+
+```ssl
+:PARAMETERS
+chartNo, strRules, Mean
+, STD, CV;
+:DEFAULT chartNo, "";
+```
+
+(Continuation-line reindentation for split declaration lists is a
+separate open layout question; this fence pins only the no-forced-';'
+guarantee.)
 
 ## Rationale
 
