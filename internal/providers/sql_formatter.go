@@ -82,6 +82,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	parenDepth := 0
 	inSelectColumns := false
 	addBlankLineBeforeNextBreak := false
+	// A `--` line comment comments out the rest of its line — the next
+	// token MUST start a new line or it is swallowed into the comment
+	// (issue #218 corpus finding: `-- note` glued to `NOT EXISTS`).
+	pendingLineCommentBreak := false
 	subqueryParenDepths := make(map[int]bool)
 	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
 	// Rule D: stack of column positions immediately after each open '('.
@@ -683,17 +687,33 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 		// Preserve SQL comments — write inline with a preceding space
 		if t.Type == SQLTokenComment {
-			if !isFirstToken {
+			if pendingLineCommentBreak {
+				result.WriteString("\n")
+				parenIndent := strings.Repeat(f.indentString, parenDepth)
+				result.WriteString(baseIndent)
+				result.WriteString(parenIndent)
+				result.WriteString(extraIndent)
+				currentLineLen = len(baseIndent) + len(parenIndent) + len(extraIndent)
+				lineStartCol = currentLineLen
+				pendingLineCommentBreak = false
+			} else if !isFirstToken {
 				result.WriteString(" ")
 				currentLineLen++
 			}
 			result.WriteString(t.Text)
 			currentLineLen += len(t.Text)
 			isFirstToken = false
+			if strings.HasPrefix(t.Text, "--") {
+				pendingLineCommentBreak = true
+			}
 			continue
 		}
 
 		// Write output
+		if pendingLineCommentBreak {
+			needsBreak = true
+			pendingLineCommentBreak = false
+		}
 		if needsBreak {
 			if isSetOp {
 				result.WriteString("\n") // blank line before set operation

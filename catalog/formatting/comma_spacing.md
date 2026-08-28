@@ -24,6 +24,13 @@ history:
       A stray space before a comma is now removed: "," joined the
       whitespace-suppression set (gated on commaSpacing, like the rest of
       the comma handling).
+  - date: 2026-08-28
+    ref: "issue #218 (production-corpus idempotence)"
+    note: >-
+      Canonicalized comma-before-closer: no space between ',' and a
+      following closing delimiter or ';' on the no-whitespace path,
+      matching the whitespace-suppression path — the two disagreed and
+      `,,)` <-> `,, )` oscillated between passes.
 issues: ["#35"]
 ---
 

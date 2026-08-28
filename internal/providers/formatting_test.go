@@ -2708,3 +2708,54 @@ func TestFormatDocument_NoForcedSemicolonAfterDeclarationKeyword(t *testing.T) {
 		}
 	}
 }
+
+// Idempotence regressions from the production-corpus sweep (issue #218).
+// Each case pins format(format(x)) == format(x) for a class that
+// oscillated. [spec feature.formatting/A6]
+func TestFormatDocument_IdempotenceRegressions218(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"comma-before-closer", `dbResponse := RunSQL("Delete from T where X in " + sOrigrec,,);`},
+		{"comma-before-brace", `aRes := {DoProc("A.B.C", {uResult}),,,,,, };`},
+		{"wrapped-call-continuation", `DoProc("Category.Script.Procedure", {LimsString(sContent), LimsString(sApp), LimsString(sGuid), LimsString(sLogFile), sMode, sFileName});`},
+		{"wrapped-declare-list", `:DECLARE sFirstThing, sSecondThing, sThirdThing, sFourthThing, sFifthThing, sSixthThing, sSeventhLongThing;`},
+		{"eol-comment-spacing", ":IF (sPlatform == \"ORACLE\" .AND. oErr:GenCode != 2443) .OR. /*cannot drop constraint - nonexistent;\n\t(sPlatform == \"MSSQL\" .AND. oErr:GenCode != 3728);/*is not a constraint per the runtime message text;\n\tErrorMes(\"cannot drop\", oErr:Message);\n:ENDIF;"},
+		{"sql-line-comment", `aRows := SQLExecute("select r.id from rules r where r.active = 1 and ( -- rules with no mappings
+    not exists (select m.id from mappings m where m.ruleid = r.id)) and r.site = ?sSite?");`},
+	}
+	for _, tc := range cases {
+		f1 := tc.input
+		if e := FormatDocument(tc.input, DefaultFormattingOptions()); len(e) > 0 {
+			f1 = e[0].NewText
+		}
+		f2 := f1
+		if e := FormatDocument(f1, DefaultFormattingOptions()); len(e) > 0 {
+			f2 = e[0].NewText
+		}
+		if f1 != f2 {
+			t.Errorf("%s: not idempotent\n--- pass1 ---\n%s\n--- pass2 ---\n%s", tc.name, f1, f2)
+		}
+	}
+}
+
+// A SQL '--' line comment must end its output line — gluing the next
+// token into it hands the DBMS a query with the following code swallowed
+// by the comment (issue #218 sweep finding).
+func TestFormatDocument_SQLLineCommentForcesBreak(t *testing.T) {
+	input := `aRows := SQLExecute("select r.id from rules r where r.active = 1 and ( -- rules with no mappings
+    not exists (select m.id from mappings m where m.ruleid = r.id)) and r.site = ?sSite?");`
+	got := input
+	if e := FormatDocument(input, DefaultFormattingOptions()); len(e) > 0 {
+		got = e[0].NewText
+	}
+	for _, line := range strings.Split(got, "\n") {
+		if idx := strings.Index(line, "--"); idx >= 0 {
+			rest := line[idx:]
+			if strings.Contains(strings.ToUpper(rest), "NOT EXISTS") {
+				t.Fatalf("code glued into SQL line comment: %q", line)
+			}
+		}
+	}
+}

@@ -62,6 +62,14 @@ history:
       corpus mutation surfaced as a new validation error). Detected-SQL
       strings with an unbalanced single-quote count are now
       byte-preserved.
+  - date: 2026-08-28
+    ref: "issue #218 (production-corpus idempotence)"
+    note: >-
+      SQL '--' line comments force a line break before the next token:
+      the reflow was gluing following code into the comment ('-- note' +
+      'NOT EXISTS' -> '-- noteNOT EXISTS'), which a DBMS reads as the
+      predicate swallowed by the comment — a content-semantics hazard
+      found via the idempotence sweep.
 issues: ["#81", "#82"]
 ---
 
@@ -155,6 +163,36 @@ would rewrite the `{d '…'}` escape interior and the IN-list pattern
 ```ssl
 sSql := "update runs set fromsampd = {d '" + sDate + "'} where sessionid = ?";
 sSql2 := "delete from quotedetails where product not in('" + sList + "')";
+```
+
+A `--` line comment inside reflowed SQL always ends its output line —
+the following token starts a new line at the current nesting indent, or
+the DBMS would read it as part of the comment:
+
+### Before
+
+```ssl
+aRows := SQLExecute("select r.id from rules r where r.active = 1
+  and ( -- rules with no mappings
+    not exists (select m.id from mappings m where m.ruleid = r.id)
+  ) and r.site = ?sSite?");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT r.id
+    FROM rules r
+    WHERE r.active = 1
+      AND ( -- rules with no mappings
+        NOT EXISTS (
+            SELECT m.id
+            FROM mappings m
+            WHERE m.ruleid = r.id
+        ))
+      AND r.site = ?sSite?
+");
 ```
 
 A single-line SQL string that overflows 90 columns is reflowed by the SQL
