@@ -86,6 +86,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// token MUST start a new line or it is swallowed into the comment
 	// (issue #218 corpus finding: `-- note` glued to `NOT EXISTS`).
 	pendingLineCommentBreak := false
+	// ODBC escape tracking (issue #217): inside `{...}` the content is
+	// ODBC grammar, not schema identifiers — the marker (`fn`, `d`, `ts`,
+	// ...) is canonical lowercase, the scalar-function name after `{fn`
+	// and any SQL_* token are uppercase, and everything else keeps the
+	// author's casing (never identifier-folded).
+	odbcDepth := 0
+	odbcExpect := "" // "marker" after '{', "fnname" after '{fn'
+
 	subqueryParenDepths := make(map[int]bool)
 	afterBetween := false // tracks BETWEEN...AND to suppress AND line break
 	// Rule D: stack of column positions immediately after each open '('.
@@ -287,6 +295,35 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 		// Apply casing
 		tokenText := f.applyKeywordCasing(t)
+		switch {
+		case t.Text == "{" && t.Type == SQLTokenPunctuation:
+			odbcDepth++
+			odbcExpect = "marker"
+		case t.Text == "}" && t.Type == SQLTokenPunctuation && odbcDepth > 0:
+			odbcDepth--
+			odbcExpect = ""
+		case odbcDepth > 0 && t.Type != SQLTokenComment:
+			switch odbcExpect {
+			case "marker":
+				tokenText = strings.ToLower(t.Text)
+				if tokenText == "fn" {
+					odbcExpect = "fnname"
+				} else {
+					odbcExpect = ""
+				}
+			case "fnname":
+				tokenText = strings.ToUpper(t.Text)
+				odbcExpect = ""
+			default:
+				if t.Type == SQLTokenIdentifier {
+					if upper := strings.ToUpper(t.Text); strings.HasPrefix(upper, "SQL_") {
+						tokenText = upper
+					} else {
+						tokenText = t.Text
+					}
+				}
+			}
+		}
 
 		// Determine if we need a line break
 		needsBreak := false
@@ -1031,8 +1068,9 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev .
 		return true
 	}
 
-	// Space after ) before atom
-	if prev.Text == ")" && isAtom(curr) {
+	// Space after ) or an ODBC escape's closing } before an atom —
+	// `{fn IFNULL(x, '')}AS alias` glued into `}AS` otherwise (issue #217).
+	if (prev.Text == ")" || prev.Text == "}") && isAtom(curr) {
 		return true
 	}
 

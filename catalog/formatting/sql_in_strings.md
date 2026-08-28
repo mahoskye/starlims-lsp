@@ -70,6 +70,15 @@ history:
       'NOT EXISTS' -> '-- noteNOT EXISTS'), which a DBMS reads as the
       predicate swallowed by the comment — a content-semantics hazard
       found via the idempotence sweep.
+  - date: 2026-08-28
+    ref: "issue #217"
+    note: >-
+      ODBC escapes and placeholders made atomic (issue #217, production-
+      corpus review H3/H4/H5): '}' no longer glues to a following alias,
+      placeholder spans with quoted interiors are byte-preserved instead
+      of respaced, scalar-function names after '{fn' and SQL_* type
+      names are uppercase, and escape interiors keep the author's
+      identifier casing.
 issues: ["#81", "#82"]
 ---
 
@@ -118,7 +127,19 @@ are considered. Within the exception:
 - Within a known SQL function call, only the SQL argument (position 0) is
   ever a candidate — friendly names, LSearch default values, and parameter
   arrays are byte-preserved even when they look like SQL (issue #82).
-- SQL parameter placeholders (`?param?`) are preserved verbatim.
+- SQL parameter placeholders (`?param?`) are preserved verbatim — as an
+  atomic span whatever the interior holds, quoted content included
+  (`?'<<name>>'?`, a corpus pattern of dubious validity: the formatter
+  neither legitimizes nor rewrites it; byte-preservation is the only
+  safe treatment for suspect spans, and flagging them is diagnostic
+  territory, not layout).
+- ODBC escape sequences (`{fn …}`, `{d …}`, `{ts …}`, …) are atomic
+  spans of ODBC grammar, not schema identifiers (issue #217): a space
+  separates the closing `}` from a following token (`… )} AS alias`);
+  the marker is canonical lowercase; the scalar-function name after
+  `{fn` and any `SQL_*` token are uppercase; every other interior token
+  keeps the author's casing — escape interiors are never
+  identifier-folded.
 - Split assignments converge (issue #140): a single source line break
   between `:=` and a detected SQL string, and between the string and its
   terminating `;`, is joined before layout — so
@@ -163,6 +184,28 @@ would rewrite the `{d '…'}` escape interior and the IN-list pattern
 ```ssl
 sSql := "update runs set fromsampd = {d '" + sDate + "'} where sessionid = ?";
 sSql2 := "delete from quotedetails where product not in('" + sList + "')";
+```
+
+ODBC escapes format as atomic spans — `}` separated from a following
+alias, `{fn` names and `SQL_*` tokens uppercase, interior identifiers
+keeping the author's casing — and a placeholder's interior is never
+respaced:
+
+### Before
+
+```ssl
+aRows := SQLExecute("select {fn ifnull(sc.owner,'')} as owner, {fn convert(SC.ITEMID, SQL_VARCHAR)}itemid from limssourcecontrol sc where sc.owner = ?sUser? and sc.moddate > {fn timestampadd(SQL_TSI_DAY, -30, current_timestamp)}");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT {fn IFNULL(sc.owner, '')} AS owner, {fn CONVERT(SC.ITEMID, SQL_VARCHAR)} itemid
+    FROM limssourcecontrol sc
+    WHERE sc.owner = ?sUser?
+      AND sc.moddate > {fn TIMESTAMPADD(SQL_TSI_DAY, -30, current_timestamp)}
+");
 ```
 
 A `--` line comment inside reflowed SQL always ends its output line —

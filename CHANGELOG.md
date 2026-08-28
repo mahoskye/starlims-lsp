@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **SQL formatter: ODBC escapes and placeholders are atomic (#217).**
+  Three related defects: (1) the closing `}` of an `{fn …}` escape glued
+  to a following token (`}AS owner`, `}itemid` — invalid SQL on both
+  target DBMSs); (2) a `?…?` placeholder whose interior holds quoted
+  content was fragmented by the SQL lexer and respaced — such spans
+  (including suspect corpus patterns like `?'<<username>>'?`) are now
+  byte-preserved as atomic placeholders, neither legitimized nor
+  rewritten; (3) case-folding reached inside escapes — ODBC type names
+  were lowercased as identifiers (`SQL_VARCHAR` → `sql_varchar`) and
+  scalar-function casing depended on inventory membership. Inside
+  `{…}`: the marker is canonical lowercase, the function name after
+  `{fn` and `SQL_*` tokens are uppercase, and every other interior
+  token keeps the author's casing.
 - **Formatter is idempotent over the entire production corpus (#218).**
   Format-twice differed on 1,008 of 5,136 corpus files; now zero. Five
   root causes, each with a pinned regression: (1) comma-before-closer

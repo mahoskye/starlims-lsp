@@ -292,6 +292,21 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 	for tempPos < len(l.input) {
 		c := l.input[tempPos]
 
+		// A quoted span inside the placeholder is opaque — SSL substitutes
+		// expressions like ?'<<username>>'? whole, and breaking on the
+		// quote's characters fragmented the placeholder so the formatter
+		// respaced its interior (issue #217).
+		if c == '\'' {
+			tempPos++
+			for tempPos < len(l.input) && l.input[tempPos] != '\'' {
+				tempPos++
+			}
+			if tempPos < len(l.input) {
+				tempPos++
+			}
+			continue
+		}
+
 		if c == '(' {
 			parenDepth++
 		} else if c == ')' {
@@ -314,8 +329,22 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 	}
 
 	if foundClosing {
-		// Consume SSL parameter until closing ?
+		// Consume SSL parameter until closing ? — quoted spans stay opaque
+		// here too, or a ? inside quotes would end the placeholder early.
 		for l.pos < len(l.input) && l.input[l.pos] != '?' {
+			if l.input[l.pos] == '\'' {
+				text.WriteByte(l.input[l.pos])
+				l.advance()
+				for l.pos < len(l.input) && l.input[l.pos] != '\'' {
+					text.WriteByte(l.input[l.pos])
+					l.advance()
+				}
+				if l.pos < len(l.input) {
+					text.WriteByte(l.input[l.pos])
+					l.advance()
+				}
+				continue
+			}
 			text.WriteByte(l.input[l.pos])
 			l.advance()
 		}
