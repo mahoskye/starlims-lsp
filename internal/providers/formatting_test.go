@@ -2620,3 +2620,91 @@ func TestFormatDocument_RegionBodyVerbatim(t *testing.T) {
 		t.Errorf("region formatting not idempotent:\n--- first ---\n%s\n--- second ---\n%s", formatted, second[0].NewText)
 	}
 }
+
+// Multiple consecutive end-of-line comments on one line all survive
+// formatting, in order (issue #215 — the pending-EOL-comment slot merged
+// by clobbering, silently deleting all but the last).
+// [spec feature.formatting/A3]
+func TestFormatDocument_MultipleEOLCommentsPreserved(t *testing.T) {
+	input := `sPwd := ""; /*Encrypt(sU, sU); /* keep it simple;
+sPath := sBase;/*+sWorkingDir; /*always pass without final slash;`
+	got := input
+	if edits := FormatDocument(input, DefaultFormattingOptions()); len(edits) > 0 {
+		got = edits[0].NewText
+	}
+	for _, want := range []string{
+		"/*Encrypt(sU, sU);", "/* keep it simple;",
+		"/*+sWorkingDir;", "/*always pass without final slash;",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("comment %q missing from formatted output:\n%s", want, got)
+		}
+	}
+	again := got
+	if edits := FormatDocument(got, DefaultFormattingOptions()); len(edits) > 0 {
+		again = edits[0].NewText
+	}
+	if again != got {
+		t.Errorf("multi-EOL-comment output not idempotent:\n%s\n--- second pass ---\n%s", got, again)
+	}
+}
+
+// Detected-SQL strings with an unbalanced single-quote count are
+// byte-preserved: they end/begin inside an open SQL character literal
+// continued across concatenation, and respacing rewrites literal content
+// (issue #216 — {d '...'} escapes, IN/LIKE patterns).
+// [spec feature.formatting/A3]
+func TestFormatDocument_OddQuoteSQLStringsBytePreserved(t *testing.T) {
+	inputs := []string{
+		`sSql := "update t set d = {d '" + sDate + "'} where id = ?";`,
+		`sSql := "delete from t where name not in('" + sList + "')";`,
+		`sSql := "select x from t where note like ('" + sPat + "%')";`,
+	}
+	for _, input := range inputs {
+		got := input
+		if edits := FormatDocument(input, DefaultFormattingOptions()); len(edits) > 0 {
+			got = edits[0].NewText
+		}
+		orig := lexer.NewLexer(input).Tokenize()
+		fmtd := lexer.NewLexer(got).Tokenize()
+		var a, b []string
+		for _, tok := range orig {
+			if tok.Type == lexer.TokenString {
+				a = append(a, tok.Text)
+			}
+		}
+		for _, tok := range fmtd {
+			if tok.Type == lexer.TokenString {
+				b = append(b, tok.Text)
+			}
+		}
+		if len(a) != len(b) {
+			t.Fatalf("%q: string token count changed %d -> %d", input, len(a), len(b))
+		}
+		for i := range a {
+			if a[i] != b[i] {
+				t.Errorf("%q: string mutated:\n  orig %q\n  fmtd %q", input, a[i], b[i])
+			}
+		}
+	}
+}
+
+// A declaration keyword ending its line takes its operand list from the
+// following lines — semicolon enforcement must not truncate it
+// (production-corpus shape; fmt.semicolon_enforcement).
+func TestFormatDocument_NoForcedSemicolonAfterDeclarationKeyword(t *testing.T) {
+	input := ":PARAMETERS \n\tchartNo, strRules\n\t, STD;\n:DEFAULT chartNo, \"\";"
+	got := input
+	if edits := FormatDocument(input, DefaultFormattingOptions()); len(edits) > 0 {
+		got = edits[0].NewText
+	}
+	if strings.Contains(got, ":PARAMETERS;") {
+		t.Fatalf("forced semicolon truncated the parameter list:\n%s", got)
+	}
+	diags := GetDiagnostics(got, DefaultDiagnosticOptions())
+	for _, d := range diags {
+		if d.Code == CodeDefaultAfterParameters {
+			t.Errorf("formatting introduced default_after_parameters: %s", d.Message)
+		}
+	}
+}

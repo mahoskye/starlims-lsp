@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Formatter: multiple end-of-line comments on one line all survive
+  (#215).** The pending-EOL-comment slot merged by clobbering, silently
+  deleting all but the last comment (`x := ""; /*old; /*note;` lost
+  `/*old;`). Production corpus: 2 files were losing deliberately kept
+  commented-out code.
+- **Formatter: concatenation-continued SQL character literals are
+  byte-preserved (#216).** Detected-SQL strings with an unbalanced
+  single-quote count end (or begin) inside an open `'` literal continued
+  across concatenation; reflowing them injected whitespace/newlines into
+  literal content — malformed `{d '…'}` ODBC date escapes, `IN ('`/
+  `LIKE ('` patterns gaining whitespace. 403 corpus files were exposed;
+  such fragments now pass through untouched.
+- **Formatter: trailing-whitespace trim no longer reaches inside
+  multi-line string literals.** The post-pass trimmed line-ends inside
+  string content (343 corpus files), violating the string-bytes
+  contract; it now skips line-ends that fall within string, code-block,
+  and region-body tokens.
+- **Formatter: no forced semicolon after a bare declaration keyword.** A
+  line ending in `:PARAMETERS` (list on continuation lines) received a
+  forced `;`, truncating the statement and orphaning the list — one
+  corpus file materialized five `default_after_parameters` errors from
+  formatting alone. `:PARAMETERS`/`:DECLARE`/`:PUBLIC`/`:DEFAULT`/
+  `:INCLUDE`/`:INHERIT` now count as non-statement-ending keywords.
+
+  Corpus effect of the four fixes: formatting introduces **zero** new
+  error-severity diagnostics (was 1 file), zero string-content
+  mutations, and non-idempotent files drop 1,008 → 807.
+
 ### Changed
 - **The info severity tier is now opt-in** (`ssl.diagnostics.infoDiagnostics`,
   default off; `--validate --info` on the CLI). Info diagnostics are

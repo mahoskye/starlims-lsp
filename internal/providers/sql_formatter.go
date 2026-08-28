@@ -1401,3 +1401,18 @@ func decodeCommaCount(tokens []SQLToken, start int) int {
 	}
 	return commas
 }
+
+// IsReformattableSQLString is the formatter's candidacy gate: the content
+// must look like SQL (IsSQLString) AND be safe to reflow. A string whose
+// content holds an unbalanced number of single quotes ends (or begins)
+// inside an open SQL character literal that is continued across SSL string
+// concatenation — `"… where d = {d '" + sDate + "'}"` — and any respacing
+// there rewrites literal content (broken ODBC date escapes, IN/LIKE
+// patterns gaining whitespace). Such fragments are byte-preserved
+// (issue #216, fmt.sql_in_strings).
+func IsReformattableSQLString(content string) bool {
+	if strings.Count(content, "'")%2 == 1 {
+		return false
+	}
+	return IsSQLString(content)
+}
