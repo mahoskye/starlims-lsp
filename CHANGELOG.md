@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-28
+
+The production-corpus release. A private, production-representative
+corpus of 6,228 STARLIMS server scripts and data sources became the
+project's standing test bed, and this release is what it produced:
+twelve new diagnostics from the runtime-verification issue batch
+(#185–#200), the opt-in **info severity tier** for assistant/LLM
+consumers (with seven new SQL advisories and four advisory
+reclassifications), an adversarial formatting review
+(docs/reviews/2026-08-28) whose every finding was fixed — comment
+preservation, spliced-literal byte-preservation, ODBC escape atomicity,
+and full-corpus idempotence (1,008 unstable files → 0) — plus the
+corpus-owner-decided SQL conventions (identifier case preserved by
+default, `compact` retired, `standard` reworked) and milestone 1 of the
+expression-level AST (#184). Final formatter harness: zero panics, zero
+content mutations, zero formatting-introduced diagnostics, zero
+non-idempotent files. Downstream consumers pick this up via the
+ssl-style-guide MCP binaries and vs-code-ssl-formatter extension bumps
+(scopes: vs-code-ssl-formatter#95, ssl-style-guide#59 — one new
+required setting, `ssl.diagnostics.infoDiagnostics`, plus
+`ssl.format.sql.identifierCase`).
+
 ### Changed
 - **SQL style decisions from the formatting review (#219,
   corpus-owner-decided).** Four convention changes:
