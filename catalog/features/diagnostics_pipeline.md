@@ -127,6 +127,15 @@ history:
       terminated leading block comment now masks as comment furniture
       (criterion A24). The corpus owner confirmed `*/;` is valid and
       purely stylistic — SSL never sees the `*/`.
+  - date: 2026-08-27
+    ref: "issue #208 discussion"
+    note: >-
+      Info tier made opt-in (ssl.diagnostics.infoDiagnostics, default
+      off, criterion A27): info diagnostics repositioned as advisory
+      detail for assistant/LLM consumers — the corpus owner's direction
+      is that assistants configured with the info tier can write better
+      code, while the default human surface stays errors/warnings/hints.
+      Explicit ssl.diagnostics.rules entries bypass the gate.
 issues: []
 ---
 
@@ -169,6 +178,15 @@ rules (those are `diag.*` entries).
   appears in the first ~30 lines. The default-empty pattern list means zero
   false positives out of the box; a marker deeper in the file MUST NOT
   activate endpoint mode.
+- The info severity tier is opt-in: info diagnostics are advisory detail —
+  style observations and idiom notes aimed at assistant/LLM consumers and
+  teams that want the full picture — and are dropped by default
+  (`ssl.diagnostics.infoDiagnostics: false`) so the everyday surface stays
+  errors/warnings/hints. A rule explicitly configured in
+  `ssl.diagnostics.rules` bypasses the gate: an explicit per-rule severity
+  choice always wins, in both directions. The `--validate` CLI mirrors
+  this with an `--info` flag. Hint severity is NOT gated — hints render
+  subdued in editors already and carry actionable one-keystroke fixes.
 - SQL-mode data-source classification: a document classified as a data
   source by URI (`.ds` / `.ds.txt`) is SQL by default and produces NO SSL
   diagnostics — every SSL check would false-flag SQL syntax (`table.column`
@@ -245,6 +263,7 @@ rules (those are `diag.*` entries).
 - A20: Given a SQL-mode data-source body containing a `;` outside comments and string literals, when diagnostics are collected, then exactly one `datasource_sql_semicolon` warning fires per such semicolon at its position (offset past the header in the hybrid shape, whose own `;` terminators never flag); the warning honors rule overrides and never fires outside data-source files.
 - A21: Given a SQL-mode data-source body containing a `@name` placeholder outside comments and string literals with no case-insensitive match among the header's `:PARAMETERS` names (all placeholders, when there is no header), when diagnostics are collected, then a `datasource_undeclared_placeholder` warning fires on the placeholder's span; `@@` system functions, declared placeholders, unused declared parameters, and `DECLARE`-scripted bodies stay silent.
 - A22: Given a `.ds` data-source document whose SQL body carries no strong SSL marker — a SELECT whose list uses implicit column aliases (`col alias`), or any query that fails strict SQL-statement validation — when diagnostics are collected, then it classifies as SQL mode and no SSL diagnostic (`bare_logical_operator` on lowercase `and`/`or`, `dot_property_access` on `table.column`, or otherwise) fires; conversely, a `.ds` body carrying a strong SSL marker (a non-directive colon keyword, a `:=` assignment, or a leading unterminated `/* …` comment) classifies as SSL and keeps the full data-source diagnostic set, so a bare `and` in SSL code still flags `bare_logical_operator` (issue #153).
+- A27: Given default options, when a document emits an info-severity diagnostic, then it is dropped — the info tier is opt-in (`ssl.diagnostics.infoDiagnostics`); given the setting enabled, the same diagnostic is delivered; and given a rule explicitly configured in `ssl.diagnostics.rules` (including remapped *to* info), that rule's diagnostics are delivered regardless of the gate. Errors, warnings, and hints are never gated.
 - A24: Given a data-source document whose leading banner comment closes with `*/;` (optionally with spaces before the `;`) followed by a builder-directive / `:PARAMETERS` header and a SQL body, when diagnostics are collected, then the header still splits — no SSL diagnostic (`dot_property_access`, `bare_logical_operator`, or otherwise) fires on the SQL body, and the header lines keep their checks; the stray `;` is masked as comment furniture, never treated as content (issue #208).
 - A25: Given a data-source header whose statements are interleaved with `--` line comments (`:DSN := x;` … `--note` … `:PARAMETERS p := v;`), when diagnostics are collected, then the header split includes every header statement — the comment lines mask to blanks inside the header and no diagnostic fires on them — while a `--` comment run followed by non-header content stays with the body (issue #208).
 - A26: Given a SQL data-source body whose only SSL-looking content sits inside line-leading `--` comments (a commented-out directive such as `--:PARAMETERS p := '';`), when diagnostics are collected, then the document classifies as SQL mode — commented-out code is never a strong SSL marker — while a mid-line `--` (SSL decrement territory) does not suppress marker detection (issue #208).

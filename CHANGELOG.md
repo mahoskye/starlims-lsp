@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The info severity tier is now opt-in** (`ssl.diagnostics.infoDiagnostics`,
+  default off; `--validate --info` on the CLI). Info diagnostics are
+  repositioned as advisory detail — style observations and idiom notes
+  aimed at assistant/LLM consumers and teams that want the full picture —
+  and are dropped by default so the everyday surface stays
+  errors/warnings/hints. A rule explicitly listed in
+  `ssl.diagnostics.rules` always shows regardless of the gate (including
+  rules remapped *to* info). Hints are not gated. Affects the nine
+  default-info rules (`equals_vs_strict_equals`,
+  `not_preferred_operator`, `empty_optional_param_array`,
+  `identifier_too_long`, `complex_sql_placeholder`, `include_early`,
+  `nested_iif`, `class_member_order`, `nil_not_empty_string`).
+
 ### Added
+- **`c_style_comment_closer` (#208 discussion).** Info-tier note on
+  comments closing `*/;` — valid, purely stylistic (SSL never sees the
+  `*/`; the `;` is the real terminator), but the `*/` encodes a wrong
+  mental model of where SSL comments end. The first rule designed for
+  the opt-in info tier.
 - **`step_zero_literal` (#199).** Warns on a `:FOR` loop whose `:STEP` is a
   provable literal zero (`0`, `0.0`, `-0`) — the loop variable never
   advances, so the loop cannot terminate once entered. Variable or

@@ -6,8 +6,12 @@ status: active
 authority: tool
 schema_ref: null
 default_severity: info
+config:
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:

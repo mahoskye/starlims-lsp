@@ -20,7 +20,7 @@ func TestValidateFilePath_DataSourceSQLMode(t *testing.T) {
 	if err := os.WriteFile(hybridPath, []byte(hybrid), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	result := validateFilePath(hybridPath, false)
+	result := validateFilePath(hybridPath, false, false)
 	if !result.Valid {
 		t.Errorf("hybrid .ds file should be valid, got diagnostics: %+v", result.Diagnostics)
 	}
@@ -35,7 +35,7 @@ func TestValidateFilePath_DataSourceSQLMode(t *testing.T) {
 	if err := os.WriteFile(plainPath, []byte("SELECT T.COL1, T.COL2 FROM MYTABLE T WHERE T.ID = 1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	result = validateFilePath(plainPath, false)
+	result = validateFilePath(plainPath, false, false)
 	if len(result.Diagnostics) != 0 {
 		t.Errorf("plain SQL .ds file should produce no diagnostics, got: %+v", result.Diagnostics)
 	}
@@ -46,7 +46,7 @@ func TestValidateFilePath_DataSourceSQLMode(t *testing.T) {
 	if err := os.WriteFile(sslPath, []byte(":PARAMETERS sName;\n:DEFAULT sName, '';\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	result = validateFilePath(sslPath, false)
+	result = validateFilePath(sslPath, false, false)
 	if result.Valid {
 		t.Error("SSL-content .ds file with :DEFAULT statement should produce data-source diagnostics")
 	}
@@ -58,12 +58,12 @@ func TestValidateFilePath_DataSourceSQLMode(t *testing.T) {
 func TestValidateContent_DsFlag(t *testing.T) {
 	content := ":PARAMETERS sMode := \"Post\";\nselect IO.OBJECT_NAME as name, @sMode\n"
 
-	asDataSource := validateContent("stdin", content, true)
+	asDataSource := validateContent("stdin", content, true, false)
 	if len(asDataSource.Diagnostics) != 0 {
 		t.Errorf("with --ds, SQL-mode content should produce no diagnostics, got: %+v", asDataSource.Diagnostics)
 	}
 
-	asSSL := validateContent("stdin", content, false)
+	asSSL := validateContent("stdin", content, false, false)
 	if asSSL.Valid {
 		t.Error("without --ds, the SQL body should produce SSL diagnostics (dot property access on IO.OBJECT_NAME)")
 	}

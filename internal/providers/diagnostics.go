@@ -85,6 +85,13 @@ type DiagnosticOptions struct {
 	// effective /*@private; //*@protected; annotation for teams that
 	// prefer procedures unannotated.
 	CheckVisibilityAnnotationUsage bool
+	// IncludeInfoDiagnostics enables the info severity tier (issue #208
+	// discussion): info diagnostics are advisory detail — style
+	// observations and idiom notes aimed at assistant/LLM consumers and
+	// teams that want the full picture — and are dropped by default so
+	// the everyday surface stays errors/warnings/hints. A rule explicitly
+	// configured in RuleOverrides always shows regardless of this gate.
+	IncludeInfoDiagnostics bool
 
 	// IncludeDeclaredVariables carries variable names declared by the
 	// file's resolved :INCLUDE targets (full-splice semantics, supplied by
@@ -154,17 +161,17 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				// The header is a position-preserving prefix, so ranges line
 				// up unchanged (issues #104, #148).
 				offset := strings.Count(header, "\n")
-				sqlBodyDiagnostics = applyRuleOverrides(append(
+				sqlBodyDiagnostics = applyInfoGate(applyRuleOverrides(append(
 					checkDataSourceSQLSemicolons(body, offset),
-					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides)
+					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides), opts)
 				text = header
 			} else {
 				// Whole-document SQL body (or a comment-only stub): no SSL
 				// diagnostics, only the SQL-body checks. With no header, no
 				// @name placeholders are declared.
-				return applyRuleOverrides(append(
+				return applyInfoGate(applyRuleOverrides(append(
 					checkDataSourceSQLSemicolons(text, 0),
-					checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides)
+					checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides), opts)
 			}
 		}
 	}
@@ -222,6 +229,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for lexer-level issues
 	diagnostics = append(diagnostics, checkTokenErrors(tokens)...)
 	diagnostics = append(diagnostics, checkCommentTermination(tokens)...)
+	diagnostics = append(diagnostics, checkCStyleCommentClosers(tokens)...)
 
 	// Check for unmatched parentheses/brackets
 	if opts.CheckUnmatchedParens {
@@ -346,9 +354,32 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	diagnostics = applySuppressionComments(tokens, diagnostics)
 	diagnostics = applyRuleOverrides(diagnostics, opts.RuleOverrides)
+	diagnostics = applyInfoGate(diagnostics, opts)
 
 	result = diagnostics
 	return
+}
+
+// applyInfoGate drops info-severity diagnostics unless the info tier is
+// enabled (ssl.diagnostics.infoDiagnostics). Rules the user explicitly
+// configured in RuleOverrides are exempt — an explicit per-rule severity
+// choice always wins over the blanket gate, in both directions (a rule
+// remapped *to* info stays visible; a rule remapped away from info was
+// never info to begin with).
+func applyInfoGate(diagnostics []Diagnostic, opts DiagnosticOptions) []Diagnostic {
+	if opts.IncludeInfoDiagnostics {
+		return diagnostics
+	}
+	filtered := diagnostics[:0]
+	for _, d := range diagnostics {
+		if d.Severity == SeverityInfo {
+			if _, configured := opts.RuleOverrides[d.Code]; !configured {
+				continue
+			}
+		}
+		filtered = append(filtered, d)
+	}
+	return filtered
 }
 
 // applyRuleOverrides drops or remaps severities for diagnostics whose Code
@@ -6772,6 +6803,36 @@ func checkBuiltinExcessArguments(tokens []lexer.Token) []Diagnostic {
 				constants.GeneratedFunctionSummaries[strings.ToLower(token.Text)].Title, maxArgs, len(argStarts)-maxArgs, plural),
 			Source: "ssl-lsp",
 			Code:   CodeBuiltinExcessArguments,
+		})
+	}
+
+	return diagnostics
+}
+
+// checkCStyleCommentClosers flags SSL comments whose text ends with a
+// C-style `*/` immediately before the terminating `;`
+// (diag.c_style_comment_closer, issue #208 discussion). The construct is
+// valid — SSL reads the `*/` as literal comment text and the `;` as the
+// real terminator — so this is a pure info-tier style observation: the
+// `*/` suggests a mental model where it closes the comment, which in SSL
+// it never does.
+func checkCStyleCommentClosers(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, token := range tokens {
+		if token.Type != lexer.TokenComment {
+			continue
+		}
+		text := strings.TrimRight(strings.TrimSpace(token.Text), ";")
+		if !strings.HasSuffix(strings.TrimRight(text, " \t"), "*/") {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityInfo,
+			Range:    tokenToRange(token),
+			Message:  "SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)",
+			Source:   "ssl-lsp",
+			Code:     CodeCStyleCommentCloser,
 		})
 	}
 

@@ -137,4 +137,5 @@ const (
 	CodeFormatArgNotArray           = "format_arg_not_array"
 	CodeVisibilityAnnotationUsage   = "visibility_annotation_usage"
 	CodeBuiltinExcessArguments      = "builtin_excess_arguments"
+	CodeCStyleCommentCloser         = "c_style_comment_closer"
 )

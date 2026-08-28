@@ -20,6 +20,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `branch_target_label` | Branch() target string without the LABEL token | error | tool | active | [diag.branch_target_label](../../catalog/diagnostics/branch_target_label.md) |
 | `builder_directive_case` | Data source builder directive not uppercase | error | tool | active | [diag.builder_directive_case](../../catalog/diagnostics/builder_directive_case.md) |
 | `builtin_excess_arguments` | Surplus builtin arguments silently dropped at compile time | warning | tool | active | [diag.builtin_excess_arguments](../../catalog/diagnostics/builtin_excess_arguments.md) |
+| `c_style_comment_closer` | C-style */ before a comment's terminating semicolon | info | style_only | active | [diag.c_style_comment_closer](../../catalog/diagnostics/c_style_comment_closer.md) |
 | `catch_clause_form` | CATCH takes no exception variable or clause content | error | tool | active | [diag.catch_clause_form](../../catalog/diagnostics/catch_clause_form.md) |
 | `catch_order_before_finally` | CATCH appearing after FINALLY in a TRY block | error | tool | active | [diag.catch_order_before_finally](../../catalog/diagnostics/catch_order_before_finally.md) |
 | `class_instantiation_curly` | Built-in class instantiated with parentheses | error | tool | active | [diag.class_instantiation_curly](../../catalog/diagnostics/class_instantiation_curly.md) |

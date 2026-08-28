@@ -9,7 +9,10 @@ default_severity: info
 severity_overridable: true
 suppressible: true
 config:
+  - ssl.diagnostics.infoDiagnostics
   - ssl.diagnostics.hungarianPrefixes
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:
