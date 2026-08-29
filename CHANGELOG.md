@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--hungarian` flag on the `--validate` CLI.** Enables the two opt-in
+  Hungarian checks for that run — `hungarian_notation` (a declared name
+  carries no recognized prefix) and `hungarian_type_mismatch` (the type a
+  prefix promises disagrees with the assigned expression). Both are gated
+  behind the `ssl.diagnostics.hungarianNotation` editor setting, which the
+  CLI had no way to reach, so agent skills and CI callers could not get at
+  them at all — `hungarian_type_mismatch` shipped in v0.19.0 unreachable
+  from the CLI. The flag is orthogonal to `--info`: neither implies the
+  other, and without a flag the CLI default matches the editor default.
+  The flags are now covered by an acceptance criterion
+  (`feature.diagnostics_pipeline` A28); `--info` previously had none.
+
 ## [0.19.0] - 2026-08-29
 
 The expression-AST release. Milestone 1 of issue #184 shipped the tree
