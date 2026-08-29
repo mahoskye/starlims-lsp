@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-29
+
+The expression-AST release. Milestone 1 of issue #184 shipped the tree
+itself in v0.18.0 with no consumers; this release is what the tree was
+for. Two diagnostics graduate from token scanning and Hungarian
+guesswork to real call and type analysis, a new opt-in rule turns SSL's
+naming convention into an enforceable type annotation, and three
+correctness bugs the tree exposed are fixed — one of which, rename
+rewriting `oRec:sName` properties and like-named `:PROCEDURE` headers,
+silently corrupted code. Identifier resolution moved from lines to
+statements, so a bare `:DECLARE` no longer hides every name it declares
+from diagnostics, document symbols, rename, and the workspace index.
+Every judgment the new typing makes is a definite type or "unknown", and
+unknown is never evidence: the operator result matrix comes from the
+element inventory rather than hand-written rules, and combinations the
+language documents no result for make no claim. Verified against the
+6,228-file production corpus — the default diagnostic surface is
+unchanged at 8,794 diagnostics across 43 codes, with no panics and no
+throughput regression. Issue #184 is closed. Downstream consumers pick
+this up via the ssl-style-guide MCP binaries and vs-code-ssl-formatter
+extension bumps (scope: vs-code-ssl-formatter#95 — the rule-id enum needs
+the new `hungarian_type_mismatch` code).
+
+### Added
+- **`hungarian_type_mismatch`** (issue #184, opt-in): cross-checks the type
+  a variable's Hungarian prefix promises against the type its assigned
+  expression actually produces — `nCode := SubStr(sText, 1, 4)` stores a
+  string in a number-named variable, `:DEFAULT bFlag, ""` gives a boolean
+  a string default. SSL's naming convention encodes a type annotation on
+  every variable; with an expression tree that annotation is enforceable,
+  which is the stronger `CheckHungarianNotation` #184 proposed. Shares the
+  existing `ssl.diagnostics.hungarianNotation` setting (default off) and is
+  separately silenceable through `ssl.diagnostics.rules`. Both ends demand
+  definite evidence, so anything partial stays silent. Corpus measurement
+  over 4,620 production files: 459 hits in 272 files (5.9%).
+
+- **Coarse expression typing** (`internal/providers/expr_types.go`,
+  issue #184): literals, operator results, and builtin return types from
+  the element inventory, with an opt-in mode that additionally reads
+  Hungarian prefixes on identifiers and member names as type evidence.
+  Every judgment is a definite type or "unknown", and unknown is never
+  treated as evidence — an expression that cannot be resolved makes no
+  claim rather than a guess. Binary operator results come from the element
+  inventory's documented type matrix rather than hand-written rules, so a
+  combination the language documents no result for (`aList + sText`,
+  `nCount * sText`) makes no claim; assuming string concatenation there
+  cost 94 false positives in the first corpus run.
+
+- **`parser.StatementKind`**: `StatementExprs` now names the statement
+  shape it came from (assignment, `:DEFAULT`, `:FOR` header, condition,
+  `:RETURN`, bare expression), so consumers can tell them apart without
+  re-reading tokens.
+
+- **Formatter regressions inherited from vs-code-ssl-formatter**
+  (`internal/providers/extension_regressions_test.go`). The extension
+  removed its fallback TypeScript formatter — a corpus run showed it was
+  non-idempotent on 18% of files and appended stray semicolons to SQL in
+  `.ds` documents — making formatting LSP-only. That suite encoded real
+  user bug reports, so the scenarios not already covered here were
+  carried over: keyword casing inside an array subscript, no token
+  merging across line breaks in a multi-line SQL string, an end-of-line
+  comment not swallowing the next statement, wrapped lines never
+  starting with a comma, qualified `Table.Column` never split on wrap,
+  and semicolon enforcement across the whole block-opener family. Cases
+  where this formatter deliberately differs (statement consolidation,
+  comma-list wrapping with visual alignment, blank lines between `:CASE`
+  arms) are recorded in the same file as decisions rather than gaps.
+
 ### Changed
 - **`builtin_excess_arguments` and `format_arg_not_array` now run on the
   expression AST** (issue #184). Both rules shipped on token scanning and
@@ -31,34 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (97 and 0 hits, before and after), and end-to-end `--validate`
   throughput is unchanged within run-to-run noise.
 
-### Added
-- **`hungarian_type_mismatch`** (issue #184, opt-in): cross-checks the type
-  a variable's Hungarian prefix promises against the type its assigned
-  expression actually produces — `nCode := SubStr(sText, 1, 4)` stores a
-  string in a number-named variable, `:DEFAULT bFlag, ""` gives a boolean
-  a string default. SSL's naming convention encodes a type annotation on
-  every variable; with an expression tree that annotation is enforceable,
-  which is the stronger `CheckHungarianNotation` #184 proposed. Shares the
-  existing `ssl.diagnostics.hungarianNotation` setting (default off) and is
-  separately silenceable through `ssl.diagnostics.rules`. Both ends demand
-  definite evidence, so anything partial stays silent. Corpus measurement
-  over 4,620 production files: 459 hits in 272 files (5.9%).
-- **Coarse expression typing** (`internal/providers/expr_types.go`,
-  issue #184): literals, operator results, and builtin return types from
-  the element inventory, with an opt-in mode that additionally reads
-  Hungarian prefixes on identifiers and member names as type evidence.
-  Every judgment is a definite type or "unknown", and unknown is never
-  treated as evidence — an expression that cannot be resolved makes no
-  claim rather than a guess. Binary operator results come from the element
-  inventory's documented type matrix rather than hand-written rules, so a
-  combination the language documents no result for (`aList + sText`,
-  `nCount * sText`) makes no claim; assuming string concatenation there
-  cost 94 false positives in the first corpus run.
-- **`parser.StatementKind`**: `StatementExprs` now names the statement
-  shape it came from (assignment, `:DEFAULT`, `:FOR` header, condition,
-  `:RETURN`, bare expression), so consumers can tell them apart without
-  re-reading tokens.
-
 ### Fixed
 - **Rename rewrote unrelated symbols that merely shared a name** (issue
   #184). Rename and reference search matched identifiers by word, so
@@ -72,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playing a different role than the symbol under the cursor are not
   references to it. Positions the tree cannot resolve stay unclassified
   and keep the prior word-match behavior, so coverage does not regress.
+
 - **Declarations were resolved by line, so a bare `:DECLARE` hid every name
   it declared** (issue #184). `ExtractVariables` read a declaration's names
   out of an AST node grouped by line, and the undeclared check's
@@ -93,12 +134,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on a declaration line anywhere in its own file. Declared names also feed
   document symbols, rename, the workspace index, and every name-shaped
   diagnostic, so the loss was not confined to one check.
+
 - **`builtin_excess_arguments` crashed on a surplus run ending in skipped
   argument slots.** `Left(sText, nA, nB,,)` indexed the argument list at
   -1 while building the diagnostic range and panicked; the pipeline's
   panic recovery turned that into a single `internal_error` diagnostic,
   so the file lost its real diagnostics. Argument ranges now come from
   the argument subtrees, which are always well-formed.
+
 - **Semicolon enforcement skipped bare `:BEGINCASE`.** It was the only
   block opener that never got a semicolon: the token after it is always
   `:CASE` or `:OTHERWISE`, both continuation keywords, so the lookahead
@@ -109,22 +152,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documents throughout. No corpus impact (0 of 6,228 files change; real
   code already writes the semicolon) and full-corpus idempotence is
   unaffected.
-
-### Added
-- **Formatter regressions inherited from vs-code-ssl-formatter**
-  (`internal/providers/extension_regressions_test.go`). The extension
-  removed its fallback TypeScript formatter — a corpus run showed it was
-  non-idempotent on 18% of files and appended stray semicolons to SQL in
-  `.ds` documents — making formatting LSP-only. That suite encoded real
-  user bug reports, so the scenarios not already covered here were
-  carried over: keyword casing inside an array subscript, no token
-  merging across line breaks in a multi-line SQL string, an end-of-line
-  comment not swallowing the next statement, wrapped lines never
-  starting with a comma, qualified `Table.Column` never split on wrap,
-  and semicolon enforcement across the whole block-opener family. Cases
-  where this formatter deliberately differs (statement consolidation,
-  comma-list wrapping with visual alignment, blank lines between `:CASE`
-  arms) are recorded in the same file as decisions rather than gaps.
 
 ## [0.18.0] - 2026-08-28
 
@@ -1365,7 +1392,9 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.18.0...v0.19.0
+[0.18.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.14.1...v0.15.0
