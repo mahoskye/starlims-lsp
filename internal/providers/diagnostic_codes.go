@@ -145,4 +145,5 @@ const (
 	CodeSQLDialectMix               = "sql_dialect_mix"
 	CodeSQLSelectStar               = "sql_select_star"
 	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
+	CodeHungarianTypeMismatch       = "hungarian_type_mismatch"
 )

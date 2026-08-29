@@ -37,7 +37,11 @@ func TestInferExprTypeStructural(t *testing.T) {
 		{`1 = 2`, typeBoolean},
 		{`"a" $ "abc"`, typeBoolean},
 		{`2 * 3`, typeNumber},
-		{`"a" + sTail`, typeString},
+		{`"a" + "b"`, typeString},
+		{`dStart - 7`, typeUnknown},
+		// Combinations the language documents no result for make no claim.
+		{`{1} + "a"`, typeUnknown},
+		{`2 * "a"`, typeUnknown},
 		{`AllTrim(sText)`, typeString},
 		{`Len(sText)`, typeNumber},
 		{`Empty(sText)`, typeBoolean},
@@ -74,6 +78,9 @@ func TestInferExprTypeNamedReadsHungarian(t *testing.T) {
 		{`_sName`, typeString},
 		{`Me:sTemplate`, typeString},
 		{`sFirst + sLast`, typeString},
+		{`dStart - 7`, typeDate},
+		{`dEnd - dStart`, typeNumber},
+		{`aItems + sExtra`, typeUnknown},
 		// Shape failures make no claim: no uppercase body letter, an
 		// unlisted prefix, the variant prefix, a loop counter, and an
 		// ALLCAPS constant.

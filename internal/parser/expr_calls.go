@@ -53,8 +53,15 @@ func (c CallSite) EffectiveArgs() []*Expr {
 // the expression parser could not resolve simply yield no call sites —
 // unknown is never reported as evidence.
 func CollectCalls(tokens []lexer.Token) []CallSite {
+	return CollectCallsIn(ExtractStatementExpressions(tokens))
+}
+
+// CollectCallsIn is CollectCalls over an already-extracted statement list,
+// for callers that need both views and should not pay for extraction
+// twice.
+func CollectCallsIn(stmts []StatementExprs) []CallSite {
 	var out []CallSite
-	for _, se := range ExtractStatementExpressions(tokens) {
+	for _, se := range stmts {
 		for _, e := range se.Exprs {
 			collectCallsInto(e, se.Complete, &out)
 		}

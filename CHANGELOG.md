@@ -32,13 +32,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throughput is unchanged within run-to-run noise.
 
 ### Added
+- **`hungarian_type_mismatch`** (issue #184, opt-in): cross-checks the type
+  a variable's Hungarian prefix promises against the type its assigned
+  expression actually produces — `nCode := SubStr(sText, 1, 4)` stores a
+  string in a number-named variable, `:DEFAULT bFlag, ""` gives a boolean
+  a string default. SSL's naming convention encodes a type annotation on
+  every variable; with an expression tree that annotation is enforceable,
+  which is the stronger `CheckHungarianNotation` #184 proposed. Shares the
+  existing `ssl.diagnostics.hungarianNotation` setting (default off) and is
+  separately silenceable through `ssl.diagnostics.rules`. Both ends demand
+  definite evidence, so anything partial stays silent. Corpus measurement
+  over 4,620 production files: 459 hits in 272 files (5.9%).
 - **Coarse expression typing** (`internal/providers/expr_types.go`,
   issue #184): literals, operator results, and builtin return types from
   the element inventory, with an opt-in mode that additionally reads
   Hungarian prefixes on identifiers and member names as type evidence.
   Every judgment is a definite type or "unknown", and unknown is never
   treated as evidence — an expression that cannot be resolved makes no
-  claim rather than a guess.
+  claim rather than a guess. Binary operator results come from the element
+  inventory's documented type matrix rather than hand-written rules, so a
+  combination the language documents no result for (`aList + sText`,
+  `nCount * sText`) makes no claim; assuming string concatenation there
+  cost 94 false positives in the first corpus run.
+- **`parser.StatementKind`**: `StatementExprs` now names the statement
+  shape it came from (assignment, `:DEFAULT`, `:FOR` header, condition,
+  `:RETURN`, bare expression), so consumers can tell them apart without
+  re-reading tokens.
 
 ### Fixed
 - **`builtin_excess_arguments` crashed on a surplus run ending in skipped
