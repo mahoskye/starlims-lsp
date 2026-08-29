@@ -146,6 +146,15 @@ history:
       corpus, the index costs ~165ms against ~675ms of lexing and
       replaces ~85ms of per-rule token scanning; end-to-end --validate
       throughput was unchanged within run-to-run noise.
+  - date: 2026-08-29
+    ref: "downstream request (ssl-style-guide MCP)"
+    note: >-
+      --validate gained a --hungarian flag, alongside the existing --info,
+      so a CLI caller can enable the opt-in Hungarian checks. The MCP
+      binaries that serve LLM consumers had no way to reach
+      hungarian_type_mismatch, which is gated behind an editor setting the
+      CLI did not expose. The flags are also now covered by an acceptance
+      criterion (A28); --info had none.
 issues: []
 ---
 
@@ -278,6 +287,7 @@ rules (those are `diag.*` entries).
 - A25: Given a data-source header whose statements are interleaved with `--` line comments (`:DSN := x;` … `--note` … `:PARAMETERS p := v;`), when diagnostics are collected, then the header split includes every header statement — the comment lines mask to blanks inside the header and no diagnostic fires on them — while a `--` comment run followed by non-header content stays with the body (issue #208).
 - A26: Given a SQL data-source body whose only SSL-looking content sits inside line-leading `--` comments (a commented-out directive such as `--:PARAMETERS p := '';`), when diagnostics are collected, then the document classifies as SQL mode — commented-out code is never a strong SSL marker — while a mid-line `--` (SSL decrement territory) does not suppress marker detection (issue #208).
 - A23: Given a document whose `:REGION` body holds non-SSL payload (HTML with dotted attributes, JavaScript `&&`/`==`, 0-based indexing), when diagnostics are collected, then no diagnostic fires on any body line; a region missing its `:ENDREGION` still reports `unclosed_block`; and formatting the document leaves every body line byte-identical (issue #164).
+- A28: Given the `--validate` CLI, when `--info` or `--hungarian` is passed, then the corresponding opt-in option is enabled for that run — info-severity diagnostics are delivered, and `hungarian_notation` / `hungarian_type_mismatch` fire — and without the flag each stays off, so the CLI default matches the editor default.
 
 ## Rationale
 

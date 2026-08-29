@@ -28,6 +28,27 @@ type DiagnosticDetail struct {
 	Code     string `json:"code,omitempty"`
 }
 
+// validateFlags are the CLI switches that shape a validate run. The
+// opt-in diagnostic options are exposed here because --validate serves
+// agent skills and CI, where the caller — not a user settings file —
+// decides how much detail it wants.
+type validateFlags struct {
+	// dataSource forces data-source classification (--ds).
+	dataSource bool
+	// includeInfo delivers the opt-in info advisory tier (--info).
+	includeInfo bool
+	// hungarian enables the Hungarian-notation checks (--hungarian):
+	// hungarian_notation and hungarian_type_mismatch.
+	hungarian bool
+}
+
+// withDataSource returns a copy with dataSource set, so a file path's
+// own extension can classify it without mutating the caller's flags.
+func (f validateFlags) withDataSource(on bool) validateFlags {
+	f.dataSource = on
+	return f
+}
+
 // runValidate handles the --validate CLI mode.
 // It validates SSL files or stdin content and outputs JSON diagnostics.
 func runValidate(args []string) {
@@ -39,19 +60,19 @@ func runValidate(args []string) {
 		}
 	}
 
-	// Check for --stdin / --ds flags
 	useStdin := false
-	forceDataSource := false
-	includeInfo := false
+	var flags validateFlags
 	files := make([]string, 0, len(args))
 	for _, arg := range args {
 		switch arg {
 		case "--stdin":
 			useStdin = true
 		case "--ds":
-			forceDataSource = true
+			flags.dataSource = true
 		case "--info":
-			includeInfo = true
+			flags.includeInfo = true
+		case "--hungarian":
+			flags.hungarian = true
 		default:
 			files = append(files, arg)
 		}
@@ -69,7 +90,7 @@ func runValidate(args []string) {
 	hasErrors := false
 
 	if useStdin {
-		result := validateStdin(forceDataSource, includeInfo)
+		result := validateStdin(flags)
 		results = append(results, result)
 		if !result.Valid {
 			hasErrors = true
@@ -77,7 +98,7 @@ func runValidate(args []string) {
 	}
 
 	for _, filePath := range files {
-		result := validateFilePath(filePath, forceDataSource, includeInfo)
+		result := validateFilePath(filePath, flags)
 		results = append(results, result)
 		if !result.Valid {
 			hasErrors = true
@@ -116,6 +137,12 @@ func printValidateHelp() {
 	fmt.Println("              Data source SQL content is exempt from SSL checks.")
 	fmt.Println("  --info      Include info-severity diagnostics (the opt-in advisory")
 	fmt.Println("              tier; dropped by default to keep output actionable).")
+	fmt.Println("  --hungarian Enable the Hungarian-notation checks, both off by")
+	fmt.Println("              default: hungarian_notation (a declared name carries no")
+	fmt.Println("              recognized prefix) and hungarian_type_mismatch (the type")
+	fmt.Println("              a prefix promises disagrees with the assigned")
+	fmt.Println("              expression). Noisy on legacy code that predates the")
+	fmt.Println("              convention.")
 	fmt.Println("  --help      Print this help message")
 	fmt.Println()
 	fmt.Println("Exit codes:")
@@ -155,7 +182,7 @@ func printValidateHelp() {
 	fmt.Println("  echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin")
 }
 
-func validateFilePath(filePath string, forceDataSource, includeInfo bool) DiagnosticOutput {
+func validateFilePath(filePath string, flags validateFlags) DiagnosticOutput {
 	fileName := filepath.Base(filePath)
 
 	content, err := os.ReadFile(filePath)
@@ -175,7 +202,7 @@ func validateFilePath(filePath string, forceDataSource, includeInfo bool) Diagno
 		}
 	}
 
-	return validateContent(fileName, string(content), forceDataSource || isDataSourcePath(fileName), includeInfo)
+	return validateContent(fileName, string(content), flags.withDataSource(flags.dataSource || isDataSourcePath(fileName)))
 }
 
 // isDataSourcePath checks if a file path refers to a data source file (.ds or .ds.txt).
@@ -184,7 +211,7 @@ func isDataSourcePath(name string) bool {
 	return strings.HasSuffix(lower, ".ds") || strings.HasSuffix(lower, ".ds.txt")
 }
 
-func validateStdin(isDataSource, includeInfo bool) DiagnosticOutput {
+func validateStdin(flags validateFlags) DiagnosticOutput {
 	content, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return DiagnosticOutput{
@@ -202,18 +229,19 @@ func validateStdin(isDataSource, includeInfo bool) DiagnosticOutput {
 		}
 	}
 
-	return validateContent("stdin", string(content), isDataSource, includeInfo)
+	return validateContent("stdin", string(content), flags)
 }
 
-func validateContent(name string, content string, isDataSource, includeInfo bool) DiagnosticOutput {
+func validateContent(name string, content string, flags validateFlags) DiagnosticOutput {
 	// Route through the text path, which owns data-source SQL-mode
 	// classification (feature.diagnostics_pipeline A14, issue #141): plain
 	// SQL .ds content gets no SSL diagnostics, and the hybrid
 	// directives-then-SQL shape keeps diagnostics on its header only —
 	// identical to the editor path in validateDocument.
 	opts := providers.DefaultDiagnosticOptions()
-	opts.IsDataSourceFile = isDataSource
-	opts.IncludeInfoDiagnostics = includeInfo
+	opts.IsDataSourceFile = flags.dataSource
+	opts.IncludeInfoDiagnostics = flags.includeInfo
+	opts.CheckHungarianNotation = flags.hungarian
 	diagnostics := providers.GetDiagnostics(content, opts)
 
 	// Convert to output format
