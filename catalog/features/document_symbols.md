@@ -23,6 +23,15 @@ history:
     ref: "issue #44"
     note: selectionRange now covers exactly the procedure name identifier,
       located from the declaration line's tokens.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Declared names now come from statement-based declaration resolution
+      (parser.CollectDeclarations). A declaration written as a bare
+      `:DECLARE` / `:PARAMETERS` with its names on the following lines
+      previously produced no names at all, so every name it declared was
+      invisible to this behavior. No change on the production corpus's
+      default-on output; the names it recovers were simply missing before.
 issues: ["#44"]
 ---
 

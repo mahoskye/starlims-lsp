@@ -28,6 +28,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code hungarian_notation assigned.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Declared names now come from statement-based declaration resolution
+      (parser.CollectDeclarations). A declaration written as a bare
+      `:DECLARE` / `:PARAMETERS` with its names on the following lines
+      previously produced no names at all, so every name it declared was
+      invisible to this behavior. No change on the production corpus's
+      default-on output; the names it recovers were simply missing before.
 issues: []
 ---
 
