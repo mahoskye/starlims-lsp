@@ -7,6 +7,7 @@ authority: tool
 schema_ref: null
 config: []
 tests:
+  - internal/providers/identifier_roles_test.go
   - internal/providers/rename_test.go
   - internal/server/cross_file_test.go
 history:
@@ -35,6 +36,17 @@ history:
       obj:Method()/Base:Method() call sites are invisible. Prepare-rename
       gains the dispatch-target last-segment carve-out (A4 narrowed to
       non-dispatch strings).
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Identifier occurrences are now classified by role from the
+      expression tree (parser.IdentifierRoles): a variable reference, a
+      member name, a call callee, a class name, a declared name, or a
+      procedure header. Word matching could not separate a variable
+      `sName` from the property in `oRec:sName` or from a like-named
+      procedure, so this behavior acted on occurrences of a different
+      symbol. Positions the tree cannot resolve stay unclassified and
+      keep the prior word-match behavior.
 issues: ["#43", "#125"]
 ---
 
@@ -111,6 +123,8 @@ issues: ["#43", "#125"]
 - A14: Given a dotted dispatch self-site inside the definition file, when the rename executes, then its last segment is edited alongside the declaration and identifier uses.
 - A15: Given the cursor on a category or script segment of a dotted dispatch string, when prepare-rename is invoked, then the rename is rejected.
 - A16: Given a caller file rewritten on disk after indexing (site moved, no re-index), when the rename executes, then the edit is computed at the site's fresh position from current disk content.
+- A17: Given a variable `sName` and a member access `oRec:sName` in the same file, when the variable is renamed, then the member access is NOT edited — a property belongs to the receiver's type, not to the file's variable of that spelling.
+- A18: Given a variable `sName` and a `:PROCEDURE sName;` in the same file, when the variable is renamed then the procedure header and its call sites are NOT edited, and when the procedure is renamed then the variable's declaration and uses are NOT edited.
 
 ## Rationale
 

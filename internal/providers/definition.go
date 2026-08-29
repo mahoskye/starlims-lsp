@@ -35,8 +35,26 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 
 	wordLower := strings.ToLower(word)
 
+	// What the identifier under the cursor *is* decides which symbol table
+	// to consult (issue #184). Without it, `oRec:sName` jumped to a local
+	// variable named sName, and a variable jumped to a like-named
+	// procedure because procedures were searched first.
+	cursorRole := roleAtTextPosition(text, line-1, column-1)
+	if cursorRole == parser.RoleMember {
+		// A property or method belongs to the receiver's type, which is
+		// not resolved here; jumping to a like-named local would be a
+		// wrong answer, and no answer is better than a wrong one.
+		return nil
+	}
+	if cursorRole == parser.RoleInstantiation {
+		return nil
+	}
+
 	// Check if it's a procedure
 	for _, proc := range procedures {
+		if cursorRole == parser.RoleVariable || cursorRole == parser.RoleDeclaredName {
+			break
+		}
 		if strings.ToLower(proc.Name) == wordLower {
 			return &Location{
 				URI: uri,
@@ -195,10 +213,6 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 		}
 	}
 
-	// Tokenize once so each text match can be classified: matches inside
-	// comments and non-dispatch strings are not references (issue #43).
-	tokens := lexer.NewLexer(text).Tokenize()
-
 	// Rune offset of the start of each line within text (tokens carry rune
 	// offsets, while regex matches are byte offsets within a line).
 	lineStartOffsets := make([]int, len(lines))
@@ -207,6 +221,18 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 		lineStartOffsets[i] = runeOffset
 		runeOffset += utf8.RuneCountInString(lineText) + 1 // +1 for the split '\n'
 	}
+
+	// Tokenize once so each text match can be classified: matches inside
+	// comments and non-dispatch strings are not references (issue #43).
+	tokens := lexer.NewLexer(text).Tokenize()
+
+	// Classify what each identifier occurrence *is* (issue #184). Word
+	// matching cannot separate a variable `sName` from the property in
+	// `oRec:sName` or from a procedure of the same name; the expression
+	// tree can, so occurrences playing a different role than the symbol
+	// under the cursor are not references to it.
+	roles := parser.IdentifierRoles(tokens)
+	cursorRole := roleAtPosition(tokens, roles, lineStartOffsets, line-1, column-1)
 
 	for i, lineText := range lines {
 		// For local scope, skip lines outside the procedure
@@ -231,6 +257,13 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 			matchOffset := lineStartOffsets[i] + utf8.RuneCountInString(lineText[:match[0]])
 			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
 			if !isReferenceMatch(tokens, matchOffset, matchLen) {
+				continue
+			}
+
+			// Drop occurrences that name a different kind of symbol
+			// (issue #184). Unclassified positions keep the word-match
+			// behavior — the tree makes no claim there.
+			if !rolesReferToSameSymbol(cursorRole, roleAtOffset(tokens, roles, matchOffset)) {
 				continue
 			}
 
@@ -421,4 +454,76 @@ func findDoProcDefinition(text string, line, column int, uri string, procedures 
 	}
 
 	return nil
+}
+
+// roleAtOffset returns the identifier role of the token covering a rune
+// offset, or RoleUnclassified when no identifier token covers it.
+func roleAtOffset(tokens []lexer.Token, roles []parser.IdentifierRole, offset int) parser.IdentifierRole {
+	for i := range tokens {
+		tok := &tokens[i]
+		if tok.Type == lexer.TokenEOF || tok.Offset > offset {
+			break
+		}
+		if offset >= tok.Offset+utf8.RuneCountInString(tok.Text) {
+			continue
+		}
+		if i < len(roles) {
+			return roles[i]
+		}
+		return parser.RoleUnclassified
+	}
+	return parser.RoleUnclassified
+}
+
+// roleAtPosition returns the identifier role at a 0-based line/character.
+func roleAtPosition(tokens []lexer.Token, roles []parser.IdentifierRole, lineStartOffsets []int, line, character int) parser.IdentifierRole {
+	if line < 0 || line >= len(lineStartOffsets) || character < 0 {
+		return parser.RoleUnclassified
+	}
+	return roleAtOffset(tokens, roles, lineStartOffsets[line]+character)
+}
+
+// rolesReferToSameSymbol reports whether an occurrence playing role `other`
+// can be the same symbol as the one under the cursor playing role `cursor`.
+// Either role being unclassified means the tree makes no claim, so the
+// word match stands.
+func rolesReferToSameSymbol(cursor, other parser.IdentifierRole) bool {
+	if cursor == parser.RoleUnclassified || other == parser.RoleUnclassified {
+		return true
+	}
+	return symbolFamily(cursor) == symbolFamily(other)
+}
+
+// symbolFamily groups roles that can denote the same symbol. A variable
+// and its declaration are one symbol; a procedure and its call sites are
+// another; a member name belongs to whatever object supplies it, and a
+// class name to the inventory — neither can be the file's variable or
+// procedure of the same spelling.
+func symbolFamily(role parser.IdentifierRole) int {
+	switch role {
+	case parser.RoleVariable, parser.RoleDeclaredName:
+		return 1
+	case parser.RoleCall, parser.RoleProcedureName:
+		return 2
+	case parser.RoleMember:
+		return 3
+	case parser.RoleInstantiation:
+		return 4
+	default:
+		return 0
+	}
+}
+
+// roleAtTextPosition classifies the identifier at a 0-based line/character
+// of a source text.
+func roleAtTextPosition(text string, line, character int) parser.IdentifierRole {
+	tokens := lexer.NewLexer(text).Tokenize()
+	lines := strings.Split(text, "\n")
+	lineStartOffsets := make([]int, len(lines))
+	runeOffset := 0
+	for i, lineText := range lines {
+		lineStartOffsets[i] = runeOffset
+		runeOffset += utf8.RuneCountInString(lineText) + 1
+	}
+	return roleAtPosition(tokens, parser.IdentifierRoles(tokens), lineStartOffsets, line, character)
 }

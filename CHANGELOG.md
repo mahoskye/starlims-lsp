@@ -60,6 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-reading tokens.
 
 ### Fixed
+- **Rename rewrote unrelated symbols that merely shared a name** (issue
+  #184). Rename and reference search matched identifiers by word, so
+  renaming a variable `sName` also edited the property in `oRec:sName`
+  and a `:PROCEDURE sName;` header — silently corrupting code the user
+  never meant to touch. Go-to-definition on a member name jumped to the
+  like-named local, and hover reported the local's declaration for it.
+  Identifier occurrences are now classified by role from the expression
+  tree (`parser.IdentifierRoles`): variable reference, member name, call
+  callee, class name, declared name, or procedure header. Occurrences
+  playing a different role than the symbol under the cursor are not
+  references to it. Positions the tree cannot resolve stay unclassified
+  and keep the prior word-match behavior, so coverage does not regress.
 - **Declarations were resolved by line, so a bare `:DECLARE` hid every name
   it declared** (issue #184). `ExtractVariables` read a declaration's names
   out of an AST node grouped by line, and the undeclared check's
