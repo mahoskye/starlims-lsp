@@ -489,45 +489,18 @@ func (p *Parser) findProcedureEndLine(parent *Node, procedureStmt *Node) int {
 	return procedureStmt.EndLine
 }
 
-// ExtractVariables extracts all variables from the AST.
+// ExtractVariables extracts all declared variables. The root argument is
+// retained for API compatibility and no longer read: declarations are
+// resolved from the token stream statement by statement
+// (CollectDeclarations, issue #184), because the AST-node walk this
+// replaced grouped tokens by line and lost every name of a declaration
+// written as a bare `:DECLARE` followed by its names on later lines.
 func (p *Parser) ExtractVariables(root *Node) []VariableInfo {
 	var variables []VariableInfo
-	p.findVariables(root, &variables)
-	return variables
-}
-
-func (p *Parser) findVariables(node *Node, variables *[]VariableInfo) {
-	for _, child := range node.Children {
-		firstToken := p.getFirstSignificantToken(child)
-		if firstToken != nil {
-			normalized := p.getNormalizedText(firstToken)
-			if normalized == "DECLARE" || normalized == "PUBLIC" || normalized == "PARAMETERS" {
-				var scope VariableScope
-				switch normalized {
-				case "PUBLIC":
-					scope = ScopePublic
-				case "PARAMETERS":
-					scope = ScopeParameter
-				default:
-					scope = ScopeLocal
-				}
-
-				for _, token := range child.Tokens {
-					upper := strings.ToUpper(token.Text)
-					if token.Type == lexer.TokenIdentifier &&
-						upper != "DECLARE" && upper != "PUBLIC" && upper != "PARAMETERS" {
-						*variables = append(*variables, VariableInfo{
-							Name:   token.Text,
-							Line:   token.Line,
-							Column: token.Column,
-							Scope:  scope,
-						})
-					}
-				}
-			}
-		}
-		p.findVariables(child, variables)
+	for _, decl := range CollectDeclarations(p.tokens) {
+		variables = append(variables, decl.Names...)
 	}
+	return variables
 }
 
 // --- Block Handlers ---

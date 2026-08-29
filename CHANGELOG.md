@@ -60,6 +60,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-reading tokens.
 
 ### Fixed
+- **Declarations were resolved by line, so a bare `:DECLARE` hid every name
+  it declared** (issue #184). `ExtractVariables` read a declaration's names
+  out of an AST node grouped by line, and the undeclared check's
+  declaration-site exemption asked whether a declaring keyword sat on the
+  *same line*. A declaration written as
+
+  ```ssl
+  :DECLARE
+      sDebugSQL,
+      sSQL;
+  ```
+
+  therefore registered none of its names and exempted none of them, so
+  every name flagged itself at its own declaration. Names and binding
+  spans now come from `parser.CollectDeclarations` /
+  `parser.DeclarationSpans`, which read the statement through its
+  terminating `;`. On the production corpus this was 241 of 2,060
+  `undeclared_variable` hits (11.7%); afterwards no flagged name appears
+  on a declaration line anywhere in its own file. Declared names also feed
+  document symbols, rename, the workspace index, and every name-shaped
+  diagnostic, so the loss was not confined to one check.
 - **`builtin_excess_arguments` crashed on a surplus run ending in skipped
   argument slots.** `Left(sText, nA, nB,,)` indexed the argument list at
   -1 while building the diagnostic range and panicked; the pipeline's

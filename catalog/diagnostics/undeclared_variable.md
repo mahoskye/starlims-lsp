@@ -17,6 +17,7 @@ spec_options:
   global_variables: ["gSystemContext"]
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/undeclared_declarations_test.go
 history:
   - date: 2025-11-XX
     ref: "commit a4df25b"
@@ -55,6 +56,22 @@ history:
       The identifier following :CLASS is the class-name declaration, not a
       variable use — same skip-until-semicolon mechanism as :INCLUDE and
       :INHERIT. Closes the exemption noted in the #149 entry above.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Declaration resolution is now statement-based rather than
+      line-based. Both halves of the check read declarations by line: the
+      declared-name set came from an AST-node walk that grouped tokens by
+      line, and the declaration-site exemption asked whether a declaring
+      keyword sat on the same line. A declaration written as a bare
+      `:DECLARE` (or `:PARAMETERS`) with its names on the following lines
+      therefore registered none of its names AND exempted none of them,
+      so every name flagged itself at its own declaration. Names and
+      spans now come from parser.CollectDeclarations /
+      parser.DeclarationSpans, which read the statement through its
+      terminating `;`. Corpus: 241 of 2,060 hits (11.7%) were this
+      false positive; after the fix, zero flagged name appears on a
+      declaration line anywhere in its own file.
 issues: []
 ---
 
@@ -63,6 +80,12 @@ issues: []
 Opt-in check (default off, per DECISIONS.md D5): flags an identifier used as
 a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration in
 scope, reported once per scope.
+
+Declarations are read as statements — keyword through the terminating
+`;` — so layout never hides one: `:DECLARE sA, sB;`, a comma list broken
+across lines, and a bare `:DECLARE` with its names on the following lines
+all declare the same names, and every one of those positions is a binding
+site rather than a use.
 
 Treated as declared, never flagged: built-in function and class names,
 `Me`/`Base` forms, identifiers inside `:INCLUDE` paths, `:INHERIT`
@@ -93,6 +116,19 @@ resolve) the check is single-file, exactly as before.
 :PROCEDURE Demo;
 	:DECLARE nCount;
 	nCount := 1;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS sFirst, sSecond
+	, sThird;
+	:DECLARE
+		sFourth,
+		sFifth;
+	UsrMes(sFirst + sSecond + sThird + sFourth + sFifth);
 :ENDPROC;
 ```
 

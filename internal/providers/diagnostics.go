@@ -5136,6 +5136,9 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 	// Build set of built-in identifiers to skip
 	builtins := buildBuiltinSet()
 
+	// Token positions that bind a name rather than use one.
+	declarationSpans := parser.DeclarationSpans(tokens)
+
 	// Track which undeclared variables we've already reported (once per scope)
 	reported := make(map[string]bool)
 
@@ -5220,8 +5223,12 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 			continue
 		}
 
-		// Check if on a declaration line (DECLARE, PARAMETERS, PUBLIC)
-		if isOnDeclarationLine(tokens, i) {
+		// Skip positions inside a statement that binds names rather than
+		// using them — a declaration, or a :PROCEDURE header
+		// (issue #184). Read from the statement, not the line: a
+		// declaration written as a bare `:DECLARE` with its names on
+		// later lines used to flag every one of its own names.
+		if declarationSpans[i] {
 			continue
 		}
 
@@ -5285,40 +5292,6 @@ func buildBuiltinSet() map[string]bool {
 	builtins["NIL"] = true         // Null value
 
 	return builtins
-}
-
-// isOnDeclarationLine checks if a token at position i is on a declaration line.
-func isOnDeclarationLine(tokens []lexer.Token, pos int) bool {
-	if pos < 0 || pos >= len(tokens) {
-		return false
-	}
-
-	line := tokens[pos].Line
-
-	// Search backward to find the first keyword on this line
-	for i := pos - 1; i >= 0; i-- {
-		if tokens[i].Line != line {
-			break
-		}
-		if tokens[i].Type == lexer.TokenKeyword {
-			normalized := strings.ToUpper(strings.TrimPrefix(tokens[i].Text, ":"))
-			if normalized == "DECLARE" || normalized == "PARAMETERS" || normalized == "PUBLIC" || normalized == "PROCEDURE" {
-				return true
-			}
-		}
-	}
-
-	// Also check forward in case the keyword comes after position
-	for i := pos; i < len(tokens) && tokens[i].Line == line; i++ {
-		if tokens[i].Type == lexer.TokenKeyword {
-			normalized := strings.ToUpper(strings.TrimPrefix(tokens[i].Text, ":"))
-			if normalized == "DECLARE" || normalized == "PARAMETERS" || normalized == "PUBLIC" || normalized == "PROCEDURE" {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // checkUnusedVariables checks for declared variables that are never used.
