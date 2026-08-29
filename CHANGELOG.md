@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-29
+
+Splits the shared Hungarian gate so a consumer can take the correctness
+signal without the convention audit. Measuring the pair over 6,228
+production files showed `hungarian_notation` reporting 31,219 names
+against `hungarian_type_mismatch`'s 477 — correct reports every one, since
+53.6% of that codebase's declared names carry no recognized prefix, but a
+65:1 ratio that made the pair unusable together on the LLM-facing surface.
+The rules were already independent in logic; only the switch was shared.
+
 ### Added
 - **`ssl.diagnostics.hungarianTypes` setting and `--hungarian-types` CLI
   flag**, gating `hungarian_type_mismatch` on its own. `--hungarian` and
@@ -1438,7 +1448,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.17.0...v0.18.0
