@@ -10,6 +10,7 @@ severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/expr_call_checks_test.go
 history:
   - date: 2026-08-26
     ref: "issue #200"
@@ -33,20 +34,39 @@ history:
       which matched the inventory on all 15. The 97 production hits are
       genuine silent-drop bugs; the message's 'never evaluated' claim is
       literal.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Rebuilt on the expression AST's call-site index: the callee and the
+      argument boundaries come from the tree instead of a token scan, so
+      a member call is excluded by being a member call (any receiver
+      shape — `aDocs[1]:Left(...)`, `GetDoc():Left(...)`) rather than by
+      a preceding-token test, and each surplus argument carries its own
+      range. Fixes a latent crash: a surplus run ending in skipped slots
+      (`Left(s, a, b,,)`) indexed the argument list at -1 and panicked,
+      which the pipeline's recovery turned into an internal_error
+      diagnostic that replaced the file's real output. Corpus
+      differential over 6,228 production files: identical output to the
+      token implementation (97 hits before and after).
 issues: []
 ---
 
 ## Behavior
 
 Flags a builtin call that passes more arguments than the builtin's
-published signature accepts. Maximum arity comes from the generated
-element inventory (`GeneratedFunctionSummaries` signature strings,
-counting optional `[x]` parameters) combined with the curated signature
-list, taking the larger count. Functions whose signature is variadic
-(`...`), unparseable, or absent are never flagged — unknown arity stays
-silent. Arguments are counted top-level (nesting respected); skipped
-arguments (`,,`) count as arguments. The range spans the surplus
-arguments; the message names the accepted and surplus counts.
+published signature accepts. Calls come from the expression AST's
+call-site index, so a bare `Name(...)` call is distinguished from a
+member call structurally and nesting is respected by construction.
+Maximum arity comes from the generated element inventory
+(`GeneratedFunctionSummaries` signature strings, counting optional `[x]`
+parameters) combined with the curated signature list, taking the larger
+count. Functions whose signature is variadic (`...`), unparseable, or
+absent are never flagged — unknown arity stays silent. Skipped arguments
+(`,,`) count as arguments; a single trailing comma does not. The range
+spans the surplus arguments, taken from their own subtrees; when the
+first surplus slot is a skipped argument there is no expression to point
+at and the call name carries the range. The message names the accepted
+and surplus counts.
 
 It must NOT flag:
 
@@ -90,12 +110,31 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Flags
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE sPrefix, sText, nA, nB;
+	sPrefix := Left(sText, nA, nB,,);
+:ENDPROC;
+```
+
 ### Does not flag
 
 ```ssl
 :PROCEDURE Main;
 	:DECLARE oDoc, sOut;
 	sOut := oDoc:Left("custom", "method", "args");
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE aDocs, sOut;
+	sOut := aDocs[1]:Left("a", "b", "c");
+	sOut := GetDoc():Left("a", "b", "c");
 :ENDPROC;
 ```
 

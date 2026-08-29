@@ -136,6 +136,16 @@ history:
       is that assistants configured with the info tier can write better
       code, while the default human surface stays errors/warnings/hints.
       Explicit ssl.diagnostics.rules entries bypass the gate.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      collectDiagnostics now builds the expression AST's call-site index
+      (parser.CollectCalls) once per document and passes it to every
+      call-shaped rule, so expression parsing is paid for at most once
+      rather than per rule. Measured over the 6,228-file production
+      corpus, the index costs ~165ms against ~675ms of lexing and
+      replaces ~85ms of per-rule token scanning; end-to-end --validate
+      throughput was unchanged within run-to-run noise.
 issues: []
 ---
 

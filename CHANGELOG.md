@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`builtin_excess_arguments` and `format_arg_not_array` now run on the
+  expression AST** (issue #184). Both rules shipped on token scanning and
+  Hungarian guesswork and recorded the expression tree as their upgrade
+  path; they are the tree's first diagnostic consumers.
+  `parser.CollectCalls` builds a call-site index — callee, receiver, and
+  argument subtrees — once per document, and `collectDiagnostics` shares
+  it across every call-shaped rule.
+  - `builtin_excess_arguments` now excludes a method call by it *being* a
+    method call at any receiver shape (`aDocs[1]:Left(...)`,
+    `GetDoc():Left(...)`), and takes each surplus argument's range from
+    its own subtree.
+  - `format_arg_not_array` types both sides instead of matching tokens: a
+    receiver is any expression inferring to a string
+    (`AllTrim(sTpl):Format`, `Me:sTemplate:Format`), and the second
+    argument is judged by inferred type rather than having to be a single
+    token — so `sA + sB`, `AllTrim(sA)`, `Len(sA)`, and `nCount > 3` flag
+    where they were previously unprovable and silent. Identifiers now
+    need a documented Hungarian prefix to claim a type, so `xThing`,
+    `vThing`, and loop counters are unknown rather than presumed scalar.
+  Both changes are output-identical on the 6,228-file production corpus
+  (97 and 0 hits, before and after), and end-to-end `--validate`
+  throughput is unchanged within run-to-run noise.
+
+### Added
+- **Coarse expression typing** (`internal/providers/expr_types.go`,
+  issue #184): literals, operator results, and builtin return types from
+  the element inventory, with an opt-in mode that additionally reads
+  Hungarian prefixes on identifiers and member names as type evidence.
+  Every judgment is a definite type or "unknown", and unknown is never
+  treated as evidence — an expression that cannot be resolved makes no
+  claim rather than a guess.
+
 ### Fixed
+- **`builtin_excess_arguments` crashed on a surplus run ending in skipped
+  argument slots.** `Left(sText, nA, nB,,)` indexed the argument list at
+  -1 while building the diagnostic range and panicked; the pipeline's
+  panic recovery turned that into a single `internal_error` diagnostic,
+  so the file lost its real diagnostics. Argument ranges now come from
+  the argument subtrees, which are always well-formed.
 - **Semicolon enforcement skipped bare `:BEGINCASE`.** It was the only
   block opener that never got a semicolon: the token after it is always
   `:CASE` or `:OTHERWISE`, both continuation keywords, so the lookahead
