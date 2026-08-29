@@ -9,10 +9,10 @@ default_severity: warning
 severity_overridable: true
 suppressible: true
 config:
-  - ssl.diagnostics.hungarianNotation
+  - ssl.diagnostics.hungarianTypes
   - ssl.diagnostics.rules
 spec_options:
-  check_hungarian_notation: true
+  check_hungarian_types: true
 tests:
   - internal/providers/expr_hungarian_test.go
   - internal/providers/expr_types_test.go
@@ -30,15 +30,36 @@ history:
       files: 459 hits in 272 files (5.9%), the largest classes being
       number-named variables assigned string-returning builtins (SubStr,
       Right, At) and array-named variables assigned strings.
+  - date: 2026-08-29
+    ref: "corpus noise measurement"
+    note: >-
+      Given its own setting (ssl.diagnostics.hungarianTypes) instead of
+      sharing ssl.diagnostics.hungarianNotation. Measuring the shared gate
+      over 6,228 production files showed the two rules are different
+      findings at wildly different volumes: hungarian_notation 31,219 hits
+      against this rule's 477, a 65:1 ratio, because 53.6% of the corpus's
+      57,647 declared names carry no recognized prefix at all. Those
+      reports are correct — the codebase simply does not use the
+      convention — but they made the pair unusable together for a consumer
+      that wants the correctness signal. The rules were already
+      independent in logic (this one only ever inspects names that carry a
+      prefix, so it is silent on exactly the code the other floods); only
+      the switch was shared.
 issues: []
 ---
 
 ## Behavior
 
-Opt-in check (`ssl.diagnostics.hungarianNotation`, default off, shared
-with `hungarian_notation`): flags an assignment whose target's Hungarian
-prefix promises one type while the assigned expression infers to a
-different one.
+Opt-in check (`ssl.diagnostics.hungarianTypes`, default off): flags an
+assignment whose target's Hungarian prefix promises one type while the
+assigned expression infers to a different one.
+
+Gated separately from `hungarian_notation`, and neither setting enables
+the other. The two are independent findings: that rule audits a codebase
+against a naming convention and reports every name lacking a prefix,
+while this one reports a self-contradiction and therefore only ever
+inspects names that already carry a prefix. On a codebase that does not
+use the convention this rule stays quiet where the other is loudest.
 
 It applies to plain `:=` assignments and to `:DEFAULT ident, value`, and
 requires definite evidence at both ends:
