@@ -1055,6 +1055,17 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 		if nonStatementEndingKeywords[keyword] {
 			return false
 		}
+
+		// :BEGINCASE takes no operand, so it is a complete statement on its
+		// own and ends with a semicolon regardless of what follows. Without
+		// this it is the one block opener that never gets one: the token
+		// after it is always :CASE or :OTHERWISE, both continuation
+		// keywords, so the lookahead below returns false. Every sibling
+		// opener (:IF, :TRY, :WHILE, :PROCEDURE) already gets a semicolon
+		// because nothing continues it.
+		if keyword == "BEGINCASE" {
+			return true
+		}
 	}
 
 	// Look at the next non-whitespace token to decide

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Semicolon enforcement skipped bare `:BEGINCASE`.** It was the only
+  block opener that never got a semicolon: the token after it is always
+  `:CASE` or `:OTHERWISE`, both continuation keywords, so the lookahead
+  in `needsSemicolonAtLineEnd` bailed out before deciding. `:BEGINCASE`
+  takes no operand, so it is a complete statement on its own and is now
+  terminated regardless of what follows — matching `:IF`, `:TRY`,
+  `:WHILE`, and `:PROCEDURE`, and the `:BEGINCASE;` form the catalog
+  documents throughout. No corpus impact (0 of 6,228 files change; real
+  code already writes the semicolon) and full-corpus idempotence is
+  unaffected.
+
+### Added
+- **Formatter regressions inherited from vs-code-ssl-formatter**
+  (`internal/providers/extension_regressions_test.go`). The extension
+  removed its fallback TypeScript formatter — a corpus run showed it was
+  non-idempotent on 18% of files and appended stray semicolons to SQL in
+  `.ds` documents — making formatting LSP-only. That suite encoded real
+  user bug reports, so the scenarios not already covered here were
+  carried over: keyword casing inside an array subscript, no token
+  merging across line breaks in a multi-line SQL string, an end-of-line
+  comment not swallowing the next statement, wrapped lines never
+  starting with a comma, qualified `Table.Column` never split on wrap,
+  and semicolon enforcement across the whole block-opener family. Cases
+  where this formatter deliberately differs (statement consolidation,
+  comma-list wrapping with visual alignment, blank lines between `:CASE`
+  arms) are recorded in the same file as decisions rather than gaps.
+
 ## [0.18.0] - 2026-08-28
 
 The production-corpus release. A private, production-representative
