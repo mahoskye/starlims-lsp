@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ssl.diagnostics.hungarianTypes` setting and `--hungarian-types` CLI
+  flag**, gating `hungarian_type_mismatch` on its own. `--hungarian` and
+  `ssl.diagnostics.hungarianNotation` keep enabling both rules.
+
+### Changed
+- **`hungarian_notation` and `hungarian_type_mismatch` are gated
+  separately.** They were two independent findings sharing one switch, and
+  measurement showed why that was wrong: over 6,228 production files the
+  convention audit reports **31,219** names against the type check's
+  **477** — a 65:1 ratio — because 53.6% of that codebase's 57,647
+  declared names carry no recognized prefix. Every one of those reports is
+  correct; the codebase simply does not use the convention. But sharing a
+  switch forced any consumer wanting the correctness signal to accept a
+  whole-codebase naming audit, which for the LLM-facing MCP surface meant
+  `hungarian_notation` was >50% of the output in 40% of files and 100% of
+  it in 14%.
+
+  The two rules were already independent in logic — the type check only
+  ever inspects names that already carry a prefix, so it is silent on
+  exactly the code the other floods — so this splits only the gate.
+  `ssl.diagnostics.hungarianNotation` no longer enables
+  `hungarian_type_mismatch`; use `ssl.diagnostics.hungarianTypes` (or both).
+
 ## [0.20.0] - 2026-08-29
 
 A single-feature release, cut so the downstream MCP binaries can reach the

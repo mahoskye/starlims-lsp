@@ -37,6 +37,17 @@ history:
       previously produced no names at all, so every name it declared was
       invisible to this behavior. No change on the production corpus's
       default-on output; the names it recovers were simply missing before.
+  - date: 2026-08-29
+    ref: "corpus noise measurement"
+    note: >-
+      No longer enables diag.hungarian_type_mismatch, which moved to its
+      own setting (ssl.diagnostics.hungarianTypes). This rule's volume is
+      a property of the codebase, not a defect: over 6,228 production
+      files it reports 31,219 names because 53.6% of the corpus's 57,647
+      declarations carry no recognized prefix. Every report is correct;
+      sharing a switch with the type cross-check simply forced consumers
+      to take a whole-codebase convention audit to get a correctness
+      signal.
 issues: []
 ---
 

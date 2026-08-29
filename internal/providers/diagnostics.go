@@ -60,10 +60,20 @@ type DiagnosticOptions struct {
 	CheckUnusedVars        bool
 	CheckSQLParams         bool
 	CheckHungarianNotation bool
-	HungarianPrefixes      []string
-	GlobalVariables        []string
-	MaxBlockDepth          int
-	IsDataSourceFile       bool
+	// CheckHungarianTypes gates diag.hungarian_type_mismatch, separately
+	// from CheckHungarianNotation (issue #184 follow-up). The two rules
+	// are independent findings that happened to share one switch: the
+	// notation check enforces a house convention, and reports every name
+	// a codebase that opted out of it ever declared; the type cross-check
+	// reports a contradiction — a prefix promising one type over an
+	// expression producing another — and only ever looks at names that
+	// carry a prefix in the first place. A consumer wanting the
+	// correctness signal without the convention audit enables this alone.
+	CheckHungarianTypes bool
+	HungarianPrefixes   []string
+	GlobalVariables     []string
+	MaxBlockDepth       int
+	IsDataSourceFile    bool
 	// IsEndpointFile marks the file as an SSL endpoint script. When true,
 	// `Request` and `Response` are treated as pre-injected runtime
 	// ambients (not declared, not flagged as undeclared, not assignable).
@@ -107,6 +117,7 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 		CheckUnusedVars:        false,
 		CheckSQLParams:         false,
 		CheckHungarianNotation: false,
+		CheckHungarianTypes:    false,
 		HungarianPrefixes:      []string{"a", "b", "d", "fn", "n", "o", "s", "v"},
 		MaxBlockDepth:          4,
 	}
@@ -242,6 +253,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check for Hungarian notation (opt-in)
 	if opts.CheckHungarianNotation {
 		diagnostics = append(diagnostics, checkHungarianNotation(variables, opts.HungarianPrefixes)...)
+	}
+	if opts.CheckHungarianTypes {
 		diagnostics = append(diagnostics, checkHungarianTypeMismatch(tokens, stmtExprs)...)
 	}
 

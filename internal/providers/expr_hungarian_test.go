@@ -7,7 +7,7 @@ import (
 
 func hungarianOptions() DiagnosticOptions {
 	opts := DefaultDiagnosticOptions()
-	opts.CheckHungarianNotation = true
+	opts.CheckHungarianTypes = true
 	return opts
 }
 
@@ -35,6 +35,24 @@ nCode := SubStr(sText, 1, 4);
 	}
 	if got := typeMismatchLines(t, script); len(got) != 1 || got[0] != 2 {
 		t.Fatalf("expected one diagnostic on line 2 when enabled, got %v", got)
+	}
+
+	// The two Hungarian rules are separately gated: the convention audit
+	// must not drag in the type cross-check, or a consumer that wants one
+	// is forced to take the other.
+	notationOnly := DefaultDiagnosticOptions()
+	notationOnly.CheckHungarianNotation = true
+	for _, d := range GetDiagnostics(script, notationOnly) {
+		if d.Code == CodeHungarianTypeMismatch {
+			t.Error("hungarianNotation must not enable hungarian_type_mismatch")
+		}
+	}
+	typesOnly := DefaultDiagnosticOptions()
+	typesOnly.CheckHungarianTypes = true
+	for _, d := range GetDiagnostics(script, typesOnly) {
+		if d.Code == CodeHungarianNotation {
+			t.Error("hungarianTypes must not enable hungarian_notation")
+		}
 	}
 }
 

@@ -42,6 +42,7 @@ type SignatureHelpSettings struct {
 // DiagnosticsSettings represents diagnostics settings from the client.
 type DiagnosticsSettings struct {
 	HungarianNotation *bool `json:"hungarianNotation"`
+	HungarianTypes    *bool `json:"hungarianTypes"`
 	UnusedVariables   *bool `json:"unusedVariables"`
 	// InfoDiagnostics enables the info severity tier (advisory detail for
 	// assistant/LLM consumers and completionist teams). Default off —
@@ -472,6 +473,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 	if clientSettings.SSL.Diagnostics != nil {
 		diagnostics := clientSettings.SSL.Diagnostics
 		applyOptional(&s.settings.Diagnostics.CheckHungarianNotation, diagnostics.HungarianNotation)
+		applyOptional(&s.settings.Diagnostics.CheckHungarianTypes, diagnostics.HungarianTypes)
 		applyOptional(&s.settings.Diagnostics.CheckUnusedVars, diagnostics.UnusedVariables)
 		applyOptional(&s.settings.Diagnostics.IncludeInfoDiagnostics, diagnostics.InfoDiagnostics)
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)

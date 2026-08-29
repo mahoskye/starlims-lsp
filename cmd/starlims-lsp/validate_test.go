@@ -110,4 +110,15 @@ nCode := SubStr(sText, 1, 4);
 	if withHungarian["not_preferred_operator"] {
 		t.Error("--hungarian must not imply --info")
 	}
+
+	// --hungarian-types takes the correctness check without the
+	// convention audit, which is what a consumer reviewing code that does
+	// not use the convention wants.
+	typesOnly := codes(validateFlags{hungarianTypes: true})
+	if !typesOnly["hungarian_type_mismatch"] {
+		t.Error("--hungarian-types did not enable hungarian_type_mismatch")
+	}
+	if typesOnly["hungarian_notation"] {
+		t.Error("--hungarian-types must not enable hungarian_notation")
+	}
 }

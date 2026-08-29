@@ -104,6 +104,7 @@ interface SQLFormattingOptions {
 
 interface DiagnosticOptions {
   hungarianNotation: boolean;
+  hungarianTypes: boolean;
   unusedVariables: boolean;
   infoDiagnostics: boolean;
   hungarianPrefixes: string[];
@@ -678,7 +679,39 @@ Info-tier rules: `equals_vs_strict_equals`, `not_preferred_operator`,
 { "ssl.diagnostics.infoDiagnostics": true }
 ```
 
-### 5.9 Suppression comments (in-file)
+### 5.9 ssl.diagnostics.hungarianTypes
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `false` |
+| **File** | `internal/providers/diagnostics.go` (`CheckHungarianTypes`) |
+
+When enabled, warns where a variable's Hungarian prefix promises one type
+and its assigned expression produces another (code
+`hungarian_type_mismatch`).
+
+Gated separately from [`ssl.diagnostics.hungarianNotation`](#51-ssldiagnosticshungariannotation),
+and neither setting enables the other. They are different findings:
+`hungarian_notation` audits a codebase against the naming convention and
+reports every declared name lacking a prefix, so on a codebase that does
+not use the convention it reports most of the file. This check reports a
+self-contradiction instead, and only ever inspects names that already
+carry a prefix — so it stays quiet on exactly the code the other floods.
+Enable this one alone to get the correctness signal without the
+convention audit.
+
+```json
+{ "ssl.diagnostics.hungarianTypes": true }
+```
+
+**Example Warning:**
+```ssl
+:DECLARE nCode, sText;
+nCode := SubStr(sText, 1, 4);  /* Warning: 'nCode' promises a number by its prefix, but this expression produces a string;
+```
+
+### 5.10 Suppression comments (in-file)
 
 Not a configuration key, but part of the same rule-control surface: any
 diagnostic can be suppressed in the source itself (added in v0.5.0,

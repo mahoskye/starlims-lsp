@@ -37,9 +37,13 @@ type validateFlags struct {
 	dataSource bool
 	// includeInfo delivers the opt-in info advisory tier (--info).
 	includeInfo bool
-	// hungarian enables the Hungarian-notation checks (--hungarian):
+	// hungarian enables both Hungarian checks (--hungarian):
 	// hungarian_notation and hungarian_type_mismatch.
 	hungarian bool
+	// hungarianTypes enables only the type cross-check
+	// (--hungarian-types): hungarian_type_mismatch, without the
+	// convention audit that hungarian_notation performs.
+	hungarianTypes bool
 }
 
 // withDataSource returns a copy with dataSource set, so a file path's
@@ -73,6 +77,8 @@ func runValidate(args []string) {
 			flags.includeInfo = true
 		case "--hungarian":
 			flags.hungarian = true
+		case "--hungarian-types":
+			flags.hungarianTypes = true
 		default:
 			files = append(files, arg)
 		}
@@ -137,12 +143,18 @@ func printValidateHelp() {
 	fmt.Println("              Data source SQL content is exempt from SSL checks.")
 	fmt.Println("  --info      Include info-severity diagnostics (the opt-in advisory")
 	fmt.Println("              tier; dropped by default to keep output actionable).")
-	fmt.Println("  --hungarian Enable the Hungarian-notation checks, both off by")
-	fmt.Println("              default: hungarian_notation (a declared name carries no")
-	fmt.Println("              recognized prefix) and hungarian_type_mismatch (the type")
-	fmt.Println("              a prefix promises disagrees with the assigned")
-	fmt.Println("              expression). Noisy on legacy code that predates the")
-	fmt.Println("              convention.")
+	fmt.Println("  --hungarian Enable both Hungarian checks, off by default:")
+	fmt.Println("              hungarian_notation (a declared name carries no")
+	fmt.Println("              recognized prefix) and hungarian_type_mismatch (the")
+	fmt.Println("              type a prefix promises disagrees with the assigned")
+	fmt.Println("              expression). hungarian_notation reports every name in")
+	fmt.Println("              a codebase that does not use the convention, so it is")
+	fmt.Println("              loud on legacy code.")
+	fmt.Println("  --hungarian-types")
+	fmt.Println("              Enable only hungarian_type_mismatch. It looks solely at")
+	fmt.Println("              names that already carry a prefix, so it stays quiet on")
+	fmt.Println("              code that does not use the convention while still")
+	fmt.Println("              reporting names that contradict their own prefix.")
 	fmt.Println("  --help      Print this help message")
 	fmt.Println()
 	fmt.Println("Exit codes:")
@@ -242,6 +254,7 @@ func validateContent(name string, content string, flags validateFlags) Diagnosti
 	opts.IsDataSourceFile = flags.dataSource
 	opts.IncludeInfoDiagnostics = flags.includeInfo
 	opts.CheckHungarianNotation = flags.hungarian
+	opts.CheckHungarianTypes = flags.hungarian || flags.hungarianTypes
 	diagnostics := providers.GetDiagnostics(content, opts)
 
 	// Convert to output format
