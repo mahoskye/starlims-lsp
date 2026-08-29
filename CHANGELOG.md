@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-29
+
+A single-feature release, cut so the downstream MCP binaries can reach the
+Hungarian checks. `hungarian_type_mismatch` shipped in v0.19.0 gated
+behind an editor setting the `--validate` CLI could not reach, which left
+it unreachable for the agent and CI callers the CLI exists for; passing
+`--hungarian` to a v0.19.0 binary read it as a filename and returned a
+phantom failed result. This release makes the flag real.
+
 ### Added
 - **`--hungarian` flag on the `--validate` CLI.** Enables the two opt-in
   Hungarian checks for that run — `hungarian_notation` (a declared name
@@ -1405,7 +1414,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.16.0...v0.17.0
