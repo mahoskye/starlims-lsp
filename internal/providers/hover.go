@@ -58,6 +58,13 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getOperatorHover(word); hover != nil {
 		return hover
 	}
+	// A member name is a property or method on the receiver's type, not
+	// the file's like-named procedure or variable (issue #184). Reporting
+	// the local `sName` for `oRec:sName` is a wrong answer; the earlier
+	// providers above answer from published inventory data and stay.
+	if roleAtTextPosition(text, line-1, column-1) == parser.RoleMember {
+		return nil
+	}
 	if hover := getProcedureHover(word, procedures); hover != nil {
 		return hover
 	}

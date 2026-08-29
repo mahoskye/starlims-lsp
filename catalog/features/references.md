@@ -7,6 +7,7 @@ authority: tool
 schema_ref: null
 config: []
 tests:
+  - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
   - internal/providers/crossfile_test.go
   - internal/server/handler_test.go
@@ -38,6 +39,17 @@ history:
       per-site re-resolution through the dispatch resolver; open documents
       scan from the live parse. Dotted self-sites in the definition file,
       previously invisible to the whole-content match, are included.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Identifier occurrences are now classified by role from the
+      expression tree (parser.IdentifierRoles): a variable reference, a
+      member name, a call callee, a class name, a declared name, or a
+      procedure header. Word matching could not separate a variable
+      `sName` from the property in `oRec:sName` or from a like-named
+      procedure, so this behavior acted on occurrences of a different
+      symbol. Positions the tree cannot resolve stay unclassified and
+      keep the prior word-match behavior.
 issues: ["#42", "#43", "#125"]
 ---
 
@@ -109,6 +121,8 @@ issues: ["#42", "#43", "#125"]
 - A12: Given a caller file open with unsaved edits that removed its dispatch site, when references are requested, then the stale indexed site is NOT returned — open documents are scanned from the live buffer.
 - A13: Given no workspace index, when references are requested, then results are byte-identical to the single-file behavior.
 - A14: Given a dotted dispatch self-site inside the definition file, when references are requested on the procedure, then that site appears exactly once in the results.
+- A15: Given a variable `sName` and a member access `oRec:sName`, when references are requested on the variable, then the member-access occurrence is NOT returned.
+- A16: Given a variable and a procedure sharing a name, when references are requested from one of them, then only that symbol's own occurrences are returned.
 
 ## Rationale
 

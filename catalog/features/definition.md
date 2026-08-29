@@ -7,6 +7,7 @@ authority: tool
 schema_ref: null
 config: []
 tests:
+  - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
   - internal/server/handler_test.go
 history:
@@ -47,6 +48,17 @@ history:
       CreateUDObject initializer key or the first `:prop :=`
       augmentation). Shaped receiver + unknown member is null; unshaped
       receivers keep prior behavior.
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Identifier occurrences are now classified by role from the
+      expression tree (parser.IdentifierRoles): a variable reference, a
+      member name, a call callee, a class name, a declared name, or a
+      procedure header. Word matching could not separate a variable
+      `sName` from the property in `oRec:sName` or from a like-named
+      procedure, so this behavior acted on occurrences of a different
+      symbol. Positions the tree cannot resolve stay unclassified and
+      keep the prior word-match behavior.
 issues: ["#41"]
 ---
 
@@ -113,6 +125,7 @@ issues: ["#41"]
 - A13: Given `RunDS("QUERIES.ORDERS")` with a workspace data source `Data Sources/QUERIES/ORDERS.ds`, or `RunDS("Orders")` with a flat `Orders.ds`, when go-to-definition is invoked inside the string, then a Location in the data-source file is returned; a RunDS target resolving nowhere is null.
 - A14: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;` and later uses, when go-to-definition is invoked on `Name` or `Total` after `oObj:`, then the Location is the initializer key or the first augmenting assignment respectively.
 - A15: Given the same shaped `oObj` and go-to-definition on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
+- A16: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when definition is requested, then no location is returned — a property is not the like-named local, and no answer beats a wrong one.
 
 ## Rationale
 

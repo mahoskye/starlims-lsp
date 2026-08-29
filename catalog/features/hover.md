@@ -8,6 +8,7 @@ schema_ref: null
 config:
   - ssl.diagnostics.endpointPatterns
 tests:
+  - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
   - internal/providers/element_reference_test.go
   - internal/server/handler_test.go
@@ -60,6 +61,17 @@ history:
       hover exception: a target naming a same-file procedure shows that
       procedure's docblock hover, mirroring go-to-definition's same-file
       semantics for 1-part targets (A17-A18).
+  - date: 2026-08-28
+    ref: "issue #184 (expression AST consumers)"
+    note: >-
+      Identifier occurrences are now classified by role from the
+      expression tree (parser.IdentifierRoles): a variable reference, a
+      member name, a call callee, a class name, a declared name, or a
+      procedure header. Word matching could not separate a variable
+      `sName` from the property in `oRec:sName` or from a like-named
+      procedure, so this behavior acted on occurrences of a different
+      symbol. Positions the tree cannot resolve stay unclassified and
+      keep the prior word-match behavior.
 issues: []
 ---
 
@@ -135,6 +147,7 @@ issues: []
 - A16: Given the same shaped `oObj` and a hover on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
 - A17: Given `oResult := DoProc("BuildShell", {oContext});` and a same-file `:PROCEDURE BuildShell;` preceded by a docblock, when the user hovers inside the target string, then the hover shows the procedure's docblock hover (description, parameters, returns, declaration location), matching the name case-insensitively.
 - A18: Given `DoProc("NoSuchProc", {})` naming no procedure in the current file, when the user hovers inside the string, then the response is null — 1-part targets never resolve cross-file, and the string suppression (A7) holds.
+- A19: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when hover is requested, then the local variable's hover is NOT shown.
 
 ## Rationale
 

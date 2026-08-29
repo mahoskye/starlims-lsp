@@ -25,6 +25,8 @@ type DeclarationStatement struct {
 	Start, End int
 	// Names are the declared names in source order.
 	Names []VariableInfo
+	// Indices are the token indices of Names, positionally aligned.
+	Indices []int
 }
 
 // declarationScopes maps the declaring keywords to the scope they open.
@@ -49,11 +51,13 @@ func CollectDeclarations(tokens []lexer.Token) []DeclarationStatement {
 			continue
 		}
 		end := statementEnd(tokens, i)
+		names, indices := declaredNames(tokens, i+1, end, scope)
 		out = append(out, DeclarationStatement{
-			Scope: scope,
-			Start: i,
-			End:   end,
-			Names: declaredNames(tokens, i+1, end, scope),
+			Scope:   scope,
+			Start:   i,
+			End:     end,
+			Names:   names,
+			Indices: indices,
 		})
 		i = end
 	}
@@ -66,8 +70,9 @@ func CollectDeclarations(tokens []lexer.Token) []DeclarationStatement {
 // (`:DECLARE nCount := nOther;` — itself flagged by
 // diag.declare_initializer) contributes its target and not the
 // identifiers on its right-hand side.
-func declaredNames(tokens []lexer.Token, from, end int, scope VariableScope) []VariableInfo {
+func declaredNames(tokens []lexer.Token, from, end int, scope VariableScope) ([]VariableInfo, []int) {
 	var names []VariableInfo
+	var indices []int
 	expectingName := true
 
 	for i := from; i <= end && i < len(tokens); i++ {
@@ -88,6 +93,7 @@ func declaredNames(tokens []lexer.Token, from, end int, scope VariableScope) []V
 					Column: t.Column,
 					Scope:  scope,
 				})
+				indices = append(indices, i)
 				expectingName = false
 			}
 			continue
@@ -98,7 +104,7 @@ func declaredNames(tokens []lexer.Token, from, end int, scope VariableScope) []V
 		}
 	}
 
-	return names
+	return names, indices
 }
 
 // DeclarationSpans reports, per token index, whether that token sits
