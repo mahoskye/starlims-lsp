@@ -11,8 +11,32 @@ import (
 	"starlims-lsp/internal/lexer"
 )
 
+// StatementKind names the statement shape a StatementExprs came from, so
+// consumers can tell an assignment from a `:DEFAULT` or a loop header
+// without re-reading the tokens.
+type StatementKind int
+
+const (
+	// StmtExpression is a bare expression statement (`UsrMes("hi");`).
+	StmtExpression StatementKind = iota
+	// StmtAssign is `target <op> value`; Exprs is [target, value] and
+	// Assign holds the operator.
+	StmtAssign
+	// StmtDefault is `:DEFAULT ident, value`; Exprs is [target, value].
+	StmtDefault
+	// StmtFor is a `:FOR` header; Exprs is [target, from, to] plus the
+	// optional step.
+	StmtFor
+	// StmtCondition is the expression after `:IF` / `:WHILE` / `:CASE`.
+	StmtCondition
+	// StmtReturn is `:RETURN value` with a value present.
+	StmtReturn
+)
+
 // StatementExprs is the parsed expression content of one statement.
 type StatementExprs struct {
+	// Kind is the statement shape Exprs was parsed from.
+	Kind StatementKind
 	// Start and End are inclusive token indices bracketing the statement
 	// (End is the terminating `;` when present).
 	Start, End int
@@ -104,6 +128,7 @@ func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 		switch {
 		case exprAfterKeyword[kw]:
 			e, next := ParseExpression(tokens, start+1)
+			se.Kind = StmtCondition
 			se.Exprs = []*Expr{e}
 			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
 			return se, true
@@ -114,6 +139,7 @@ func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 				return se, false
 			}
 			e, next := ParseExpression(tokens, start+1)
+			se.Kind = StmtReturn
 			se.Exprs = []*Expr{e}
 			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
 			return se, true
@@ -129,6 +155,7 @@ func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 			}
 			target := &Expr{Kind: ExprIdentifier, Start: idIdx, End: idIdx, Name: tokens[idIdx].Text}
 			e, next := ParseExpression(tokens, commaIdx+1)
+			se.Kind = StmtDefault
 			se.Exprs = []*Expr{target, e}
 			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
 			return se, true
@@ -152,6 +179,7 @@ func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 	opIdx := nextSignificantIndex(tokens, next, end)
 	if opIdx >= 0 && tokens[opIdx].Type == lexer.TokenOperator && isAssignmentOperator(tokens[opIdx].Text) {
 		rhs, after := ParseExpression(tokens, opIdx+1)
+		se.Kind = StmtAssign
 		se.Exprs = []*Expr{lhs, rhs}
 		se.Assign = tokens[opIdx].Text
 		se.Complete = rhs.Kind != ExprUnknown && coversStatement(tokens, after, end)
@@ -174,6 +202,7 @@ func parseForHeader(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 		return se, false
 	}
 	target := &Expr{Kind: ExprIdentifier, Start: idIdx, End: idIdx, Name: tokens[idIdx].Text}
+	se.Kind = StmtFor
 	se.Exprs = []*Expr{target}
 	se.Assign = ":="
 

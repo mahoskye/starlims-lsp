@@ -171,6 +171,15 @@ func inferType(e *parser.Expr, useNames bool, depth int) sslType {
 			return inferType(e.Children[0], useNames, depth+1)
 		}
 	case parser.ExprIncrement:
+		// `++`/`--` are documented on numbers, and `--` additionally on
+		// strings and dates; the result keeps the operand's type.
+		if len(e.Children) == 1 {
+			switch operand := inferType(e.Children[0], useNames, depth+1); operand {
+			case typeNumber, typeString, typeDate:
+				return operand
+			}
+			return typeUnknown
+		}
 		return typeNumber
 	case parser.ExprUnary:
 		switch strings.ToUpper(e.Op) {
@@ -224,42 +233,88 @@ func literalType(text string) sslType {
 	return typeUnknown
 }
 
-func binaryType(e *parser.Expr, useNames bool, depth int) sslType {
-	op := strings.ToUpper(e.Op)
+// namedTypes maps the type words the element inventory uses in its
+// operator matrix and return wordings to sslType. Wildcard and error
+// wordings ("any", "non-number", "incompatible", "n/a", ...) are absent on
+// purpose: a row that does not name two concrete operand types and a
+// concrete result makes no claim this inference can use.
+var namedTypes = map[string]sslType{
+	"string":     typeString,
+	"number":     typeNumber,
+	"boolean":    typeBoolean,
+	"date":       typeDate,
+	"array":      typeArray,
+	"object":     typeObject,
+	"code block": typeCodeBlock,
+	"nil":        typeNIL,
+}
+
+// operandPair keys the operator result matrix.
+type operandPair struct {
+	op          string
+	left, right sslType
+}
+
+// operatorResults is the documented operator type matrix from the element
+// inventory (GeneratedOperatorBySymbol TypeBehavior rows), reduced to the
+// rows that name two concrete operand types and a concrete result. Any
+// combination absent from it — `aList + sText`, `nCount * sText` — is a
+// combination the language documents no result for, so it yields no claim
+// rather than a guess.
+var operatorResults = buildOperatorResults()
+
+func buildOperatorResults() map[operandPair]sslType {
+	out := make(map[operandPair]sslType)
+	for _, details := range constants.GeneratedOperatorBySymbol {
+		op := strings.ToUpper(details.Symbol)
+		for _, row := range details.TypeBehavior {
+			left, okL := namedTypes[strings.ToLower(row.Left)]
+			right, okR := namedTypes[strings.ToLower(row.Right)]
+			result, okR2 := namedTypes[strings.ToLower(row.Result)]
+			if okL && okR && okR2 {
+				out[operandPair{op, left, right}] = result
+			}
+		}
+	}
+	return out
+}
+
+// isBooleanOperator reports whether an operator always yields a boolean.
+// Every documented row for these operators results in either boolean or
+// an error, and an erroring expression produces no value to type.
+func isBooleanOperator(op string) bool {
 	switch op {
 	case ".AND.", ".OR.", "&&", "||",
 		"=", "==", "!=", "<>", "#", "$",
 		"<", ">", "<=", ">=":
+		return true
+	}
+	return false
+}
+
+func binaryType(e *parser.Expr, useNames bool, depth int) sslType {
+	op := strings.ToUpper(e.Op)
+	if isBooleanOperator(op) {
 		return typeBoolean
-	case "*", "/", "%", "^", "**", "<<", ">>":
-		return typeNumber
 	}
 	if len(e.Children) != 2 {
 		return typeUnknown
 	}
-	// An assignment inside a group (`(i += 1) <= n`) evaluates to the
-	// assigned value.
-	if isAssignOp(op) {
+	// A plain assignment inside a group (`(x := f()) != NIL`) evaluates to
+	// the assigned value; the compound forms go through the matrix, which
+	// documents them the same way as their bare operators.
+	if op == ":=" {
 		return inferType(e.Children[1], useNames, depth+1)
 	}
-	if op != "+" && op != "-" {
+	left := inferType(e.Children[0], useNames, depth+1)
+	if left == typeUnknown {
 		return typeUnknown
 	}
-	left := inferType(e.Children[0], useNames, depth+1)
 	right := inferType(e.Children[1], useNames, depth+1)
-	switch {
-	case left == typeString || right == typeString:
-		// `+` concatenates; `-` trims trailing spaces then concatenates.
-		return typeString
-	case left == typeNumber && right == typeNumber:
-		return typeNumber
-	case op == "-" && left == typeDate && right == typeDate:
-		return typeNumber
-	case op == "+" && left == typeDate && right == typeNumber,
-		op == "-" && left == typeDate && right == typeNumber:
-		return typeDate
+	if right == typeUnknown {
+		return typeUnknown
 	}
-	return typeUnknown
+	return operatorResults[operandPair{op, left, right}]
 }
 
 func isAssignOp(op string) bool {

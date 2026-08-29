@@ -233,9 +233,16 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	variables := p.ExtractVariables(ast)
 	typeInfo := buildSimpleTypeInfo(tokens, variables)
 
+	// Expression-AST consumers (issue #184): the statement trees and the
+	// call-site index derived from them are built once here and shared by
+	// every tree-driven rule.
+	stmtExprs := parser.ExtractStatementExpressions(tokens)
+	calls := parser.CollectCallsIn(stmtExprs)
+
 	// Check for Hungarian notation (opt-in)
 	if opts.CheckHungarianNotation {
 		diagnostics = append(diagnostics, checkHungarianNotation(variables, opts.HungarianPrefixes)...)
+		diagnostics = append(diagnostics, checkHungarianTypeMismatch(tokens, stmtExprs)...)
 	}
 
 	// SSL language rule enforcement (always enabled)
@@ -271,9 +278,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
 	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens)...)
 	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens)...)
-	// Expression-AST consumers (issue #184): the call-site index is built
-	// once here and shared by every call-shaped rule.
-	calls := parser.CollectCalls(tokens)
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens, calls)...)
 	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens, calls)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
