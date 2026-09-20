@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-20
+
+A small correction release. An explicit `+` sign in a scientific-notation
+exponent turned out to be valid SSL, contrary to the style guide, which
+is corrected in schema 1.7.2: the lexer now reads `9.0E+1` as one number
+instead of leaving its pieces unreported, and `scientific_notation` keeps
+the author's sign in its suggestion. It also pins unary plus, which SSL
+does not have, as `unexpected_token`'s finding, with a fence and a test
+(#244).
+
 ### Fixed
 - **An explicit `+` exponent sign is valid SSL, and the LSP now reads it.**
   The lexer refused to fold `9.0E+1` into a number, stopping at `9.0` and
@@ -1543,7 +1553,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...v0.20.0
