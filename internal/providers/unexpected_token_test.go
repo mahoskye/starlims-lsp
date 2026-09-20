@@ -72,6 +72,8 @@ func TestUnexpectedToken_MessagesAndAnchors(t *testing.T) {
 			1, 0, "Unexpected operator '*' - expected a statement"},
 		{"unary plus does not exist", ":DECLARE x;\nx := +5;\n",
 			1, 5, "Unexpected operator '+' - expected an expression"},
+		{"malformed exponent is nobody else's", ":DECLARE nX, nVar;\nnX := 2.0E+nVar;\n",
+			1, 9, "Unexpected identifier 'E' - expected an operator or ';'"},
 	}
 	for _, c := range cases {
 		got := unexpectedTokens(t, c.script)
@@ -119,6 +121,7 @@ func TestUnexpectedToken_DoesNotFlag(t *testing.T) {
 		"bare and optional":         ":PROCEDURE Demo;\n\tnTotal := nMissing + 1;\n\tThis;\n\t:RETURN;\n:ENDPROC;\n",
 		"end of file":               ":DECLARE nCount;\nnCount := 1",
 		"expression forms":          ":DECLARE oEmail, x, bOk, fn, oObj, aItems, i;\noEmail := Email{};\nx++;\n++x;\nbOk := .T. .AND. .F.;\nfn := {|n| n + 1};\nx := oObj:Method(1)[2]:Prop;\nx := -aItems[i] ^ 2;\n:WHILE (i += 1) <= 10;\n:ENDWHILE;\nx := NIL;\nx := \"s\" $ \"haystack\";\nx := 5 % 2 ** 3;\nx := [bracket string];\nDoProc(\"P\", {a,,c});\n-x;\n",
+		"signed exponents":          ":DECLARE nA, nB, nD;\nnA := 9.0E+1;\nnB := 9.0E-1;\nnD := 1.5e+3 * 2;\n",
 		"member chain across lines": ":DECLARE txt, sTitle, sUser;\n:RETURN txt:ToString()\n\t:Replace(\"##TITLE##\", sTitle)\n\t:Replace(\"##USER##\", sUser);\n",
 		"assignment forms":          ":DECLARE a, b, c, x, n, oObj;\na := b := c;\noObj:Prop := oObj:Items[1] := x;\n:RETURN x := .T.;\n:RETURN { .T., n += 1 };\nDoProc(\"P\", {a := 1});\n",
 	}

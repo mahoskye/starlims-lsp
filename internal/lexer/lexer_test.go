@@ -218,7 +218,10 @@ func TestLexer_TokenNumber(t *testing.T) {
 		// Grammar: DecimalPart ::= "." Digit {Digit} — a dot with no digit
 		// after it is not part of the number (issue #83).
 		{"trailing_dot_not_consumed", "5.", "5"},
-		{"scientific_explicit_plus_invalid", "1.5e+10", "1.5"},
+		{"scientific_explicit_plus", "1.5e+10", "1.5e+10"},
+		{"scientific_explicit_plus_upper", "9.0E+1", "9.0E+1"},
+		{"scientific_sign_needs_digit", "2.0E+x", "2.0"},
+		{"scientific_sign_at_end", "1.5e+", "1.5"},
 		{"scientific_negative", "2.3e-5", "2.3e-5"},
 		{"scientific_requires_decimal_point_lower", "1e10", "1"},
 		{"scientific_requires_decimal_point_upper", "1E10", "1"},
@@ -1441,9 +1444,10 @@ func TestLexer_ScientificNotation_ExponentMinusOnly(t *testing.T) {
 	}
 }
 
-func TestLexer_ScientificNotation_NoPlusSign(t *testing.T) {
-	// EBNF: explicit '+' in exponent is not valid (e.g., 9.0E+1 is invalid).
-	// The lexer should stop before '+' and not consume the exponent.
+func TestLexer_ScientificNotation_PlusSign(t *testing.T) {
+	// [spec diag.scientific_notation] Either exponent sign is valid
+	// (issue #246): `9.0E+1` is one number token. The lexer used to stop
+	// at `9.0`, leaving `E`, `+`, `1` that no rule reported.
 	input := `9.0E+1`
 	lex := NewLexer(input)
 	tokens := lex.Tokenize()
@@ -1451,8 +1455,8 @@ func TestLexer_ScientificNotation_NoPlusSign(t *testing.T) {
 	if tokens[0].Type != TokenNumber {
 		t.Fatalf("expected TokenNumber, got %s", tokens[0].Type)
 	}
-	if tokens[0].Text != "9.0" {
-		t.Errorf("expected '9.0' (rejects E+), got %q", tokens[0].Text)
+	if tokens[0].Text != "9.0E+1" {
+		t.Errorf("expected '9.0E+1' as one number, got %q", tokens[0].Text)
 	}
 }
 

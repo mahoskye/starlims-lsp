@@ -361,15 +361,18 @@ func (l *Lexer) readNumber() Token {
 			text.WriteRune(char)
 			seenDecimal = true
 			l.advance()
-		} else if (char == 'e' || char == 'E') && (l.peek(1) == '-' || l.isDigit(l.peek(1))) {
-			// SSL grammar: Exponent ::= ("e" | "E") ["-"] Digit {Digit}
-			// Only optional minus sign is allowed; explicit "+" is not valid (e.g. 9E+1 is invalid).
+		} else if (char == 'e' || char == 'E') && exponentFollows(l.peek(1), l.peek(2)) {
+			// Exponent ::= ("e" | "E") ["+" | "-"] Digit {Digit}. Either sign
+			// is valid (issue #246); the sign must be followed by a digit or
+			// the `e` is not an exponent at all. An exponent needs a digit,
+			// a decimal point, and a fraction before it: `7e2` and `.5e1`
+			// are not numbers (diag.scientific_notation).
 			if !seenDecimal || digitsBeforeDecimal == 0 {
 				break
 			}
 			text.WriteRune(char)
 			l.advance()
-			if l.pos < len(l.input) && l.input[l.pos] == '-' {
+			if l.pos < len(l.input) && (l.input[l.pos] == '-' || l.input[l.pos] == '+') {
 				text.WriteRune(l.input[l.pos])
 				l.advance()
 			}
@@ -379,6 +382,15 @@ func (l *Lexer) readNumber() Token {
 	}
 
 	return Token{Type: TokenNumber, Text: text.String(), Line: line, Column: col, Offset: start}
+}
+
+// exponentFollows reports whether the two runes after an `e`/`E` begin an
+// exponent: a digit, or a sign followed by a digit.
+func exponentFollows(next, after rune) bool {
+	if next >= '0' && next <= '9' {
+		return true
+	}
+	return (next == '-' || next == '+') && after >= '0' && after <= '9'
 }
 
 // isKeywordStart decides whether a `:` opens a keyword token (`:IF`) or is

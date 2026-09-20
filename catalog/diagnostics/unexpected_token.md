@@ -68,7 +68,15 @@ history:
       never carries a leading sign, so `x := +5;` does not compile. The
       flag the parser already produced is now pinned by a fence and a
       test rather than left incidental.
-issues: ["#240", "#244"]
+  - date: 2026-09-20
+    ref: "issue #246"
+    note: >-
+      The scientific_notation deferral narrowed to the shapes that rule
+      actually reports (a number with no decimal point, or one starting
+      with the point, glued to an `e` identifier). A well-formed number
+      glued to a stray `E` — `2.0E+nVar`, which used to defer to a rule
+      that then stayed silent — is now reported here.
+issues: ["#240", "#244", "#246"]
 ---
 
 ## Behavior
@@ -139,8 +147,9 @@ It must NOT flag:
   C-style operator or glued `===`/`!==` pair
   (`invalid_operator_sequence`), a bare `AND`/`OR`/`NOT` word in operator
   position (`bare_logical_operator`), a colon form that is not an SSL
-  keyword (`unknown_keyword` / `endfor_invalid`), a `7e2`-style exponent
-  (`scientific_notation`), a
+  keyword (`unknown_keyword` / `endfor_invalid`), the exponent shapes
+  `scientific_notation` owns — an identifier glued to a number that has
+  no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — a
   closer with no matching opener (`unmatched_delimiter` /
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file
@@ -279,6 +288,13 @@ x := (1 + );
 ```ssl
 :DECLARE x;
 x := +5;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX, nVar;
+nX := 2.0E+nVar;
 ```
 
 ## Rationale

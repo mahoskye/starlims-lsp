@@ -26,7 +26,19 @@ history:
       Fix-it wording corrected: suggestions no longer reproduce explicit
       '+' exponent signs, which are themselves invalid SSL — 9E+1 now
       suggests 9.0E1.
-issues: ["#47"]
+  - date: 2026-09-20
+    ref: "issue #246 (style guide correction ssl-style-guide#73)"
+    note: >-
+      An explicit '+' exponent sign is valid SSL after all — verified, and
+      the schema's "explicit plus signs are not supported" clause is the
+      style guide's error, tracked in ssl-style-guide#73. The lexer now
+      folds `9.0E+1` into one number token (it used to stop at `9.0`,
+      leaving `E`, `+`, `1` that no rule reported — the LSP was silent on
+      the decimal form either way), and suggestions keep the sign the
+      author wrote: 9E+1 now suggests 9.0E+1, undoing the #47 sign
+      dropping while keeping its point that a suggestion must be valid
+      SSL. The decimal-point and leading-digit requirements stand.
+issues: ["#47", "#246"]
 ---
 
 ## Behavior
@@ -46,11 +58,15 @@ immediately followed (no whitespace) by an identifier:
   by an `e…` identifier (e.g. `.5e1` lexes as `.5` + `e1`).
 
 The range covers the number token; severity is warning for all three
-shapes, and the message shows the corrected literal.
+shapes, and the message shows the corrected literal, keeping whatever
+exponent sign the author wrote (`9E+1` suggests `9.0E+1`).
 
 It must NOT flag:
 
-- valid scientific notation such as `7.0e2`, `1.2e-3`, `9.0E1`;
+- valid scientific notation such as `7.0e2`, `1.2e-3`, `9.0E1`, and the
+  signed forms `9.0E+1` and `1.5e+3` — either exponent sign is valid
+  (issue #246), so the lexer folds them into one number token and there
+  is nothing glued to report;
 - a number separated from a following identifier by whitespace or an
   operator — adjacency is the signal;
 - ordinary identifiers that merely start with `e`.
@@ -95,6 +111,17 @@ eCount := nValue + 1;
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE nA, nB, nD;
+nA := 9.0E+1;
+nB := 9.0E-1;
+nD := 1.5e+3 * 2;
+:ENDPROC;
+```
+
 ## Rationale
 
 The schema's numbers section (`require_decimal_for_scientific: true`) lists
@@ -103,6 +130,8 @@ lints slug for them, so the rule is tool-authored. Warning (not error)
 severity because the code still lexes and may even run with the exponent
 part silently misread as an identifier — which is precisely why it deserves
 a loud nudge: `7e2` is almost never an intentional variable reference.
-The fix-it messages themselves suggest only valid SSL: explicit `+`
-exponent signs — which the schema also rejects — are dropped from
-suggestions, so `9E+1` suggests `9.0E1` (issue #47).
+The fix-it messages themselves suggest only valid SSL (issue #47). An
+explicit `+` exponent sign turned out to be valid (issue #246), contrary
+to the schema clause this entry transcribed, so suggestions keep the sign
+the author wrote: `9E+1` suggests `9.0E+1`. The schema correction is
+ssl-style-guide#73.
