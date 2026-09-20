@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-20
+
+Closes the silence behind issue #240. Four kinds of broken code validated
+clean — `:FOR EACH x IN y;`, a line of English prose, `foo bar baz;`, a
+statement missing its `;` — because the parser computed that each was
+incomplete and nothing surfaced it, and an unterminated string swallowed
+the rest of a file without a word. Two always-on errors now report them,
+anchored on the offending token or the unclosed opener. The production
+corpus shaped both: assignment turned out to be an expression in SSL,
+strings turned out to span lines, and the one false positive the corpus
+exposed — a call chain continued on the next line — was the lexer's, not
+the code's, and is fixed here too.
+
 ### Added
 - **`unexpected_token` diagnostic** (error, always on): the first token in
   a statement that the SSL statement grammar cannot accept, anchored on
@@ -1515,7 +1528,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.18.0...v0.19.0
