@@ -122,3 +122,26 @@ nCode := SubStr(sText, 1, 4);
 		t.Error("--hungarian-types must not enable hungarian_notation")
 	}
 }
+
+// [spec diag.unexpected_token] An unexpected token is an error, so it is
+// the one class of #240 finding that flips the CLI's valid flag.
+func TestValidateFilePath_UnexpectedTokenFlipsValid(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "prose.ssl")
+	if err := os.WriteFile(path, []byte(":DECLARE nCount;\nnCount := 1;\nThis is a bunch of text but it does not evaluate as wrong\nnCount := 2;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := validateFilePath(path, validateFlags{})
+	if result.Valid {
+		t.Fatalf("prose should invalidate the file, got: %+v", result.Diagnostics)
+	}
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == "unexpected_token" && d.Severity == "error" && d.Line == 3 && d.Column == 6 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected an unexpected_token error at 3:6, got: %+v", result.Diagnostics)
+	}
+}

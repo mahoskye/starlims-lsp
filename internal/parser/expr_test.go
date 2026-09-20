@@ -257,3 +257,145 @@ x := 1;
 		_ = ExtractStatementExpressions(lexer.NewLexer(code).Tokenize())
 	}
 }
+
+// [spec diag.unexpected_token] The extractor names the first token the
+// statement grammar could not accept and, where it knows structurally,
+// what belonged there. Wording for the "" cases is the consumer's.
+func TestExtractStatementExpressions_UnexpectedToken(t *testing.T) {
+	cases := []struct {
+		code     string
+		tok      string // text of the unexpected token; "" for end of file
+		line     int    // 1-based line of the unexpected token
+		expected string
+	}{
+		{"This is a bunch of text but it does not evaluate as wrong\nnCount := 2;", "is", 1, ""},
+		{"foo bar baz;", "bar", 1, ""},
+		{":FOR EACH nItem IN aItems;", "nItem", 1, "':='"},
+		{":FOR i := 1 10;", "10", 1, "':TO'"},
+		{":FOR :TO 10;", ":TO", 1, "a loop variable"},
+		{":FOR i 1 :TO 10;", "1", 1, "':='"},
+		{":FOR i := :TO 10;", ":TO", 1, "an expression after ':='"},
+		{":FOR i := 1 :TO ;", ";", 1, "an expression after ':TO'"},
+		{":FOR i := 1 :TO 10 :STEP;", ";", 1, "an expression after ':STEP'"},
+		{":FOR i := 1 :TO 10\n:NEXT;", ":NEXT", 2, "':STEP' or ';'"},
+		{":FOR i := 1 :TO 10 :STEP 2 3;", "3", 1, "';'"},
+		{"nCount := 1\nnCount := 2;", "nCount", 2, ""},
+		{":IF;", ";", 1, "a condition"},
+		{":WHILE nA nB;", "nB", 1, ""},
+		{"nCount := ;", ";", 1, "an expression"},
+		{"x := 1 + ;", ";", 1, ""},
+		{`DoProc("X" {a});`, "{", 1, ""},
+		{"x := (1 + );", ")", 1, ""},
+		{`:DEFAULT sName "x";`, `"x"`, 1, "','"},
+		{":DEFAULT;", ";", 1, "a parameter name"},
+		{":DEFAULT sName, ;", ";", 1, "a default value"},
+		{":RETURN 1 2;", "2", 1, ""},
+		{"*x;", "*", 1, "a statement"},
+		{"x := 1 +", "", 1, ""},
+	}
+	for _, c := range cases {
+		tokens := lexer.NewLexer(c.code).Tokenize()
+		stmts := ExtractStatementExpressions(tokens)
+		if len(stmts) != 1 {
+			t.Errorf("%q: want 1 statement, got %d", c.code, len(stmts))
+			continue
+		}
+		se := stmts[0]
+		if se.Complete || se.Unexpected < 0 {
+			t.Errorf("%q: claimed Complete (Unexpected=%d)", c.code, se.Unexpected)
+			continue
+		}
+		got := tokens[se.Unexpected]
+		if c.tok == "" {
+			if got.Type != lexer.TokenEOF {
+				t.Errorf("%q: want end of file, got %q", c.code, got.Text)
+			}
+		} else if got.Text != c.tok || got.Line != c.line {
+			t.Errorf("%q: unexpected token got %q (line %d), want %q (line %d)", c.code, got.Text, got.Line, c.tok, c.line)
+		}
+		if se.Expected != c.expected {
+			t.Errorf("%q: Expected got %q, want %q", c.code, se.Expected, c.expected)
+		}
+	}
+}
+
+// [spec diag.unexpected_token] Statements the grammar accepts in full are
+// Complete with no unexpected token; a bare `:RETURN;` carries no
+// expression and is omitted rather than reported as missing one; a final
+// statement that ends at end of file without `;` is complete.
+func TestExtractStatementExpressions_CompleteForms(t *testing.T) {
+	complete := []string{
+		"This;",
+		"nCount := 1",
+		"x := (1 + 2) * 3;",
+		":FOR i := 10 :TO 1 :STEP -1;",
+		":FOR i := 1\n\t:TO nMax;",
+		"nTotal := nA\n\t+ nB;",
+		"oEmail := Email{};",
+		"x++;",
+		"bOk := .T. .AND. .F.;",
+		"fn := {|n| n + 1};",
+		"x := oObj:Method(1)[2]:Prop;",
+		":WHILE (i += 1) <= 10;",
+		`DoProc("P", {a,,c});`,
+		"-x;",
+		":RETURN nSum * 2;",
+	}
+	for _, code := range complete {
+		stmts := extract(t, code)
+		if len(stmts) != 1 {
+			t.Errorf("%q: want 1 statement, got %d", code, len(stmts))
+			continue
+		}
+		if !stmts[0].Complete || stmts[0].Unexpected != -1 {
+			t.Errorf("%q: not Complete (Unexpected=%d, Expected=%q)", code, stmts[0].Unexpected, stmts[0].Expected)
+		}
+	}
+	if stmts := extract(t, ":RETURN;"); len(stmts) != 0 {
+		t.Errorf(":RETURN; should yield no statement, got %d", len(stmts))
+	}
+}
+
+// [spec diag.unexpected_token] Assignment is an expression wherever an
+// operand can stand — chained, as a list element, as a `:RETURN` value, in
+// a condition — and parses in full; only the statement's own left-hand
+// side is not a value position.
+func TestParseExpression_AssignmentExpressions(t *testing.T) {
+	cases := []struct{ code, want string }{
+		{`(a := b := c)`, `(group (:= a (:= b c)))`},
+		{`{ .T., n += 1 }`, `(array .T. (+= n 1))`},
+		{`Foo(a := 1, b)`, `(call Foo (:= a 1) b)`},
+		{`(i += 1) <= nCount`, `(<= (group (+= i 1)) nCount)`},
+	}
+	for _, tc := range cases {
+		if got := parseExprString(t, tc.code); got != tc.want {
+			t.Errorf("%q:\n  got  %s\n  want %s", tc.code, got, tc.want)
+		}
+	}
+	// ParseExpression itself is not a value position: a bare `a := b` is
+	// the identifier `a` with the assignment left for the statement.
+	if got := parseExprString(t, `a := b`); got != "a" {
+		t.Errorf("bare assignment: got %s, want a", got)
+	}
+
+	stmts := extract(t, "a := b := c;\n:RETURN x := .T.;\n:IF x := 1;\n:DEFAULT sName, sOther := \"x\";\n")
+	if len(stmts) != 4 {
+		t.Fatalf("want 4 statements, got %d", len(stmts))
+	}
+	want := []string{"a | (:= b c)", "(:= x .T.)", "(:= x 1)", "sName | (:= sOther \"x\")"}
+	for i, s := range stmts {
+		if !s.Complete {
+			t.Errorf("stmt %d not Complete (Unexpected=%d)", i, s.Unexpected)
+		}
+		var parts []string
+		for _, e := range s.Exprs {
+			parts = append(parts, e.String())
+		}
+		if got := strings.Join(parts, " | "); got != want[i] {
+			t.Errorf("stmt %d: got %s, want %s", i, got, want[i])
+		}
+	}
+	if stmts[0].Kind != StmtAssign || stmts[0].Assign != ":=" {
+		t.Errorf("chained assignment lost its StmtAssign classification: %+v", stmts[0])
+	}
+}

@@ -267,6 +267,10 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
 		diagnostics = append(diagnostics, checkParameterPlacement(tokens)...)
 		diagnostics = append(diagnostics, checkDefaultPlacement(tokens)...)
+		// Statement grammar (diag.unexpected_token, issue #240). Gated off
+		// for data-source files: their SSL is directive syntax outside the
+		// expression grammar and their bodies are SQL.
+		diagnostics = append(diagnostics, checkUnexpectedTokens(tokens, stmtExprs)...)
 	}
 	diagnostics = append(diagnostics, checkDeclareInitializer(tokens)...)
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)

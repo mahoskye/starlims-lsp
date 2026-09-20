@@ -61,6 +61,7 @@ const (
 	CodeUnknownKeyword              = "unknown_keyword"
 	CodeEndForInvalid               = "endfor_invalid"
 	CodeUnknownToken                = "unknown_token"
+	CodeUnexpectedToken             = "unexpected_token"
 	CodeCommentTermination          = "comment_termination"
 	CodeCommentTextAfterTerminator  = "comment_text_after_terminator"
 	CodeAssignmentInCondition       = "assignment_in_condition"

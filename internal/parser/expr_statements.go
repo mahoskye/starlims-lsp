@@ -48,9 +48,20 @@ type StatementExprs struct {
 	// statement is an assignment, else "".
 	Assign string
 	// Complete reports whether expression parsing consumed the whole
-	// statement: every significant token is inside some tree in Exprs.
+	// statement: every significant token is inside some tree in Exprs and
+	// no tree contains an ExprUnknown. Equivalent to Unexpected < 0.
 	// Consumers wanting zero-risk claims should require Complete.
 	Complete bool
+	// Unexpected is the index of the first significant token the statement
+	// grammar could not accept (diag.unexpected_token), or -1 when the
+	// statement is Complete. It is the token to report, not the statement.
+	Unexpected int
+	// Expected names what the grammar wanted at Unexpected when the parser
+	// knows it structurally — a `:FOR` header piece, a missing condition or
+	// operand. It is "" when the wording is better derived from context
+	// (an operator was expected after a finished expression, a comma inside
+	// an argument list); consumers own that derivation.
+	Expected string
 }
 
 // statement-leading keywords whose remainder is one expression.
@@ -120,44 +131,54 @@ func statementEnd(tokens []lexer.Token, start int) int {
 // parseStatement classifies one statement span and parses its expression
 // content. ok=false means the statement carries no expressions.
 func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool) {
-	se := StatementExprs{Start: start, End: end}
+	se := StatementExprs{Start: start, End: end, Unexpected: -1}
 	first := tokens[start]
 
 	if first.Type == lexer.TokenKeyword {
 		kw := strings.ToUpper(strings.TrimPrefix(first.Text, ":"))
 		switch {
 		case exprAfterKeyword[kw]:
-			e, next := ParseExpression(tokens, start+1)
+			e, next, fail := parseValueAt(tokens, start+1)
 			se.Kind = StmtCondition
 			se.Exprs = []*Expr{e}
-			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
+			se.finish(tokens, e, start+1, next, fail, "a condition", "")
 			return se, true
 		case kw == "RETURN":
-			// Bare `:RETURN;` has no expression — the next significant
-			// token is the terminator (or nothing).
-			if coversStatement(tokens, start+1, end) {
+			e, next, fail := parseValueAt(tokens, start+1)
+			if e.Kind == ExprUnknown && fail >= 0 && isTerminator(tokens[fail]) {
+				// Bare `:RETURN;` — the operand is optional, so there is
+				// no expression here and nothing to report.
 				return se, false
 			}
-			e, next := ParseExpression(tokens, start+1)
 			se.Kind = StmtReturn
 			se.Exprs = []*Expr{e}
-			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
+			se.finish(tokens, e, start+1, next, fail, "an expression", "")
 			return se, true
 		case kw == "DEFAULT":
 			// :DEFAULT ident, expr;
+			se.Kind = StmtDefault
 			idIdx := nextSignificantIndex(tokens, start+1, end)
-			if idIdx < 0 || tokens[idIdx].Type != lexer.TokenIdentifier {
-				return se, false
+			if idIdx < 0 {
+				idIdx = end
 			}
-			commaIdx := nextSignificantIndex(tokens, idIdx+1, end)
-			if commaIdx < 0 || tokens[commaIdx].Type != lexer.TokenPunctuation || tokens[commaIdx].Text != "," {
-				return se, false
+			if tokens[idIdx].Type != lexer.TokenIdentifier {
+				se.Unexpected, se.Expected = idIdx, "a parameter name"
+				se.Exprs = []*Expr{unknownAt(idIdx), unknownAt(idIdx)}
+				return se, true
 			}
 			target := &Expr{Kind: ExprIdentifier, Start: idIdx, End: idIdx, Name: tokens[idIdx].Text}
-			e, next := ParseExpression(tokens, commaIdx+1)
-			se.Kind = StmtDefault
+			commaIdx := nextSignificantIndex(tokens, idIdx+1, end)
+			if commaIdx < 0 {
+				commaIdx = end
+			}
+			if tokens[commaIdx].Type != lexer.TokenPunctuation || tokens[commaIdx].Text != "," {
+				se.Unexpected, se.Expected = commaIdx, "','"
+				se.Exprs = []*Expr{target, unknownAt(commaIdx)}
+				return se, true
+			}
+			e, next, fail := parseValueAt(tokens, commaIdx+1)
 			se.Exprs = []*Expr{target, e}
-			se.Complete = e.Kind != ExprUnknown && coversStatement(tokens, next, end)
+			se.finish(tokens, e, commaIdx+1, next, fail, "a default value", "")
 			return se, true
 		case kw == "FOR":
 			return parseForHeader(tokens, start, end)
@@ -171,67 +192,149 @@ func parseStatement(tokens []lexer.Token, start, end int) (StatementExprs, bool)
 	}
 
 	// Assignment or expression statement.
-	lhs, next := ParseExpression(tokens, start)
-	if lhs.Kind == ExprUnknown {
+	lhs, next, fail := parseExpressionAt(tokens, start)
+	if fail >= 0 {
 		se.Exprs = []*Expr{lhs}
+		se.finish(tokens, lhs, start, next, fail, "a statement", "")
 		return se, true
 	}
 	opIdx := nextSignificantIndex(tokens, next, end)
 	if opIdx >= 0 && tokens[opIdx].Type == lexer.TokenOperator && isAssignmentOperator(tokens[opIdx].Text) {
-		rhs, after := ParseExpression(tokens, opIdx+1)
+		rhs, after, rfail := parseValueAt(tokens, opIdx+1)
 		se.Kind = StmtAssign
 		se.Exprs = []*Expr{lhs, rhs}
 		se.Assign = tokens[opIdx].Text
-		se.Complete = rhs.Kind != ExprUnknown && coversStatement(tokens, after, end)
+		se.finish(tokens, rhs, opIdx+1, after, rfail, "an expression", "")
 		return se, true
 	}
 	se.Exprs = []*Expr{lhs}
-	se.Complete = coversStatement(tokens, next, end)
+	se.finish(tokens, lhs, start, next, -1, "", "")
 	return se, true
 }
 
-// parseForHeader parses `:FOR ident := expr :TO expr [:STEP expr];`.
+// parseForHeader parses `:FOR ident := expr :TO expr [:STEP expr];`. A
+// header that departs from that shape is still returned (ok=true) with
+// Unexpected on the first departing token and Expected naming the piece
+// that belonged there, so the departure can be reported; Exprs holds
+// whatever was parsed before it.
 func parseForHeader(tokens []lexer.Token, start, end int) (StatementExprs, bool) {
-	se := StatementExprs{Start: start, End: end}
+	se := StatementExprs{Start: start, End: end, Kind: StmtFor, Unexpected: -1}
 	idIdx := nextSignificantIndex(tokens, start+1, end)
-	if idIdx < 0 || tokens[idIdx].Type != lexer.TokenIdentifier {
-		return se, false
+	if idIdx < 0 {
+		idIdx = end
 	}
-	opIdx := nextSignificantIndex(tokens, idIdx+1, end)
-	if opIdx < 0 || tokens[opIdx].Type != lexer.TokenOperator || tokens[opIdx].Text != ":=" {
-		return se, false
+	if tokens[idIdx].Type != lexer.TokenIdentifier {
+		se.Unexpected, se.Expected = idIdx, "a loop variable"
+		return se, true
 	}
 	target := &Expr{Kind: ExprIdentifier, Start: idIdx, End: idIdx, Name: tokens[idIdx].Text}
-	se.Kind = StmtFor
 	se.Exprs = []*Expr{target}
 	se.Assign = ":="
 
-	fromExpr, next := ParseExpression(tokens, opIdx+1)
+	opIdx := nextSignificantIndex(tokens, idIdx+1, end)
+	if opIdx < 0 {
+		opIdx = end
+	}
+	if tokens[opIdx].Type != lexer.TokenOperator || tokens[opIdx].Text != ":=" {
+		se.Unexpected, se.Expected = opIdx, "':='"
+		return se, true
+	}
+
+	fromExpr, next, fail := parseValueAt(tokens, opIdx+1)
 	se.Exprs = append(se.Exprs, fromExpr)
-	complete := fromExpr.Kind != ExprUnknown
+	if idx, exp := exprFailure(tokens, opIdx+1, fail, end, "an expression after ':='"); idx >= 0 {
+		se.Unexpected, se.Expected = idx, exp
+		return se, true
+	}
 
 	// :TO expr
 	toIdx := nextSignificantIndex(tokens, next, end)
-	if toIdx < 0 || tokens[toIdx].Type != lexer.TokenKeyword ||
-		!strings.EqualFold(strings.TrimPrefix(tokens[toIdx].Text, ":"), "TO") {
-		se.Complete = false
+	if toIdx < 0 {
+		toIdx = end
+	}
+	if !isKeyword(tokens[toIdx], "TO") {
+		se.Unexpected, se.Expected = toIdx, "':TO'"
 		return se, true
 	}
-	toExpr, next := ParseExpression(tokens, toIdx+1)
+	toExpr, next, fail := parseValueAt(tokens, toIdx+1)
 	se.Exprs = append(se.Exprs, toExpr)
-	complete = complete && toExpr.Kind != ExprUnknown
+	if idx, exp := exprFailure(tokens, toIdx+1, fail, end, "an expression after ':TO'"); idx >= 0 {
+		se.Unexpected, se.Expected = idx, exp
+		return se, true
+	}
 
 	// Optional :STEP expr
-	stepIdx := nextSignificantIndex(tokens, next, end)
-	if stepIdx >= 0 && tokens[stepIdx].Type == lexer.TokenKeyword &&
-		strings.EqualFold(strings.TrimPrefix(tokens[stepIdx].Text, ":"), "STEP") {
-		stepExpr, after := ParseExpression(tokens, stepIdx+1)
+	tail := "':STEP' or ';'"
+	if stepIdx := nextSignificantIndex(tokens, next, end); stepIdx >= 0 && isKeyword(tokens[stepIdx], "STEP") {
+		stepExpr, after, sfail := parseValueAt(tokens, stepIdx+1)
 		se.Exprs = append(se.Exprs, stepExpr)
-		complete = complete && stepExpr.Kind != ExprUnknown
+		if idx, exp := exprFailure(tokens, stepIdx+1, sfail, end, "an expression after ':STEP'"); idx >= 0 {
+			se.Unexpected, se.Expected = idx, exp
+			return se, true
+		}
 		next = after
+		tail = "';'"
 	}
-	se.Complete = complete && coversStatement(tokens, next, end)
+	if idx := leftover(tokens, next, end); idx >= 0 {
+		se.Unexpected, se.Expected = idx, tail
+		return se, true
+	}
+	se.Complete = true
 	return se, true
+}
+
+// finish sets Unexpected/Expected/Complete for a statement whose last
+// parsed piece is e (parsed from `from`, failing at `fail`, leaving
+// `next`). `empty` names what belonged at `from` when no expression
+// started there; `tail` names what may follow a finished expression when
+// that is more specific than the consumer's default wording.
+func (se *StatementExprs) finish(tokens []lexer.Token, e *Expr, from, next, fail int, empty, tail string) {
+	if idx, exp := exprFailure(tokens, from, fail, se.End, empty); idx >= 0 {
+		se.Unexpected, se.Expected = idx, exp
+		return
+	}
+	if idx := leftover(tokens, next, se.End); idx >= 0 {
+		se.Unexpected, se.Expected = idx, tail
+		return
+	}
+	se.Complete = true
+}
+
+// exprFailure maps an expression parser failure to (index, expected).
+// When the failure sits on the first significant token from `from`, no
+// expression started at all and `empty` is what belonged there; a failure
+// deeper in leaves Expected "" for the consumer to word from context.
+func exprFailure(tokens []lexer.Token, from, fail, end int, empty string) (int, string) {
+	if fail < 0 {
+		return -1, ""
+	}
+	if nextSignificantIndex(tokens, from, end) == fail {
+		return fail, empty
+	}
+	return fail, ""
+}
+
+// leftover returns the first significant token at or after `next` that is
+// not the statement's terminator, or -1 when the expression reached the
+// `;` or the end of input.
+func leftover(tokens []lexer.Token, next, end int) int {
+	idx := nextSignificantIndex(tokens, next, end)
+	if idx < 0 || isTerminator(tokens[idx]) {
+		return -1
+	}
+	return idx
+}
+
+func isTerminator(t lexer.Token) bool {
+	return t.Type == lexer.TokenEOF || (t.Type == lexer.TokenPunctuation && t.Text == ";")
+}
+
+func isKeyword(t lexer.Token, name string) bool {
+	return t.Type == lexer.TokenKeyword && strings.EqualFold(strings.TrimPrefix(t.Text, ":"), name)
+}
+
+func unknownAt(idx int) *Expr {
+	return &Expr{Kind: ExprUnknown, Start: idx, End: idx}
 }
 
 func isAssignmentOperator(text string) bool {
@@ -253,15 +356,4 @@ func nextSignificantIndex(tokens []lexer.Token, from, end int) int {
 		return j
 	}
 	return -1
-}
-
-// coversStatement reports whether nothing significant remains between
-// `from` and the statement end (exclusive of the `;` itself).
-func coversStatement(tokens []lexer.Token, from, end int) bool {
-	idx := nextSignificantIndex(tokens, from, end)
-	if idx < 0 {
-		return true
-	}
-	t := tokens[idx]
-	return t.Type == lexer.TokenPunctuation && t.Text == ";"
 }

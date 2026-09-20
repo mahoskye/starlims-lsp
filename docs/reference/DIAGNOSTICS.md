@@ -125,6 +125,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
 | `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
 | `undeclared_variable` | Use of an undeclared variable | warning | tool | active | [diag.undeclared_variable](../../catalog/diagnostics/undeclared_variable.md) |
+| `unexpected_token` | Unexpected token in a statement | error | tool | active | [diag.unexpected_token](../../catalog/diagnostics/unexpected_token.md) |
 | `unicode_literal_prefix` | N'...' Unicode literal prefix in embedded SQL | info | style_only | active | [diag.unicode_literal_prefix](../../catalog/diagnostics/unicode_literal_prefix.md) |
 | `unjustified_collate` | COLLATE in embedded SQL without a justification comment | info | style_only | active | [diag.unjustified_collate](../../catalog/diagnostics/unjustified_collate.md) |
 | `unknown_keyword` | Unknown colon-prefixed keyword | warning | tool | active | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
