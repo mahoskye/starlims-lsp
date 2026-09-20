@@ -70,6 +70,8 @@ func TestUnexpectedToken_MessagesAndAnchors(t *testing.T) {
 			1, 8, "Unexpected end of file - expected an expression"},
 		{"statement cannot start here", ":DECLARE x;\n*x;\n",
 			1, 0, "Unexpected operator '*' - expected a statement"},
+		{"unary plus does not exist", ":DECLARE x;\nx := +5;\n",
+			1, 5, "Unexpected operator '+' - expected an expression"},
 	}
 	for _, c := range cases {
 		got := unexpectedTokens(t, c.script)

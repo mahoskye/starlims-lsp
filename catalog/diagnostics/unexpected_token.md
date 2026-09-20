@@ -60,7 +60,15 @@ history:
       member access, so the call-chain fence holds by being complete
       rather than by deferring to unknown_keyword; the deferral itself
       stays for genuine unknown keywords.
-issues: ["#240"]
+  - date: 2026-09-20
+    ref: "issue #244"
+    note: >-
+      Unary plus settled: SSL's unary operators are `-`, `!`, and `.NOT.`
+      only (ssl-ebnf-grammar.md, UnaryOperator), and a numeric literal
+      never carries a leading sign, so `x := +5;` does not compile. The
+      flag the parser already produced is now pinned by a fence and a
+      test rather than left incidental.
+issues: ["#240", "#244"]
 ---
 
 ## Behavior
@@ -94,6 +102,9 @@ The statements in scope are the ones the parser models:
 A required operand that is missing is unexpected at whatever token stands
 in its place, including the `;` itself (`nCount := ;`, `:IF;`). Where the
 operand is optional the terminator is expected: `:RETURN;` is complete.
+SSL has no unary plus — its unary operators are `-`, `!`, and `.NOT.`, and
+a numeric literal never carries a leading sign — so in `x := +5;` the `+`
+is unexpected where an expression was due (issue #244).
 
 Assignment is an expression wherever an operand can stand. `a := b := c;`,
 `oObj:Prop := oObj:Items[1] := x;`, `:RETURN x := .T.;`, `{ .T., n += 1 }`,
@@ -261,6 +272,13 @@ oObj:Prop := oObj:Items[1] := x;
 ```ssl
 :DECLARE x;
 x := (1 + );
+```
+
+### Flags
+
+```ssl
+:DECLARE x;
+x := +5;
 ```
 
 ## Rationale
