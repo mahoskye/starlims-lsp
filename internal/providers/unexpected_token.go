@@ -223,11 +223,18 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 			return true
 		}
 		// scientific_notation: `7e2` lexes as number `7` glued to
-		// identifier `e2`; the number is what that rule reports.
+		// identifier `e2`, and `.5e1` as `.5` glued to `e1`; the number is
+		// what that rule reports. Only those shapes — a number with no
+		// decimal point, or one starting with the point — are its. A
+		// well-formed number glued to a stray `E` (`2.0E+nVar`) is nobody
+		// else's and stays here.
 		if idx > 0 && tokens[idx-1].Type == lexer.TokenNumber &&
 			tokens[idx-1].Offset+len(tokens[idx-1].Text) == tok.Offset &&
 			(tok.Text[0] == 'e' || tok.Text[0] == 'E') {
-			return true
+			num := tokens[idx-1].Text
+			if !strings.Contains(num, ".") || strings.HasPrefix(num, ".") {
+				return true
+			}
 		}
 	}
 	return false

@@ -3920,10 +3920,9 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 		// e.g., 7e2 -> tokens: "7" + "e2"; 1e-3 -> tokens: "1" + "e" + "-" + "3"
 		if !strings.Contains(num, ".") {
 			if len(upper) >= 2 && upper[0] == 'E' && (upper[1] >= '0' && upper[1] <= '9' || upper[1] == '+' || upper[1] == '-') {
-				// Explicit '+' exponent signs are themselves invalid SSL
-				// (schema numbers.invalid_examples) — the suggested fix
-				// drops the '+' rather than reproducing it (issue #47).
-				suggested := next.Text[:1] + strings.TrimPrefix(next.Text[1:], "+")
+				// The exponent sign, if any, is kept: either sign is valid
+				// SSL (issue #246); only the decimal point is missing.
+				suggested := next.Text
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityWarning,
 					Range:    tokenToRange(tokens[i]),
@@ -3936,12 +3935,9 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 			if upper == "E" && i+2 < len(tokens) {
 				afterE := tokens[i+2]
 				if afterE.Type == lexer.TokenOperator && (afterE.Text == "+" || afterE.Text == "-") {
-					// A '-' exponent sign is valid and kept; a '+' sign is
-					// invalid SSL and dropped from the suggestion (issue #47).
+					// Either exponent sign is valid SSL and kept (issue
+					// #246); only the decimal point is missing.
 					suggestedSign := afterE.Text
-					if suggestedSign == "+" {
-						suggestedSign = ""
-					}
 					suggestedExp := "..."
 					if i+3 < len(tokens) && tokens[i+3].Type == lexer.TokenNumber {
 						suggestedExp = tokens[i+3].Text
@@ -3949,7 +3945,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityWarning,
 						Range:    tokenToRange(tokens[i]),
-						Message:  fmt.Sprintf("SSL scientific notation requires a decimal point (and no '+' exponent sign): use '%s.0%s%s%s' instead of '%s%s%s...'", num, next.Text, suggestedSign, suggestedExp, num, next.Text, afterE.Text),
+						Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s%s%s' instead of '%s%s%s...'", num, next.Text, suggestedSign, suggestedExp, num, next.Text, afterE.Text),
 						Source:   "ssl-lsp",
 						Code:     CodeScientificNotation,
 					})

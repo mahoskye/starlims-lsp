@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **An explicit `+` exponent sign is valid SSL, and the LSP now reads it.**
+  The lexer refused to fold `9.0E+1` into a number, stopping at `9.0` and
+  leaving `E`, `+`, `1` that no rule reported: `scientific_notation` only
+  handles the shapes lacking a decimal point, and `unexpected_token`
+  deferred to it. So the decimal form drew nothing at all, while `9E+1`
+  drew a suggestion to drop a sign that was never invalid. Now `9.0E+1`
+  and `1.5e+3` lex as one number, `scientific_notation`'s suggestions keep
+  the sign the author wrote (`9E+1` → `9.0E+1`), and `unexpected_token`
+  defers only for the shapes `scientific_notation` really reports, so a
+  well-formed number glued to a stray `E` (`2.0E+nVar`) is reported. The
+  style guide's "explicit plus signs are not supported" clause is its
+  error, tracked in ssl-style-guide#73; its decimal-point and
+  leading-digit requirements stand. (#246)
+
 ## [0.22.0] - 2026-09-20
 
 Closes the silence behind issue #240. Four kinds of broken code validated
