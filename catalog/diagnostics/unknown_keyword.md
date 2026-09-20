@@ -26,6 +26,17 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-09-20
+    ref: "issue #240 follow-up"
+    note: >-
+      The lexer guard now looks past whitespace and comments to the
+      previous significant token, so a call chain continued on the next
+      line (`txt:ToString()` then `:Replace(...)`) reads as member access.
+      Over 6,228 production files this rule fired 3 times, all that
+      shape, all false; the formatter was worse, recasing `:Replace` to
+      `:REPLACE` and inserting a `;` that split the chain. The
+      continuation reading yields to a real keyword, so a lost `;` before
+      a line-leading `:IF` still lexes the keyword.
 issues: []
 ---
 
@@ -35,10 +46,17 @@ Flags a colon-prefixed keyword token (`:Name`) whose name, uppercased, is
 not a recognized SSL keyword. The range covers the token; the message names
 the offending text verbatim (`Unknown SSL keyword: ':Foobar'`).
 
-The lexer only forms a keyword token when the `:` does **not** immediately
-follow an identifier, `)`, or `]` — so member access (`oObj:Method()`,
-`Me:field`) never reaches this rule. That lexer guard is the primary
-false-positive fence for this check.
+The lexer only forms a keyword token when the `:` does **not** follow a
+receiver — an identifier, `)`, or `]` — so member access (`oObj:Method()`,
+`Me:field`) never reaches this rule. The receiver may end the previous
+line: a call chain continued on the next line with the colon leading it
+(`txt:ToString()` then `:Replace(...)`) is member access too, since the
+look-back skips whitespace and comments. That continuation reading is
+taken only when the word after the colon is not an SSL keyword, so a
+statement that lost its `;` before a line-leading `:IF` still lexes the
+keyword. That lexer guard is the primary false-positive fence for this
+check; a method named like a keyword on a continuation line
+(`oObj:Return(...)`) is the one shape it cannot tell apart.
 
 It must NOT flag:
 
@@ -80,6 +98,15 @@ oObj:Refresh();
 
 ```ssl
 :LABELSkip;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE txt, sTitle, sUser, sOut;
+sOut := txt:ToString()
+	:Replace("##TITLE##", sTitle)
+	:Replace("##USER##", sUser);
 ```
 
 ## Rationale

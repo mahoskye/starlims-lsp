@@ -53,6 +53,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   statement's own left-hand side is not a value position, so
   `StmtAssign` classification is unchanged.
 
+### Fixed
+- **A call chain continued on the next line is no longer mangled.** The
+  lexer decided whether a `:` opens a keyword by looking only at the token
+  immediately before it, so in
+
+  ```ssl
+  :RETURN txt:ToString()
+      :Replace("##TITLE##", sTitle)
+      :Replace("##USER##", sUser);
+  ```
+
+  each `:Replace` lexed as a keyword: `unknown_keyword` warned on every
+  one, and the formatter — worse — recased them to `:REPLACE` and forced
+  a `;` after the receiver line, splitting valid code into three broken
+  statements. The look-back now skips whitespace and comments to the
+  previous significant token, and yields to a real keyword so a lost `;`
+  before a line-leading `:IF` still lexes the keyword. The parser and
+  formatter treat a line-leading member-access `:` as a continuation
+  (one extra indent level, no semicolon before it). Over 6,228
+  production files `unknown_keyword` fired 3 times, all this shape.
+
 ## [0.21.0] - 2026-08-29
 
 Splits the shared Hungarian gate so a consumer can take the correctness

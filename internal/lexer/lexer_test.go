@@ -1706,3 +1706,48 @@ func TestLexer_TokenString_Unterminated(t *testing.T) {
 		}
 	}
 }
+
+// [spec diag.unknown_keyword] A `:` after a receiver is member access even
+// across a line break, so a call chain may continue on the next line; the
+// continuation reading yields to a real keyword, so a lost `;` before a
+// line-leading `:IF` still lexes the keyword.
+func TestLexer_MemberAccessAcrossLineBreak(t *testing.T) {
+	kindAfterColon := func(src string) (colonType TokenType, colonText string) {
+		for _, tok := range NewLexer(src).Tokenize() {
+			if strings.HasPrefix(tok.Text, ":") && tok.Line > 1 {
+				return tok.Type, tok.Text
+			}
+		}
+		return TokenEOF, ""
+	}
+	cases := []struct {
+		name     string
+		src      string
+		wantType TokenType
+		wantText string
+	}{
+		{"chain continued on next line", "x := txt:ToString()\n\t:Replace(\"a\", \"b\");", TokenPunctuation, ":"},
+		{"chain after a subscript", "x := aItems[1]\n\t:ToString();", TokenPunctuation, ":"},
+		{"chain after an identifier", "x := oObj\n\t:Prop;", TokenPunctuation, ":"},
+		{"comment between", "x := txt:ToString() /* c;\n\t:Replace(\"a\", \"b\");", TokenPunctuation, ":"},
+		{"lost ; before :IF stays a keyword", "DoProc(\"x\")\n:IF y;", TokenKeyword, ":IF"},
+		{"lost ; before :ENDFOR stays a keyword", "DoProc(\"x\")\n:ENDFOR;", TokenKeyword, ":ENDFOR"},
+		{"lost ; before a legacy label stays a keyword", "DoProc(\"x\")\n:LABELRetry;", TokenKeyword, ":LABELRetry"},
+		{"no receiver before: keyword", "x := 1\n:Foo;", TokenKeyword, ":Foo"},
+	}
+	for _, c := range cases {
+		gotType, gotText := kindAfterColon(c.src)
+		if gotType != c.wantType || gotText != c.wantText {
+			t.Errorf("%s: got %v %q, want %v %q", c.name, gotType, gotText, c.wantType, c.wantText)
+		}
+	}
+	// Same-line forms are unchanged: adjacent is member access, a space
+	// before the colon still reads as member access after a receiver.
+	for _, src := range []string{"x := txt:Replace(1);", "x := txt :Replace(1);"} {
+		for _, tok := range NewLexer(src).Tokenize() {
+			if tok.Type == TokenKeyword && tok.Text != ":=" {
+				t.Errorf("%q: %q lexed as a keyword", src, tok.Text)
+			}
+		}
+	}
+}

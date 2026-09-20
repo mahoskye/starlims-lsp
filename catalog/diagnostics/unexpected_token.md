@@ -53,6 +53,13 @@ history:
       `:DEFAULT x,;` values and `*****` banner lines standing outside a
       header comment that a stray `;` ended early (the style guide has no
       `*` comment form, so those lines are code to LIMS).
+  - date: 2026-09-20
+    ref: "issue #240 follow-up"
+    note: >-
+      The lexer now reads a line-leading `:Method(` after a receiver as
+      member access, so the call-chain fence holds by being complete
+      rather than by deferring to unknown_keyword; the deferral itself
+      stays for genuine unknown keywords.
 issues: ["#240"]
 ---
 
@@ -121,9 +128,8 @@ It must NOT flag:
   C-style operator or glued `===`/`!==` pair
   (`invalid_operator_sequence`), a bare `AND`/`OR`/`NOT` word in operator
   position (`bare_logical_operator`), a colon form that is not an SSL
-  keyword (`unknown_keyword` / `endfor_invalid` — including the lexer's
-  reading of a line-leading member call such as `:Replace(...)` continuing
-  a chain as a keyword), a `7e2`-style exponent (`scientific_notation`), a
+  keyword (`unknown_keyword` / `endfor_invalid`), a `7e2`-style exponent
+  (`scientific_notation`), a
   closer with no matching opener (`unmatched_delimiter` /
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -852,5 +853,34 @@ func TestParser_ExtractTopLevelParameters_EmptyScript(t *testing.T) {
 	params, line := p.ExtractTopLevelParameters(root)
 	if params != nil || line != -1 {
 		t.Errorf("expected (nil, -1), got (%v, %d)", params, line)
+	}
+}
+
+// [spec fmt.indent_style] A line-leading member-access `:` continues the
+// statement from the previous line, so the structural parser groups a
+// call chain written across lines as one statement, not one per line.
+func TestGroupStatements_MemberChainAcrossLines(t *testing.T) {
+	code := "sOut := txt:ToString()\n\t:Replace(\"##TITLE##\", sTitle)\n\t:Replace(\"##USER##\", sUser);\nnNext := 1;\n"
+	root := NewParser(lexer.NewLexer(code).Tokenize()).Parse()
+	// The structural parser also emits whitespace-only nodes after each
+	// terminator; only nodes carrying a significant token are statements.
+	var stmts []*Node
+	for _, c := range root.Children {
+		for _, tok := range c.Tokens {
+			if tok.Type != lexer.TokenWhitespace && tok.Type != lexer.TokenEOF {
+				stmts = append(stmts, c)
+				break
+			}
+		}
+	}
+	if len(stmts) != 2 {
+		var got []string
+		for _, c := range stmts {
+			got = append(got, fmt.Sprintf("L%d-%d", c.StartLine, c.EndLine))
+		}
+		t.Fatalf("want 2 statements, got %d: %v", len(stmts), got)
+	}
+	if chain := stmts[0]; chain.StartLine != 1 || chain.EndLine != 3 {
+		t.Errorf("chain spans lines %d-%d, want 1-3", chain.StartLine, chain.EndLine)
 	}
 }
