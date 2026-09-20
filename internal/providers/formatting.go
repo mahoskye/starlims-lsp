@@ -435,6 +435,7 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		// the second pass and oscillated (issue #218).
 		isContinuation := s.continuationIndent > 0 ||
 			isContinuationOperator(token) ||
+			isMemberAccessColon(token) ||
 			s.lastNonWSToken.Text == ":=" ||
 			s.lastNonWSToken.Text == "," ||
 			isContinuationOperator(s.lastNonWSToken)
@@ -1434,6 +1435,15 @@ func isCallSite(tokens []lexer.Token, i int) bool {
 		return t.Text == "("
 	}
 	return false
+}
+
+// isMemberAccessColon reports whether a token at line start is the
+// member-access `:` continuing a call chain from the previous line
+// (`txt:ToString()` then `:Replace(...)`); the lexer only emits the
+// punctuation colon there when the previous significant token ends a
+// receiver, so a statement never begins with one.
+func isMemberAccessColon(token lexer.Token) bool {
+	return token.Type == lexer.TokenPunctuation && token.Text == ":"
 }
 
 // isContinuationOperator reports whether a token at line start continues the

@@ -37,6 +37,15 @@ history:
       semicolon — the operand list on the following lines is the same
       statement; the forced ';' truncated it (5 default_after_parameters
       errors materialized on one corpus file).
+  - date: 2026-09-20
+    ref: "issue #240 follow-up"
+    note: >-
+      A call chain continued on the next line with the colon leading it
+      no longer gets a `;` forced after the receiver line: the lexer now
+      reads that colon as member access. Previously `:Replace(...)` lexed
+      as a keyword, so the formatter ended the statement before it and
+      recased it to `:REPLACE`, splitting valid code into three broken
+      statements.
 issues: ["#38", "#89"]
 ---
 
@@ -56,7 +65,11 @@ No semicolon is added when the expression continues past the line break:
 - the line ends inside an unclosed `(` / `{` / `[`;
 - the line ends with `:TO` / `:STEP`, or the next line starts with a
   continuation keyword (`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`,
-  `:FINALLY`, `:TO`, `:STEP`).
+  `:FINALLY`, `:TO`, `:STEP`);
+- the next line starts with a member-access `:` continuing a call chain
+  (`txt:ToString()` then `:Replace(...)`). The lexer reads that colon as
+  member access, not a keyword, so the chain is one statement and its
+  member names are never recased (issue #240 follow-up).
 
 Semicolons are never inserted inside strings or comments. The check runs at
 every line break and at end-of-file, so a final statement with no trailing
@@ -145,6 +158,24 @@ chartNo, strRules, Mean
 (Continuation-line reindentation for split declaration lists is a
 separate open layout question; this fence pins only the no-forced-';'
 guarantee.)
+
+### Before
+
+```ssl
+:DECLARE txt, sTitle, sUser, sOut;
+sOut := txt:ToString()
+	:Replace("##TITLE##", sTitle)
+	:Replace("##USER##", sUser);
+```
+
+### After
+
+```ssl
+:DECLARE txt, sTitle, sUser, sOut;
+sOut := txt:ToString()
+	:Replace("##TITLE##", sTitle)
+	:Replace("##USER##", sUser);
+```
 
 ## Rationale
 

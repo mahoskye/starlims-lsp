@@ -381,14 +381,56 @@ func (l *Lexer) readNumber() Token {
 	return Token{Type: TokenNumber, Text: text.String(), Line: line, Column: col, Offset: start}
 }
 
+// isKeywordStart decides whether a `:` opens a keyword token (`:IF`) or is
+// the member-access operator (`oObj:Method()`). Directly after a receiver
+// — an identifier, `)`, or `]` — it is member access. A receiver may also
+// end the previous line with the member call continuing on the next
+// (`txt:ToString()` then `:Replace(...)` on its own line; issue #240
+// follow-up), so the look-back skips whitespace and comments. That
+// continuation reading is taken only when the word after the colon is not
+// an SSL keyword, so a statement that lost its `;` before a line-leading
+// `:IF` still lexes the keyword and is reported, never silently absorbed.
 func (l *Lexer) isKeywordStart(tokens []Token) bool {
-	if len(tokens) > 0 {
-		last := tokens[len(tokens)-1]
-		if last.Type == TokenIdentifier || last.Text == ")" || last.Text == "]" {
+	if !l.isAlpha(l.peek(1)) {
+		return false
+	}
+	for i := len(tokens) - 1; i >= 0; i-- {
+		t := tokens[i]
+		if t.Type == TokenWhitespace || t.Type == TokenComment {
+			continue
+		}
+		if !endsReceiver(t) {
+			return true
+		}
+		if i == len(tokens)-1 {
 			return false
 		}
+		return isKeywordWord(l.peekWord(1))
 	}
-	return l.isAlpha(l.peek(1))
+	return true
+}
+
+// endsReceiver reports whether a token can end a member-access receiver.
+func endsReceiver(t Token) bool {
+	return t.Type == TokenIdentifier || (t.Type == TokenPunctuation && (t.Text == ")" || t.Text == "]"))
+}
+
+// peekWord returns the identifier characters starting `offset` runes
+// ahead, without consuming them.
+func (l *Lexer) peekWord(offset int) string {
+	var b strings.Builder
+	for i := l.pos + offset; i < len(l.input) && l.isIdentifierPart(l.input[i]); i++ {
+		b.WriteRune(l.input[i])
+	}
+	return b.String()
+}
+
+// isKeywordWord reports whether a colon-prefixed word is one the keyword
+// checks own: a recognized keyword, the recognized-but-invalid :ENDFOR,
+// or a legacy :LABEL form.
+func isKeywordWord(word string) bool {
+	u := strings.ToUpper(word)
+	return constants.IsKeyword(u) || u == "ENDFOR" || strings.HasPrefix(u, "LABEL")
 }
 
 func (l *Lexer) readKeyword() Token {

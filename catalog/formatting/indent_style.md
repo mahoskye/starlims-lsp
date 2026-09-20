@@ -39,6 +39,14 @@ history:
       Expression continuations that begin with a binary operator take the
       same one-level extra indent the line wrapper emits; previously the
       wrapped form lost its indent level on the next format pass.
+  - date: 2026-09-20
+    ref: "issue #240 follow-up"
+    note: >-
+      A line beginning with a member-access `:` (a call chain continued
+      from the previous line) is a continuation and takes the same one
+      extra level; the lexer now reads that colon as member access rather
+      than a keyword, which used to make the formatter treat the line as
+      a new statement.
 issues: ["#36", "#86", "#101"]
 ---
 
@@ -54,9 +62,10 @@ with `"space"` each level is `ssl.format.indentSize` spaces (default 4).
 For line-length accounting a tab is counted as `indentSize` columns.
 
 Continuation lines — inside an unclosed `(`/`{`/`[`, beginning with a
-binary operator, or following a line that ended in `:=` or a binary
-operator — sit exactly one level past the line that opened the statement
-(issues #86/#89). The anchor is lexical, not block depth: an `:IF`
+binary operator or with a member-access `:` continuing a call chain, or
+following a line that ended in `:=` or a binary operator — sit exactly one
+level past the line that opened the statement (issues #86/#89; the
+member-access form is the issue #240 follow-up). The anchor is lexical, not block depth: an `:IF`
 condition's continuation indents one level past the `:IF` line even though
 the body will indent further. The extra level is fixed, never proportional
 to nesting depth, and a closing delimiter that leads a line aligns with
@@ -132,6 +141,24 @@ fences above run with the default tab style):
     :DECLARE sName;
     ...
 :ENDPROC;
+```
+
+### Before
+
+```ssl
+:DECLARE txt, sTitle, sUser, sOut;
+sOut := txt:ToString()
+:Replace("##TITLE##", sTitle)
+:Replace("##USER##", sUser);
+```
+
+### After
+
+```ssl
+:DECLARE txt, sTitle, sUser, sOut;
+sOut := txt:ToString()
+	:Replace("##TITLE##", sTitle)
+	:Replace("##USER##", sUser);
 ```
 
 ## Rationale

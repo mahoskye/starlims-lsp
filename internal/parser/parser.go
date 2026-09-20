@@ -655,9 +655,12 @@ func (p *Parser) isStatementContinuation(tokens []lexer.Token, currentIndex int,
 
 	lastIsContinuation := last.Type == lexer.TokenOperator ||
 		last.Text == "," || last.Text == "(" || last.Text == "[" || last.Text == "{"
+	// A line-leading member-access `:` (punctuation, never a keyword
+	// token) continues a call chain from the previous line.
 	nextIsContinuation := next.Type == lexer.TokenOperator ||
 		next.Text == "," || next.Text == "." || next.Text == ")" ||
-		next.Text == "]" || next.Text == "}" || next.Text == ";"
+		next.Text == "]" || next.Text == "}" || next.Text == ";" ||
+		(next.Type == lexer.TokenPunctuation && next.Text == ":")
 	isFunctionCall := next.Text == "(" &&
 		(last.Type == lexer.TokenIdentifier || last.Type == lexer.TokenKeyword)
 

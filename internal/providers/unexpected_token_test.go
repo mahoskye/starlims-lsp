@@ -111,13 +111,14 @@ func TestUnexpectedToken_OnePerStatementAndRecovery(t *testing.T) {
 // operands, and undeclared names in well-formed expressions never flag.
 func TestUnexpectedToken_DoesNotFlag(t *testing.T) {
 	clean := map[string]string{
-		"valid loops":       ":DECLARE i, aItems;\n:FOR i := 1 :TO Len(aItems);\n:NEXT;\n:FOR i := 10 :TO 1 :STEP -1;\n:NEXT;\n",
-		"literal text":      ":DECLARE sText;\n/* This is a bunch of text but it does not evaluate as wrong;\nsText := \"This is a bunch of text but it does not evaluate as wrong.\";\n",
-		"continuations":     ":DECLARE nTotal, nA, nB, i, nMax;\nnTotal := nA\n\t+ nB;\n:FOR i := 1\n\t:TO nMax;\n:NEXT;\n",
-		"bare and optional": ":PROCEDURE Demo;\n\tnTotal := nMissing + 1;\n\tThis;\n\t:RETURN;\n:ENDPROC;\n",
-		"end of file":       ":DECLARE nCount;\nnCount := 1",
-		"expression forms":  ":DECLARE oEmail, x, bOk, fn, oObj, aItems, i;\noEmail := Email{};\nx++;\n++x;\nbOk := .T. .AND. .F.;\nfn := {|n| n + 1};\nx := oObj:Method(1)[2]:Prop;\nx := -aItems[i] ^ 2;\n:WHILE (i += 1) <= 10;\n:ENDWHILE;\nx := NIL;\nx := \"s\" $ \"haystack\";\nx := 5 % 2 ** 3;\nx := [bracket string];\nDoProc(\"P\", {a,,c});\n-x;\n",
-		"assignment forms":  ":DECLARE a, b, c, x, n, oObj;\na := b := c;\noObj:Prop := oObj:Items[1] := x;\n:RETURN x := .T.;\n:RETURN { .T., n += 1 };\nDoProc(\"P\", {a := 1});\n",
+		"valid loops":               ":DECLARE i, aItems;\n:FOR i := 1 :TO Len(aItems);\n:NEXT;\n:FOR i := 10 :TO 1 :STEP -1;\n:NEXT;\n",
+		"literal text":              ":DECLARE sText;\n/* This is a bunch of text but it does not evaluate as wrong;\nsText := \"This is a bunch of text but it does not evaluate as wrong.\";\n",
+		"continuations":             ":DECLARE nTotal, nA, nB, i, nMax;\nnTotal := nA\n\t+ nB;\n:FOR i := 1\n\t:TO nMax;\n:NEXT;\n",
+		"bare and optional":         ":PROCEDURE Demo;\n\tnTotal := nMissing + 1;\n\tThis;\n\t:RETURN;\n:ENDPROC;\n",
+		"end of file":               ":DECLARE nCount;\nnCount := 1",
+		"expression forms":          ":DECLARE oEmail, x, bOk, fn, oObj, aItems, i;\noEmail := Email{};\nx++;\n++x;\nbOk := .T. .AND. .F.;\nfn := {|n| n + 1};\nx := oObj:Method(1)[2]:Prop;\nx := -aItems[i] ^ 2;\n:WHILE (i += 1) <= 10;\n:ENDWHILE;\nx := NIL;\nx := \"s\" $ \"haystack\";\nx := 5 % 2 ** 3;\nx := [bracket string];\nDoProc(\"P\", {a,,c});\n-x;\n",
+		"member chain across lines": ":DECLARE txt, sTitle, sUser;\n:RETURN txt:ToString()\n\t:Replace(\"##TITLE##\", sTitle)\n\t:Replace(\"##USER##\", sUser);\n",
+		"assignment forms":          ":DECLARE a, b, c, x, n, oObj;\na := b := c;\noObj:Prop := oObj:Items[1] := x;\n:RETURN x := .T.;\n:RETURN { .T., n += 1 };\nDoProc(\"P\", {a := 1});\n",
 	}
 	for name, script := range clean {
 		if got := unexpectedTokens(t, script); len(got) != 0 {
@@ -142,7 +143,6 @@ func TestUnexpectedToken_DefersToOwningRule(t *testing.T) {
 		{"scientific notation", ":DECLARE nTotal;\nnTotal := 7e2;\n", CodeScientificNotation},
 		{"stray closer", ":DECLARE x;\nx := 1);\n", CodeUnmatchedDelimiter},
 		{"unclosed opener", ":DECLARE x, y;\nx := (1 + 2;\ny := 3;\n", CodeUnclosedDelimiter},
-		{"line-leading member call read as a keyword", ":DECLARE txt, sTitle;\n:RETURN txt:ToString()\n\t:Replace(\"##TITLE##\", sTitle);\n", CodeUnknownKeyword},
 	}
 	for _, c := range cases {
 		if got := unexpectedTokens(t, c.script); len(got) != 0 {
