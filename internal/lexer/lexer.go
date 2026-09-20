@@ -65,6 +65,12 @@ type Token struct {
 	Line   int
 	Column int
 	Offset int
+	// Unterminated is set on a TokenString the lexer never saw close: the
+	// literal ran to end of input (diag.unterminated_string). The lexer
+	// is the authority here — a bracket string's text can end in `]`
+	// without being closed (`[[a]`), so consumers must read this flag,
+	// not the token's last character.
+	Unterminated bool
 }
 
 // Lexer tokenizes SSL source code.
@@ -308,6 +314,7 @@ func (l *Lexer) readString() Token {
 		closeQuote = ']'
 	}
 	bracketDepth := 0
+	closed := false
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 		text.WriteRune(char)
@@ -321,12 +328,13 @@ func (l *Lexer) readString() Token {
 			if quote == '[' && bracketDepth > 0 {
 				bracketDepth--
 			} else {
+				closed = true
 				break
 			}
 		}
 	}
 
-	return Token{Type: TokenString, Text: text.String(), Line: line, Column: col, Offset: start}
+	return Token{Type: TokenString, Text: text.String(), Line: line, Column: col, Offset: start, Unterminated: !closed}
 }
 
 func (l *Lexer) readNumber() Token {

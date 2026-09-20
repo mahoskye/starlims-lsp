@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`unexpected_token` diagnostic** (error, always on): the first token in
+  a statement that the SSL statement grammar cannot accept, anchored on
+  that token with a message naming it and what was expected
+  (`Unexpected identifier 'is' - expected an operator or ';'`). Closes
+  the gap behind issue #240, where `:FOR EACH x IN y;`, a line of English
+  prose, `foo bar baz;`, and a statement missing its `;` before the next
+  line all validated clean: the expression parser already knew each one
+  was incomplete and threw the knowledge away. The `:FOR` header is held
+  to its one shape (`:FOR i := a :TO b [:STEP c];`) with the expected
+  piece named, and `:FOR EACH` gets told SSL has no such form. It is
+  declaration-independent — LIMS accepts undeclared variables; what it
+  rejects is a token after an expression that is not a valid
+  continuation — and it defers to the lexer- and operator-level rules
+  that already name the same token, so a mistake is reported once. Being
+  an error, it is the first #240 finding that flips `--validate`'s
+  `valid` flag. Catalog: `diag.unexpected_token`.
+- **`unterminated_string` diagnostic** (error, always on): a string
+  literal that reaches end of file without its closing `"`, `'`, or `]`,
+  reported on the opening delimiter
+  (`Unterminated string literal - expected a closing '"' before end of
+  file`). SSL strings span lines — the production corpus closes 18,006
+  of them across a line break — so an unterminated one swallows the rest
+  of the file by the language's rule, and until now nothing said so: in
+  issue #240 the apostrophe in "doesn't" hid a trailing `.` that
+  `unknown_token` would have caught and every statement after it. The
+  lexer now records whether it saw the closer (`Token.Unterminated`),
+  which is the only exact source — a bracket string's text can end in
+  `]` and still be open (`[[a]`). Catalog: `diag.unterminated_string`.
+
+### Changed
+- **`StatementExprs.Complete` is stricter.** A tree containing an
+  `ExprUnknown` (a dangling operator, a broken argument list) no longer
+  counts as complete, so tree-driven rules make no claims about it; a
+  final statement ending at end of file without `;` now does count as
+  complete, and a bare `:RETURN;` yields no statement rather than an
+  incomplete one. `StatementExprs` gains `Unexpected` and `Expected`.
+- **The expression AST accepts assignment as an expression** in every
+  value position — chained (`a := b := c;`), as an array-literal element or
+  call argument, as a `:RETURN` value, in a condition — mirroring what LIMS
+  compiles (a production corpus of 6,228 files uses the chained form in
+  twenty places). The tree carries it as a binary node nesting to the
+  right; typing already read a `:=` node as its right-hand value. Only a
+  statement's own left-hand side is not a value position, so
+  `StmtAssign` classification is unchanged.
+
 ## [0.21.0] - 2026-08-29
 
 Splits the shared Hungarian gate so a consumer can take the correctness

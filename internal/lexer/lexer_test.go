@@ -1671,3 +1671,38 @@ func TestLexer_SpacedCodeBlock(t *testing.T) {
 		}
 	}
 }
+
+// [spec diag.unterminated_string] The lexer records whether it saw a
+// string's closer. Strings span lines, and a bracket string's text can end
+// in `]` without being closed (`[[a]`), so the flag — not the last
+// character — is the verdict.
+func TestLexer_TokenString_Unterminated(t *testing.T) {
+	cases := []struct {
+		input        string
+		unterminated bool
+	}{
+		{`"abc"`, false},
+		{`""`, false},
+		{`'abc'`, false},
+		{`[abc]`, false},
+		{`[[a]b]`, false},
+		{"\"line one\nline two\"", false},
+		{`"it's"`, false},
+		{`"abc`, true},
+		{`"`, true},
+		{`'abc`, true},
+		{`[abc`, true},
+		{`[[a]`, true},
+		{"\"never\nclosed", true},
+	}
+	for _, c := range cases {
+		tokens := NewLexer(c.input).Tokenize()
+		if len(tokens) == 0 || tokens[0].Type != TokenString {
+			t.Errorf("%q: expected a string token first, got %+v", c.input, tokens)
+			continue
+		}
+		if tokens[0].Unterminated != c.unterminated {
+			t.Errorf("%q: Unterminated = %v, want %v", c.input, tokens[0].Unterminated, c.unterminated)
+		}
+	}
+}

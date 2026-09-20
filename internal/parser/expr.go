@@ -182,6 +182,12 @@ type exprParser struct {
 	tokens []lexer.Token
 	pos    int
 	depth  int
+	// fail is the index of the first token the parser could not accept,
+	// or -1 while every token so far has fit the grammar. It is set once,
+	// by whichever failure comes first in parse (hence source) order, and
+	// survives the ExprUnknown wrapping that hides the exact spot from the
+	// returned tree.
+	fail int
 }
 
 // ParseExpression parses one expression from tokens starting at index
@@ -191,9 +197,48 @@ type exprParser struct {
 // The parser never panics and always advances past what it consumed;
 // unresolvable regions come back as ExprUnknown subtrees.
 func ParseExpression(tokens []lexer.Token, start int) (*Expr, int) {
-	p := &exprParser{tokens: tokens, pos: start}
+	e, next, _ := parseExpressionAt(tokens, start)
+	return e, next
+}
+
+// parseExpressionAt is ParseExpression plus the index of the first token
+// the parser could not accept, or -1 when the tree contains no
+// ExprUnknown. That index is the statement-level "unexpected token"
+// (diag.unexpected_token): the returned tree may wrap the failure in an
+// ExprUnknown whose span starts well before it, so the position has to be
+// recorded as it happens.
+func parseExpressionAt(tokens []lexer.Token, start int) (*Expr, int, int) {
+	p := &exprParser{tokens: tokens, pos: start, fail: -1}
 	e := p.parseBinary(1)
-	return e, p.pos
+	return e, p.pos, p.fail
+}
+
+// parseValueAt is parseExpressionAt for a value position — an assignment
+// right-hand side, a condition, a `:RETURN` value, a `:DEFAULT` value, a
+// `:FOR` bound — where SSL accepts an assignment as the expression:
+// `a := b := c;`, `:RETURN x := .T.;`, `:IF x := 1;`. The statement's own
+// left-hand side is not a value position, so parseStatement keeps using
+// parseExpressionAt there and finds the assignment operator itself.
+func parseValueAt(tokens []lexer.Token, start int) (*Expr, int, int) {
+	p := &exprParser{tokens: tokens, pos: start, fail: -1}
+	e := p.parseAssignable()
+	return e, p.pos, p.fail
+}
+
+// failAt records the first unacceptable token. Positions past the end of
+// input clamp to the last token (the EOF marker) so "unexpected end of
+// file" has a place to point at.
+func (p *exprParser) failAt(idx int) {
+	if p.fail >= 0 {
+		return
+	}
+	if idx >= len(p.tokens) {
+		idx = len(p.tokens) - 1
+	}
+	if idx < 0 {
+		return
+	}
+	p.fail = idx
 }
 
 func (p *exprParser) skipInsignificant() {
@@ -221,7 +266,28 @@ func (p *exprParser) unknownHere() *Expr {
 	if at >= len(p.tokens) && at > 0 {
 		at = len(p.tokens) - 1
 	}
+	p.failAt(at)
 	return &Expr{Kind: ExprUnknown, Start: at, End: at}
+}
+
+// parseAssignable parses an expression that may be an assignment
+// expression. Assignment is an expression in SSL wherever an operand can
+// stand — inside a group (`(i += 1) <= n`), as a list element
+// (`{ .T., n += 1 }`), as a value — even though the canonical grammar keeps
+// it a statement; production code chains it (`a := b := c`). The tree
+// carries it as a binary node with the assignment operator, nesting to the
+// right, and typing reads a `:=` node as its right-hand value.
+func (p *exprParser) parseAssignable() *Expr {
+	e := p.parseBinary(1)
+	if e.Kind == ExprUnknown {
+		return e
+	}
+	if op := p.peek(); op != nil && op.Type == lexer.TokenOperator && isAssignmentOperator(op.Text) {
+		p.pos++
+		rhs := p.parseAssignable()
+		return &Expr{Kind: ExprBinary, Start: e.Start, End: rhs.End, Op: op.Text, Children: []*Expr{e, rhs}}
+	}
+	return e
 }
 
 func (p *exprParser) parseBinary(minPrec int) *Expr {
@@ -383,21 +449,12 @@ func (p *exprParser) parsePrimary() *Expr {
 		switch tok.Text {
 		case "(":
 			p.pos++
-			inner := p.parseBinary(1)
-			// Assignment-in-group is an idiomatic SSL expression form
-			// (`:WHILE (i += 1) <= nCount;`) even though the canonical
-			// grammar keeps assignment a statement; the tree carries it as
-			// a binary node with the assignment operator.
-			if op := p.peek(); op != nil && op.Type == lexer.TokenOperator && isAssignmentOperator(op.Text) &&
-				inner.Kind != ExprUnknown {
-				p.pos++
-				rhs := p.parseBinary(1)
-				inner = &Expr{Kind: ExprBinary, Start: inner.Start, End: rhs.End, Op: op.Text, Children: []*Expr{inner, rhs}}
-			}
+			inner := p.parseAssignable()
 			if closer := p.peek(); closer != nil && closer.Type == lexer.TokenPunctuation && closer.Text == ")" {
 				p.pos++
 				return &Expr{Kind: ExprGroup, Start: at, End: p.pos - 1, Children: []*Expr{inner}}
 			}
+			p.failAt(p.pos)
 			return &Expr{Kind: ExprUnknown, Start: at, End: p.pos - 1}
 		case "{":
 			elems, endIdx, ok := p.parseArgumentList("}")
@@ -424,6 +481,7 @@ func (p *exprParser) parseArgumentList(close string) ([]*Expr, int, bool) {
 	for {
 		tok := p.peek()
 		if tok == nil {
+			p.failAt(p.pos)
 			return elems, p.pos - 1, false
 		}
 		if tok.Type == lexer.TokenPunctuation {
@@ -450,9 +508,10 @@ func (p *exprParser) parseArgumentList(close string) ([]*Expr, int, bool) {
 		if !expectingElem {
 			// Two element expressions with no comma between them: broken
 			// list, bail without the closer.
+			p.failAt(p.pos)
 			return elems, p.pos, false
 		}
-		elem := p.parseBinary(1)
+		elem := p.parseAssignable()
 		elems = append(elems, elem)
 		expectingElem = false
 		if elem.Kind == ExprUnknown {
@@ -477,6 +536,7 @@ func (p *exprParser) parseSubscripts() ([]*Expr, int, bool) {
 		}
 		tok := p.peek()
 		if tok == nil {
+			p.failAt(p.pos)
 			return subs, p.pos - 1, false
 		}
 		if tok.Type == lexer.TokenPunctuation {
@@ -490,6 +550,7 @@ func (p *exprParser) parseSubscripts() ([]*Expr, int, bool) {
 				continue
 			}
 		}
+		p.failAt(p.pos)
 		return subs, p.pos, false
 	}
 }
