@@ -133,6 +133,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unmatched_block_end` | Block-end keyword with no open block | error | tool | active | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |
 | `unmatched_delimiter` | Closing delimiter with nothing open | error | tool | active | [diag.unmatched_delimiter](../../catalog/diagnostics/unmatched_delimiter.md) |
 | `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | tool | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
+| `unterminated_string` | String literal never closed | error | authoritative | active | [diag.unterminated_string](../../catalog/diagnostics/unterminated_string.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
 | `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | tool | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
 | `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |

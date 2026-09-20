@@ -24,6 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that already name the same token, so a mistake is reported once. Being
   an error, it is the first #240 finding that flips `--validate`'s
   `valid` flag. Catalog: `diag.unexpected_token`.
+- **`unterminated_string` diagnostic** (error, always on): a string
+  literal that reaches end of file without its closing `"`, `'`, or `]`,
+  reported on the opening delimiter
+  (`Unterminated string literal - expected a closing '"' before end of
+  file`). SSL strings span lines — the production corpus closes 18,006
+  of them across a line break — so an unterminated one swallows the rest
+  of the file by the language's rule, and until now nothing said so: in
+  issue #240 the apostrophe in "doesn't" hid a trailing `.` that
+  `unknown_token` would have caught and every statement after it. The
+  lexer now records whether it saw the closer (`Token.Unterminated`),
+  which is the only exact source — a bracket string's text can end in
+  `]` and still be open (`[[a]`). Catalog: `diag.unterminated_string`.
 
 ### Changed
 - **`StatementExprs.Complete` is stricter.** A tree containing an

@@ -225,6 +225,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkTokenErrors(tokens)...)
 	diagnostics = append(diagnostics, checkCommentTermination(tokens)...)
 	diagnostics = append(diagnostics, checkCStyleCommentClosers(tokens)...)
+	diagnostics = append(diagnostics, checkUnterminatedStrings(tokens)...)
 
 	// Check for unmatched parentheses/brackets
 	if opts.CheckUnmatchedParens {
