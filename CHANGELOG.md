@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-21
+
+The strict profile. `--validate --strict` turns on the three checks an
+editor withholds because a human mid-edit has names that are
+legitimately undeclared or unused — a non-interactive consumer only ever
+sees finished code, where each is a defect. It costs 0.2 findings per
+file on code that already validates.
+
+Measuring it against production corpora then surfaced eight defects, and
+most of this release is those. Two of them broke a stated contract:
+formatting was not idempotent (A6), and in one shape grew a file by a
+line on *every* pass. Two were silent — a comment closed C-style hides
+the next statement, and a misplaced semicolon in a SQL data source is
+rejected outright by STARLIMS rather than merely being unwise. The rest
+are classification and false-positive fixes found the same way (#249).
+
 ### Added
 - **`--strict` on `--validate`, enabling the three checks the editor leaves
   off.** `undeclared_variable`, `unused_variable`, and `invalid_sql_param`
@@ -1710,7 +1726,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.20.0...v0.21.0
