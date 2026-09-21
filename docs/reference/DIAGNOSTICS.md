@@ -29,6 +29,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `class_or_script` | :CLASS must be the file's first significant statement | error | authoritative | active | [diag.class_or_script](../../catalog/diagnostics/class_or_script.md) |
 | `code_block_comparison` | Code blocks compared with = or == | warning | style_only | active | [diag.code_block_comparison](../../catalog/diagnostics/code_block_comparison.md) |
 | `code_block_structure` | Code block literal without a bound variable | warning | tool | active | [diag.code_block_structure](../../catalog/diagnostics/code_block_structure.md) |
+| `comment_swallows_code` | Comment runs past its '*/' and swallows the next statement | warning | authoritative | active | [diag.comment_swallows_code](../../catalog/diagnostics/comment_swallows_code.md) |
 | `comment_termination` | Comment missing its semicolon terminator | error | authoritative | active | [diag.comment_termination](../../catalog/diagnostics/comment_termination.md) |
 | `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | warning | tool | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
 | `complex_sql_placeholder` | Complex expression inside a SQLExecute named placeholder | info | tool | active | [diag.complex_sql_placeholder](../../catalog/diagnostics/complex_sql_placeholder.md) |
@@ -36,7 +37,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
 | `datasource_default_required` | Data source parameter missing its inline default (removed — premise was wrong) | error | authoritative | removed | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
-| `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | warning | advisory | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
+| `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | error | authoritative | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
 | `datasource_undeclared_placeholder` | Undeclared @name placeholder in a SQL data-source body | warning | authoritative | active | [diag.datasource_undeclared_placeholder](../../catalog/diagnostics/datasource_undeclared_placeholder.md) |
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |

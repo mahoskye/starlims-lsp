@@ -124,6 +124,16 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 }
 
 // GetDiagnostics returns all diagnostics for a document.
+// concatDiagnostics joins diagnostic slices without the append-spread
+// idiom, which mutates its first argument's backing array.
+func concatDiagnostics(groups ...[]Diagnostic) []Diagnostic {
+	var out []Diagnostic
+	for _, g := range groups {
+		out = append(out, g...)
+	}
+	return out
+}
+
 func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// A data-source document whose content is plain SQL gets no SSL
 	// diagnostics at all — every SSL check would false-flag SQL syntax
@@ -136,6 +146,19 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 	// applyRuleOverrides on both SQL-mode paths below.
 	var sqlBodyDiagnostics []Diagnostic
 	if opts.IsDataSourceFile {
+		// The strict trio models SSL scoping, which a data source does
+		// not follow: its `:PARAMETERS` carry inline `:=` defaults, its
+		// builder directives take bare identifiers as *values*
+		// (`:DSN := starlims;` — `starlims` is a DSN name, not a variable
+		// read), and its SQL body names columns and keywords that are not
+		// SSL identifiers at all. Left on, every data source reported its
+		// own directive values and SQL keywords as undeclared. The
+		// data-source dialect gets its own placeholder check
+		// (checkDataSourceUndeclaredPlaceholders) instead (issue #249).
+		opts.CheckUndeclaredVars = false
+		opts.CheckUnusedVars = false
+		opts.CheckSQLParams = false
+
 		// A data-source file is SQL by default and only stays in SSL mode
 		// when its body carries a strong SSL marker (issue #153): a
 		// non-directive colon keyword or a `:=` assignment, or the document
@@ -146,7 +169,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 		// markers and route here; a real SSL data source (A11) has one and
 		// falls through to the full SSL pipeline below.
 		header, body := SplitDataSourceHeader(text)
-		if !hasStrongSSLMarker(body) && !hasUnterminatedLeadingBlockComment(text) {
+		if IsSQLModeDataSourceSplit(text, header, body) {
 			if strings.TrimSpace(header) != "" {
 				// Hybrid shape: the directive / :PARAMETERS header keeps its
 				// SSL and data-source checks; the SQL body gets only the
@@ -156,17 +179,23 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				// The header is a position-preserving prefix, so ranges line
 				// up unchanged (issues #104, #148).
 				offset := strings.Count(header, "\n")
-				sqlBodyDiagnostics = applyInfoGate(applyRuleOverrides(append(
+				sqlBodyDiagnostics = applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(body, offset),
-					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset)...), opts.RuleOverrides), opts)
+					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset),
+					// The header region, unmasked. The split blanks its
+					// comments and swallows a banner's trailing `;`, so
+					// the SSL pipeline below never sees either.
+					checkDataSourceHeaderSemicolons(text[:len(header)]),
+				), opts.RuleOverrides), opts)
 				text = header
 			} else {
 				// Whole-document SQL body (or a comment-only stub): no SSL
 				// diagnostics, only the SQL-body checks. With no header, no
 				// @name placeholders are declared.
-				return applyInfoGate(applyRuleOverrides(append(
+				return applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(text, 0),
-					checkDataSourceUndeclaredPlaceholders(text, nil, 0)...), opts.RuleOverrides), opts)
+					checkDataSourceUndeclaredPlaceholders(text, nil, 0),
+				), opts.RuleOverrides), opts)
 			}
 		}
 	}
@@ -4063,6 +4092,17 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 				continue
 			}
 
+			// A leading sign is unary, not arithmetic: in `{-1}` the
+			// token before `-` is `{`, which infers as an array, so the
+			// pair read as "array - numeric". Same shape in `(-1)`,
+			// `f(a, -1)` and `n := -1`. Only a token that can *end* a
+			// value makes a following sign binary (issue #249). This sits
+			// below the NIL check, which owns `NIL - 1` and reports it
+			// under its own code.
+			if isUnarySignPosition(tokens, token, prevIdx) {
+				continue
+			}
+
 			leftType := inferOperandType(tokens, prevIdx, -1, typeInfo)
 			rightType := inferOperandType(tokens, nextIdx, +1, typeInfo)
 			if leftType != "" && rightType != "" && leftType != rightType {
@@ -5020,6 +5060,43 @@ func previousSignificantTokenIndex(tokens []lexer.Token, start int) int {
 		return i
 	}
 	return -1
+}
+
+// isUnarySignPosition reports whether a `+` or `-` at the given operator
+// token is a sign on the following literal rather than a binary operator.
+// SSL has no unary plus, but `+` is included so the arithmetic check stays
+// silent there and leaves the finding to unexpected_token, which owns it.
+//
+// The test is what precedes the sign: a binary operator needs a left
+// operand, so the sign is binary only when the previous significant token
+// can end a value — an identifier, a literal, or a closing bracket.
+// Everything else (an opening bracket, a comma, an assignment, another
+// operator, a keyword, or the start of the file) puts the sign in unary
+// position.
+func isUnarySignPosition(tokens []lexer.Token, token lexer.Token, prevIdx int) bool {
+	if token.Text != "+" && token.Text != "-" {
+		return false
+	}
+	if prevIdx < 0 {
+		return true
+	}
+	prev := tokens[prevIdx]
+	switch prev.Type {
+	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString:
+		return false
+	case lexer.TokenKeyword:
+		// A literal keyword (NIL, .T., .F.) ends a value; a control
+		// keyword does not.
+		_, isLiteral := constants.CanonicalSSLLiteral(prev.Text)
+		return !isLiteral
+	case lexer.TokenPunctuation:
+		switch prev.Text {
+		case ")", "]", "}":
+			return false
+		}
+		return true
+	}
+	return true
 }
 
 func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
@@ -6625,6 +6702,39 @@ func checkSpacedSkipCommas(tokens []lexer.Token) []Diagnostic {
 // real terminator — so this is a pure info-tier style observation: the
 // `*/` suggests a mental model where it closes the comment, which in SSL
 // it never does.
+// codeAfterCStyleCloser reports the first statement-looking fragment that
+// follows a `*/` inside a comment token, if any. It is what the comment
+// swallowed past the point the author thought it ended.
+func codeAfterCStyleCloser(commentText string) (string, bool) {
+	idx := strings.Index(commentText, "*/")
+	if idx < 0 {
+		return "", false
+	}
+	rest := strings.TrimRight(commentText[idx+2:], "; \t\r\n")
+	for _, line := range strings.Split(rest, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Banner decoration is not code.
+		if strings.Trim(line, "*=-_+#~ \t") == "" {
+			continue
+		}
+		// Only report when it actually looks like a statement: an
+		// assignment, a colon keyword, or a call.
+		if !strings.Contains(line, ":=") &&
+			!(strings.HasPrefix(line, ":") && len(line) > 2) &&
+			!strings.Contains(line, "(") {
+			continue
+		}
+		if len(line) > 48 {
+			line = line[:45] + "..."
+		}
+		return "'" + line + "'", true
+	}
+	return "", false
+}
+
 func checkCStyleCommentClosers(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -6633,16 +6743,38 @@ func checkCStyleCommentClosers(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 		text := strings.TrimRight(strings.TrimSpace(token.Text), ";")
-		if !strings.HasSuffix(strings.TrimRight(text, " \t"), "*/") {
+		if strings.HasSuffix(strings.TrimRight(text, " \t"), "*/") {
+			// `/* ... */;` — the `*/` is the last thing before the real
+			// terminator, so it is inert text and nothing is hidden.
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range:    tokenToRange(token),
+				Message:  "SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)",
+				Source:   "ssl-lsp",
+				Code:     CodeCStyleCommentCloser,
+			})
 			continue
 		}
-		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityInfo,
-			Range:    tokenToRange(token),
-			Message:  "SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)",
-			Source:   "ssl-lsp",
-			Code:     CodeCStyleCommentCloser,
-		})
+		// `/* ... */` with no `;` after it: the comment did NOT end at the
+		// `*/`, it ran on to the next `;` and took whatever was in between
+		// with it. The author believed they closed the comment, so the
+		// swallowed statement looks like live code in the editor while
+		// never executing. This is the dangerous half of the C-style
+		// confusion and the one the validator used to miss entirely —
+		// a swallowed `:PROCEDURE` surfaced only as a puzzling
+		// `unmatched_block_end` elsewhere, and a swallowed assignment
+		// surfaced as nothing at all (issue #249).
+		if swallowed, ok := codeAfterCStyleCloser(token.Text); ok {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message: fmt.Sprintf(
+					"This comment does not end at its '*/' - SSL comments end at ';', so it runs on and swallows %s. That code never executes. End the comment with ';'",
+					swallowed),
+				Source: "ssl-lsp",
+				Code:   CodeCommentSwallowsCode,
+			})
+		}
 	}
 
 	return diagnostics

@@ -652,8 +652,18 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 		// input like `:=.not.` or `**=` lexed as `**` `=`) already has the
 		// previous operator's trailing space — adding a leading one printed
 		// a double space.
+		// A comment ends the line's content, so an operator glued to one
+		// gets no leading space here. The same token reached on the next
+		// pass has source whitespace before it and goes through the
+		// whitespace handler, which emits indentation instead — the two
+		// paths must agree or the forms oscillate between passes, the
+		// same failure issue #218 fixed for commas. The shape that hits
+		// this is an orphan `*/` after a comment SSL already terminated
+		// at its `;` (`/* note;*/`), which lexes as `*` then `/`
+		// (issue #249).
 		if !s.lineStart && s.prevToken.Type != lexer.TokenWhitespace &&
-			s.prevToken.Type != lexer.TokenOperator && !isOpenParen(s.prevToken) {
+			s.prevToken.Type != lexer.TokenOperator &&
+			s.prevToken.Type != lexer.TokenComment && !isOpenParen(s.prevToken) {
 			s.builder.WriteString(" ")
 			s.currentLineLen++
 		}

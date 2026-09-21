@@ -2817,3 +2817,59 @@ func TestFormatDocument_SQLRewriteAlwaysRuleF(t *testing.T) {
 		t.Errorf("short unchanged SQL should stay inline:\n%s", got2)
 	}
 }
+
+// [spec feature.formatting/A6] A SQL string holding an unterminated `/*`
+// is byte-preserved rather than reflowed. Reflowing it swallowed the
+// remaining lines into a comment that never closes and left a trailing
+// blank line, so every pass added one more line and the file grew
+// without bound (issue #249).
+func TestFormat_UnterminatedBlockCommentInSQLStringIsStable(t *testing.T) {
+	src := ":PROCEDURE T;\n" +
+		":DECLARE sRawSql;\n" +
+		"sRawSql := \"\n" +
+		"    SELECT a FROM b\n" +
+		"    /* note\n" +
+		"       more;\n" +
+		"    WHERE c = 'A'\n" +
+		"\";\n" +
+		":RETURN sRawSql;\n" +
+		":ENDPROC;\n"
+
+	opts := DefaultFormattingOptions()
+	fmtOnce := func(text string) string {
+		edits := FormatDocument(text, opts)
+		if len(edits) == 0 {
+			return text
+		}
+		return edits[0].NewText
+	}
+	first := fmtOnce(src)
+	second := fmtOnce(first)
+	if first != second {
+		t.Errorf("formatting is not idempotent:\n--- first ---\n%s\n--- second ---\n%s", first, second)
+	}
+
+	// Byte-preservation: the string's own lines survive untouched.
+	for _, fragment := range []string{"SELECT a FROM b", "/* note", "       more;", "    WHERE c = 'A'"} {
+		if !strings.Contains(first, fragment) {
+			t.Errorf("formatter rewrote unreformattable SQL string content; %q is gone", fragment)
+		}
+	}
+
+	// An orphan `*/` after a comment SSL already terminated at its `;`
+	// lexes as `*` then `/`. The operator path used to give it a leading
+	// space that the whitespace path did not, so pass 1 and pass 2
+	// disagreed (issue #249, same class as #218).
+	orphan := ":PROCEDURE T;\n:DECLARE x;\n\n/* note;*/\nx := 1;\n:ENDPROC;\n"
+	orphanFirst := fmtOnce(orphan)
+	if orphanFirst != fmtOnce(orphanFirst) {
+		t.Errorf("orphan comment closer is not idempotent:\n%s", orphanFirst)
+	}
+
+	// A terminated block comment is still reflowed as before.
+	ok := ":PROCEDURE T;\n:DECLARE s;\ns := \"\nSELECT a FROM b\n/* note */\nWHERE c = 1\n\";\n:ENDPROC;\n"
+	okFirst := fmtOnce(ok)
+	if okFirst != fmtOnce(okFirst) {
+		t.Error("terminated-comment case regressed to non-idempotent")
+	}
+}

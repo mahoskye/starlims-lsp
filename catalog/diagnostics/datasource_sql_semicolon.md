@@ -3,9 +3,9 @@ id: diag.datasource_sql_semicolon
 title: Bare statement separator in a SQL data-source body
 kind: diagnostic
 status: active
-authority: advisory
+authority: authoritative
 schema_ref: module_structure.data_source_modules.sql_data_source.comments
-default_severity: warning
+default_severity: error
 severity_overridable: true
 suppressible: false
 spec_options:
@@ -22,6 +22,17 @@ history:
       separators in the body — the data source runs as a single SQL
       command, so a bare `;` is at best platform-dependent and gets an
       advisory warning rather than an authoritative error.
+  - date: 2026-09-21
+    ref: "issue #249"
+    note: >-
+      Raised from warning to error and reclassified from advisory to
+      authoritative. STARLIMS rejects the document outright with
+      "Invalid SQL statement: remove any misplaced semicolons(;)" —
+      confirmed against a live server — so the previous "may fail on
+      some database platforms" hedge understated it. Also extended to
+      stray separators in the header region, which the mask had hidden;
+      the test is a separator with no statement before it, rather than
+      the `*/;` spelling specifically.
 issues: ["ssl-style-guide#50"]
 ---
 
@@ -29,11 +40,37 @@ issues: ["ssl-style-guide#50"]
 
 SQL-mode data-source rule (the file must be a data source — URI ending in
 `.ds` / `.ds.txt`, or `--ds` on the CLI — whose content classifies as SQL
-mode; the spec fences run with `is_data_source_file: true`). Warns on
-every `;` that the SQL lexer sees as punctuation in the SQL body: outside
-comments, outside quoted string literals, and — in the hybrid
+mode; the spec fences run with `is_data_source_file: true`). Reports
+every `;` that the SQL lexer sees as punctuation in the SQL body:
+outside comments, outside quoted string literals, and — in the hybrid
 header-then-SQL shape — past the directive header, whose own `;`
 terminators belong to the header statements and never flag.
+
+It also reports a stray `;` in the header region, which the body scan
+does not reach: the split masks the header's comments and consumes the
+`;` closing a `*/;` banner so the directive scan can proceed
+(feature.diagnostics_pipeline A24). Masking is a parsing convenience,
+not a verdict that what was masked is harmless, so the unmasked region
+is checked separately.
+
+The test there is emptiness, not a spelling: a `;` with no statement in
+front of it is stray. A directive's own terminator has content before it
+and never flags. That covers every shape the `*/;` pattern would miss —
+`*/` with the `;` on the next line, a `;` after a `--` banner, and a
+doubled `;;` between directives. A stray `;` is also scanned past rather
+than ending the header, since ending it there dropped the directives
+into the body and misclassified the document as SSL.
+
+Error severity. The body runs as a single SQL command and STARLIMS
+refuses a document containing a stray separator, reporting
+`Invalid SQL statement: remove any misplaced semicolons(;)`.
+
+The `*/;` spelling is near-universal in **SSL-mode** data sources (85%
+of one production corpus), where the `;` genuinely is the SSL comment
+terminator and nothing is wrong. It is correspondingly rare in SQL-mode
+documents (2%), which is what a rule that breaks the server at runtime
+looks like in a corpus. Mode is therefore load-bearing: this rule never
+runs outside SQL mode.
 
 It must NOT flag:
 

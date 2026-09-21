@@ -194,12 +194,25 @@ func TestSplitDataSourceHeader(t *testing.T) {
 			wantBody:   "SELECT 1 FROM DUAL\n",
 		},
 		{
-			// Unterminated SSL comment: nothing is masked, no header found,
-			// content returned unchanged.
-			name:       "ssl_comment_not_masked",
+			// An SSL-style banner above a directive header is header
+			// furniture, the same as the terminated form above: masked to
+			// blanks so the header scan reaches the directives beneath it.
+			// It used to abort the scan, dropping the directives into the
+			// body where their `:=` read as a strong SSL marker and the
+			// SQL body was lexed as SSL (issue #249).
+			name:       "ssl_banner_then_directive",
 			content:    "/* doc;\n:DSN := conn;\nSELECT 1 FROM DUAL\n",
+			wantHeader: "       \n:DSN := conn;\n",
+			wantBody:   "SELECT 1 FROM DUAL\n",
+		},
+		{
+			// With no header statement beneath it the banner is not
+			// furniture, so nothing is masked and the document keeps the
+			// shape the unterminated-comment rule reads as SSL.
+			name:       "ssl_comment_without_header_not_masked",
+			content:    "/* doc;\nSELECT 1 FROM DUAL\n",
 			wantHeader: "",
-			wantBody:   "/* doc;\n:DSN := conn;\nSELECT 1 FROM DUAL\n",
+			wantBody:   "/* doc;\nSELECT 1 FROM DUAL\n",
 		},
 		{
 			name:       "ssl_keyword_is_not_header",
@@ -457,8 +470,11 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	if len(hits) != 1 {
 		t.Fatalf("plain: expected exactly one separator warning, got %+v", hits)
 	}
-	if hits[0].Severity != SeverityWarning {
-		t.Errorf("plain: expected warning severity, got %d", hits[0].Severity)
+	// Error, not warning: STARLIMS refuses the document outright with
+	// "Invalid SQL statement: remove any misplaced semicolons(;)"
+	// (issue #249).
+	if hits[0].Severity != SeverityError {
+		t.Errorf("plain: expected error severity, got %d", hits[0].Severity)
 	}
 	if hits[0].Range.Start.Line != 0 || hits[0].Range.Start.Character != 18 {
 		t.Errorf("plain: expected range at 0:18 (the ';'), got %+v", hits[0].Range)
@@ -551,11 +567,15 @@ func TestGetDiagnostics_DataSourceUndeclaredPlaceholder(t *testing.T) {
 	}
 }
 
-// A banner closing `*/;` — the production idiom whose `;` doubles as the
-// SSL comment terminator — masks including the `;`, so header detection
-// still splits and the SQL body stays SQL. The corpus shape: boxed banner,
-// `:PARAMETERS` with inline := defaults, multi-line SELECT with qualified
-// columns, SQL and/or, and || concatenation.
+// A banner closing `*/;` masks including the `;`, so header detection
+// still splits and the SQL body stays SQL. The corpus shape: boxed
+// banner, `:PARAMETERS` with inline := defaults, multi-line SELECT with
+// qualified columns, SQL and/or, and || concatenation.
+//
+// Masking is a parsing convenience only. In a SQL-mode document that
+// `;` is a misplaced statement separator that STARLIMS rejects with
+// "Invalid SQL statement: remove any misplaced semicolons(;)", so it is
+// reported as an error even though the split succeeds (issue #249).
 // [spec feature.diagnostics_pipeline/A24]
 func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
@@ -569,15 +589,33 @@ func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T)
 		"FROM SAMPLES s, TESTS t\n" +
 		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = ?sStatus? or s.RUSH = 'Y'\n"
 
-	clean := banner + ":PARAMETERS sStatus := \"Done\", nLimit := 100;\n\n" + sql
-	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
-		t.Errorf("expected no diagnostics for banner-*/; data source, got %+v", diags)
+	onlySemicolon := func(label, content string) {
+		t.Helper()
+		diags := GetDiagnostics(content, opts)
+		if len(diags) != 1 {
+			t.Fatalf("%s: expected exactly the misplaced-semicolon error, got %+v", label, diags)
+		}
+		if diags[0].Code != CodeDatasourceSQLSemicolon {
+			t.Errorf("%s: expected %s, got %s", label, CodeDatasourceSQLSemicolon, diags[0].Code)
+		}
+		if diags[0].Severity != SeverityError {
+			t.Errorf("%s: expected error severity, got %d", label, diags[0].Severity)
+		}
 	}
 
-	// Spaces before the `;` are the same idiom.
+	// The split still works — the SQL body draws no SSL diagnostics —
+	// but the banner's `;` is reported.
+	clean := banner + ":PARAMETERS sStatus := \"Done\", nLimit := 100;\n\n" + sql
+	onlySemicolon("banner-*/;", clean)
+
+	// Spaces before the `;` are the same idiom, and the same error.
 	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus;\n\n" + sql
-	if diags := GetDiagnostics(spaced, opts); len(diags) != 0 {
-		t.Errorf("expected no diagnostics for banner-*/ ; data source, got %+v", diags)
+	onlySemicolon("banner-*/ ;", spaced)
+
+	// Dropping the `;` is the fix, and leaves the document clean.
+	fixed := strings.Replace(banner, "*/;", "*/", 1) + ":PARAMETERS sStatus := \"Done\";\n\n" + sql
+	if diags := GetDiagnostics(fixed, opts); len(diags) != 0 {
+		t.Errorf("banner closed with plain */ should be clean, got %+v", diags)
 	}
 
 	// Header checks still run after the masked banner residue: a
@@ -636,5 +674,166 @@ func TestGetDiagnostics_CommentedOutDirectiveIsNotSSLMarker(t *testing.T) {
 	ssl := ":PARAMETERS nCount;\n:DECLARE nTotal;\nnTotal := nCount - -1;\n:RETURN nTotal;\n"
 	if !hasStrongSSLMarker(ssl) {
 		t.Error("SSL body with mid-line dashes should keep its strong marker")
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A31] A banner in SSL comment style
+// above a directive header is furniture: the header still splits, so a
+// SQL body stays in SQL mode. The headerless shapes the
+// unterminated-comment rule was written for are unaffected (issue #249).
+func TestSQLModeDataSource_SSLStyleBannerAboveHeader(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		wantSQL bool
+	}{
+		{
+			name:    "ssl_banner_over_directives_and_sql",
+			content: "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS s := \"A\";\n\nSELECT a FROM b WHERE c = ?s?\n",
+			wantSQL: true,
+		},
+		{
+			name:    "multiline_ssl_banner_over_directives",
+			content: "/* ====;\n/* DATA SOURCE: X;\n/* ====;\n:DSN := conn;\n\nSELECT a FROM b\n",
+			wantSQL: true,
+		},
+		{
+			name:    "c_style_banner_unchanged",
+			content: "/* DATA SOURCE: X */\n:DSN := conn;\n\nSELECT a FROM b\n",
+			wantSQL: true,
+		},
+		{
+			// A16: a comment-only stub has no header, so the
+			// unterminated-comment rule still decides, and still says SSL.
+			name:    "comment_only_stub_stays_ssl",
+			content: "/* just a note about this data source\n",
+			wantSQL: false,
+		},
+		{
+			// A22: a real SSL data source keeps its SSL classification —
+			// its body carries strong markers whatever the banner does.
+			name:    "ssl_data_source_stays_ssl",
+			content: "/* banner;\n:PARAMETERS s := \"A\";\n\n:DECLARE x;\nx := 1;\n:RETURN x;\n",
+			wantSQL: false,
+		},
+		{
+			name:    "ssl_banner_without_header_stays_ssl",
+			content: "/* doc;\nSELECT 1 FROM DUAL\n",
+			wantSQL: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSQLModeDataSource(tc.content); got != tc.wantSQL {
+				t.Errorf("IsSQLModeDataSource = %v, want %v", got, tc.wantSQL)
+			}
+		})
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A31] The end-to-end consequence: the
+// SQL body of such a document draws no SSL diagnostics.
+func TestDiagnostics_SSLBannerDataSourceBodyIsNotLexedAsSSL(t *testing.T) {
+	content := "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT io.name FROM sample WHERE status = ?sStatus? AND a = 1\n"
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	opts.IncludeInfoDiagnostics = true
+	for _, d := range GetDiagnostics(content, opts) {
+		t.Errorf("SQL body drew an SSL diagnostic: %s — %s", d.Code, d.Message)
+	}
+}
+
+// [spec diag.datasource_sql_semicolon] The rule is about the semicolon,
+// not about the `*/;` spelling: any separator with no statement in front
+// of it is stray, wherever it sits in a SQL-mode document. A stray one
+// also must not abort the header scan, which used to drop the directives
+// into the body and misclassify the document as SSL (issue #249).
+func TestDataSourceStraySemicolonShapes(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	opts.IncludeInfoDiagnostics = true
+
+	body := "\nSELECT a FROM b\n"
+	stray := []struct{ name, content string }{
+		{"adjacent to the banner close", "/* X\n*/;\n:DSN := conn;\n" + body},
+		{"on its own line after the banner", "/* X\n*/\n;\n:DSN := conn;\n" + body},
+		{"after a -- banner", "-- X\n;\n:DSN := conn;\n" + body},
+		{"doubled between directives", ":DSN := conn;;\n:PARAMETERS s := \"A\";\n" + body},
+		{"headerless, after a leading comment", "/* X\n*/;\nSELECT a FROM b\n"},
+	}
+	for _, tc := range stray {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits int
+			for _, d := range GetDiagnostics(tc.content, opts) {
+				if d.Code == CodeDatasourceSQLSemicolon {
+					hits++
+					if d.Severity != SeverityError {
+						t.Errorf("expected error severity, got %d", d.Severity)
+					}
+				}
+			}
+			if hits != 1 {
+				t.Errorf("expected exactly one misplaced-semicolon error, got %d", hits)
+			}
+		})
+	}
+
+	clean := []struct{ name, content string }{
+		{"banner closed with a plain */", "/* X\n*/\n:DSN := conn;\n" + body},
+		{"directives only", ":DSN := conn;\n:PARAMETERS s := \"A\";\n" + body},
+		{"-- banner, no stray", "-- X\n:DSN := conn;\n" + body},
+		{"plain SQL, no header", "SELECT a FROM b WHERE c = 1\n"},
+	}
+	for _, tc := range clean {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, d := range GetDiagnostics(tc.content, opts) {
+				t.Errorf("expected clean, got %s: %s", d.Code, d.Message)
+			}
+		})
+	}
+
+	// The same banner in an SSL-mode document is correct SSL: the `;` is
+	// the comment terminator, so only the stylistic advisory applies.
+	sslMode := "/* X\n*/;\n:PARAMETERS s := \"A\";\n\n:DECLARE x;\nx := 1;\n"
+	for _, d := range GetDiagnostics(sslMode, opts) {
+		if d.Code == CodeDatasourceSQLSemicolon {
+			t.Error("fired on an SSL-mode data source, where the ';' terminates the comment")
+		}
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A22] Mode detection tests for what
+// SQL cannot contain, in the position SSL puts it. An Oracle-style bind
+// sits after an operator, so a bind whose name collides with an SSL
+// keyword no longer reads as that keyword (issue #249).
+//
+// These pin the direction that matters: a document wrongly called SSL
+// has its SQL keywords reported as undeclared variables, while one
+// wrongly called SQL merely runs fewer checks.
+func TestSQLModeDetection_MarkerPositionAndEdges(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		wantSQL bool
+	}{
+		{"plain SELECT", ":DSN := c;\n\nSELECT a FROM b WHERE x = 1\n", true},
+		{"bind named like a keyword (:default)", ":DSN := c;\n\nSELECT a FROM b WHERE s = :default\n", true},
+		{"bind named like a keyword (:error)", ":DSN := c;\n\nSELECT a FROM b WHERE s = :error\n", true},
+		{"ordinary bind (:status)", ":DSN := c;\n\nSELECT a FROM b WHERE s = :status\n", true},
+		{"':=' inside a single-quoted literal", ":DSN := c;\n\nSELECT a FROM b WHERE n = 'x := 1'\n", true},
+		{"':DECLARE' inside a literal", ":DSN := c;\n\nSELECT a FROM b WHERE n = 'use :DECLARE'\n", true},
+		{"':=' inside a SQL comment", ":DSN := c;\n\nSELECT a FROM b /* x := 1 */\n", true},
+
+		{"SSL body with :DECLARE", ":PARAMETERS s;\n\n:DECLARE x;\nx := 1;\n:RETURN x;\n", false},
+		{"SSL keyword after a ';' on one line", ":PARAMETERS s;\n\nx := 1; :RETURN x;\n", false},
+		{"SSL body that is only :RETURN", ":PARAMETERS s;\n\n:RETURN 1;\n", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSQLModeDataSource(tc.content); got != tc.wantSQL {
+				mode := map[bool]string{true: "SQL", false: "SSL"}
+				t.Errorf("classified as %s, want %s", mode[got], mode[tc.wantSQL])
+			}
+		})
 	}
 }

@@ -30,12 +30,18 @@ func checkDataSourceSQLSemicolons(body string, lineOffset int) []Diagnostic {
 			continue
 		}
 		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityWarning,
+			// Error, not warning: STARLIMS does not tolerate this. The
+			// body runs as a single SQL command and the server refuses
+			// the document outright with "Invalid SQL statement: remove
+			// any misplaced semicolons(;)" — confirmed against a live
+			// server, which is why the earlier "may fail on some
+			// database platforms" hedge was wrong (issue #249).
+			Severity: SeverityError,
 			Range: Range{
 				Start: Position{Line: lineOffset + tok.Line - 1, Character: tok.Column - 1},
 				End:   Position{Line: lineOffset + tok.Line - 1, Character: tok.Column},
 			},
-			Message: "Semicolon outside comments and string literals in a SQL data-source body. The body runs as a single SQL command; ';' statement separators are not part of the data-source format and may fail on some database platforms.",
+			Message: "Misplaced semicolon in a SQL data-source body. The body runs as a single SQL command, so ';' statement separators are not part of the format - STARLIMS rejects the document with \"Invalid SQL statement: remove any misplaced semicolons(;)\". Delete it.",
 			Source:  "ssl-lsp",
 			Code:    CodeDatasourceSQLSemicolon,
 		})

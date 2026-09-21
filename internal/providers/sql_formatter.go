@@ -1564,9 +1564,56 @@ func decodeCommaCount(tokens []SQLToken, start int) int {
 // there rewrites literal content (broken ODBC date escapes, IN/LIKE
 // patterns gaining whitespace). Such fragments are byte-preserved
 // (issue #216, fmt.sql_in_strings).
+//
+// A content carrying an unterminated `/*` is refused for the same
+// reason. The reflow treats the opener as starting a block comment that
+// never ends, swallows the remaining lines into it, and emits a trailing
+// blank line — which the next pass indents and the pass after that
+// re-blanks, so the file grows by one line on *every* format. That
+// breaks the idempotence contract (feature.formatting A6) without bound.
+// Measured over 298 production files, every non-idempotent case was this
+// shape (issue #249).
 func IsReformattableSQLString(content string) bool {
 	if strings.Count(content, "'")%2 == 1 {
 		return false
 	}
+	if hasUnterminatedSQLBlockComment(content) {
+		return false
+	}
 	return IsSQLString(content)
+}
+
+// hasUnterminatedSQLBlockComment reports whether content leaves a `/*`
+// open at the end. Openers inside a single-quoted SQL literal do not
+// count — callers reach here only with balanced quotes, so literal
+// tracking is reliable. Depth is counted rather than matched once,
+// because T-SQL nests block comments.
+func hasUnterminatedSQLBlockComment(content string) bool {
+	depth := 0
+	inLiteral := false
+	for i := 0; i < len(content); i++ {
+		c := content[i]
+		if inLiteral {
+			// '' is an escaped quote inside a literal, not a close.
+			if c == '\'' {
+				if i+1 < len(content) && content[i+1] == '\'' {
+					i++
+					continue
+				}
+				inLiteral = false
+			}
+			continue
+		}
+		switch {
+		case depth == 0 && c == '\'':
+			inLiteral = true
+		case c == '/' && i+1 < len(content) && content[i+1] == '*':
+			depth++
+			i++
+		case c == '*' && i+1 < len(content) && content[i+1] == '/' && depth > 0:
+			depth--
+			i++
+		}
+	}
+	return depth > 0
 }

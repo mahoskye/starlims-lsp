@@ -7,6 +7,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--strict` on `--validate`, enabling the three checks the editor leaves
+  off.** `undeclared_variable`, `unused_variable`, and `invalid_sql_param`
+  are gated off by default for a good reason — an editor reports them
+  continuously while someone is mid-edit, when a name is legitimately
+  undeclared or unused for the next few keystrokes. A non-interactive
+  consumer never sees that state: an agent or a CI gate is handed finished
+  code, where each of the three is a defect. Until now `--validate` had no
+  way to say so, because it hardcoded `DefaultDiagnosticOptions()` and the
+  three options had no flag.
+
+  Measuring the profile over 1,923 SSL and data-source files put the cost
+  at close to nothing on the code that matters: across the 1,509 files
+  that validate without errors today, `--strict` adds 320 findings — 0.2
+  per file, with 1,324 of them picking up nothing at all and the worst
+  single file reporting 20. The volume concentrates instead in files that
+  already fail to parse, which is where a consumer wants telling. All
+  three are warning or hint severity, so `--strict` never flips `valid`
+  or the exit code by itself.
+
+  Each flag keeps one concern, as `--hungarian-types` does: `--strict`
+  implies neither `--info` nor the Hungarian checks (#249).
+
+- **A SQL bind whose name collides with an SSL keyword no longer
+  misclassifies the document.** Data-source mode detection looks for
+  what SQL cannot contain — a `:KEYWORD` token or a `:=` — and
+  `WHERE s = :default` produced a `:DEFAULT` keyword token, so a plain
+  SQL data source read as SSL. That is the loud direction to get wrong:
+  every SQL reserved word in the body then reports as an undeclared
+  variable.
+
+  A colon keyword now counts only in statement-leading position — the
+  start of the body or just after a `;` — which is where SSL writes them
+  and where a bind never is. Binds whose name was not an SSL keyword
+  were always safe; the colliding names are safe now too. Verified
+  across 1,610 production data sources: no document changes
+  classification (#249).
+
+- **`datasource_sql_semicolon` is now an error, and catches the banner
+  form it used to mask.** A SQL-mode data source whose banner closes
+  `*/;` is rejected by STARLIMS with `Invalid SQL statement: remove any
+  misplaced semicolons(;)` — confirmed against a live server. The rule
+  previously hedged ("may fail on some database platforms") at warning
+  severity, and the banner case was not reported at all: criterion A24
+  consumed that `;` as "comment furniture" so the directive scan could
+  proceed, and treated masking it as a verdict that it was harmless.
+
+  Masking stays — the header scan needs it — but the unmasked header
+  region is now checked separately, so the `;` is reported while the
+  split still works. A banner closed with a plain `*/` is clean.
+
+  The test is a separator with no statement in front of it, not the
+  `*/;` spelling: the semicolon is what the server objects to, and
+  keying on emptiness also catches the shapes a pattern misses — `*/`
+  with the `;` on the next line, a `;` after a `--` banner, and a
+  doubled `;;` between directives, all of which slipped through
+  silently. A stray separator is now scanned past rather than ending
+  the header scan, which used to drop the directives into the body and
+  misclassify the document as SSL.
+
+  The corpus shows why this went unnoticed: `*/;` appears in 85% of
+  SSL-mode data sources, where the `;` genuinely is the SSL comment
+  terminator and nothing is wrong, against 2% of SQL-mode ones — the
+  distribution you would expect from a form that breaks the server.
+  Across 1,610 production data sources the change reports 27
+  occurrences in 17 files, taking the count that fail validation from 4
+  to 23. Those 19 additional documents were already broken at runtime
+  (#249).
+- **`comment_swallows_code`: a comment closed C-style hides the next
+  statement, and nothing reported it.** SSL comments end at the first
+  `;` and at nothing else — the grammar is
+  `CommentStatement ::= "/*" {Character} ";"`, so a `*/` is ordinary
+  comment text with no closing effect. A comment "closed" that way
+  therefore runs on to the next `;` and takes the statement in between
+  with it. That code never executes while still reading as live code in
+  the editor.
+
+  `c_style_comment_closer` covered only the inert `*/;` spelling, where
+  the `;` really does terminate and nothing is hidden. The spelling that
+  actually hides code drew nothing: a swallowed `:PROCEDURE` surfaced
+  only as a puzzling `unmatched_block_end` at some later `:ENDPROC`, and
+  a swallowed `:DECLARE` or assignment surfaced as nothing at all — the
+  file validated clean while behaving differently than it reads.
+
+  The new rule reports at warning severity and names the swallowed
+  fragment. It does not fire on `*/;`, on banner decoration before the
+  terminator, or on SQL-mode data sources, where `/* ... */` is a real
+  SQL comment. Measured over 4,842 production files it reports 74
+  occurrences across 29 files (0.6%) (#249).
+
+### Fixed
+- **The strict trio no longer runs on data-source documents.** A data
+  source does not follow SSL scoping: its builder directives take bare
+  identifiers as *values* (`:DSN := starlims;` — `starlims` is a DSN
+  name, not a variable read), its `:PARAMETERS` carry inline `:=`
+  defaults, and its SQL body names columns and keywords that are not SSL
+  identifiers at all. With `--strict` every data source therefore
+  reported its own directives and SQL keywords as undeclared variables —
+  16 findings on a five-line example, against 2 without the flag. The
+  three checks are now forced off for a data-source document whatever
+  the caller asks for; `checkDataSourceUndeclaredPlaceholders` remains
+  the dialect's own placeholder check (#249).
+- **Formatting is idempotent again (A6).** Two independent defects broke
+  it, both found by formatting a production corpus twice and diffing.
+
+  A SQL string holding an **unterminated `/*`** was reflowed as if the
+  opener began a block comment: the remaining lines were swallowed into
+  it and a trailing blank line was emitted, so every pass added one more
+  line and the file grew *without bound*. Such content is now refused by
+  `IsReformattableSQLString` and byte-preserved, alongside the existing
+  unbalanced-quote guard it sits next to.
+
+  Separately, an **orphan `*/` after a comment SSL already terminated at
+  its `;`** (`/* note;*/`, which lexes as `*` then `/`) got a leading
+  space from the operator path that the whitespace path did not give it
+  on the following pass, so pass 1 and pass 2 disagreed. An operator
+  glued to a comment now takes no leading space, making the two paths
+  agree — the same fix shape as #218 for commas.
+
+  Re-measured after both: 0 non-idempotent files across a 300-file SSL
+  sample (previously 4) and 1,610 data sources (#249).
+- **A data-source banner written in SSL comment style no longer
+  misclassifies the document.** `SplitDataSourceHeader` masked only
+  terminated `/* ... */` banners, so a `/*` closed by `;` aborted the
+  header scan outright: the header came back empty, the builder
+  directives fell into the body, and their `:=` read as a strong SSL
+  marker. A plain SQL data source under such a banner classified as SSL
+  and had its SQL body lexed as SSL — `?name?` placeholders reporting as
+  unknown tokens, dotted columns as property access.
+
+  A banner above a directive header is now treated as header furniture
+  whatever comment style it uses, and the leading-unterminated-comment
+  signal decides only the headerless shapes it was written for: a
+  comment-only stub and an SSL data source opening with an unterminated
+  comment both still classify as SSL (A16/A22 preserved). The SQL-mode
+  decision is now one function shared with the diagnostics pipeline
+  rather than duplicated in it. No file in a 1,610-document production
+  corpus changes classification; the fix matters for the shape a
+  generator can produce (#249).
+- **A unary sign is no longer read as arithmetic.** `arithmetic_type_mismatch`
+  took the previous significant token as its left operand without asking
+  whether the operator had a left operand at all. In `{-1}` that token is
+  the array literal's own `{`, which infers as an array, so a negative
+  number at the head of an array literal reported "Non-numeric type in
+  arithmetic operation '-': array - numeric". `{1, -2}` was unaffected,
+  which is why it went unnoticed: only a *leading* sign sat next to the
+  brace.
+
+  A sign is now binary only when the previous significant token can end a
+  value — an identifier, a literal, or a closing `)`, `]`, `}`. After an
+  opening bracket, a comma, an assignment, another operator, or a
+  keyword it is unary and no arithmetic finding applies. The fence sits
+  below the NIL check so `NIL - 1` keeps reporting under
+  `nil_in_operations`, and a genuine binary mismatch such as
+  `sLabel - 1` still reports (#249).
+
+
 ## [0.23.0] - 2026-09-20
 
 A small correction release. An explicit `+` sign in a scientific-notation
