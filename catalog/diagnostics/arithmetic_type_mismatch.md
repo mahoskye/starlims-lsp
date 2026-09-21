@@ -19,7 +19,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
-issues: []
+  - date: 2026-09-21
+    ref: "issue #249"
+    note: >-
+      Fenced against unary signs. A leading negative in an array literal
+      (`{-1}`) inferred its left operand from the literal's own opening
+      brace and reported "array - numeric".
+issues:
+  - 249
 ---
 
 ## Behavior
@@ -51,7 +58,14 @@ It must NOT flag:
 - `NIL` literals in arithmetic, which report as `diag.nil_in_operations`
   before type comparison happens;
 - member-access operands (`obj:prop`) and array elements on the
-  operator's far side, which inference deliberately leaves untyped.
+  operator's far side, which inference deliberately leaves untyped;
+- a **unary sign**, where `-` (or `+`) marks the sign of the value that
+  follows rather than subtracting from what precedes it. A sign is
+  binary only when the previous significant token can end a value — an
+  identifier, a literal, or a closing `)`, `]`, `}`. After an opening
+  bracket, a comma, an assignment, another operator, or a keyword, it is
+  unary. Without this fence `{-1}` read as `array - numeric`, since the
+  token before the sign was the array literal's own `{`.
 
 ## Examples
 
@@ -90,6 +104,19 @@ nTotal := nCount - 1;
 :PROCEDURE Demo;
 :DECLARE sLabel;
 sLabel := "total: " + 5;
+:ENDPROC;
+```
+
+### Does not flag
+
+A unary sign, wherever it appears — after `{`, `(`, `,`, `:=`, or
+another operator.
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE aFlags, nOffset;
+aFlags := {-1, 2};
+nOffset := -1;
 :ENDPROC;
 ```
 

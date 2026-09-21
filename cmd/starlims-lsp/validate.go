@@ -44,6 +44,15 @@ type validateFlags struct {
 	// (--hungarian-types): hungarian_type_mismatch, without the
 	// convention audit that hungarian_notation performs.
 	hungarianTypes bool
+	// strict enables the three provider checks the editor leaves off
+	// (--strict): undeclared_variable, unused_variable, and
+	// invalid_sql_param. They are off by default because an editor
+	// reports them continuously while a human is mid-edit, when a name
+	// is legitimately undeclared or unused for the next few keystrokes.
+	// A non-interactive consumer — an agent or a CI gate — sees only
+	// finished code, where each of the three is a defect rather than a
+	// transient state, so it wants all three (issue #249).
+	strict bool
 }
 
 // withDataSource returns a copy with dataSource set, so a file path's
@@ -79,6 +88,8 @@ func runValidate(args []string) {
 			flags.hungarian = true
 		case "--hungarian-types":
 			flags.hungarianTypes = true
+		case "--strict":
+			flags.strict = true
 		default:
 			files = append(files, arg)
 		}
@@ -155,6 +166,16 @@ func printValidateHelp() {
 	fmt.Println("              names that already carry a prefix, so it stays quiet on")
 	fmt.Println("              code that does not use the convention while still")
 	fmt.Println("              reporting names that contradict their own prefix.")
+	fmt.Println("  --strict    Enable the three checks the editor leaves off:")
+	fmt.Println("              undeclared_variable (a name used but never declared),")
+	fmt.Println("              unused_variable (a declaration nothing reads), and")
+	fmt.Println("              invalid_sql_param (a ?marker? with no matching name).")
+	fmt.Println("              They are off by default because an editor reports them")
+	fmt.Println("              while a human is mid-edit, when a name is legitimately")
+	fmt.Println("              undeclared or unused for the next few keystrokes. On")
+	fmt.Println("              finished code each is a defect, so agents and CI want")
+	fmt.Println("              all three. None is error severity, so --strict never")
+	fmt.Println("              flips the exit code on its own.")
 	fmt.Println("  --help      Print this help message")
 	fmt.Println()
 	fmt.Println("Exit codes:")
@@ -255,6 +276,9 @@ func validateContent(name string, content string, flags validateFlags) Diagnosti
 	opts.IncludeInfoDiagnostics = flags.includeInfo
 	opts.CheckHungarianNotation = flags.hungarian
 	opts.CheckHungarianTypes = flags.hungarian || flags.hungarianTypes
+	opts.CheckUndeclaredVars = flags.strict
+	opts.CheckUnusedVars = flags.strict
+	opts.CheckSQLParams = flags.strict
 	diagnostics := providers.GetDiagnostics(content, opts)
 
 	// Convert to output format

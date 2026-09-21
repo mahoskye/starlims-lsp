@@ -65,6 +65,7 @@ const (
 	CodeUnterminatedString          = "unterminated_string"
 	CodeCommentTermination          = "comment_termination"
 	CodeCommentTextAfterTerminator  = "comment_text_after_terminator"
+	CodeCommentSwallowsCode         = "comment_swallows_code"
 	CodeAssignmentInCondition       = "assignment_in_condition"
 	CodeDotPropertyAccess           = "dot_property_access"
 	CodeClassInstantiationCurly     = "class_instantiation_curly"

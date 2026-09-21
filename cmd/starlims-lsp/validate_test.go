@@ -123,6 +123,64 @@ nCode := SubStr(sText, 1, 4);
 	}
 }
 
+// [spec feature.diagnostics_pipeline/A29] --strict turns on the three
+// checks the editor leaves off, and nothing else. They are the checks a
+// human mid-edit does not want and a finished-code consumer does
+// (issue #249).
+func TestValidateStrictFlag(t *testing.T) {
+	// sTypo is read but never declared; sUnused is declared but never
+	// read; ?sMissing? names no variable in scope. None of the three is
+	// visible to a default run.
+	content := `:PROCEDURE Demo;
+:DECLARE sName, sUnused;
+sName := "x" + sTypo;
+SQLExecute("SELECT a FROM t WHERE b = ?sMissing?");
+:IF sName # "";
+:ENDIF;
+:RETURN sName;
+:ENDPROC;
+`
+	codes := func(flags validateFlags) map[string]bool {
+		out := map[string]bool{}
+		for _, d := range validateContent("stdin", content, flags).Diagnostics {
+			out[d.Code] = true
+		}
+		return out
+	}
+
+	strictCodes := []string{"undeclared_variable", "unused_variable", "invalid_sql_param"}
+
+	base := codes(validateFlags{})
+	for _, code := range strictCodes {
+		if base[code] {
+			t.Errorf("%s fired without --strict — CLI defaults must match the editor defaults", code)
+		}
+	}
+
+	strict := codes(validateFlags{strict: true})
+	for _, code := range strictCodes {
+		if !strict[code] {
+			t.Errorf("--strict did not enable %s", code)
+		}
+	}
+
+	// Each flag carries one concern: --strict no more implies the info
+	// tier than --hungarian does.
+	if strict["not_preferred_operator"] {
+		t.Error("--strict must not imply --info")
+	}
+	if strict["hungarian_notation"] || strict["hungarian_type_mismatch"] {
+		t.Error("--strict must not imply the Hungarian checks")
+	}
+
+	// All three are warning or hint severity, so a file whose only
+	// findings are strict findings stays valid and the CLI still exits 0.
+	result := validateContent("stdin", content, validateFlags{strict: true})
+	if !result.Valid {
+		t.Errorf("--strict findings must not flip valid; got %+v", result.Diagnostics)
+	}
+}
+
 // [spec diag.unexpected_token] An unexpected token is an error, so it is
 // the one class of #240 finding that flips the CLI's valid flag.
 func TestValidateFilePath_UnexpectedTokenFlipsValid(t *testing.T) {

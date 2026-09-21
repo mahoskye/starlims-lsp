@@ -9739,3 +9739,74 @@ e := SQLExecute("select (qty + 1) total from orders");`
 		}
 	}
 }
+
+// [spec diag.arithmetic_type_mismatch] A unary sign is not arithmetic.
+// `{-1}` used to infer its left operand from the array literal's own
+// opening brace and report "array - numeric" (issue #249).
+func TestArithmeticTypeMismatch_UnarySignIsNotBinary(t *testing.T) {
+	unary := []string{
+		"aFlags := {-1};",
+		"aFlags := {-1, 2};",
+		"aFlags := {1, -2};",
+		"nOffset := -1;",
+		"nOffset := (-1);",
+		"nOffset := nCount * -1;",
+	}
+	for _, stmt := range unary {
+		script := ":PROCEDURE Demo;\n:DECLARE aFlags, nOffset, nCount;\n" + stmt + "\n:ENDPROC;\n"
+		for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+			if d.Code == CodeArithmeticTypeMismatch {
+				t.Errorf("%q: unary sign reported as arithmetic — %s", stmt, d.Message)
+			}
+		}
+	}
+
+	// The fence must not silence a genuine binary mismatch: the sign
+	// follows an identifier, so it has a left operand.
+	binary := ":PROCEDURE Demo;\n:DECLARE nTotal, sLabel;\nnTotal := sLabel - 1;\n:ENDPROC;\n"
+	found := false
+	for _, d := range GetDiagnostics(binary, DefaultDiagnosticOptions()) {
+		if d.Code == CodeArithmeticTypeMismatch {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("binary string-minus-numeric no longer reports arithmetic_type_mismatch")
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A30] The strict trio is off for a
+// data-source document whatever the caller asked for. Its dialect does
+// not follow SSL scoping: directive values are bare identifiers used as
+// values, :PARAMETERS carries inline defaults, and the SQL body names
+// columns and keywords (issue #249).
+func TestStrictChecksExemptDataSources(t *testing.T) {
+	ds := ":DSN := starlims;\n:TABLENAME := sampleList;\n:PARAMETERS sStatus := \"A\";\n\nSELECT sampleid FROM sample WHERE status = ?sStatus?\n"
+
+	opts := DefaultDiagnosticOptions()
+	opts.IsDataSourceFile = true
+	opts.CheckUndeclaredVars = true
+	opts.CheckUnusedVars = true
+	opts.CheckSQLParams = true
+
+	for _, d := range GetDiagnostics(ds, opts) {
+		switch d.Code {
+		case CodeUndeclaredVariable, CodeUnusedVariable, CodeInvalidSqlParam:
+			t.Errorf("%s fired on a data source: %s", d.Code, d.Message)
+		}
+	}
+
+	// The same options on an ordinary SSL document still report.
+	sslOpts := opts
+	sslOpts.IsDataSourceFile = false
+	ssl := ":PROCEDURE Demo;\n:DECLARE sName;\nsName := sTypo;\n:RETURN sName;\n:ENDPROC;\n"
+	found := false
+	for _, d := range GetDiagnostics(ssl, sslOpts) {
+		if d.Code == CodeUndeclaredVariable {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("the data-source exemption leaked into ordinary SSL documents")
+	}
+}

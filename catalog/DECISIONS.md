@@ -4,6 +4,39 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D15 — Data-source mode detection tests for SQL-impossible constructs, and defaults to SQL (2026-09-21, issue #249)
+
+Mode detection asks whether a data-source body contains something SQL
+**cannot** contain — a colon keyword in statement-leading position, or a
+`:=` — rather than whether it resembles SSL. That makes it a one-way
+proof instead of a similarity score, which is why it needs no tuning
+thresholds. The position requirement is load-bearing: an Oracle-style
+bind sits after an operator, so `WHERE s = :default` is not evidence of
+the `:DEFAULT` keyword.
+
+When no marker is found the document is SQL. This is deliberate and the
+asymmetry is the whole point: a document wrongly called SSL has every
+SQL reserved word in it reported as an undeclared variable, while one
+wrongly called SQL merely runs fewer checks. Bias toward the quiet
+failure.
+
+**Accepted consequence.** An SSL data source whose body carries no colon
+keyword and no `:=` — a bare expression or call — reads as SQL. This is
+not fixable in kind, because SSL cannot be proven from the *absence* of
+markers, and it is bounded: mode detection runs only for documents
+already known to be data sources (every call site is gated on
+`isDataSourceURI` or `--ds`), so an ordinary `.ssl` script is never
+affected. No occurrence was found in a 1,610-document production
+corpus. Defaulting such a document to SQL is accepted rather than
+worked around.
+
+Signals deliberately **not** added, having been measured against the
+same corpus: `.AND.`/`.OR.`/`.NOT.`, `Me:`/`Base:`, `==`, and
+`DoProc`/`ExecFunction`/`CreateUdObject` flip nothing. Array-literal
+braces must never be used — ODBC escapes (`{fn …}` in 166 files, `{d …}`
+in 7) are character-for-character identical to an SSL array literal, so
+the signal is SQL-possible and fails the criterion above.
+
 ## D14 — SQL conventions are dialect-aware; preserve before canonicalize (2026-08-28, issue #219, PR #225)
 
 Where a SQL canonicalization is safe on one target DBMS but not the

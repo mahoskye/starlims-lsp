@@ -47,12 +47,19 @@ func maskLeadingSQLComments(content string) string {
 				return maskRange(content, i)
 			}
 			i += 2 + end + 2
-			// Production banners close `*/;` — the `;` is the SSL comment
-			// terminator, which SSL reads as part of the comment and SQL
-			// reads as an empty statement. Either way it is comment
-			// furniture, and left unmasked it aborted the header scan in
-			// SplitDataSourceHeader (issue #208, criterion A24). Consume
-			// it with any same-line spacing before it.
+			// Production banners close `*/;`. Left unmasked the `;`
+			// aborted the header scan in SplitDataSourceHeader (issue
+			// #208, criterion A24), so it is consumed here with any
+			// same-line spacing before it.
+			//
+			// Masking it is a parsing convenience, NOT a judgement that
+			// it is harmless. In an SSL document it genuinely is the
+			// comment terminator. In a SQL-mode data source it is a
+			// misplaced semicolon that STARLIMS rejects outright with
+			// "Invalid SQL statement: remove any misplaced
+			// semicolons(;)" — confirmed against a live server. That is
+			// reported by checkDataSourceBannerSemicolon, which reads
+			// the unmasked content (issue #249).
 			j := i
 			for j < len(content) && (content[j] == ' ' || content[j] == '\t') {
 				j++
@@ -65,6 +72,172 @@ func maskLeadingSQLComments(content string) string {
 		}
 	}
 	return maskRange(content, len(content))
+}
+
+// checkDataSourceHeaderSemicolons reports a semicolon in a SQL-mode
+// data source's header region that terminates an *empty* statement.
+//
+// The body is covered by checkDataSourceSQLSemicolons; the header is not,
+// because SplitDataSourceHeader masks it (comments to blanks, and the `;`
+// closing a `*/;` banner consumed outright so the directive scan can
+// proceed — criterion A24). Masking is a parsing convenience, not a
+// verdict that what was masked is harmless.
+//
+// The rule is about the semicolon, not about any particular spelling
+// around it: a data-source body runs as a single SQL command, so a `;`
+// with no statement in front of it is a stray separator and STARLIMS
+// refuses the document with "Invalid SQL statement: remove any misplaced
+// semicolons(;)" — confirmed against a live server. A directive's own
+// terminator has content before it and never flags. Deciding on
+// emptiness rather than on a `*/;` pattern also covers the shapes a
+// pattern misses: `*/` then `;` on its own line, a `;` after a `--`
+// banner, and a doubled `;;` between directives (issue #249).
+//
+// Callers must already know the document is a SQL-mode data source.
+func checkDataSourceHeaderSemicolons(region string) []Diagnostic {
+	var diagnostics []Diagnostic
+	line, col := 1, 1
+	sawContent := false
+	step := func(n int) {
+		for k := 0; k < n; k++ {
+			col++
+		}
+	}
+	for i := 0; i < len(region); {
+		c := region[i]
+		switch {
+		case c == '\n':
+			line++
+			col = 1
+			i++
+		case c == ' ' || c == '\t' || c == '\r':
+			step(1)
+			i++
+		case strings.HasPrefix(region[i:], "/*"):
+			end := strings.Index(region[i+2:], "*/")
+			if end < 0 {
+				return diagnostics
+			}
+			for _, r := range region[i : i+2+end+2] {
+				if r == '\n' {
+					line++
+					col = 1
+				} else {
+					col++
+				}
+			}
+			i += 2 + end + 2
+		case strings.HasPrefix(region[i:], "--"):
+			end := strings.IndexByte(region[i:], '\n')
+			if end < 0 {
+				return diagnostics
+			}
+			step(end)
+			i += end
+		case c == '\'':
+			j := i + 1
+			for j < len(region) {
+				if region[j] == '\'' {
+					if j+1 < len(region) && region[j+1] == '\'' {
+						j += 2
+						continue
+					}
+					j++
+					break
+				}
+				j++
+			}
+			for _, r := range region[i:j] {
+				if r == '\n' {
+					line++
+					col = 1
+				} else {
+					col++
+				}
+			}
+			sawContent = true
+			i = j
+		case c == ';':
+			if !sawContent {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range: Range{
+						Start: Position{Line: line - 1, Character: col - 1},
+						End:   Position{Line: line - 1, Character: col},
+					},
+					Message: "Misplaced semicolon in a SQL data source. Nothing precedes it, so it is a stray statement separator - the body runs as a single SQL command and STARLIMS rejects the document with \"Invalid SQL statement: remove any misplaced semicolons(;)\". Delete it. (A ';' is required only after an SSL comment, and only in SSL documents.)",
+					Source:  "ssl-lsp",
+					Code:    CodeDatasourceSQLSemicolon,
+				})
+			}
+			sawContent = false
+			step(1)
+			i++
+		default:
+			sawContent = true
+			step(1)
+			i++
+		}
+	}
+	return diagnostics
+}
+
+// maskLeadingSSLBannerComments blanks a leading run of SSL-style block
+// comments — `/*` runs closed by `;` rather than `*/` — when a
+// data-source header statement follows them.
+//
+// maskLeadingSQLComments deliberately stops at an unterminated `/*`,
+// because for a whole-document verdict that shape means SSL. But a
+// banner written in SSL comment style sitting *above* a builder-directive
+// header is header furniture, exactly like the `--` runs already made
+// transparent here: it says nothing about whether the body below the
+// directives is SQL. Left unmasked it aborted the header scan outright,
+// so the header came back empty, the directives fell into the body, and
+// their `:=` read as a strong SSL marker — classifying a plain SQL data
+// source as SSL and lexing its SQL body as SSL. 32 of 1,610 production
+// data sources carry this shape (issue #249).
+//
+// Only the unterminated form is handled; anything with a `*/` ahead is
+// left to maskLeadingSQLComments, whose position this must not take.
+func maskLeadingSSLBannerComments(content string) string {
+	i := 0
+	for i < len(content) {
+		switch c := content[i]; {
+		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
+			i++
+			continue
+		}
+		if !strings.HasPrefix(content[i:], "/*") {
+			break
+		}
+		// A `*/` anywhere ahead means this is the SQL comment form.
+		if strings.Contains(content[i:], "*/") {
+			return content
+		}
+		semi := strings.IndexByte(content[i:], ';')
+		if semi < 0 {
+			// No terminator at all: a genuinely unterminated comment, the
+			// signal that this document is SSL. Leave it visible.
+			return content
+		}
+		i += semi + 1
+	}
+	if i == 0 {
+		return content
+	}
+	// Mask only when the banner actually introduces a header; otherwise
+	// this is an SSL document whose comment happens to be terminated.
+	rest := content[i:]
+	for _, line := range strings.SplitAfter(rest, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !isDataSourceHeaderLine(line) {
+			return content
+		}
+		break
+	}
+	return maskRange(content, i)
 }
 
 // maskRange replaces every non-newline byte of content[:end] with a space.
@@ -107,13 +280,23 @@ func IsSQLCommentOnly(content string) bool {
 // the header. Content that does not start with a header statement returns
 // header == "" and body == content unchanged.
 func SplitDataSourceHeader(content string) (header, body string) {
-	masked := maskLeadingSQLComments(content)
+	masked := maskLeadingSQLComments(maskLeadingSSLBannerComments(content))
 	lines := strings.SplitAfter(masked, "\n")
 	end := 0 // number of leading lines consumed by the header
 	i := 0
 	for i < len(lines) {
 		trimmed := strings.TrimSpace(lines[i])
 		if trimmed == "" {
+			i++
+			continue
+		}
+		// A line holding nothing but stray separators is scanned past
+		// rather than treated as the start of the body. Breaking here
+		// dropped the directives below it into the body, where their
+		// `:=` read as a strong SSL marker and misclassified a SQL
+		// document. The separator itself is reported by
+		// checkDataSourceHeaderSemicolons (issue #249).
+		if strings.Trim(trimmed, "; \t") == "" {
 			i++
 			continue
 		}
@@ -193,23 +376,34 @@ func blankPreservingNewline(line string) string {
 // construct — decisive evidence that a data-source body is SSL, not SQL
 // (issue #153):
 //
-//   - a non-directive colon keyword (:DECLARE, :IF, :RETURN, :PROCEDURE, …).
-//     SQL has no `:KEYWORD` syntax at all, and the lexer only emits a
-//     keyword token off a leading colon, so any such token is SSL. The one
-//     SSL keyword that is also a data-source header directive, :PARAMETERS,
-//     is excluded; the builder directives (:DSN/:TABLENAME/…) are not SSL
-//     keywords, so they never match regardless.
+//   - a non-directive colon keyword (:DECLARE, :IF, :RETURN, :PROCEDURE, …)
+//     in **statement-leading** position: the start of the body, or just
+//     after a `;`. SSL always writes them there. The position requirement
+//     is what separates them from an Oracle-style bind, which sits after
+//     an operator — `WHERE s = :default` used to read as the `:DEFAULT`
+//     keyword and misclassify a plain SQL document as SSL, which is the
+//     loud direction to get wrong (its SQL keywords then report as
+//     undeclared variables). Binds whose name is not an SSL keyword were
+//     always safe; this makes the colliding names safe too (issue #249).
+//     The one SSL keyword that is also a data-source header directive,
+//     :PARAMETERS, is excluded; the builder directives (:DSN/:TABLENAME/…)
+//     are not SSL keywords, so they never match regardless.
 //   - a `:=` assignment. A plain SQL statement never contains one; the
 //     inline `:=` defaults of a :PARAMETERS header do, which is why callers
 //     scan the body with the directive header already stripped by
 //     SplitDataSourceHeader.
 //
 // Strings and comments are consumed as single tokens, so a `:DECLARE` or
-// `:=` inside a SQL string or comment does not trip the check. Oracle-style
-// binds (`= :status`) lex as a colon keyword whose name is not an SSL
-// keyword, so they do not either. The unterminated SSL comment form is
-// detected separately (hasUnterminatedLeadingBlockComment) because the SSL
-// lexer stops a `/*` at the first `;`, mis-reading SQL comments.
+// `:=` inside a SQL string or comment does not trip the check. The
+// unterminated SSL comment form is detected separately
+// (hasUnterminatedLeadingBlockComment) because the SSL lexer stops a `/*`
+// at the first `;`, mis-reading SQL comments.
+//
+// Note the asymmetry this heuristic is built around: it tests for what
+// SQL *cannot* contain rather than for what SSL looks like, and defaults
+// to SQL. A document wrongly called SSL floods with bogus diagnostics; one
+// wrongly called SQL merely runs fewer checks. Bias toward the quiet
+// failure.
 func hasStrongSSLMarker(body string) bool {
 	// Line-leading `--` SQL comments are commentary, not code — a
 	// commented-out directive (`--:PARAMETERS p := '';`, corpus-observed)
@@ -223,11 +417,16 @@ func hasStrongSSLMarker(body string) bool {
 		}
 	}
 	body = strings.Join(lines, "")
+	statementLeading := true
 	for _, t := range lexer.NewLexer(body).Tokenize() {
 		switch t.Type {
+		case lexer.TokenWhitespace, lexer.TokenComment:
+			// Neither content nor a statement boundary: leave the
+			// leading flag as it was.
+			continue
 		case lexer.TokenKeyword:
 			name := strings.ToUpper(strings.TrimPrefix(t.Text, ":"))
-			if name != "PARAMETERS" && constants.IsKeyword(name) {
+			if statementLeading && name != "PARAMETERS" && constants.IsKeyword(name) {
 				return true
 			}
 		case lexer.TokenOperator:
@@ -235,6 +434,9 @@ func hasStrongSSLMarker(body string) bool {
 				return true
 			}
 		}
+		// Only a `;` opens a new statement; anything else means the
+		// next token sits mid-expression.
+		statementLeading = t.Type == lexer.TokenPunctuation && t.Text == ";"
 	}
 	return false
 }
@@ -262,6 +464,26 @@ func hasUnterminatedLeadingBlockComment(content string) bool {
 // Callers must already know the document is a data-source file; this
 // function only classifies its content.
 func IsSQLModeDataSource(content string) bool {
-	_, body := SplitDataSourceHeader(content)
-	return !hasStrongSSLMarker(body) && !hasUnterminatedLeadingBlockComment(content)
+	header, body := SplitDataSourceHeader(content)
+	return IsSQLModeDataSourceSplit(content, header, body)
+}
+
+// IsSQLModeDataSourceSplit is IsSQLModeDataSource for a caller that has
+// already split the header, so the two cannot drift apart.
+//
+// When a builder-directive header was found, the body decides and the
+// leading-comment signal is not consulted: a banner above the header is
+// furniture whatever comment style it uses, and the structure beneath it
+// is the stronger evidence. The leading-comment rule still decides the
+// headerless shapes it was written for — a comment-only stub, and an SSL
+// data source that opens with an unterminated comment (issue #153,
+// criteria A16/A22).
+func IsSQLModeDataSourceSplit(content, header, body string) bool {
+	if hasStrongSSLMarker(body) {
+		return false
+	}
+	if strings.TrimSpace(header) != "" {
+		return true
+	}
+	return !hasUnterminatedLeadingBlockComment(content)
 }
