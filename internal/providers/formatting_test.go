@@ -1548,19 +1548,19 @@ func TestFormatDocument_ChainedMemberAccessNoSpaces(t *testing.T) {
 
 // --- Gap 5: Mashed :LABELName normalization ---
 
-func TestFormatDocument_MashedLabelNormalization(t *testing.T) {
-	input := `:LABELMyLabel;
-x := 1;`
-	opts := DefaultFormattingOptions()
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-	if strings.Contains(formatted, ":LABELMyLabel") {
-		t.Errorf("expected mashed label to be split, got:\n%s", formatted)
+func TestFormatDocument_JoinedLabelKeptVerbatim(t *testing.T) {
+	// `:LABELMyLabel` and `:LABEL MyLabel` store different label text, and
+	// Branch() matches it exactly (reference keywords/LABEL.md), so the
+	// formatter must not split the joined form — it used to, which sent
+	// every Branch("LABELMyLabel") to a label that no longer existed.
+	input := ":LABELMyLabel;\nx := 1;\nBranch(\"LABELMyLabel\");\n:LABEL Other;\n"
+	formatted := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(formatted, ":LABELMyLabel;") || strings.Contains(formatted, ":LABEL MyLabel") {
+		t.Errorf("joined label must be kept verbatim, got:\n%s", formatted)
 	}
-	if !strings.Contains(formatted, ":LABEL MyLabel") {
-		t.Errorf("expected ':LABEL MyLabel', got:\n%s", formatted)
+	if !strings.Contains(formatted, ":LABEL Other;") {
+		t.Errorf("spaced label must be kept, got:\n%s", formatted)
 	}
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 // --- Keyword casing normalization ---

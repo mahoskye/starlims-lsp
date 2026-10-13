@@ -507,6 +507,11 @@ code, or output format changes for either distribution.
   rewritten differently on every save. Well-formed code is unaffected.
 
 ### Fixed
+- **The formatter no longer splits a joined label.** `:LABELName;` was
+  rewritten as `:LABEL Name;`, which stores different label text, so every
+  `Branch("LABELName")` lost its target. On the production corpus, 15 files
+  gained `branch_target_label` errors after formatting. The joined form is
+  now written verbatim (reference keywords/LABEL.md).
 - **`global_assignment` no longer flags qualified members.** A property or
   class field whose name matches a predefined or configured global, such as
   `oSummary:pending := 0;` (`Pending` is a status global) or

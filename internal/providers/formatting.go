@@ -1102,12 +1102,13 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			tokenWritten = state.writeTokenWithSQLFormatting(token)
 		}
 		if !tokenWritten {
-			// Normalize mashed :LABELName -> :LABEL Name
+			// A joined `:LABELName` is written verbatim. It stores the label
+			// text `LABELName`, which Branch() matches exactly; `:LABEL Name`
+			// would store `LABEL Name` and send every Branch("LABELName") to a
+			// label that no longer exists (reference keywords/LABEL.md).
 			if token.Type == lexer.TokenKeyword && isLabelKeywordMashed(token.Text) {
-				labelName := token.Text[1+len("LABEL"):] // skip ":" + "LABEL"
-				out := ":LABEL " + labelName
-				state.builder.WriteString(out)
-				state.currentLineLen += len(out)
+				state.builder.WriteString(token.Text)
+				state.currentLineLen += len(token.Text)
 			} else if token.Type == lexer.TokenKeyword && strings.HasPrefix(token.Text, ".") {
 				// Dot-wrapped literals (.T., .F., .AND., .OR., .NOT.) — uppercase but no colon
 				normalized := strings.ToUpper(token.Text)
@@ -1442,9 +1443,9 @@ func isUnaryContext(lastNonWS lexer.Token, lineStart bool) bool {
 	if lastNonWS.Text == ":=" {
 		return true
 	}
-	// A mashed `:LABELName` is written as `:LABEL Name`, so on the next
-	// pass the operator follows the name, an operand (issue #256, found
-	// by FuzzFormat).
+	// A joined `:LABELName` ends with its label name, an operand, so an
+	// operator after it is not awaiting one (issue #256, found by
+	// FuzzFormat).
 	if lastNonWS.Type == lexer.TokenKeyword && isLabelKeywordMashed(lastNonWS.Text) {
 		return false
 	}
