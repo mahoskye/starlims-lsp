@@ -21,6 +21,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12
+      (operators/equals.md, strict-equals.md, not-equals.md, hash.md): a
+      number or date compared with NIL returns a logical instead of
+      raising, so a guard such as `nValue == NIL` is safe. Behavior
+      already matches; a fence pins NIL comparisons against numbers and
+      dates.
 issues: []
 ---
 
@@ -70,6 +79,18 @@ x := NIL;
 :IF x = NIL;
     x := 0;
 :ENDIF;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Check;
+	:PARAMETERS nValue, dWhen;
+	:IF nValue == NIL .OR. dWhen != NIL;
+		:RETURN 5 = NIL;
+	:ENDIF;
+	:RETURN Today() = NIL;
+:ENDPROC;
 ```
 
 ## Rationale
