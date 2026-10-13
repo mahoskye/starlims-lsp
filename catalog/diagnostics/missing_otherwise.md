@@ -3,7 +3,7 @@ id: diag.missing_otherwise
 title: BEGINCASE without an OTHERWISE clause
 kind: diagnostic
 status: active
-authority: tool
+authority: advisory
 schema_ref: null
 default_severity: hint
 severity_overridable: true
@@ -20,6 +20,11 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Authority corrected tool -> advisory to mirror the style guide
+      record (otherwise_for_default_handling, advisory, hint).
 issues: []
 ---
 
@@ -88,9 +93,10 @@ It must NOT flag:
 ## Rationale
 
 In SSL's `:BEGINCASE`, `:OTHERWISE` only executes when no earlier `:CASE`
-body ran, making it the natural place for default handling; the style guide
-documents this semantics without mandating the clause, so the tool nudges
-at hint severity rather than warning (be7a174). The outermost-only scope is
+body ran, making it the natural place for default handling. The style
+guide's `otherwise_for_default_handling` record (advisory, hint)
+recommends the clause without the language requiring it, so the tool
+nudges at hint severity rather than warning (be7a174). The outermost-only scope is
 intentional and test-pinned (`..._NestedIgnoresInner` asserts exactly one
 hint when an inner block has `:OTHERWISE` and the outer does not): nested
 case blocks are usually exhaustive dispatch helpers, and flagging every

@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`mixed_type_operator` reads the operator's real operands, and stops
+  guessing types from elsewhere in the file.** The `+` check looked at
+  the token on each side of the operator and typed names from a
+  file-wide record of their last assignment, so a `vValue := 0;` in one
+  procedure made `vValue + " units"` in another a "numeric + string"
+  mismatch, and an assignment *after* a use typed the use. It also read
+  constant-style names (`MAX_ROWS`) and loop counters as numeric, and
+  flagged `date + number`, the one mixed pairing `+` supports. The rule
+  now runs on the expression tree: operands are typed from literals,
+  strict Hungarian prefixes, documented builtin return types, and nested
+  operations, and nothing is inferred from assignments. Precedence is
+  honored (`nCount * 2 + sLabel`), a call on the left is typed as one on
+  the right always was (`Upper(sA) + 1`), and `"a" + nCount + "b"`
+  reports once rather than twice. Measured over 6,228 production SSL and
+  data-source files, 3,723 reports became 108; 3,554 of the removed ones
+  were constant-style names typed numeric, and the 68 new ones are
+  prefixed names whose type the assignment record had overridden (#255).
+- **`max_block_depth` follows the indentation a reader sees.** A
+  `:CASE`/`:OTHERWISE` arm counted as a level of its own, so a
+  `:BEGINCASE` cost one level more than an `:IF` whose body sits at the
+  same indentation, and every `:ELSE`/`:CATCH`/`:FINALLY` body of an
+  over-deep block was reported again on top of the block. Branch bodies
+  now sit at the depth of the block they continue and are never reported
+  themselves: one diagnostic per offending block. On the production
+  corpus 3,786 reports became 1,059, with none added (#255).
+- **`negative_logic` requires the negation to govern the whole
+  condition.** `:IF .NOT. bDone .AND. bReady;` is
+  `(.NOT. bDone) .AND. bReady` — unary operators bind tighter than every
+  binary one — so swapping its branches cannot remove the negation the
+  rule asks to drop. The condition is now read from the expression tree
+  (75 of 895 corpus reports) (#255).
+- **`nil_in_operations` no longer double-reports a member call on NIL.**
+  In `1 + NIL:ToString()` the nearest token to the `+` is NIL, but the
+  operand is the member call, which `nil_method_call` already reports.
+  The rule now reads operands from the expression tree and fires only
+  when the operand is the NIL literal itself. Severity stays `warning`;
+  whether a guaranteed runtime failure should be `error` is an open
+  question on #255.
+- **`mixed_error_handling_families` sees a script's own handler.** Each
+  `:PROCEDURE` boundary also closed the top-level span, so a script's
+  `:TRY` before its procedures and its `:ERROR;` handler after them —
+  where the grammar puts a legacy handler — never met. All top-level
+  code is now one span (#255).
+- **`nested_iif` reports each nested call once.** At three or more
+  levels an inner `IIF` was reported once per enclosing `IIF`, as
+  identical diagnostics on one range (#255).
+- **`max_params_warning` is ranged on the procedure name**, not on the
+  start of the `:PROCEDURE` line (#255).
+
+### Changed
+- **Catalog authority now mirrors the style guide record for ten
+  diagnostics**, and stale severity prose left over from the info-tier
+  move is corrected: `me_outside_class` and `mixed_type_operator` are
+  authoritative, `missing_otherwise` and `max_params_warning` advisory,
+  `max_block_depth`, `mixed_error_handling_families`, `negative_logic`,
+  and `nested_iif` style_only, and `nil_in_operations` and
+  `nil_not_empty_string` authoritative. No severity changed (#255).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

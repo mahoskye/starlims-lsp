@@ -322,6 +322,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkDeprecatedKeywords(tokens)...)
 	diagnostics = append(diagnostics, checkNotPreferredOperators(tokens)...)
 	diagnostics = append(diagnostics, checkLiteralTypeSafety(tokens, typeInfo)...)
+	diagnostics = append(diagnostics, checkNilInOperations(tokens, stmtExprs)...)
+	diagnostics = append(diagnostics, checkMixedTypePlus(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
 	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens)...)
 	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens)...)
@@ -333,7 +335,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNameLengths(variables, procedures, opts.HungarianPrefixes)...)
 	diagnostics = append(diagnostics, checkRedeclaredVariables(tokens)...)
 	diagnostics = append(diagnostics, checkNestedIIF(tokens)...)
-	diagnostics = append(diagnostics, checkNegativeLogic(tokens)...)
+	diagnostics = append(diagnostics, checkNegativeLogic(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens)...)
 	diagnostics = append(diagnostics, checkNilMethodCalls(tokens)...)
 
@@ -2340,40 +2342,83 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 }
 
 // checkBlockDepth checks for excessive block nesting depth.
+//
+// Depth counts the blocks opened by a block-start keyword (:PROCEDURE,
+// :IF, :WHILE, :FOR, :BEGINCASE, :TRY, :REGION, :BEGININLINECODE). The
+// parser also opens a block after each middle keyword; those bodies are
+// branches of the block they continue, not new nesting, so they never add
+// a level of their own and are never reported separately:
+//
+//   - an :ELSE / :CATCH / :FINALLY body is a sibling of its :IF / :TRY
+//     body and sits at the same depth — the opening block's report
+//     already covers it;
+//   - a :CASE / :OTHERWISE arm is a child of its :BEGINCASE block and
+//     sits at the :BEGINCASE depth, because an arm body is indented one
+//     level inside :BEGINCASE exactly as an :IF body is inside :IF.
 func checkBlockDepth(ast *parser.Node, maxDepth int) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	var checkNode func(node *parser.Node, depth int)
 	checkNode = func(node *parser.Node, depth int) {
-		if node.Type == parser.NodeBlock && depth > maxDepth {
-			// Guard against invalid line numbers
-			line := node.StartLine - 1
-			if line < 0 {
-				line = 0
+		for i, child := range node.Children {
+			if child.Type != parser.NodeBlock {
+				checkNode(child, depth)
+				continue
 			}
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range: Range{
-					Start: Position{Line: line, Character: 0},
-					End:   Position{Line: line, Character: 0},
-				},
-				Message: fmt.Sprintf("Block nesting depth (%d) exceeds maximum (%d)", depth, maxDepth),
-				Source:  "ssl-lsp",
-				Code:    CodeMaxBlockDepth,
-			})
-		}
 
-		for _, child := range node.Children {
-			newDepth := depth
-			if child.Type == parser.NodeBlock {
-				newDepth++
+			starter := ""
+			if i > 0 {
+				starter = blockStarterKeyword(node.Children[i-1])
 			}
-			checkNode(child, newDepth)
+			childDepth := depth + 1
+			report := true
+			switch starter {
+			case "CASE", "OTHERWISE":
+				childDepth = depth
+				report = false
+			case "ELSE", "CATCH", "FINALLY":
+				report = false
+			}
+
+			if report && childDepth > maxDepth {
+				// Guard against invalid line numbers
+				line := child.StartLine - 1
+				if line < 0 {
+					line = 0
+				}
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityInfo,
+					Range: Range{
+						Start: Position{Line: line, Character: 0},
+						End:   Position{Line: line, Character: 0},
+					},
+					Message: fmt.Sprintf("Block nesting depth (%d) exceeds maximum (%d)", childDepth, maxDepth),
+					Source:  "ssl-lsp",
+					Code:    CodeMaxBlockDepth,
+				})
+			}
+			checkNode(child, childDepth)
 		}
 	}
 
 	checkNode(ast, 0)
 	return diagnostics
+}
+
+// blockStarterKeyword returns the normalized keyword (no colon, upper
+// case) that leads the statement node opening a block, or "" when the
+// node does not start with a keyword.
+func blockStarterKeyword(stmt *parser.Node) string {
+	for _, t := range stmt.Tokens {
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+			continue
+		}
+		if t.Type != lexer.TokenKeyword {
+			return ""
+		}
+		return strings.ToUpper(strings.TrimPrefix(t.Text, ":"))
+	}
+	return ""
 }
 
 func checkHungarianNotation(variables []parser.VariableInfo, prefixes []string) []Diagnostic {
@@ -4081,14 +4126,10 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 				})
 			}
 		case "+", "-", "*", "/":
-			if isNilLiteral(left) || isNilLiteral(right) {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
-					Range:    tokenToRange(token),
-					Message:  "Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first",
-					Source:   "ssl-lsp",
-					Code:     CodeNilInOperations,
-				})
+			// A NIL operand is nil_in_operations' finding
+			// (checkNilInOperations, on the expression tree); `+` is
+			// mixed_type_operator's, also on the tree (checkMixedTypePlus).
+			if isNilLiteral(left) || isNilLiteral(right) || token.Text == "+" {
 				continue
 			}
 
@@ -4097,44 +4138,33 @@ func checkLiteralTypeSafety(tokens []lexer.Token, typeInfo map[string]string) []
 			// pair read as "array - numeric". Same shape in `(-1)`,
 			// `f(a, -1)` and `n := -1`. Only a token that can *end* a
 			// value makes a following sign binary (issue #249). This sits
-			// below the NIL check, which owns `NIL - 1` and reports it
-			// under its own code.
+			// below the NIL skip: `NIL - 1` is nil_in_operations'.
 			if isUnarySignPosition(tokens, token, prevIdx) {
 				continue
 			}
 
 			leftType := inferOperandType(tokens, prevIdx, -1, typeInfo)
 			rightType := inferOperandType(tokens, nextIdx, +1, typeInfo)
-			if leftType != "" && rightType != "" && leftType != rightType {
-				if token.Text == "+" {
-					// + is overloaded: string concatenation or arithmetic
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityWarning,
-						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Mixed types in '+' operation: %s + %s. The '+' operator requires both operands to be the same type (both strings or both numeric)", leftType, rightType),
-						Source:   "ssl-lsp",
-						Code:     CodeMixedTypeOperator,
-					})
-				} else {
-					// -, *, / are arithmetic only
-					if leftType == "string" || rightType == "string" {
-						diagnostics = append(diagnostics, Diagnostic{
-							Severity: SeverityWarning,
-							Range:    tokenToRange(token),
-							Message:  fmt.Sprintf("String in arithmetic operation '%s': %s %s %s. Arithmetic operators require numeric operands", token.Text, leftType, token.Text, rightType),
-							Source:   "ssl-lsp",
-							Code:     CodeArithmeticTypeMismatch,
-						})
-					} else if leftType != "numeric" || rightType != "numeric" {
-						diagnostics = append(diagnostics, Diagnostic{
-							Severity: SeverityWarning,
-							Range:    tokenToRange(token),
-							Message:  fmt.Sprintf("Non-numeric type in arithmetic operation '%s': %s %s %s", token.Text, leftType, token.Text, rightType),
-							Source:   "ssl-lsp",
-							Code:     CodeArithmeticTypeMismatch,
-						})
-					}
-				}
+			if leftType == "" || rightType == "" || leftType == rightType {
+				continue
+			}
+			// -, *, / are arithmetic only
+			if leftType == "string" || rightType == "string" {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(token),
+					Message:  fmt.Sprintf("String in arithmetic operation '%s': %s %s %s. Arithmetic operators require numeric operands", token.Text, leftType, token.Text, rightType),
+					Source:   "ssl-lsp",
+					Code:     CodeArithmeticTypeMismatch,
+				})
+			} else if leftType != "numeric" || rightType != "numeric" {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(token),
+					Message:  fmt.Sprintf("Non-numeric type in arithmetic operation '%s': %s %s %s", token.Text, leftType, token.Text, rightType),
+					Source:   "ssl-lsp",
+					Code:     CodeArithmeticTypeMismatch,
+				})
 			}
 		}
 	}
@@ -4713,39 +4743,54 @@ func checkPublicVariables(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkProcedureParameterCounts warns when procedures exceed the parameter count
-// threshold documented in the style guide.
+// checkProcedureParameterCounts reports procedures whose parameter count
+// exceeds the style guide's recommended maximum (8), with a sharper
+// message past the platform's own warning threshold (20). Both tiers are
+// info severity under one code; the range is the procedure name.
 func checkProcedureParameterCounts(procedures []parser.ProcedureInfo) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	for _, proc := range procedures {
 		count := len(proc.Parameters)
-		if count > 20 {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range: Range{
-					Start: Position{Line: proc.StartLine - 1, Character: 0},
-					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
-				},
-				Message: fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, count),
-				Source:  "ssl-lsp",
-				Code:    CodeMaxParamsWarning,
-			})
-		} else if count > 8 {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityInfo,
-				Range: Range{
-					Start: Position{Line: proc.StartLine - 1, Character: 0},
-					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
-				},
-				Message: fmt.Sprintf("Procedure '%s' has %d parameters; style guide recommends at most 8 per procedure", proc.Name, count),
-				Source:  "ssl-lsp",
-				Code:    CodeMaxParamsWarning,
-			})
+		if count <= 8 {
+			continue
 		}
+		message := fmt.Sprintf("Procedure '%s' has %d parameters; style guide recommends at most 8 per procedure", proc.Name, count)
+		if count > 20 {
+			message = fmt.Sprintf("Procedure '%s' has %d parameters; procedures with more than 20 parameters should be refactored", proc.Name, count)
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityInfo,
+			Range:    procedureNameRange(proc),
+			Message:  message,
+			Source:   "ssl-lsp",
+			Code:     CodeMaxParamsWarning,
+		})
 	}
 
 	return diagnostics
+}
+
+// procedureNameRange ranges over the name token of a :PROCEDURE
+// declaration. When the declaration node is unavailable it falls back to
+// the start of the declaration line.
+func procedureNameRange(proc parser.ProcedureInfo) Range {
+	if proc.Node != nil {
+		sawKeyword := false
+		for _, t := range proc.Node.Tokens {
+			if t.Type == lexer.TokenKeyword && strings.EqualFold(strings.TrimPrefix(t.Text, ":"), "PROCEDURE") {
+				sawKeyword = true
+				continue
+			}
+			if sawKeyword && t.Type == lexer.TokenIdentifier {
+				return tokenToRange(t)
+			}
+		}
+	}
+	return Range{
+		Start: Position{Line: proc.StartLine - 1, Character: 0},
+		End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name)},
+	}
 }
 
 // checkNameLengths warns when variable or procedure names exceed style guide limits.
@@ -5657,6 +5702,8 @@ func checkRedeclaredVariables(tokens []lexer.Token) []Diagnostic {
 // Schema: no_nested_ternaries: true
 func checkNestedIIF(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
+	// An inner IIF is found once per enclosing IIF scan; report it once.
+	reported := make(map[int]bool)
 
 	for i, token := range tokens {
 		if token.Type != lexer.TokenIdentifier {
@@ -5685,7 +5732,8 @@ func checkNestedIIF(tokens []lexer.Token) []Diagnostic {
 			if parenDepth > 0 && tokens[j].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[j].Text, "IIF") {
 				// Check it's a call
 				nIdx := nextSignificantTokenIndex(tokens, j+1)
-				if nIdx >= 0 && tokens[nIdx].Text == "(" {
+				if nIdx >= 0 && tokens[nIdx].Text == "(" && !reported[j] {
+					reported[j] = true
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityInfo,
 						Range:    tokenToRange(tokens[j]),
@@ -5704,8 +5752,9 @@ func checkNestedIIF(tokens []lexer.Token) []Diagnostic {
 // checkNegativeLogic flags :IF blocks with negated conditions that have :ELSE blocks,
 // suggesting the logic be inverted for readability.
 // Schema: prefer_positive_logic: true
-func checkNegativeLogic(tokens []lexer.Token) []Diagnostic {
+func checkNegativeLogic(tokens []lexer.Token, stmts []parser.StatementExprs) []Diagnostic {
 	var diagnostics []Diagnostic
+	conditions := conditionExprsByKeyword(stmts)
 
 	for i, token := range tokens {
 		if token.Type != lexer.TokenKeyword {
@@ -5732,6 +5781,12 @@ func checkNegativeLogic(tokens []lexer.Token) []Diagnostic {
 		}
 
 		if !isNegated {
+			continue
+		}
+		// The negation must govern the whole condition: in
+		// `.NOT. bA .AND. bB` it binds only bA, and swapping the branches
+		// cannot remove it.
+		if !negationGovernsCondition(conditions[i]) {
 			continue
 		}
 
@@ -6259,29 +6314,43 @@ func checkExitCaseAfterReturn(tokens []lexer.Token) []Diagnostic {
 // (diag.mixed_error_handling_families, issue #191): the legacy handler can
 // intercept a raised error before the :CATCH sees it, producing confusing
 // control flow that is rarely intentional. One diagnostic per span, ranged
-// on the first token of whichever family appears later. Tokens outside any
-// :PROCEDURE (top-level script code) are treated as one span of their own.
+// on the first token of whichever family appears later.
+//
+// Each :PROCEDURE ... :ENDPROC is its own span. All top-level script code
+// is one further span, however many procedures sit between its pieces:
+// the grammar puts a script's legacy handler after the statements it
+// protects (Program ::= {Statement} [ErrorHandler]), so a top-level :TRY
+// before the procedures and a top-level :ERROR after them still meet.
 func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	// spanLegacy/spanStructured track the first occurrence of each family
-	// in the current span; -1 means not seen yet.
-	legacyIdx, structuredIdx := -1, -1
-	flush := func() {
-		if legacyIdx >= 0 && structuredIdx >= 0 {
-			later := legacyIdx
-			if structuredIdx > later {
-				later = structuredIdx
-			}
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(tokens[later]),
-				Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure",
-				Source:   "ssl-lsp",
-				Code:     CodeMixedErrorHandlingFamilies,
-			})
+	// span tracks the first occurrence of each family; -1 means not seen.
+	type span struct{ legacy, structured int }
+	newSpan := func() span { return span{-1, -1} }
+	flush := func(sp span) {
+		if sp.legacy < 0 || sp.structured < 0 {
+			return
 		}
-		legacyIdx, structuredIdx = -1, -1
+		later := sp.legacy
+		if sp.structured > later {
+			later = sp.structured
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(tokens[later]),
+			Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure",
+			Source:   "ssl-lsp",
+			Code:     CodeMixedErrorHandlingFamilies,
+		})
+	}
+
+	topLevel, proc := newSpan(), newSpan()
+	inProc := false
+	current := func() *span {
+		if inProc {
+			return &proc
+		}
+		return &topLevel
 	}
 
 	for i, token := range tokens {
@@ -6290,28 +6359,40 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		}
 		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
 		case "PROCEDURE":
-			flush()
+			if inProc {
+				flush(proc)
+			}
+			proc = newSpan()
+			inProc = true
 		case "ENDPROC":
-			flush()
+			if inProc {
+				flush(proc)
+				proc = newSpan()
+			}
+			inProc = false
 		case "ERROR", "RESUME":
 			// Only the marker-statement forms `:ERROR;` / `:RESUME;` are
 			// legacy handlers. `:ERROR` also appears in expression position
 			// (e.g. `LimsString(:ERROR)` inside a :CATCH, corpus-observed) —
 			// that is not the legacy family.
-			if legacyIdx >= 0 {
+			sp := current()
+			if sp.legacy >= 0 {
 				continue
 			}
 			if n := nextSignificantTokenIndex(tokens, i+1); n >= 0 &&
 				tokens[n].Type == lexer.TokenPunctuation && tokens[n].Text == ";" {
-				legacyIdx = i
+				sp.legacy = i
 			}
 		case "TRY", "CATCH":
-			if structuredIdx < 0 {
-				structuredIdx = i
+			if sp := current(); sp.structured < 0 {
+				sp.structured = i
 			}
 		}
 	}
-	flush()
+	if inProc {
+		flush(proc)
+	}
+	flush(topLevel)
 
 	return diagnostics
 }

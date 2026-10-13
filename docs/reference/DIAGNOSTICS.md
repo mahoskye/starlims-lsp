@@ -78,20 +78,20 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `limit_public_vars` | PUBLIC variables discouraged | info | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
 | `loop_in_finally` | LOOP inside a FINALLY block | error | authoritative | active | [diag.loop_in_finally](../../catalog/diagnostics/loop_in_finally.md) |
 | `loop_outside_loop` | :LOOP outside a :WHILE or :FOR loop | error | authoritative | active | [diag.loop_outside_loop](../../catalog/diagnostics/loop_outside_loop.md) |
-| `max_block_depth` | Block nesting exceeds the configured maximum depth | info | advisory | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
-| `max_params_warning` | Procedure has too many parameters | info | style_only | active | [diag.max_params_warning](../../catalog/diagnostics/max_params_warning.md) |
-| `me_outside_class` | Me used outside a class definition | error | tool | active | [diag.me_outside_class](../../catalog/diagnostics/me_outside_class.md) |
+| `max_block_depth` | Block nesting exceeds the configured maximum depth | info | style_only | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |
+| `max_params_warning` | Procedure has too many parameters | info | advisory | active | [diag.max_params_warning](../../catalog/diagnostics/max_params_warning.md) |
+| `me_outside_class` | Me used outside a class definition | error | authoritative | active | [diag.me_outside_class](../../catalog/diagnostics/me_outside_class.md) |
 | `mismatched_block_end` | Block end keyword does not match the open block | error | tool | active | [diag.mismatched_block_end](../../catalog/diagnostics/mismatched_block_end.md) |
 | `mismatched_delimiter` | Closing delimiter does not match the open one | error | tool | active | [diag.mismatched_delimiter](../../catalog/diagnostics/mismatched_delimiter.md) |
-| `missing_otherwise` | BEGINCASE without an OTHERWISE clause | hint | tool | active | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
-| `mixed_error_handling_families` | Legacy :ERROR/:RESUME mixed with :TRY/:CATCH in one procedure | warning | tool | active | [diag.mixed_error_handling_families](../../catalog/diagnostics/mixed_error_handling_families.md) |
-| `mixed_type_operator` | Mixed operand types in a '+' operation | warning | tool | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
+| `missing_otherwise` | BEGINCASE without an OTHERWISE clause | hint | advisory | active | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
+| `mixed_error_handling_families` | Legacy :ERROR/:RESUME mixed with :TRY/:CATCH in one procedure | warning | style_only | active | [diag.mixed_error_handling_families](../../catalog/diagnostics/mixed_error_handling_families.md) |
+| `mixed_type_operator` | Mixed operand types in a '+' operation | warning | authoritative | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
 | `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | warning | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
-| `negative_logic` | Negated IF condition with an ELSE branch | info | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
-| `nested_iif` | IIF call nested inside another IIF call | info | advisory | active | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
-| `nil_in_operations` | NIL literal in an arithmetic or string operation | warning | style_only | active | [diag.nil_in_operations](../../catalog/diagnostics/nil_in_operations.md) |
+| `negative_logic` | Negated IF condition with an ELSE branch | info | style_only | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
+| `nested_iif` | IIF call nested inside another IIF call | info | style_only | active | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
+| `nil_in_operations` | NIL literal in an arithmetic or string operation | warning | authoritative | active | [diag.nil_in_operations](../../catalog/diagnostics/nil_in_operations.md) |
 | `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
-| `nil_not_empty_string` | NIL compared against a default-value literal | info | advisory | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
+| `nil_not_empty_string` | NIL compared against a default-value literal | info | authoritative | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
 | `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
 | `not_preferred_operator` | Discouraged inequality operator form | info | advisory | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |

@@ -3,7 +3,7 @@ id: diag.nested_iif
 title: IIF call nested inside another IIF call
 kind: diagnostic
 status: active
-authority: advisory
+authority: style_only
 schema_ref: lints.style_rules.no_nested_ternaries
 default_severity: info
 config:
@@ -14,6 +14,7 @@ spec_options:
   include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/diagnostics_audit_test.go
 history:
   - date: 2026-03-28
     ref: "commit be7a174"
@@ -23,6 +24,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Each nested IIF is reported once. At three or more levels an inner
+      call had been reported once per enclosing IIF, as identical
+      diagnostics on one range. Authority corrected advisory ->
+      style_only to mirror the style guide record (no_nested_iif).
 issues: []
 ---
 
@@ -41,9 +49,10 @@ It must NOT flag:
   another (`sA := IIF(b1, "x", "y") + IIF(b2, "u", "v");`);
 - other function calls nested inside an `IIF()`.
 
-Note: with three or more nested levels, an inner call is reported once per
-enclosing `IIF` that contains it, so deeply nested chains produce multiple
-diagnostics — the noise is proportional to the offense.
+Each nested call is reported once, however many `IIF` calls enclose it:
+`IIF(a, IIF(b, IIF(c, 1, 2), 3), 4)` produces two diagnostics, one per
+nested call. An `IIF` inside a code block literal (`{|x| IIF(...)}`) is
+not seen — the block is a single opaque token.
 
 ## Examples
 
@@ -71,10 +80,9 @@ sSecond := IIF(bCond2, "C", "D");
 
 ## Rationale
 
-The style guide's lints set `no_nested_ternaries: true` at advisory level.
+The style guide's `no_nested_iif` record (style_only) forbids nesting.
 Nested `IIF()` is legal and sometimes compact, but each level doubles the
 reader's branch tracking; `:BEGINCASE`/`:CASE` or `:IF`/`:ELSE` states the
-same logic linearly. Info severity (one notch above the pure-style hints)
-reflects that nested ternaries measurably hide bugs while still being a
+same logic linearly. Info severity: D13's opt-in advisory tier, for a
 readability rule with no runtime consequence. Pinned in providers_test.go
 (TestGetDiagnostics_NestedIIF*).
