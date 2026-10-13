@@ -54,6 +54,8 @@ It must NOT flag:
 - positional `?` placeholders with a value array
   (`RunSQL("... = ?", "CONN", {sValue})`);
 - named placeholders in `SQLExecute` calls — that is the supported form;
+- a member call such as `oDb:RunSQL(...)`: the object's own method, not
+  the built-in (DECISIONS.md D10);
 - SQL strings that are not the first string argument of a recognized
   positional SQL function (the rule inspects call sites, not free-standing
   strings).
@@ -82,6 +84,15 @@ RunSQL("UPDATE SAMPLES SET STATUS = ?", "CONN", {sStatus});
 
 ```ssl
 aRows := SQLExecute("SELECT ID FROM SAMPLES WHERE STATUS = ?sStatus?");
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE oDb, bOk, sName;
+	bOk := oDb:RunSQL("UPDATE T SET A = ?sName?");
+:ENDPROC;
 ```
 
 ## Rationale

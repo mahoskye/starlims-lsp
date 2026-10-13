@@ -1249,6 +1249,12 @@ func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
 		if !parameterizedFuncs[strings.ToUpper(token.Text)] {
 			continue
 		}
+		// A member call (oDb:RunSQL(...)) is the object's own method, not
+		// the built-in (DECISIONS.md D10).
+		if prev := prevSignificantTokenIndex(tokens, i-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+			continue
+		}
 
 		funcName := token.Text
 
