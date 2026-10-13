@@ -136,7 +136,7 @@ func (s *SSLServer) definitionFileSymbols(defURI string) (string, []parser.Proce
 	tokens := lexer.NewLexer(content).Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
-	return content, p.ExtractProcedures(ast), p.ExtractVariables(ast), true
+	return content, p.ExtractProcedures(ast), p.ExtractVariables(), true
 }
 
 // procedureSubjectAt reports whether the word at the cursor line genuinely

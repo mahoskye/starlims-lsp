@@ -106,7 +106,7 @@ func (dm *DocumentManager) ParseDocument(uri string, version int) *DocumentCache
 		Tokens:     tokens,
 		AST:        ast,
 		Procedures: p.ExtractProcedures(ast),
-		Variables:  p.ExtractVariables(ast),
+		Variables:  p.ExtractVariables(),
 	}
 
 	dm.SetCache(uri, cache)

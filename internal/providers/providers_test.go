@@ -442,7 +442,7 @@ y := localVar;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to localVar in ProcA (line 2)
 	// Should only find references within ProcA, not ProcB
@@ -483,7 +483,7 @@ x := gCounter + 1;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to gCounter (line 1)
 	locations := FindReferencesWithScope(text, 1, 10, "file:///test.ssl", true, procedures, variables)
@@ -516,7 +516,7 @@ y := sName;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to sName in ProcA (line 2)
 	locations := FindReferencesWithScope(text, 2, 13, "file:///test.ssl", true, procedures, variables)
@@ -554,7 +554,7 @@ x := HelperProc();
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to HelperProc (line 1)
 	locations := FindReferencesWithScope(text, 1, 12, "file:///test.ssl", true, procedures, variables)
@@ -999,7 +999,7 @@ func TestGetSignatureHelp_KnownFunction(t *testing.T) {
 	text := `result := Len(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for Len(")
 	}
@@ -1012,7 +1012,7 @@ func TestGetSignatureHelp_ActiveParameter(t *testing.T) {
 	text := `result := SubStr("hello", 1, `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SubStr")
 	}
@@ -1022,7 +1022,7 @@ func TestGetSignatureHelp_ActiveParameter(t *testing.T) {
 }
 
 // [spec feature.signature_help/A4]
-func TestGetSignatureHelpWithProcedures_UserDefinedProcReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_UserDefinedProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE MyCustomProc;
 :PARAMETERS sName, nValue, bFlag;
 :ENDPROC;
@@ -1031,19 +1031,16 @@ result := MyCustomProc(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor inside the call to MyCustomProc
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 24)
+	help := GetSignatureHelpFromTokens(tokens, 5, 24)
 
 	if help != nil {
 		t.Fatal("expected no signature help for direct user-defined procedure call")
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_DirectUserProcActiveParameterReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_DirectUserProcActiveParameterReturnsNil(t *testing.T) {
 	text := `:PROCEDURE Calculate;
 :PARAMETERS nA, nB, nC;
 :ENDPROC;
@@ -1052,19 +1049,16 @@ result := Calculate(1, 2, `
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the second comma (third parameter)
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 26)
+	help := GetSignatureHelpFromTokens(tokens, 5, 26)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_NoParamsReturnsNilForDirectProc(t *testing.T) {
+func TestGetSignatureHelp_NoParamsReturnsNilForDirectProc(t *testing.T) {
 	text := `:PROCEDURE DoSomething;
 :ENDPROC;
 
@@ -1072,19 +1066,16 @@ result := DoSomething(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren (column 23)
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 4, 23)
+	help := GetSignatureHelpFromTokens(tokens, 4, 23)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_BuiltInTakesPrecedence(t *testing.T) {
+func TestGetSignatureHelp_BuiltInTakesPrecedence(t *testing.T) {
 	// Built-in functions should still work and take precedence
 	text := `:PROCEDURE Len;
 :PARAMETERS x;
@@ -1094,12 +1085,9 @@ result := Len(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 15)
+	help := GetSignatureHelpFromTokens(tokens, 5, 15)
 
 	if help == nil {
 		t.Fatal("expected signature help")
@@ -1114,7 +1102,7 @@ result := Len(`
 }
 
 // [spec feature.signature_help/A4]
-func TestGetSignatureHelpWithProcedures_CaseInsensitiveUserProcReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_CaseInsensitiveUserProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE myproc;
 :PARAMETERS sValue;
 :ENDPROC;
@@ -1123,12 +1111,9 @@ result := MYPROC(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 18)
+	help := GetSignatureHelpFromTokens(tokens, 5, 18)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
@@ -1140,15 +1125,15 @@ func tokenizeForSignatureHelp(t *testing.T, text string) []lexer.Token {
 	return lexer.NewLexer(text).Tokenize()
 }
 
-// TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero: immediately
+// TestGetSignatureHelp_OpenParenActiveParamZero: immediately
 // after the opening paren of a built-in call, the signature with its
 // parameter list is returned and activeParameter is 0.
 // [spec feature.signature_help/A1]
-func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
+func TestGetSignatureHelp_OpenParenActiveParamZero(t *testing.T) {
 	text := `result := SQLExecute(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1166,14 +1151,14 @@ func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_ConstructorContext: signature help
+// TestGetSignatureHelp_ConstructorContext: signature help
 // inside `Email{` returns the class's constructor signatures on the wired
 // token-based path (issue #40). [spec feature.signature_help/A8]
-func TestGetSignatureHelpWithProcedures_ConstructorContext(t *testing.T) {
+func TestGetSignatureHelp_ConstructorContext(t *testing.T) {
 	text := `oMail := Email{`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected constructor signature help for Email{")
 	}
@@ -1190,16 +1175,16 @@ func TestGetSignatureHelpWithProcedures_ConstructorContext(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount: commas
+// TestGetSignatureHelp_ArrayLiteralCommasDoNotCount: commas
 // inside an array literal argument belong to the literal, not the enclosing
 // call's parameter index (fixed alongside issue #40's brace handling).
-func TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount(t *testing.T) {
+func TestGetSignatureHelp_ArrayLiteralCommasDoNotCount(t *testing.T) {
 	// Cursor inside the array literal: the enclosing DoProc is at its
 	// second argument (one top-level comma), not its fourth.
 	text := `DoProc("Calc", {1, 2, `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		// DoProc is a built-in dispatch function with a signature.
 		t.Fatal("expected signature help for DoProc")
@@ -1209,16 +1194,16 @@ func TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount(t *testing.
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_TopLevelCommasOnly: activeParameter
+// TestGetSignatureHelp_TopLevelCommasOnly: activeParameter
 // counts top-level commas only — commas inside string literals must not
 // advance it, and it stays put while typing within an argument.
 // [spec feature.signature_help/A2]
-func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
+func TestGetSignatureHelp_TopLevelCommasOnly(t *testing.T) {
 	// One top-level comma; the commas inside the SQL string don't count.
 	text := `result := SQLExecute("SELECT a, b, c FROM t", `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1230,7 +1215,7 @@ func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
 	text2 := `result := SQLExecute("SELECT a, b, c FROM t", sName`
 	tokens2 := tokenizeForSignatureHelp(t, text2)
 
-	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(text2)+1)
+	help2 := GetSignatureHelpFromTokens(tokens2, 1, len(text2)+1)
 	if help2 == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1239,14 +1224,14 @@ func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_NestedCallsInnermost: inside nested
+// TestGetSignatureHelp_NestedCallsInnermost: inside nested
 // calls the innermost enclosing call's signature is shown; once the inner
 // call closes, the outer one is. [spec feature.signature_help/A3]
-func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
+func TestGetSignatureHelp_NestedCallsInnermost(t *testing.T) {
 	inner := `result := Upper(AllTrim(`
 	tokens := tokenizeForSignatureHelp(t, inner)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(inner)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(inner)+1)
 	if help == nil {
 		t.Fatal("expected signature help inside AllTrim(")
 	}
@@ -1257,7 +1242,7 @@ func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
 	outer := `result := Upper(AllTrim(sValue)`
 	tokens2 := tokenizeForSignatureHelp(t, outer)
 
-	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(outer)+1)
+	help2 := GetSignatureHelpFromTokens(tokens2, 1, len(outer)+1)
 	if help2 == nil {
 		t.Fatal("expected signature help after inner call closed")
 	}
@@ -1266,26 +1251,26 @@ func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil: names not in
+// TestGetSignatureHelp_UnknownFunctionReturnsNil: names not in
 // the built-in inventory produce no signature help.
 // [spec feature.signature_help/A5]
-func TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_UnknownFunctionReturnsNil(t *testing.T) {
 	text := `result := NotARealFunction(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+	if help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1); help != nil {
 		t.Fatalf("expected no signature help for unknown function, got %+v", help)
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil: positions outside
+// TestGetSignatureHelp_OutsideCallReturnsNil: positions outside
 // any call's argument list produce no signature help.
 // [spec feature.signature_help/A7]
-func TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_OutsideCallReturnsNil(t *testing.T) {
 	text := `x := 5;`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+	if help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1); help != nil {
 		t.Fatalf("expected no signature help outside a call, got %+v", help)
 	}
 }

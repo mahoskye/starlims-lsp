@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+An audit of inherited and legacy behavior (#257). Every compatibility
+shim, alias, fallback, and setting was traced to its origin and its
+consumers, and given a decision. The full record is in
+`docs/reviews/legacy-inventory.md`. No setting, CLI flag, diagnostic
+code, or output format changes for either distribution.
+
+### Fixed
+- **Hover and completion no longer call `:REGION` and `:BEGININLINECODE`
+  "legacy".** Both are current, supported SSL (bodies stored for
+  `GetRegion()` / `GetInlineCode()`). #28 settled that when it removed
+  `region_legacy`, but four keyword descriptions still said otherwise.
+  So did several docs, including one that still claimed the LSP emits an
+  info diagnostic for `:REGION`.
+- **CONFIGURATION.md matches the server.** `builtinFunctionCase` defaults
+  to `"PascalCase"`, not `"preserve"`. `endpointPatterns` are
+  case-insensitive substrings, not globs (the old example could never
+  match). `max_block_depth` is info-tier, not a warning. `unusedVariables`
+  is a client setting. `signatureHelp.autoTrigger` applies only at
+  startup. Section 10 now maps the VS Code extension's setting names to
+  server keys instead of presenting server keys as VS Code settings, and
+  Appendix A lists all settings.
+- `diag.deprecated_keyword` catalog frontmatter: `authority: style_only`,
+  `schema_ref: lints.deprecated_keywords`. The style guide owns the rule
+  now. Behavior and warning severity are unchanged.
+
+### Removed
+- **Dead internals, no behavior change.** Removed: the unread `root`
+  argument of `Parser.ExtractVariables`; the unread `procedures` argument
+  of `GetSignatureHelpWithProcedures`, which is folded into
+  `GetSignatureHelpFromTokens`; and `style != "compact"` guards that
+  could no longer be false after `compact` became an alias.
+- **43 unreachable curated function signatures** (TraceOn, In64BitMode,
+  UndeclaredVars, …) for names absent from the published inventory. The
+  overlay is read only for published names, so they never reached hover,
+  signature help, or `--export-signatures`, whose output is
+  byte-identical. The map is renamed `curatedFunctionSignatures`, and a
+  test now rejects unreachable entries.
+
+### Deprecated
+- **`ssl.format.sql.style: "compact"`** was already a deprecated alias
+  for `canonicalCompact` (#219). It now has a removal plan. First the VS
+  Code extension drops it from its enum and migrates stored values. Then
+  the next LSP minor release removes the alias. Nothing changes in this
+  release. `--format` callers are unaffected: the CLI cannot select a SQL
+  style.
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

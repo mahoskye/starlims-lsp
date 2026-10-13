@@ -14,7 +14,7 @@ func parseText(text string) ([]parser.ProcedureInfo, []parser.VariableInfo) {
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
-	return p.ExtractProcedures(ast), p.ExtractVariables(ast)
+	return p.ExtractProcedures(ast), p.ExtractVariables()
 }
 
 // ==================== PrepareRename Tests ====================

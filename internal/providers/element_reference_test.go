@@ -96,7 +96,7 @@ func TestConstructorSignatureHelp(t *testing.T) {
 	// Cursor inside `Email{|` — exercised on the wired token-based path
 	// (the text-based GetSignatureHelp entry point was deleted, issue #40).
 	tokens := lexer.NewLexer("oEmail := Email{").Tokenize()
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, 17)
+	help := GetSignatureHelpFromTokens(tokens, 1, 17)
 	if help == nil {
 		t.Fatal("expected signature help inside Email{ ..., got nil")
 	}

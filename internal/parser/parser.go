@@ -489,13 +489,14 @@ func (p *Parser) findProcedureEndLine(parent *Node, procedureStmt *Node) int {
 	return procedureStmt.EndLine
 }
 
-// ExtractVariables extracts all declared variables. The root argument is
-// retained for API compatibility and no longer read: declarations are
+// ExtractVariables extracts all declared variables. Declarations are
 // resolved from the token stream statement by statement
 // (CollectDeclarations, issue #184), because the AST-node walk this
 // replaced grouped tokens by line and lost every name of a declaration
-// written as a bare `:DECLARE` followed by its names on later lines.
-func (p *Parser) ExtractVariables(root *Node) []VariableInfo {
+// written as a bare `:DECLARE` followed by its names on later lines. It
+// takes no AST: the root parameter the walk needed was removed once
+// nothing read it (issue #257).
+func (p *Parser) ExtractVariables() []VariableInfo {
 	var variables []VariableInfo
 	for _, decl := range CollectDeclarations(p.tokens) {
 		variables = append(variables, decl.Names...)

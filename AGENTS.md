@@ -71,7 +71,7 @@ All SSL keywords must be prefixed with `:` and written in UPPERCASE:
 :CLASS ClassName;
 :INHERIT BaseClass;
 
-/* Legacy functional text blocks;
+/* Named text and inline-code blocks (stored for GetRegion / GetInlineCode);
 :REGION RegionName;
 :ENDREGION;
 :BEGININLINECODE BlockName;

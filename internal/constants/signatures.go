@@ -19,9 +19,14 @@ type FunctionSignature struct {
 	Parameters  []FunctionParameter
 }
 
-// legacySSLFunctionSignatures maps historical function names (lowercase) to signatures.
-// The public SSLFunctionSignatures map is the canonical inventory in canonical.go.
-var legacySSLFunctionSignatures = map[string]FunctionSignature{
+// curatedFunctionSignatures maps function names (lowercase) to hand-curated
+// signatures with per-parameter descriptions. It is an overlay, not an
+// inventory: buildCanonicalFunctionSignatures (canonical.go) reads it only
+// for names in the published inventory (SSLFunctionNames), so an entry
+// whose name is not published is unreachable. Entries for functions absent
+// from the published reference were pruned for that reason (issue #257);
+// do not add one back without the function first entering the inventory.
+var curatedFunctionSignatures = map[string]FunctionSignature{
 	"aadd": {
 		Name: "aadd", Description: "Appends an element to an array and returns the appended element.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -55,13 +60,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "o", Type: "object", Required: true, Description: "Object to which properties will be added."},
 			{Name: "propName", Type: "variant", Required: true, Description: "Name of the property to be added to an object."},
-		},
-	},
-	"addtoapplication": {
-		Name: "AddToApplication", Description: "Stub function that always returns null. Does not actually store data.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "key", Type: "string", Required: true, Description: "Unique identifier for the data being added to the application."},
-			{Name: "value", Type: "variant", Required: true, Description: "Value to add to the application under the specified key."},
 		},
 	},
 	"addtosession": {
@@ -174,10 +172,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "isoLevel", Type: "variant", Required: true, Description: "Specifies the isolation level for the database transaction. If null or empty, uses the default isolation level from GlobalSettings.SqlDefaultIsolationLevel."},
 		},
 	},
-	"break": {
-		Name: "Break", Description: "Triggers a debugger break and returns null.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
 	"buildarray": {
 		Name: "buildarray", Description: "Converts a string into an array based on specified delimiters and options, returning the resulting array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
@@ -219,12 +213,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "BuildStringForIn", Description: "Converts an array to a string suitable for SQL IN clause, returning a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "target", Type: "array", Required: true, Description: "An array containing the elements that will be converted into a string format suitable for use in an SQL IN clause."},
-		},
-	},
-	"callbuiltinfunction": {
-		Name: "CallBuiltInFunction", Description: "Calls a parameterless built-in SSL function by name and returns its result.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "functionName", Type: "string", Required: true, Description: "Name of the built-in function to be called."},
 		},
 	},
 	"checkonftp": {
@@ -954,13 +942,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "cacheCode", Type: "boolean", Required: false, Description: "CacheCode indicates whether to cache the generated code for performance improvement."},
 		},
 	},
-	"executedatasource": {
-		Name: "ExecuteDataSource", Description: "Executes a data source by name and returns its result as a variant.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "dsName", Type: "string", Required: true, Description: "Data source name to execute."},
-			{Name: "parameters", Type: "object[]", Required: true, Description: "An array of objects representing the parameters to pass to the data source."},
-		},
-	},
 	"extractcol": {
 		Name: "extractcol", Description: "Extracts a specified column from a 2D array and returns it as a new array.", ReturnType: "array",
 		Parameters: []FunctionParameter{
@@ -1011,12 +992,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "xml", Type: "string", Required: true, Description: "A string containing XML data that will be parsed and converted into an SSLValue object."},
 		},
 	},
-	"getallclientscripts": {
-		Name: "GetAllClientScripts", Description: "Returns a string containing all client scripts for a given encoded XFD.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "encodedXFD", Type: "string", Required: true, Description: "Encoded XFD string that identifies the client scripts to retrieve."},
-		},
-	},
 	"getappbasefolder": {
 		Name: "GetAppBaseFolder", Description: "Returns the base folder path of the application as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{},
@@ -1029,12 +1004,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "GetByName", Description: "Returns a variant by name from the local context.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
 			{Name: "name", Type: "string", Required: true, Description: "Variable name whose value is being retrieved."},
-		},
-	},
-	"getclientscriptreferences": {
-		Name: "GetClientScriptReferences", Description: "Computes and returns a list of client script references from the provided code.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "csCode", Type: "variant", Required: true, Description: "A string containing client script code from which references will be extracted and returned as an array of client script IDs."},
 		},
 	},
 	"getconnectionbyname": {
@@ -1166,33 +1135,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "dsName", Type: "string", Required: true, Description: "Identifier for the dataset whose parameters are to be retrieved."},
 		},
 	},
-	"getexecutiontrace": {
-		Name: "GetExecutionTrace", Description: "Returns a string containing the execution trace of the current thread's call stack.", ReturnType: "string",
-		Parameters: []FunctionParameter{},
-	},
-	"getfeaturesandnumbers": {
-		Name: "GetFeaturesAndNumbers", Description: "Returns an array of feature IDs and their corresponding license counts.", ReturnType: "array",
-		Parameters: []FunctionParameter{},
-	},
 	"getfileversion": {
 		Name: "GetFileVersion", Description: "Returns the file version as a string for the specified file name.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "fileName", Type: "string", Required: true, Description: "Path to the file for which the version information is to be retrieved."},
-		},
-	},
-	"getforbiddenappids": {
-		Name: "GetForbiddenAppIDs", Description: "Returns a string containing IDs of forbidden applications.", ReturnType: "string",
-		Parameters: []FunctionParameter{},
-	},
-	"getforbiddendesignerappids": {
-		Name: "GetForbiddenDesignerAppIDs", Description: "Returns a string of forbidden designer application IDs.", ReturnType: "string",
-		Parameters: []FunctionParameter{},
-	},
-	"getformreferences": {
-		Name: "GetFormReferences", Description: "Returns a list of client script references from an XFD document.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "formId", Type: "variant", Required: true, Description: "FormId identifies the form for which references are being retrieved. Must be a non-empty string."},
-			{Name: "xfdDocument", Type: "variant", Required: true, Description: "Represents the XML-formatted document containing form references. Must be a non-empty string."},
 		},
 	},
 	"getfromapplication": {
@@ -1233,10 +1179,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "variables", Type: "array", Required: true, Description: "An array containing variables that can be referenced within the inline code."},
 		},
 	},
-	"getinstallationkey": {
-		Name: "GetInstallationKey", Description: "Returns the installation key as a string.", ReturnType: "string",
-		Parameters: []FunctionParameter{},
-	},
 	"getinternal": {
 		Name: "GetInternal", Description: "Retrieves a property value from an object and returns it as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -1265,12 +1207,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "GetLastSSLError", Description: "Returns the last SSL error encountered as an sslerror object.", ReturnType: "sslerror",
 		Parameters: []FunctionParameter{},
 	},
-	"getlicenseinfoastext": {
-		Name: "GetLicenseInfoAsText", Description: "Returns license information as a text string in HTML format if specified.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "bHtml", Type: "boolean", Required: true, Description: "BHtml determines whether the license information is returned in HTML format or plain text."},
-		},
-	},
 	"getlogsfolder": {
 		Name: "GetLogsFolder", Description: "Returns the path to the logs folder as a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{},
@@ -1291,18 +1227,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "connectionName", Type: "variant", Required: true, Description: "Specifies the database connection to use for retrieving data without locking."},
 		},
-	},
-	"getnumberofinstrumentconnections": {
-		Name: "GetNumberOfInstrumentConnections", Description: "Returns the number of instrument connections as a double.", ReturnType: "double",
-		Parameters: []FunctionParameter{},
-	},
-	"getnumberofnamedconcurrentusers": {
-		Name: "GetNumberOfNamedConcurrentUsers", Description: "Returns the number of named concurrent users as a double.", ReturnType: "double",
-		Parameters: []FunctionParameter{},
-	},
-	"getnumberofnamedusers": {
-		Name: "GetNumberOfNamedUsers", Description: "Returns the number of named users as a double.", ReturnType: "double",
-		Parameters: []FunctionParameter{},
 	},
 	"getprinters": {
 		Name: "GetPrinters", Description: "Returns a list of available printers as a variant.", ReturnType: "variant",
@@ -1422,10 +1346,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "falseValue", Type: "variant", Required: true, Description: "To return when the condition is false."},
 		},
 	},
-	"in64bitmode": {
-		Name: "In64BitMode", Description: "Determines if the system is running in 64-bit mode and returns a boolean value.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
 	"inbatchprocess": {
 		Name: "InBatchProcess", Description: "Determines if the current process is running in a batch mode and returns a boolean value.", ReturnType: "variant",
 		Parameters: []FunctionParameter{},
@@ -1454,20 +1374,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Parameters: []FunctionParameter{
 			{Name: "varName", Type: "string", Required: true, Description: "String containing the name of the variable to check for existence."},
 		},
-	},
-	"isdemolicense": {
-		Name: "IsDemoLicense", Description: "Determines if the current license is a demo version and returns `true` if it is.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{},
-	},
-	"isfeatureauthorized": {
-		Name: "IsFeatureAuthorized", Description: "Validates if a feature is authorized based on application GUID and returns a boolean.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "appGuid", Type: "string", Required: true, Description: "A string containing application GUIDs used to check feature authorization."},
-		},
-	},
-	"isfeaturebasedlicense": {
-		Name: "IsFeatureBasedLicense", Description: "Determines if the license is feature-based and returns a boolean value.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{},
 	},
 	"isguid": {
 		Name: "IsGuid", Description: "Validates whether a string is a valid GUID and returns a boolean result.", ReturnType: "boolean",
@@ -1600,10 +1506,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "offset", Type: "double", Required: true, Description: "Specifies the starting position within the source string from which to begin searching for the substring."},
 		},
 	},
-	"limscleanup": {
-		Name: "LimsCleanup", Description: "Returns null without performing any actual cleanup operations (stub function).", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
 	"limsdate": {
 		Name: "LIMSDate", Description: "Converts a date to a formatted string. Returns a string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
@@ -1725,12 +1627,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "source", Type: "string", Required: true, Description: "String that will be converted to lowercase."},
 		},
 	},
-	"lprint": {
-		Name: "LPrint", Description: "Writes a line of text to the report output and returns null.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "source", Type: "string", Required: true, Description: "String to be printed or logged."},
-		},
-	},
 	"lsearch": {
 		Name: "LSearch", Description: "Computes a search based on a command string and returns the result as a variant.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -1850,32 +1746,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "value2", Type: "variant", Required: true, Description: "Second value to compare and return the maximum of."},
 		},
 	},
-	"mergeglobalresources": {
-		Name: "MergeGlobalResources", Description: "Merges global resources for a specified language and returns a boolean indicating success.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "packageRes", Type: "string", Required: true, Description: "String representing the resource package to merge."},
-			{Name: "language", Type: "string", Required: true, Description: "Specifies the language for merging global resources."},
-		},
-	},
-	"mergehtmlform": {
-		Name: "MergeHtmlForm", Description: "Merges HTML form data into a single string based on provided parameters and returns it as a variant.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "formId", Type: "variant", Required: true, Description: "Unique identifier for the HTML form to be merged."},
-			{Name: "langId", Type: "variant", Required: true, Description: "Language identifier for the HTML form being merged."},
-			{Name: "formDefinition", Type: "variant", Required: true, Description: "HTML form definition to be merged."},
-			{Name: "formType", Type: "variant", Required: true, Description: "Type of HTML form to be merged, such as \"sample\" or \"analysis\"."},
-			{Name: "formFullName", Type: "variant", Required: true, Description: "Full name or type of the form, which is used to determine the form's type and resources during processing."},
-			{Name: "offlineMode", Type: "variant", Required: false, Description: "A boolean parameter that indicates whether the form should be processed in offline mode."},
-		},
-	},
-	"mergexfd": {
-		Name: "MergeXfd", Description: "Merges XFD documents into a single document and returns it as a string.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "formId", Type: "variant", Required: true, Description: "FormId identifies the form whose XFD document is being merged."},
-			{Name: "langId", Type: "string", Required: true, Description: "Specifies the language identifier for merging resources in an XFD document."},
-			{Name: "xfdDocument", Type: "string", Required: true, Description: "A string containing the XML-format document to be merged."},
-		},
-	},
 	"mimedecode": {
 		Name: "MimeDecode", Description: "Converts a MIME-encoded string back to its original form and returns it as a string.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -1923,10 +1793,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "privateKeyFilePath", Type: "string", Required: true, Description: "Path to the private key file used for SFTP operations."},
 		},
 	},
-	"netframeworkversion": {
-		Name: "NetFrameworkVersion", Description: "Returns the version of the .NET Framework as a string.", ReturnType: "string",
-		Parameters: []FunctionParameter{},
-	},
 	"noofdays": {
 		Name: "NoOfDays", Description: "Computes the number of days in a given month and returns it as a double.", ReturnType: "double",
 		Parameters: []FunctionParameter{
@@ -1950,29 +1816,9 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "itemType", Type: "variant", Required: true, Description: "Specifies the data type for elements in the array being prepared, such as \"string\", \"numeric\", or \"date\". Defaults to \"string\" if not provided."},
 		},
 	},
-	"prepareform": {
-		Name: "PrepareForm", Description: "Returns a new form ID based on encoded XFD and provided new ID.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "encodedXFD", Type: "string", Required: true, Description: "EncodedXFD contains the encoded form definition data to be prepared."},
-			{Name: "newId", Type: "string", Required: true, Description: "Unique identifier for the form being prepared."},
-		},
-	},
-	"prepareformclientscript": {
-		Name: "PrepareFormClientScript", Description: "Converts encoded XFD and client script pairs into a form client script. Returns a string.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "encodedXFD", Type: "string", Required: true, Description: "A string that represents the encoded XML Form Definition (XFD) used to prepare the client script."},
-			{Name: "stringOfClientScriptPairs", Type: "string", Required: true, Description: "String of client script pairs that defines the scripts to be executed on the client side."},
-		},
-	},
 	"prmcount": {
 		Name: "PrmCount", Description: "Returns the number of parameters in the current procedure as a double.", ReturnType: "variant",
 		Parameters: []FunctionParameter{},
-	},
-	"processxfdformforimport": {
-		Name: "ProcessXfdFormForImport", Description: "Converts import settings to XFD format and returns a variant object.", ReturnType: "variant",
-		Parameters: []FunctionParameter{
-			{Name: "settings", Type: "variant", Required: true, Description: "An object containing configuration settings for processing XFD forms, including package and dictionary XFD values, mode of operation, and overwrite transaction settings."},
-		},
 	},
 	"raiseerror": {
 		Name: "RaiseError", Description: "Raises a custom SSL error with a message and optional details. Always throws an exception.", ReturnType: "boolean",
@@ -2054,14 +1900,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "source", Type: "string", Required: true, Description: "String that will be repeated multiple times."},
 			{Name: "count", Type: "double", Required: true, Description: "Number of times the source string should be repeated."},
 		},
-	},
-	"resetapplication": {
-		Name: "ResetApplication", Description: "Resets the application and returns null.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
-	"resetfeatures": {
-		Name: "ResetFeatures", Description: "Resets system features and returns true on success.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{},
 	},
 	"retrievelong": {
 		Name: "RetrieveLong", Description: "Retrieves a long integer from the database and saves it to a file. Returns `true` on success.", ReturnType: "boolean",
@@ -2255,12 +2093,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 		Name: "ServerTimeZone", Description: "Returns the server's time zone offset from UTC in minutes.", ReturnType: "double",
 		Parameters: []FunctionParameter{},
 	},
-	"setampm": {
-		Name: "SetAmPm", Description: "Sets or retrieves the AM/PM format flag for date and time values; returns a boolean indicating the current setting.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "flag", Type: "boolean", Required: false, Description: "Indicates whether to set the time format to AM/PM."},
-		},
-	},
 	"setbyname": {
 		Name: "SetByName", Description: "Sets a variable by name and returns the new value.", ReturnType: "variant",
 		Parameters: []FunctionParameter{
@@ -2306,28 +2138,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "arg4", Type: "variant", Required: true, Description: "Fourth index value to set in the specified collection within the object."},
 			{Name: "arg5", Type: "variant", Required: true, Description: "Fifth value to set in the nested structure."},
 			{Name: "arg6", Type: "variant", Required: true, Description: "Value to set at the specified index in the collection."},
-		},
-	},
-	"setlocationoracle": {
-		Name: "SetLocationOracle", Description: "Sets Oracle location for reporting and returns a string result.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "file", Type: "string", Required: true, Description: "Path to the file."},
-			{Name: "server", Type: "string", Required: true, Description: "Represents the hostname or IP address of the Oracle database server."},
-			{Name: "user", Type: "string", Required: true, Description: "Username used for authentication with the Oracle server."},
-			{Name: "password", Type: "string", Required: true, Description: "Represents the user's password for accessing an Oracle database location."},
-			{Name: "encrypted", Type: "boolean", Required: true, Description: "Indicates whether the connection to the Oracle server should be made using encryption."},
-		},
-	},
-	"setlocationsqlserver": {
-		Name: "SetLocationSQLServer", Description: "Sets SQL Server location for a file and returns a string indicating success or failure.", ReturnType: "string",
-		Parameters: []FunctionParameter{
-			{Name: "file", Type: "string", Required: true, Description: "Path to the file being processed."},
-			{Name: "server", Type: "string", Required: true, Description: "Specifies the SQL Server instance where the database is located."},
-			{Name: "database", Type: "string", Required: true, Description: "Specifies the name of the SQL Server database where the data is stored."},
-			{Name: "owner", Type: "string", Required: true, Description: "Specifies the owner of the SQL Server location being set."},
-			{Name: "user", Type: "string", Required: true, Description: "Username used to authenticate with the SQL Server database."},
-			{Name: "password", Type: "string", Required: true, Description: "Password for authenticating with the SQL Server database."},
-			{Name: "encrypted", Type: "boolean", Required: true, Description: "Indicates whether the connection to the SQL Server should be encrypted."},
 		},
 	},
 	"setsqltimeout": {
@@ -2391,23 +2201,11 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "statement", Type: "variant", Required: true, Description: "SQL query or statement from which comments will be removed."},
 		},
 	},
-	"sqltraceoff": {
-		Name: "SqlTraceOff", Description: "Disables SQL tracing and returns a boolean indicating success or failure.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
-	"sqltraceon": {
-		Name: "SqlTraceOn", Description: "Enables SQL tracing and returns a boolean indicating success.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
 	"sqrt": {
 		Name: "Sqrt", Description: "Computes and returns the square root of a given number as a double.", ReturnType: "double",
 		Parameters: []FunctionParameter{
 			{Name: "number", Type: "double", Required: true, Description: "For which the square root is to be calculated."},
 		},
-	},
-	"stationname": {
-		Name: "StationName", Description: "Returns the name of the current station as a string.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
 	},
 	"stdround": {
 		Name: "StdRound", Description: "Rounds a number to a specified number of decimal places and returns the result as a string.", ReturnType: "string",
@@ -2481,24 +2279,6 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "length", Type: "double", Required: true, Description: "Specifies the number of characters to extract from the source string, starting at the specified position."},
 		},
 	},
-	"syncdesignresources": {
-		Name: "SyncDesignResources", Description: "Synchronizes design resources for a given XFD document and optionally updates translations, returning a boolean indicating success.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "formID", Type: "string", Required: true, Description: "FormID string specifies the identifier for the design resource to synchronize."},
-			{Name: "languageID", Type: "string", Required: true, Description: "LanguageID specifies the language for which design resources should be synchronized."},
-			{Name: "xfdDocument", Type: "string", Required: true, Description: "XML document containing design resources to synchronize."},
-			{Name: "translationOnly", Type: "boolean", Required: false, Description: "Indicates whether to perform a translation-only synchronization."},
-		},
-	},
-	"syncprogramaticresources": {
-		Name: "SyncProgramaticResources", Description: "Syncs programmatic resources based on form and language IDs, returning a boolean success status.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "formID", Type: "string", Required: true, Description: "Unique identifier for a form in STARLIMS, which is used to synchronize programmatic resources."},
-			{Name: "languageID", Type: "string", Required: true, Description: "Language identifier for the resources being synchronized."},
-			{Name: "resourceDocument", Type: "string", Required: true, Description: "Document containing programmatic resources to synchronize."},
-			{Name: "translationOnly", Type: "boolean", Required: false, Description: "TranslationOnly determines whether to perform a translation-only synchronization."},
-		},
-	},
 	"tablefldlst": {
 		Name: "TableFldLst", Description: "Returns an array of field names for a specified table in STARLIMS.", ReturnType: "array",
 		Parameters: []FunctionParameter{
@@ -2541,33 +2321,10 @@ var legacySSLFunctionSignatures = map[string]FunctionSignature{
 			{Name: "typeName", Type: "string", Required: true, Description: "TypeName specifies the type of XML schema to use for serialization."},
 		},
 	},
-	"traceoff": {
-		Name: "TraceOff", Description: "Disables process tracing and returns a boolean indicating success.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
-	"traceon": {
-		Name: "TraceOn", Description: "Enables tracing and returns a boolean indicating success or failure.", ReturnType: "variant",
-		Parameters: []FunctionParameter{},
-	},
 	"trim": {
 		Name: "Trim", Description: "Returns a new string with leading and trailing whitespace removed from the source string.", ReturnType: "string",
 		Parameters: []FunctionParameter{
 			{Name: "source", Type: "string", Required: true, Description: "String from which leading and trailing whitespace will be removed."},
-		},
-	},
-	"tryconnect": {
-		Name: "TryConnect", Description: "Attempts to establish a connection and returns a double indicating success or failure.", ReturnType: "double",
-		Parameters: []FunctionParameter{
-			{Name: "userName", Type: "string", Required: true, Description: "Username used for authentication in a connection attempt."},
-			{Name: "utcOffset", Type: "double", Required: true, Description: "Difference in hours between Coordinated Universal Time (UTC) and the local time zone, used to adjust timestamps for accurate synchronization across different geographical locations."},
-			{Name: "userType", Type: "string", Required: true, Description: "Type of user attempting to connect, such as \"admin\" or \"guest\"."},
-			{Name: "platforma", Type: "string", Required: true, Description: "Platform identifier used in the connection attempt."},
-		},
-	},
-	"undeclaredvars": {
-		Name: "UndeclaredVars", Description: "Sets whether undeclared variables are allowed and returns the previous setting as a boolean.", ReturnType: "boolean",
-		Parameters: []FunctionParameter{
-			{Name: "allowUndeclaredVars", Type: "boolean", Required: true, Description: "AllowUndeclaredVars determines whether undeclared variables are allowed in the script."},
 		},
 	},
 	"updlong": {

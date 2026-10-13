@@ -112,8 +112,9 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 		}
 	}
 
-	// Step 3: Fallback. Without procedure info there is no scope to respect,
-	// so any match wins (backward compatibility). With procedure info, only
+	// Step 3: Fallback. Without procedure info — a script with no
+	// :PROCEDURE blocks, where ExtractProcedures returns nil — there is no
+	// scope to respect, so any match wins. With procedure info, only
 	// file-level declarations qualify — another procedure's local is out of
 	// scope at the cursor and must not be surfaced (issue #41).
 	for _, v := range variables {

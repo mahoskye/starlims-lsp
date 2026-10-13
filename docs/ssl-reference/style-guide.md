@@ -286,7 +286,7 @@ Place `/*@private;` or `/*@protected;` on its own line immediately before `:PROC
 ### Code Organization
 
 - Prefer comment regions (`/* region ...;` / `/* endregion;`) for editor grouping
-- Treat `:REGION` / `:ENDREGION` as legacy functional text-capture constructs (body text stored for runtime retrieval via `GetRegion(sValue, vSrc, vDst)`), not formatting aids
+- Treat `:REGION` / `:ENDREGION` as functional text-capture constructs (body text stored for runtime retrieval via `GetRegion(sValue, vSrc, vDst)`), not formatting aids
 
 ---
 

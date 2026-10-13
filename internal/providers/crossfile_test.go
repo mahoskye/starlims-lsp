@@ -271,7 +271,7 @@ x := oObj:Unknown;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Augmented property: use on line 5 -> assignment on line 4 (0-based 3).
 	locs := FindDefinitionCrossFile(text, tokens, 5, 15, "file:///self.ssl", procedures, variables, nil)

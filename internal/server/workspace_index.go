@@ -267,7 +267,7 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 		HasLayoutAnchor: anchored,
 		EntryParameters: entryParams,
 		EntryParamsLine: entryLine,
-		DeclaredVars:    dedupeVariableNames(p.ExtractVariables(ast)),
+		DeclaredVars:    dedupeVariableNames(p.ExtractVariables()),
 		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
 		CallSites:       indexedCallSites(providers.ExtractCallSites(tokens)),
 	}

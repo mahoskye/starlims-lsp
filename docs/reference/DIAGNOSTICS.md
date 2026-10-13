@@ -42,7 +42,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |
 | `default_on_declare_line` | :DEFAULT on the same line as :DECLARE | error | tool | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |
-| `deprecated_keyword` | Legacy keyword discouraged in new code | warning | tool | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
+| `deprecated_keyword` | Legacy keyword discouraged in new code | warning | style_only | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
 | `direct_procedure_call` | Procedure called directly instead of via DoProc/ExecFunction | error | tool | active | [diag.direct_procedure_call](../../catalog/diagnostics/direct_procedure_call.md) |
 | `dollar_string_only` | $ containment operator with non-string operands | warning | style_only | active | [diag.dollar_string_only](../../catalog/diagnostics/dollar_string_only.md) |
 | `doproc_in_class` | DoProc call inside a class method | error | authoritative | active | [diag.doproc_in_class](../../catalog/diagnostics/doproc_in_class.md) |

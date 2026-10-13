@@ -271,7 +271,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 		diagnostics = append(diagnostics, checkBlockDepth(ast, opts.MaxBlockDepth)...)
 	}
 
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	typeInfo := buildSimpleTypeInfo(tokens, variables)
 
 	// Expression-AST consumers (issue #184): the statement trees and the
@@ -344,7 +344,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	// Check for undeclared variable usage (opt-in)
 	if opts.CheckUndeclaredVars {
-		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, ast, p, opts.GlobalVariables, opts.IncludeDeclaredVariables, opts.IsEndpointFile)...)
+		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, p, opts.GlobalVariables, opts.IncludeDeclaredVariables, opts.IsEndpointFile)...)
 	}
 
 	// Check for unused variable declarations (opt-in)
@@ -5193,12 +5193,12 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 //   - Issue #56: :INCLUDE paths should be skipped from checking
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
-func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
+func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	// Build set of declared variables from the AST
+	// Build set of declared variables from the token stream
 	declaredVars := make(map[string]bool)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	for _, v := range variables {
 		declaredVars[strings.ToUpper(v.Name)] = true
 	}
@@ -5390,7 +5390,7 @@ func checkUnusedVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 	var diagnostics []Diagnostic
 
 	// Extract all declared variables
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	if len(variables) == 0 {
 		return diagnostics
 	}
@@ -5482,7 +5482,7 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 
 	// Build set of all declared variables (case-insensitive)
 	declaredVars := make(map[string]bool)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	for _, v := range variables {
 		declaredVars[strings.ToUpper(v.Name)] = true
 	}

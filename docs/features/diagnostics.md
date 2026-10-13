@@ -100,7 +100,6 @@ updated. **Do not add rows here — add or edit a catalog entry instead.**
 | Negative logic with ELSE | Hint | Negated `:IF` condition with `:ELSE` — consider inverting |
 | Style-level parameter count | Hint | Procedures with more than 8 parameters (style guide recommendation) |
 | `:STEP` spacing | Warning | `:STEP` keyword without a preceding space in `:FOR` loops |
-| `:REGION` legacy warning | Info | `:REGION`/`:ENDREGION` is a legacy functional construct — prefer `/* region` / `/* endregion` comments |
 | Code block structure | Warning | Code block literal `{|| expr}` has empty parameter list — at least one bound variable required |
 
 ### 2.3 Opt-in Diagnostics
@@ -109,10 +108,10 @@ These diagnostics are implemented but disabled by default:
 
 | Diagnostic | Severity | Description |
 |------------|----------|-------------|
-| Undeclared variables | Warning | Variable used without declaration (enable via `CheckUndeclaredVars`) |
-| Unused variables | Hint | Variable declared but never used (enable via `CheckUnusedVars`) |
-| SQL parameter validation | Warning | SQL `?param?` not matching declared variable (enable via `CheckSQLParams`) |
-| Hungarian notation | Warning | Prefix conventions (enable via `CheckHungarianNotation`) |
+| Undeclared variables | Warning | Variable used without declaration (`--validate --strict`; not an editor setting) |
+| Unused variables | Hint | Variable declared but never used (`ssl.diagnostics.unusedVariables`, or `--validate --strict`) |
+| SQL parameter validation | Warning | SQL `?param?` not matching declared variable (`--validate --strict`; not an editor setting) |
+| Hungarian notation | Warning | Prefix conventions (`ssl.diagnostics.hungarianNotation`, or `--validate --hungarian`) |
 | The entire info tier | Info | All info-severity rules, including the seven SQL advisories (enable via `ssl.diagnostics.infoDiagnostics`) |
 
 ### 2.4 Planned Diagnostics
