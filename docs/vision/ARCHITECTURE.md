@@ -281,8 +281,9 @@ The `--validate` CLI has no workspace, so its cross-file inputs are empty.
 - **Hand-curated**: `constants.go` (keyword, operator, and literal lists,
   block keywords, SQL function lists, data-source directives),
   `canonical.go` (the public function and class inventories),
-  `signatures.go` (curated signatures for functions the reference does not
-  cover).
+  `function_overrides.go` (the few documented overrides of signatures
+  generated from the reference), and `predefined_globals.go` (parses the
+  vendored predefined-globals guide).
 - **Drift guard**: `drift_test.go` compares the vendored files with a
   sibling checkout when one is present and validates the provenance.
 - `--version` prints the reference-data commit the binary was built with.
