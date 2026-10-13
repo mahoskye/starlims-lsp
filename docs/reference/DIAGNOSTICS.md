@@ -102,12 +102,8 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
 | `nil_not_empty_string` | NIL compared against a default-value literal | info | advisory | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
 | `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
-<<<<<<< HEAD
-| `not_preferred_operator` | Discouraged inequality operator form | info | advisory | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
-| `nullasblank_value` | :NULLASBLANK value other than true or false | warning | authoritative | active | [diag.nullasblank_value](../../catalog/diagnostics/nullasblank_value.md) |
-=======
 | `not_preferred_operator` | Discouraged inequality operator form | info | style_only | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
->>>>>>> origin/fix/diag-audit-255-b
+| `nullasblank_value` | :NULLASBLANK value other than true or false | warning | authoritative | active | [diag.nullasblank_value](../../catalog/diagnostics/nullasblank_value.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
