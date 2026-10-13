@@ -386,6 +386,15 @@ Two follow-ups were filed rather than changed here. #291: rules that
 `unknown_keyword`, `unknown_token`) let a statement that does not parse
 validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 `:FINALLY`, or `:ELSE` outside its block.
+### Added
+- **SQL-content checks run on SQL-mode data-source bodies (#294).** A data
+  source whose body is plain SQL got only the semicolon and placeholder
+  checks. It now also gets `unicode_literal_prefix`, `unjustified_collate`
+  (a SQL comment before the statement is the justification) and the
+  info-tier advisories that read only SQL text: `sql_comma_join`,
+  `sql_legacy_outer_join`, `sql_inconsistent_alias`, `sql_dialect_mix`
+  and `sql_select_star`.
+
 ### Changed
 - **`sql_injection` now judges the whole first argument, not its first
   token.** The rule reads the argument's expression tree. It flattens the

@@ -13,6 +13,7 @@ suppressible: true
 spec_options:
   include_info_diagnostics: true
 tests:
+  - internal/providers/datasource_sql_content_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-08-28
@@ -28,6 +29,14 @@ history:
       schema key covers this rule, so it is an LSP product decision. Behavior
       now states that each concatenated piece is judged alone and that
       literal-splice fragments are skipped.
+  - date: 2026-10-13
+    ref: "issue #294"
+    note: >-
+      Also runs on SQL-mode data-source bodies, which previously got only
+      the semicolon and placeholder checks. Corpus (--info, 6,228 files):
+      +86 sql_comma_join, +164 sql_select_star, +16
+      sql_inconsistent_alias, +1 sql_dialect_mix; no unicode or collate
+      findings.
 issues: []
 ---
 
@@ -52,6 +61,9 @@ It must NOT flag:
 - commas in the SELECT list, in function arguments, in subqueries, in
   `IN (…)` lists, or inside `'a,b'` literals and `-- x, y` comments;
 - non-SELECT statements (`DELETE FROM t` has no join surface).
+
+It also runs on the body of a SQL-mode data source (D15), which is one
+statement: the finding is ranged on the body's first word (issue #294).
 
 ## Examples
 
