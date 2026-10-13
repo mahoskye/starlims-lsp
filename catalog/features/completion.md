@@ -29,12 +29,6 @@ history:
       (categories-only level 0 per the noise policy); the pre-existing
       vs-code-ssl-formatter#74 same-file exception is now documented
       here and A5 narrowed to non-dispatch strings.
-  - date: 2026-10-13
-    ref: "issue #267"
-    note: >-
-      A11 pins that a member list is never offered on an SSL scalar or
-      array: SSL-object members do not exist there, and .NET members are
-      case-sensitive and not enumerated (D10).
 issues: []
 ---
 
