@@ -30,6 +30,16 @@ history:
       API-shape advice. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      The parameter count now comes from the :PARAMETERS declaration
+      statement, so a list the parser used to lose — more than a few
+      comment lines between :PROCEDURE and :PARAMETERS, an inline comment
+      in the list, or a bare :PARAMETERS with its names on later lines —
+      is counted. A procedure with no :PARAMETERS no longer borrows the
+      script's. Production corpus: one procedure newly reported (its
+      header comments had pushed :PARAMETERS out of the old lookahead).
 issues: []
 ---
 
@@ -66,6 +76,29 @@ procedures with no `:PARAMETERS` statement at all.
 :PROCEDURE WideProc;
 :PARAMETERS a1, a2, a3, a4, a5, a6, a7, a8, a9;
 :ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE CommentedProc;
+/* one;
+/* two;
+/* three;
+/* four;
+/* five;
+:PARAMETERS a1, /* first;
+    a2, a3, a4, a5, a6, a7, a8, a9;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE NoParams;
+:RETURN 1;
+:ENDPROC;
+:PARAMETERS a1, a2, a3, a4, a5, a6, a7, a8, a9;
 ```
 
 ### Does not flag
