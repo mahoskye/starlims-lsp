@@ -25,6 +25,12 @@ history:
       Authority tool -> authoritative to mirror the style-guide record
       single_catch_per_try. The stray-:CATCH bullet no longer claims an owner
       that does not exist (issue #292).
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
 issues: ["#292"]
 ---
 
@@ -44,8 +50,8 @@ It must NOT flag:
 - a `:CATCH` that appears after a `:FINALLY` — that clause is reported as
   `diag.catch_order_before_finally` instead, and is deliberately not
   double-counted here;
-- a stray `:CATCH` outside any `:TRY` block — not this rule's concern,
-  and currently reported by no rule (issue #292).
+- a stray `:CATCH` outside any `:TRY` block — that is
+  `stray_block_keyword`.
 
 ## Examples
 

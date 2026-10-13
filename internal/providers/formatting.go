@@ -843,6 +843,12 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 	state := newFormatState(opts)
 
 	for i, token := range tokens {
+		// A leading byte-order mark is an encoding marker the lexer keeps
+		// as zero-width whitespace; write it back untouched (issue #255).
+		if i == 0 && token.Type == lexer.TokenWhitespace && token.Text == "\uFEFF" {
+			state.builder.WriteString(token.Text)
+			continue
+		}
 		if token.Type == lexer.TokenEOF {
 			// A final statement with no trailing newline still gets its
 			// semicolon (issue #38) — mirror the newline-triggered check.

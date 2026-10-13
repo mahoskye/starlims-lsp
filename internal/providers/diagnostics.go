@@ -379,7 +379,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkDotPropertyAccess(tokens)...)
 	diagnostics = append(diagnostics, checkClassInstantiationSyntax(tokens)...)
 	diagnostics = append(diagnostics, checkCreateUdObjectBuiltinClassMisuse(tokens)...)
-	diagnostics = append(diagnostics, checkZeroBasedArrayIndex(tokens)...)
+	diagnostics = append(diagnostics, checkZeroBasedArrayIndex(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
@@ -684,8 +684,11 @@ func checkTokenErrors(tokens []lexer.Token) []Diagnostic {
 				}
 			}
 
+			// A character no SSL token class accepts cannot compile, so this
+			// is an error; unexpected_token defers to this rule, so it must
+			// be the one that fails validation (issue #291).
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
+				Severity: SeverityError,
 				Range:    tokenToRange(token),
 				Message:  fmt.Sprintf("Unknown token: '%s'", token.Text),
 				Source:   "ssl-lsp",
@@ -1022,6 +1025,21 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// endsMemberReceiver reports whether a token can end the receiver of a
+// member access: an identifier, a call's `)`, or a subscript's `]`. A
+// `.name` after any of them is dot-style property access
+// (`oObj.Value`, `oObj:Get().Value`, `aRows[1].Value`), which
+// dot_property_access owns and unknown_token leaves alone (issue #255).
+func endsMemberReceiver(t lexer.Token) bool {
+	switch t.Type {
+	case lexer.TokenIdentifier:
+		return true
+	case lexer.TokenPunctuation:
+		return t.Text == ")" || t.Text == "]"
+	}
+	return false
+}
+
 // isIdentifierPattern checks if a string looks like an identifier.
 func isIdentifierPattern(s string) bool {
 	if len(s) == 0 {
@@ -1190,11 +1208,80 @@ func netDerivedRHS(tokens []lexer.Token, start int) bool {
 	return false
 }
 
-// checkZeroBasedArrayIndex detects [0] array access patterns.
-// SSL arrays are 1-based, so index 0 is invalid.
-// Gotcha #5 in gotchas.md.
-func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
+// zeroSubscript is one literal `0` subscript found in the expression tree.
+type zeroSubscript struct {
+	// base is the identifier at the root of the subscripted receiver
+	// (`aRows` in `aRows[1][0]`), or "" when the receiver is reached
+	// through member access.
+	base string
+	// member is true when the receiver is reached through `:` member
+	// access (`dataSet:Tables[0]`).
+	member bool
+}
+
+// collectZeroSubscripts records every subscript that is exactly the
+// literal `0`, in every dimension of `a[i, j]` and `a[i][j]`, keyed by the
+// literal's token index. Receivers that are calls, groups, or anything
+// else without a provable SSL-array reading are skipped: unknown is never
+// evidence.
+func collectZeroSubscripts(tokens []lexer.Token, stmts []parser.StatementExprs) map[int]zeroSubscript {
+	found := make(map[int]zeroSubscript)
+	var walk func(e *parser.Expr)
+	walk = func(e *parser.Expr) {
+		if e == nil {
+			return
+		}
+		if e.Kind == parser.ExprIndex && len(e.Children) > 1 {
+			recv := e.Children[0]
+			for recv.Kind == parser.ExprIndex && len(recv.Children) > 0 {
+				recv = recv.Children[0]
+			}
+			var site zeroSubscript
+			ok := true
+			switch recv.Kind {
+			case parser.ExprIdentifier:
+				site.base = strings.ToUpper(recv.Name)
+			case parser.ExprMember:
+				site.member = true
+			default:
+				ok = false
+			}
+			if ok {
+				for _, sub := range e.Children[1:] {
+					if sub.Kind == parser.ExprLiteral && sub.Name == "0" &&
+						sub.Start >= 0 && sub.Start < len(tokens) && tokens[sub.Start].Type == lexer.TokenNumber {
+						found[sub.Start] = site
+					}
+				}
+			}
+		}
+		for _, c := range e.Children {
+			walk(c)
+		}
+	}
+	for i := range stmts {
+		for _, e := range stmts[i].Exprs {
+			walk(e)
+		}
+	}
+	return found
+}
+
+// checkZeroBasedArrayIndex detects a literal `0` subscript. SSL arrays are
+// 1-based, so index 0 on a native array is invalid (gotcha #5). The
+// subscripts come from the expression tree, so every dimension of a
+// multi-dimensional access is checked (issue #255). A value reached through
+// `:` member access, or a variable whose most recent assignment was
+// .NET-derived, may be a 0-based .NET collection — `dataSet:Tables[0]` is
+// the prescribed form there — so those sites get an info-tier advisory
+// instead of the error (issues #152/#166/#255).
+func checkZeroBasedArrayIndex(tokens []lexer.Token, stmts []parser.StatementExprs) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	sites := collectZeroSubscripts(tokens, stmts)
+	if len(sites) == 0 {
+		return diagnostics
+	}
 
 	// Most recent assignment per variable (file order): true when the RHS
 	// was .NET-derived, making a later [0] on that variable plausibly valid
@@ -1214,69 +1301,27 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token) []Diagnostic {
 			}
 		}
 
-		// Look for '[' punctuation
-		if token.Type != lexer.TokenPunctuation || token.Text != "[" {
+		site, ok := sites[i]
+		if !ok {
 			continue
 		}
-
-		// Check if preceded by an identifier (array variable). If that
-		// identifier is itself reached through colon member access
-		// (dataSet:Tables[0]), or its most recent assignment was
-		// .NET-derived (issue #166), the value may be a 0-based .NET
-		// collection, so the diagnostic downgrades to a warning (issue #152).
-		hasPrecedingIdent := false
-		afterMemberAccess := false
-		for j := i - 1; j >= 0; j-- {
-			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
-				continue
-			}
-			if tokens[j].Type == lexer.TokenIdentifier {
-				hasPrecedingIdent = true
-				if netDerived[strings.ToUpper(tokens[j].Text)] {
-					afterMemberAccess = true
-				}
-				if k := previousSignificantTokenIndex(tokens, j-1); k >= 0 &&
-					tokens[k].Type == lexer.TokenPunctuation && tokens[k].Text == ":" {
-					afterMemberAccess = true
-				}
-			}
-			break
-		}
-
-		if !hasPrecedingIdent {
+		if site.member || netDerived[site.base] {
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Range:    tokenToRange(token),
+				Message:  "Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is.",
+				Source:   "ssl-lsp",
+				Code:     CodeZeroBasedArrayIndex,
+			})
 			continue
 		}
-
-		// Look ahead for pattern: 0 followed by ]
-		foundZero := false
-		var zeroToken *lexer.Token
-		for j := i + 1; j < len(tokens); j++ {
-			if tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment {
-				continue
-			}
-			if tokens[j].Type == lexer.TokenNumber && tokens[j].Text == "0" {
-				foundZero = true
-				zeroToken = &tokens[j]
-				continue
-			}
-			if foundZero && tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "]" {
-				// Found [0] pattern
-				severity := SeverityError
-				message := "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element."
-				if afterMemberAccess {
-					severity = SeverityWarning
-					message = "Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is."
-				}
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: severity,
-					Range:    tokenToRange(*zeroToken),
-					Message:  message,
-					Source:   "ssl-lsp",
-					Code:     CodeZeroBasedArrayIndex,
-				})
-			}
-			break
-		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  "SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.",
+			Source:   "ssl-lsp",
+			Code:     CodeZeroBasedArrayIndex,
+		})
 	}
 
 	return diagnostics
@@ -1930,12 +1975,19 @@ func checkClassContextRules(tokens []lexer.Token, ast *parser.Node, p *parser.Pa
 	return diagnostics
 }
 
-// checkUnqualifiedFieldAssignment flags bare assignments inside class methods
-// where the target name matches a :DECLAREd class field but is not shadowed
-// by a method-local declaration or :PARAMETERS entry. In SSL, a bare
-// identifier on the LHS of an assignment creates a local — it does NOT
-// write to the class field — so the field stays unchanged and the user
-// has a silent footgun. The fix is `Me:fieldName := ...`.
+// checkUnqualifiedFieldAssignment flags bare uses of a class field inside
+// a class method. Inside a method a bare identifier follows ordinary
+// variable lookup — local, then the callers' scopes, then publics — and
+// never reaches the :DECLAREd field (ssl-style-guide field_access_via_me).
+// So a bare write (`nTotal := 0`, `nTotal++`, `aItems[1] := x`) leaves the
+// field unchanged (unqualified_field_assignment), and a bare read
+// (`:RETURN nTotal`) raises `Variable [nTotal] is undefined!` or silently
+// reads someone else's variable (unqualified_field_read, issue #260). The
+// fix for both is `Me:fieldName`.
+//
+// Targets and reads come from the expression tree (issue #255), so every
+// assignment form is seen: plain and compound assignment, chained
+// assignment, `++`/`--`, element writes, and `:FOR` loop variables.
 func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, classMethodRanges []parser.ProcedureInfo) []Diagnostic {
 	var diagnostics []Diagnostic
 	if classStartLine <= 0 || len(classMethodRanges) == 0 {
@@ -1979,9 +2031,12 @@ func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, c
 	}
 
 	builtins := buildBuiltinSet()
+	stmts := parser.ExtractStatementExpressions(tokens)
 
 	for _, proc := range classMethodRanges {
-		// Collect method-local names (:DECLARE / :PARAMETERS inside the method).
+		// Method-local names (:DECLARE / :PARAMETERS / :PUBLIC inside the
+		// method) shadow the field: the bare name is then evidently the
+		// author's own variable.
 		locals := make(map[string]bool)
 		for i, tok := range tokens {
 			if tok.Line < proc.StartLine || tok.Line > proc.EndLine {
@@ -1991,7 +2046,7 @@ func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, c
 				continue
 			}
 			norm := strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))
-			if norm != "DECLARE" && norm != "PARAMETERS" {
+			if norm != "DECLARE" && norm != "PARAMETERS" && norm != "PUBLIC" {
 				continue
 			}
 			for j := i + 1; j < len(tokens); j++ {
@@ -2008,59 +2063,188 @@ func checkUnqualifiedFieldAssignment(tokens []lexer.Token, classStartLine int, c
 			}
 		}
 
-		// Walk tokens in the method body looking for bare-identifier assignments.
-		for i, tok := range tokens {
-			if tok.Line < proc.StartLine || tok.Line > proc.EndLine {
+		candidate := func(e *parser.Expr) (string, bool) {
+			if e == nil || e.Kind != parser.ExprIdentifier || e.Start < 0 || e.Start >= len(tokens) {
+				return "", false
+			}
+			upper := strings.ToUpper(e.Name)
+			if !fields[upper] || locals[upper] || builtins[upper] {
+				return "", false
+			}
+			return upper, true
+		}
+
+		// Once a bare write has happened, the name is a method-local from
+		// then on, so later reads of it are the local's — not reported.
+		written := make(map[string]bool)
+
+		for si := range stmts {
+			st := &stmts[si]
+			if st.Start < 0 || st.Start >= len(tokens) {
 				continue
 			}
-			if tok.Type != lexer.TokenIdentifier {
+			line := tokens[st.Start].Line
+			if line < proc.StartLine || line > proc.EndLine {
 				continue
 			}
 
-			upper := strings.ToUpper(tok.Text)
-			if !fields[upper] {
-				continue
-			}
-			if locals[upper] || builtins[upper] {
-				continue
-			}
-
-			// Skip if part of a declaration / parameters / etc.
-			if isDeclarationIdentifier(tokens, i) {
-				continue
-			}
-
-			// Skip qualified access: preceded by ':' (Me:foo / Base:foo / obj:foo).
-			prevIdx := previousSignificantTokenIndex(tokens, i-1)
-			if prevIdx >= 0 {
-				p := tokens[prevIdx]
-				if p.Type == lexer.TokenPunctuation && p.Text == ":" {
-					continue
+			var writes, reads []*parser.Expr
+			// writeKind records how each written identifier is written,
+			// for the message: "" for a plain `:=` (which creates a local),
+			// or "compound", "increment", "element" — forms that act on a
+			// variable the bare lookup must already find.
+			writeKind := make(map[*parser.Expr]string)
+			kind := ""
+			var visit func(e *parser.Expr, target bool)
+			// target marks the expression being assigned: a bare
+			// identifier there is a write; the root of an indexed target
+			// (`aItems[1] := x`) is written through, and its subscripts
+			// are reads.
+			visit = func(e *parser.Expr, target bool) {
+				if e == nil {
+					return
+				}
+				switch e.Kind {
+				case parser.ExprIdentifier:
+					if target {
+						writes = append(writes, e)
+						writeKind[e] = kind
+					} else {
+						reads = append(reads, e)
+					}
+					return
+				case parser.ExprIndex:
+					if len(e.Children) > 0 {
+						outer := kind
+						if target {
+							kind = "element"
+						}
+						visit(e.Children[0], target)
+						kind = outer
+						for _, c := range e.Children[1:] {
+							visit(c, false)
+						}
+					}
+					return
+				case parser.ExprBinary:
+					if len(e.Children) == 2 && isFieldAssignmentOp(e.Op) {
+						outer := kind
+						kind = ""
+						if e.Op != ":=" {
+							kind = "compound"
+						}
+						visit(e.Children[0], true)
+						kind = outer
+						visit(e.Children[1], false)
+						return
+					}
+				case parser.ExprIncrement:
+					if len(e.Children) == 1 {
+						outer := kind
+						kind = "increment"
+						visit(e.Children[0], true)
+						kind = outer
+					}
+					return
+				case parser.ExprCall:
+					// A bare callee is a function name, not a variable.
+					if len(e.Children) > 0 {
+						if e.Children[0].Kind != parser.ExprIdentifier {
+							visit(e.Children[0], false)
+						}
+						for _, c := range e.Children[1:] {
+							visit(c, false)
+						}
+					}
+					return
+				}
+				for _, c := range e.Children {
+					visit(c, false)
 				}
 			}
 
-			// Must be immediately followed by an assignment operator.
-			nextIdx := nextSignificantTokenIndex(tokens, i+1)
-			if nextIdx < 0 || tokens[nextIdx].Type != lexer.TokenOperator {
-				continue
-			}
-			switch tokens[nextIdx].Text {
-			case ":=", "+=", "-=", "*=", "/=", "^=", "%=":
+			switch st.Kind {
+			case parser.StmtAssign, parser.StmtFor:
+				for k, e := range st.Exprs {
+					kind = ""
+					if st.Kind == parser.StmtAssign && st.Assign != ":=" {
+						kind = "compound"
+					}
+					visit(e, k == 0)
+				}
+				kind = ""
+			case parser.StmtDefault:
+				// The target is a parameter name, already a local.
+				for _, e := range st.Exprs[min(1, len(st.Exprs)):] {
+					visit(e, false)
+				}
 			default:
-				continue
+				for _, e := range st.Exprs {
+					visit(e, false)
+				}
 			}
 
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(tok),
-				Message:  fmt.Sprintf("Bare assignment to '%s' inside a class method creates a local — use 'Me:%s' to assign the class field", tok.Text, tok.Text),
-				Source:   "ssl-lsp",
-				Code:     CodeUnqualifiedFieldAssignment,
-			})
+			flaggedHere := make(map[string]bool)
+			for _, w := range writes {
+				name, ok := candidate(w)
+				if !ok || written[name] {
+					continue
+				}
+				tok := tokens[w.Start]
+				msg := fmt.Sprintf("Bare assignment to '%s' inside a class method creates a local — use 'Me:%s' to assign the class field", tok.Text, tok.Text)
+				switch writeKind[w] {
+				case "element":
+					msg = fmt.Sprintf("Bare '%s' inside a class method does not reach the class field, so this element write misses it — use 'Me:%s'", tok.Text, tok.Text)
+				case "compound":
+					msg = fmt.Sprintf("Bare '%s' inside a class method does not reach the class field, so this compound assignment misses it — use 'Me:%s'", tok.Text, tok.Text)
+				case "increment":
+					msg = fmt.Sprintf("Bare '%s' inside a class method does not reach the class field, so this increment misses it — use 'Me:%s'", tok.Text, tok.Text)
+				}
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(tok),
+					Message:  msg,
+					Source:   "ssl-lsp",
+					Code:     CodeUnqualifiedFieldAssignment,
+				})
+				flaggedHere[name] = true
+			}
+			for _, r := range reads {
+				name, ok := candidate(r)
+				if !ok || written[name] || flaggedHere[name] {
+					continue
+				}
+				tok := tokens[r.Start]
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityWarning,
+					Range:    tokenToRange(tok),
+					Message:  fmt.Sprintf("Bare '%s' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [%s] is undefined!' when none exists. Use 'Me:%s'", tok.Text, tok.Text, tok.Text),
+					Source:   "ssl-lsp",
+					Code:     CodeUnqualifiedFieldRead,
+				})
+			}
+			// After any bare write the name has been reported once; later
+			// reads in the method are the same mistake (or, after a plain
+			// `:=`, a genuine local) and are not reported again.
+			for _, w := range writes {
+				if name, ok := candidate(w); ok {
+					written[name] = true
+				}
+			}
 		}
 	}
 
 	return diagnostics
+}
+
+// isFieldAssignmentOp reports whether an operator assigns: `:=` or one of
+// the compound forms.
+func isFieldAssignmentOp(op string) bool {
+	switch op {
+	case ":=", "+=", "-=", "*=", "/=", "^=", "%=":
+		return true
+	}
+	return false
 }
 
 // isProcedureLibraryFile reports whether the file consists solely of
@@ -2371,33 +2555,83 @@ func checkUnmatchedDelimiters(tokens []lexer.Token) []Diagnostic {
 		"}": "{",
 	}
 
-	for _, token := range tokens {
-		if token.Type == lexer.TokenPunctuation {
-			if _, isOpener := pairs[token.Text]; isOpener {
-				stack = append(stack, stackItem{char: token.Text, token: token})
-			} else if expected, isCloser := closers[token.Text]; isCloser {
-				if len(stack) == 0 {
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
-						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Unmatched '%s'", token.Text),
-						Source:   "ssl-lsp",
-						Code:     CodeUnmatchedDelimiter,
-					})
-				} else if stack[len(stack)-1].char != expected {
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityError,
-						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Expected '%s' but found '%s'", pairs[stack[len(stack)-1].char], token.Text),
-						Source:   "ssl-lsp",
-						Code:     CodeMismatchedDelimiter,
-					})
-					stack = stack[:len(stack)-1]
-				} else {
-					stack = stack[:len(stack)-1]
-				}
+	unmatched := func(token lexer.Token) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  fmt.Sprintf("Unmatched '%s'", token.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeUnmatchedDelimiter,
+		})
+	}
+
+	for i, token := range tokens {
+		if token.Type != lexer.TokenPunctuation {
+			continue
+		}
+		if _, isOpener := pairs[token.Text]; isOpener {
+			stack = append(stack, stackItem{char: token.Text, token: token})
+			continue
+		}
+		expected, isCloser := closers[token.Text]
+		if !isCloser {
+			continue
+		}
+		if len(stack) == 0 {
+			unmatched(token)
+			continue
+		}
+		top := stack[len(stack)-1]
+		if top.char == expected {
+			stack = stack[:len(stack)-1]
+			continue
+		}
+
+		// The closer does not match the innermost opener. One mistake
+		// should yield one finding (issue #255):
+		//
+		//   - a matching opener deeper in the stack means the openers above
+		//     it were never closed (`Len(aV[1);` is missing its `]`):
+		//     report those and resume at the match, as checkUnclosedBlocks
+		//     does for block keywords;
+		//   - with no matching opener anywhere, a closer followed by the
+		//     innermost opener's own closer is a stray extra
+		//     (`{a, b}});`): report it alone and leave the opener open;
+		//   - otherwise it is a wrong-kind closer standing in for the
+		//     innermost one (`(1 + 2];`): report the crossed pair and pop.
+		match := -1
+		for j := len(stack) - 2; j >= 0; j-- {
+			if stack[j].char == expected {
+				match = j
+				break
 			}
 		}
+		if match >= 0 {
+			for j := len(stack) - 1; j > match; j-- {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(stack[j].token),
+					Message:  fmt.Sprintf("Unclosed '%s'", stack[j].char),
+					Source:   "ssl-lsp",
+					Code:     CodeUnclosedDelimiter,
+				})
+			}
+			stack = stack[:match]
+			continue
+		}
+		if next := nextSignificantTokenIndex(tokens, i+1); next >= 0 &&
+			tokens[next].Type == lexer.TokenPunctuation && tokens[next].Text == pairs[top.char] {
+			unmatched(token)
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  fmt.Sprintf("Expected '%s' but found '%s'", pairs[top.char], token.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeMismatchedDelimiter,
+		})
+		stack = stack[:len(stack)-1]
 	}
 
 	// Report unclosed delimiters
@@ -2414,7 +2648,20 @@ func checkUnmatchedDelimiters(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkUnclosedBlocks checks for unclosed block statements.
+// middleKeywordOwner maps each middle clause keyword to the block it
+// belongs inside (issue #292). `:EXITCASE` is not here: its placement is
+// exitcase_last_in_branch's.
+var middleKeywordOwner = map[string]string{
+	"ELSE":      "IF",
+	"CATCH":     "TRY",
+	"FINALLY":   "TRY",
+	"CASE":      "BEGINCASE",
+	"OTHERWISE": "BEGINCASE",
+}
+
+// checkUnclosedBlocks checks for unclosed block statements, end keywords
+// with no block to close, and middle clause keywords with no block to sit
+// in.
 func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -2435,6 +2682,11 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 			endToStart[end] = append(endToStart[end], start)
 		}
 	}
+	// `:ENDFOR` is not SSL, but it is unmistakably meant to close a `:FOR`.
+	// endfor_invalid reports the token; pairing it here keeps one typo to
+	// one finding instead of also reporting the `:FOR` as unclosed
+	// (issue #255). It never produces a pairing diagnostic of its own.
+	endToStart["ENDFOR"] = []string{"FOR"}
 
 	type stackItem struct {
 		keyword string
@@ -2459,8 +2711,38 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 
 			if _, isStart := blockPairs[normalized]; isStart {
 				stack = append(stack, stackItem{keyword: normalized, token: token})
+			} else if owner, isMiddle := middleKeywordOwner[normalized]; isMiddle {
+				// A middle clause keyword needs its block open somewhere
+				// in the current procedure (or inline-code unit). An
+				// owner deeper in the stack is a pairing problem the
+				// end-keyword recovery reports; no owner at all is a
+				// stray clause no other rule names (issue #292).
+				inBlock := false
+				for i := len(stack) - 1; i >= 0; i-- {
+					k := stack[i].keyword
+					if k == owner {
+						inBlock = true
+						break
+					}
+					if k == "PROCEDURE" || k == "BEGININLINECODE" {
+						break
+					}
+				}
+				if !inBlock {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityError,
+						Range:    tokenToRange(token),
+						Message:  fmt.Sprintf("':%s' is outside any ':%s' block", normalized, owner),
+						Source:   "ssl-lsp",
+						Code:     CodeStrayBlockKeyword,
+					})
+				}
 			} else if validStarts, isEnd := endToStart[normalized]; isEnd {
+				silent := normalized == "ENDFOR"
 				if len(stack) == 0 {
+					if silent {
+						continue
+					}
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityError,
 						Range:    tokenToRange(token),
@@ -2495,7 +2777,21 @@ func checkUnclosedBlocks(tokens []lexer.Token) []Diagnostic {
 							}
 						}
 
-						if !found {
+						switch {
+						case found || silent:
+						case top.keyword == "PROCEDURE":
+							// Nothing is open inside the procedure, so the
+							// end keyword is stray, exactly as at top level
+							// — not a crossed pair with the procedure
+							// (issue #255).
+							diagnostics = append(diagnostics, Diagnostic{
+								Severity: SeverityError,
+								Range:    tokenToRange(token),
+								Message:  fmt.Sprintf("Unexpected ':%s' without matching block start", normalized),
+								Source:   "ssl-lsp",
+								Code:     CodeUnmatchedBlockEnd,
+							})
+						default:
 							diagnostics = append(diagnostics, Diagnostic{
 								Severity: SeverityError,
 								Range:    tokenToRange(token),
@@ -4012,15 +4308,10 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Code:     CodeTryRequiresHandler,
 				})
 			}
-			if !state.bodyHasStatements && (state.hasCatch || state.hasFinally) {
-				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityError,
-					Range:    tokenToRange(state.token),
-					Message:  "':TRY' requires at least one statement before ':CATCH' or ':FINALLY'",
-					Source:   "ssl-lsp",
-					Code:     CodeTryStructure,
-				})
-			}
+			// An empty protected body is reported once, at the first
+			// handler clause (above); bodyHasStatements only ever turns
+			// true, so a second report here could never be the only one
+			// (issue #255).
 			if state.hasFinally && !state.finallyHasBody {
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityError,
@@ -4477,7 +4768,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 				// SSL (issue #246); only the decimal point is missing.
 				suggested := next.Text
 				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
+					Severity: SeverityError,
 					Range:    tokenToRange(tokens[i]),
 					Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s' instead of '%s%s'", num, suggested, num, next.Text),
 					Source:   "ssl-lsp",
@@ -4496,7 +4787,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 						suggestedExp = tokens[i+3].Text
 					}
 					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityWarning,
+						Severity: SeverityError,
 						Range:    tokenToRange(tokens[i]),
 						Message:  fmt.Sprintf("SSL scientific notation requires a decimal point: use '%s.0%s%s%s' instead of '%s%s%s...'", num, next.Text, suggestedSign, suggestedExp, num, next.Text, afterE.Text),
 						Source:   "ssl-lsp",
@@ -4510,7 +4801,7 @@ func checkScientificNotation(tokens []lexer.Token) []Diagnostic {
 		// The lexer produces ".5" as a number token followed by "e1" identifier
 		if strings.HasPrefix(num, ".") && upper[0] == 'E' {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
+				Severity: SeverityError,
 				Range:    tokenToRange(tokens[i]),
 				Message:  fmt.Sprintf("SSL scientific notation requires a digit before the decimal point: use '0%s%s' instead of '%s%s'", num, next.Text, num, next.Text),
 				Source:   "ssl-lsp",
@@ -5382,17 +5673,29 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 	return diagnostics
 }
 
-// checkVisibilityAnnotations validates /*@private; and /*@protected; annotations.
-// These annotations must appear on their own line before :PROCEDURE.
-// Per the style guide, they have NO effect on class methods (only script procedures).
-// Every annotation the base rule leaves alone additionally gets the
-// info-tier visibility_annotation_usage note (issue #198) for teams that
-// prefer procedures unannotated. Exactly one of the two rules speaks per
-// annotation.
+// checkVisibilityAnnotations validates /*@private; and /*@protected;
+// annotations. The one effective placement is the exact lowercase form on
+// its own line immediately before a script :PROCEDURE; everything else the
+// author plainly meant as an annotation is inert and reported, because the
+// procedure silently stays public (issue #255). Class methods are always
+// public, so any annotation in a class file is inert too. An effective
+// annotation instead gets the info-tier visibility_annotation_usage note
+// (issue #198) for teams that prefer procedures unannotated. Exactly one
+// of the two rules speaks per annotation, and the verdict matches
+// parser.ProcedureInfo.IsPrivate.
 func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	inClass := false
+	warn := func(token lexer.Token, msg string) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(token),
+			Message:  msg,
+			Source:   "ssl-lsp",
+			Code:     CodeVisibilityAnnotation,
+		})
+	}
 
 	for i, token := range tokens {
 		if token.Type == lexer.TokenKeyword {
@@ -5406,45 +5709,34 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
-		// Shared matcher with parser.ProcedureInfo.IsPrivate extraction —
-		// the two must agree on what counts as an annotation.
-		content, ok := parser.ParseVisibilityAnnotation(token.Text)
-		if !ok {
+		content, exact := parser.ParseVisibilityAnnotation(token.Text)
+		nearContent, nearMiss := parser.ParseNearMissVisibilityAnnotation(token.Text)
+		if !exact && !nearMiss {
 			continue
 		}
+		attach, nextIdx := parser.VisibilityAnnotationAttachment(tokens, i)
 
-		// Valid annotation found - check context
 		if inClass {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' has no effect on class methods — class methods are always public/virtual", content),
-				Source:   "ssl-lsp",
-				Code:     CodeVisibilityAnnotation,
-			})
+			if exact || attach != parser.AnnotationNoProcedure {
+				if !exact {
+					content = nearContent
+				}
+				warn(token, fmt.Sprintf("Visibility annotation '/*@%s;' has no effect on class methods — class methods are always public/virtual", content))
+			}
 			continue
 		}
 
-		// Check that it's followed by :PROCEDURE
-		misplaced := false
-		nextIdx := nextSignificantTokenIndex(tokens, i+1)
-		if nextIdx >= 0 {
-			nextToken := tokens[nextIdx]
-			if nextToken.Type == lexer.TokenKeyword {
-				normalized := strings.ToUpper(strings.TrimPrefix(nextToken.Text, ":"))
-				if normalized != "PROCEDURE" {
-					misplaced = true
-					diagnostics = append(diagnostics, Diagnostic{
-						Severity: SeverityWarning,
-						Range:    tokenToRange(token),
-						Message:  fmt.Sprintf("Visibility annotation '/*@%s;' should appear on its own line immediately before ':PROCEDURE'", content),
-						Source:   "ssl-lsp",
-						Code:     CodeVisibilityAnnotation,
-					})
-				}
+		if nearMiss {
+			// A near-miss spelling is ordinary comment text; only one that
+			// stands before a :PROCEDURE is plainly an annotation attempt.
+			if attach != parser.AnnotationNoProcedure {
+				warn(token, fmt.Sprintf("'%s' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@%s;' (lowercase, no spaces)", strings.TrimSpace(token.Text), nearContent))
 			}
+			continue
 		}
-		if !misplaced {
+
+		switch attach {
+		case parser.AnnotationAttached:
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityInfo,
 				Range:    tokenToRange(token),
@@ -5452,6 +5744,15 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 				Source:   "ssl-lsp",
 				Code:     CodeVisibilityAnnotationUsage,
 			})
+		case parser.AnnotationDetached:
+			warn(token, fmt.Sprintf("Visibility annotation '/*@%s;' must sit on its own line immediately before ':PROCEDURE' — a blank line, another comment, or a shared line breaks the association, so the procedure stays public", content))
+		default:
+			// Followed by another keyword: provably misplaced. Followed by
+			// an expression statement or nothing: left alone, since
+			// annotation-shaped comments also serve as prose markers.
+			if nextIdx >= 0 && tokens[nextIdx].Type == lexer.TokenKeyword {
+				warn(token, fmt.Sprintf("Visibility annotation '/*@%s;' should appear on its own line immediately before ':PROCEDURE'", content))
+			}
 		}
 	}
 

@@ -3,7 +3,7 @@ id: diag.unterminated_string
 title: String literal never closed
 kind: diagnostic
 status: active
-authority: authoritative
+authority: tool
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -36,6 +36,15 @@ history:
       Token.Unterminated when it reaches end of input without the closer,
       and checkUnterminatedStrings reports on the opener. No data-source
       gate — the pipeline's own SQL-mode routing decides what is lexed.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Catalog audit: unexpected_token now defers to this rule when it
+      stops on the unterminated string, so `s := 1 "abc;` is one finding,
+      not two. Authority set to tool: no style-guide rule record names
+      this check (the grammar's StringLiteral requires the closer, as it
+      does for the other grammar-only checks, which are all tool). Known
+      gap recorded: a quote character inside a code-block literal.
 issues: ["#240"]
 ---
 
@@ -78,6 +87,9 @@ lines.
 It applies to whatever the pipeline lexes as SSL: a script, an SSL-mode
 data source in full, a hybrid data source's directive header. A SQL-mode
 body is never lexed (feature.diagnostics_pipeline) and cannot flag.
+
+One finding per cause across rules as well: `unexpected_token` defers to
+this rule when the token it stopped on is the unterminated string.
 
 It must NOT flag:
 
@@ -164,6 +176,13 @@ sBoth := "a""b";
 sFirst := aItems[1;
 ```
 
+### Flags
+
+```ssl
+:DECLARE sText;
+sText := 1 "never closed;
+```
+
 ## Rationale
 
 The grammar requires the closer, and the failure mode is silent
@@ -187,3 +206,12 @@ Exactness matters at one edge: a bracket string's text can end in `]`
 without being closed (`[[a]`), so the implementation must carry the
 lexer's verdict — it alone knows whether the closer was seen — rather
 than inspect the token's last character. The fifth Flags fence pins that.
+
+## Known gaps
+
+The lexer reads a code-block literal by counting braces without regard
+to strings, so `{|x| x + "}"}` ends the block at the quoted `}` and the
+rest of the line is reported as an unterminated string. A fix to make
+that reader string-aware is in flight separately (the formatter audit,
+issue #255); no fence is pinned here so that fix lands without a
+promotion step in this entry.

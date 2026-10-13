@@ -27,6 +27,12 @@ history:
       enforced_by, so the guide is not silent. Rationale cites the
       reference's clause order instead of guessing at runtime behavior;
       a nested-TRY fence pins per-block judging.
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
 issues: ["#292"]
 ---
 
@@ -46,8 +52,8 @@ It must NOT flag:
 
 - the correct order `:TRY ... :CATCH ... :FINALLY ... :ENDTRY`;
 - `:TRY`/`:CATCH` without any `:FINALLY`;
-- a `:CATCH` outside any `:TRY` block — not this ordering rule's concern,
-  and currently reported by no rule (issue #292).
+- a `:CATCH` outside any `:TRY` block — that placement is
+  `stray_block_keyword`'s, not this ordering rule's.
 
 ## Examples
 

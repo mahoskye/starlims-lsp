@@ -1755,3 +1755,21 @@ func TestLexer_MemberAccessAcrossLineBreak(t *testing.T) {
 		}
 	}
 }
+
+// A leading UTF-8 byte-order mark is an encoding marker, kept as one
+// zero-width whitespace token so nothing reads it as an unknown character
+// and the formatter can write it back (issue #255).
+func TestLexer_LeadingByteOrderMark(t *testing.T) {
+	tokens := NewLexer("\xef\xbb\xbf:DECLARE n;").Tokenize()
+	if tokens[0].Type != TokenWhitespace || tokens[0].Text != "\uFEFF" {
+		t.Fatalf("first token = %v %q, want BOM whitespace", tokens[0].Type, tokens[0].Text)
+	}
+	if tokens[1].Type != TokenKeyword || tokens[1].Line != 1 || tokens[1].Column != 1 {
+		t.Errorf("keyword after BOM = %v at %d:%d, want keyword at 1:1", tokens[1].Type, tokens[1].Line, tokens[1].Column)
+	}
+	for _, tok := range tokens {
+		if tok.Type == TokenUnknown {
+			t.Errorf("unknown token %q", tok.Text)
+		}
+	}
+}

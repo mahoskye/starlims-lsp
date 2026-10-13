@@ -103,6 +103,16 @@ func (l *Lexer) Tokenize() []Token {
 	// mode for the region body (issue #164).
 	inRegionHeader := false
 
+	// A UTF-8 byte-order mark is an encoding marker, not source text.
+	// Editors strip it before the server sees the document, but a file read
+	// from disk (--validate, --format) still carries it. Keep it as a
+	// zero-width whitespace token so the formatter writes it back and no
+	// rule reads it as an unknown character (issue #255).
+	if len(l.input) > 0 && l.input[0] == '\uFEFF' {
+		tokens = append(tokens, Token{Type: TokenWhitespace, Text: "\uFEFF", Line: 1, Column: 1, Offset: 0})
+		l.pos = 1
+	}
+
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 

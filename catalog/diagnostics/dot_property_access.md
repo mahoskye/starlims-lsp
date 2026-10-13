@@ -56,6 +56,13 @@ history:
       authority corrected to authoritative: the style-guide record
       dot_property_access (level authoritative) names this rule in
       enforced_by, so the guide is not silent.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch D)"
+    note: >-
+      Receiver widened: a `.name` after a call's `)` or a subscript's `]`
+      (`oObj:Get().Value`, `aRows[1].Value`) is the same mistake and is
+      reported here; it used to fall through to unknown_token with a
+      generic message.
 issues: []
 ---
 
@@ -86,7 +93,8 @@ It must NOT flag:
 - dotted logical operators and boolean literals (`.AND.`, `.OR.`, `.T.`,
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
-- a leading `.name` with no preceding identifier;
+- a leading `.name` with no preceding receiver (`n := .foo;` — that is
+  `unknown_token`);
 - anything inside a `:REGION` body — region payload is opaque text, never
   lexed as SSL (issue #164, feature.diagnostics_pipeline).
 
@@ -117,6 +125,14 @@ A call or subscript result is a receiver too.
 	x := aRows[1].Name;
 	x := Today().Year;
 :ENDPROC;
+```
+
+### Flags
+
+```ssl
+:DECLARE oObj, aRows, nTotal;
+nTotal := oObj:Get().Value;
+nTotal := aRows[1].Value;
 ```
 
 ### Does not flag

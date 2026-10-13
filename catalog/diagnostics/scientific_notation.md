@@ -5,7 +5,7 @@ kind: diagnostic
 status: active
 authority: tool
 schema_ref: null
-default_severity: warning
+default_severity: error
 severity_overridable: true
 suppressible: true
 tests:
@@ -44,6 +44,15 @@ history:
       Audit: the warning severity downgrades a parse failure (see Known
       gaps). The change to error is proposed in issue #291 together with the
       other warning-severity rules unexpected_token defers to.
+  - date: 2026-10-13
+    ref: "issue #291"
+    note: >-
+      Raised to error. `7e2` has no production in the grammar's
+      NumberLiteral, unexpected_token defers to this rule for the glued
+      identifier, and the spaced form `7 e2` was already an
+      unexpected_token error — so as a warning the glued form validated as
+      `valid: true` for code that cannot compile. Production cost: none
+      (0 findings in 6,228 files). Breaking for --validate consumers.
 issues: ["#47", "#246", "#291"]
 ---
 
@@ -63,7 +72,7 @@ immediately followed (no whitespace) by an identifier:
 - **Missing leading digit**: a number starting with `.` directly followed
   by an `e…` identifier (e.g. `.5e1` lexes as `.5` + `e1`).
 
-The range covers the number token; severity is warning for all three
+The range covers the number token; severity is error for all three
 shapes, and the message shows the corrected literal, keeping whatever
 exponent sign the author wrote (`9E+1` suggests `9.0E+1`).
 
@@ -132,10 +141,13 @@ nD := 1.5e+3 * 2;
 
 The schema's numbers section (`require_decimal_for_scientific: true`) lists
 exactly these invalid examples — `7e2`, `.5e1`, `9E+1` — but defines no
-lints slug for them, so the rule is tool-authored. The severity is
-warning today. That choice assumed the code might still run with the
-exponent part read as an identifier, but the grammar says these shapes do
-not parse; the move to error is tracked in Known gaps (issue #291).
+lints slug for them, so the rule is tool-authored. Error severity because
+none of these shapes is a number the grammar accepts (`NumberLiteral ::=
+IntegerPart [DecimalPart [Exponent]]`): `7e2` is a number glued to an
+identifier, which does not compile, and the spaced form `7 e2` is already
+an `unexpected_token` error. `unexpected_token` defers to this rule for
+the glued form, so this rule must carry the error, or the file validates
+as `valid: true` (issue #291).
 The fix-it messages themselves suggest only valid SSL (issue #47). An
 explicit `+` exponent sign turned out to be valid (issue #246), contrary
 to the schema clause this entry transcribed, so suggestions keep the sign

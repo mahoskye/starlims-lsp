@@ -100,7 +100,20 @@ history:
       Defers the operand after a prefix bare `Not` (`:IF Not bReady;`)
       to bare_logical_operator, which already reports the cause; the old
       deferral looked only at the unexpected token itself.
-issues: ["#240", "#244", "#246"]
+  - date: 2026-10-13
+    ref: "issues #255, #291"
+    note: >-
+      Deferral list corrected in both directions. Added: an unterminated
+      string (unterminated_string names its opener; `s := 1 "abc;` used to
+      be reported by both rules). Removed: unknown_keyword, which stays a
+      warning because a gap in the keyword list must not fail validation —
+      deferring to it let an unknown colon form the grammar cannot place
+      validate as `valid: true`. 0 new findings over 6,228 production
+      files. The rules still deferred to (unknown_token,
+      scientific_notation, and the delimiter, operator, and endfor rules)
+      are all errors, so no parse failure is reported at warning severity
+      alone.
+issues: ["#240", "#244", "#246", "#291"]
 ---
 
 ## Behavior
@@ -183,8 +196,8 @@ It must NOT flag:
   (`invalid_operator_sequence`), a bare `AND`/`OR`/`NOT` word in operator
   position (`bare_logical_operator`) — including the operand after a
   prefix bare `Not`, where the parser read `Not` as a value and stopped
-  on what followed (issue #255) — a colon form that is not an SSL
-  keyword (`unknown_keyword` / `endfor_invalid`), the exponent shapes
+  on what followed (issue #255) — a colon form that is `:ENDFOR`
+  (`endfor_invalid`), the exponent shapes
   `scientific_notation` owns — an identifier glued to a number that has
   no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — the
   name after a bare `PROCEDURE` when a `(` follows it
@@ -192,7 +205,13 @@ It must NOT flag:
   closer with no matching opener (`unmatched_delimiter` /
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file
-  into that statement). One finding per cause. A closer that does match
+  into that statement), or an unterminated string literal
+  (`unterminated_string`, which names its opener). One finding per cause,
+  and every rule deferred to is an error, so a parse failure is never
+  reported at warning severity alone. An unknown colon form is *not*
+  deferred: `unknown_keyword` is a warning (a gap in its list must not
+  fail validation), so where such a form stands in a position the grammar
+  cannot accept, this rule reports the parse failure as well. A closer that does match
   but arrives where an operand was due (`x := (1 + );`) is this rule's. A
   `:=` inside a condition is an assignment expression, complete and
   `assignment_in_condition`'s to warn about;
@@ -207,8 +226,9 @@ It must NOT flag:
   lexer never reads as SSL.
 
 An unterminated string literal swallows the rest of the file and hides
-everything this rule would otherwise see. That is a lexer condition and
-wants its own entry.
+everything this rule would otherwise see. That is `unterminated_string`'s
+to report; when consumption stops on the unterminated string itself, this
+rule defers.
 
 ## Examples
 
@@ -387,6 +407,20 @@ oStats:nHits++;
 oStats:nHits--;
 ++oStats:nHits;
 --oStats:nHits;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE sText;
+sText := 1 "never closed;
+```
+
+### Flags
+
+```ssl
+:DECLARE nCount;
+nCount := 1 :FOOBAR 2;
 ```
 
 ## Rationale

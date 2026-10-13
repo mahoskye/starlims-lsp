@@ -26,6 +26,12 @@ history:
       not implemented: they filled the first clause's body and hid
       diag.finally_empty. Fixed. The stray-:FINALLY bullet no longer claims an
       owner that does not exist (issue #292).
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
 issues: ["#292"]
 ---
 
@@ -47,8 +53,8 @@ It must NOT flag:
   each of several nested blocks;
 - a `:FINALLY` in a block that also has a `:CATCH` — one of each is the
   normal full form;
-- a stray `:FINALLY` outside any `:TRY` block — not this rule's concern,
-  and currently reported by no rule (issue #292).
+- a stray `:FINALLY` outside any `:TRY` block — that is
+  `stray_block_keyword`.
 
 ## Examples
 

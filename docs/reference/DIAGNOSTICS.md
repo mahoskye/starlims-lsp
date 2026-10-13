@@ -117,7 +117,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `return_from_constructor` | Return from a constructor (never implemented) | error | tool | removed | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
 | `runsql_non_dml` | RunSQL called with a result-returning statement | warning | advisory | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
-| `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
+| `scientific_notation` | Scientific notation missing its decimal point | error | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | authoritative | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
@@ -131,9 +131,10 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `sql_suspect_placeholder` | Template marker stacked inside a placeholder | info | tool | active | [diag.sql_suspect_placeholder](../../catalog/diagnostics/sql_suspect_placeholder.md) |
 | `step_spacing` | STEP keyword with no space before it | warning | style_only | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
 | `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
+| `stray_block_keyword` | Middle clause keyword outside its block | error | authoritative | active | [diag.stray_block_keyword](../../catalog/diagnostics/stray_block_keyword.md) |
 | `trailing_skip_commas` | Trailing skip-commas before a call's closing parenthesis | info | style_only | active | [diag.trailing_skip_commas](../../catalog/diagnostics/trailing_skip_commas.md) |
-| `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
-| `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
+| `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | authoritative | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
+| `try_structure` | TRY body with no statements before its handler | error | authoritative | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
 | `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | authoritative | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
 | `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
 | `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
@@ -142,12 +143,13 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unicode_literal_prefix` | N'...' Unicode literal prefix in embedded SQL | info | style_only | active | [diag.unicode_literal_prefix](../../catalog/diagnostics/unicode_literal_prefix.md) |
 | `unjustified_collate` | COLLATE in embedded SQL without a justification comment | info | style_only | active | [diag.unjustified_collate](../../catalog/diagnostics/unjustified_collate.md) |
 | `unknown_keyword` | Unknown colon-prefixed keyword | warning | tool | active | [diag.unknown_keyword](../../catalog/diagnostics/unknown_keyword.md) |
-| `unknown_token` | Unknown token | warning | tool | active | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
+| `unknown_token` | Unknown token | error | tool | active | [diag.unknown_token](../../catalog/diagnostics/unknown_token.md) |
 | `unmatched_block_end` | Block-end keyword with no open block | error | tool | active | [diag.unmatched_block_end](../../catalog/diagnostics/unmatched_block_end.md) |
 | `unmatched_delimiter` | Closing delimiter with nothing open | error | tool | active | [diag.unmatched_delimiter](../../catalog/diagnostics/unmatched_delimiter.md) |
-| `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | tool | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
-| `unterminated_string` | String literal never closed | error | authoritative | active | [diag.unterminated_string](../../catalog/diagnostics/unterminated_string.md) |
+| `unqualified_field_assignment` | Bare assignment to a class field inside a method | warning | authoritative | active | [diag.unqualified_field_assignment](../../catalog/diagnostics/unqualified_field_assignment.md) |
+| `unqualified_field_read` | Bare read of a class field inside a method | warning | authoritative | active | [diag.unqualified_field_read](../../catalog/diagnostics/unqualified_field_read.md) |
+| `unterminated_string` | String literal never closed | error | tool | active | [diag.unterminated_string](../../catalog/diagnostics/unterminated_string.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
-| `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | tool | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
+| `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | authoritative | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
 | `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
-| `zero_based_array_index` | Array indexed with literal 0 | error | tool | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |
+| `zero_based_array_index` | Array indexed with literal 0 | error | authoritative | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

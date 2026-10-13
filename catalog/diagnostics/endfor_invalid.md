@@ -32,6 +32,12 @@ history:
       :FOR. authority corrected to authoritative: the style-guide record
       endfor_invalid (level authoritative) names this rule in
       enforced_by, so the guide is not silent.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch D)"
+    note: >-
+      The block scanner now pairs `:ENDFOR` with its `:FOR` silently, so
+      the loop is no longer also reported as unclosed_block — one typo,
+      one finding.
 issues: []
 ---
 

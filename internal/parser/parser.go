@@ -238,6 +238,9 @@ func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
 			if _, ok := ParseVisibilityAnnotation(t.Text); ok {
 				continue
 			}
+			if _, ok := ParseNearMissVisibilityAnnotation(t.Text); ok {
+				continue
+			}
 			commentText = t.Text
 		}
 		break
@@ -248,11 +251,12 @@ func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
 	return parseProcedureDoc(commentText)
 }
 
-// isPrivateProcedure reports whether the comment immediately preceding the
-// :PROCEDURE token (skipping whitespace) is a visibility annotation. Only
-// the nearest comment counts, matching the placement rule the
-// visibility_annotation diagnostic enforces (annotation on its own line
-// immediately before :PROCEDURE).
+// isPrivateProcedure reports whether an effective visibility annotation
+// precedes the :PROCEDURE token: the nearest comment is the exact form
+// (`/*@private;` / `/*@protected;`) on the line immediately before. A
+// blank line, an intervening comment, or a near-miss spelling leaves the
+// procedure public — the same verdict the visibility_annotation
+// diagnostic reports (issue #255).
 func (p *Parser) isPrivateProcedure(procToken *lexer.Token) bool {
 	idx := -1
 	for i := range p.tokens {
@@ -271,8 +275,11 @@ func (p *Parser) isPrivateProcedure(procToken *lexer.Token) bool {
 			continue
 		}
 		if t.Type == lexer.TokenComment {
-			_, ok := ParseVisibilityAnnotation(t.Text)
-			return ok
+			if _, ok := ParseVisibilityAnnotation(t.Text); !ok {
+				return false
+			}
+			attach, _ := VisibilityAnnotationAttachment(p.tokens, j)
+			return attach == AnnotationAttached
 		}
 		break
 	}

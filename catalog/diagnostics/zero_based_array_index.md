@@ -3,11 +3,15 @@ id: diag.zero_based_array_index
 title: Array indexed with literal 0
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
+config:
+  - ssl.diagnostics.infoDiagnostics
 severity_overridable: true
 suppressible: true
+spec_options:
+  include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
 history:
@@ -37,40 +41,58 @@ history:
       with [0] is correct code on 0-based .NET collections. Unrelated
       bare identifiers keep the error; a later non-.NET reassignment
       restores it.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Catalog audit. The .NET path moved from warning to the info tier:
+      the style-guide rule net_collections_zero_based (authoritative)
+      prescribes `dataSet:Tables[0]`, and all 245 production findings were
+      that path — 227 of them a `:Tables[0]` access, the rest `:Columns`,
+      `:Rows` and similar — so a default-on warning was firing on the
+      prescribed form. A "verify which one this is" note is
+      advisory (D13). Detection moved from a token scan to the expression
+      tree, which sees every dimension: `aRows[1][0]` and `aRows[0, 1]`
+      were missed. Authority corrected to authoritative to mirror
+      arrays_one_based. Production: default 245 -> 0, --info 245 -> 247
+      (two multi-dimensional sites, both info).
 issues: []
 ---
 
 ## Behavior
 
-Flags the subscript `[0]` — a `[` whose previous significant token is an
-identifier and whose bracketed content is exactly the literal `0`
-(whitespace/comments tolerated). SSL arrays and string positions are
-1-based (ssl-style-guide: `language.arrays: one_based`), so index 0 can
-never address a native SSL element. The range covers the `0` literal.
+Flags a subscript that is exactly the literal `0`, in any dimension of an
+array access — `aItems[0]`, `aRows[1][0]`, `aRows[1, 0]`, `aRows[0, 1]`.
+SSL arrays and string positions are 1-based (ssl-style-guide
+`arrays_one_based`), so index 0 can never address a native SSL element.
+Subscripts are read from the expression tree; the range covers the `0`
+literal.
 
-Severity is contextual (issues #152/#166): the diagnostic is a warning —
-whose message says zero-based indexing may be valid for .NET collections —
-when the indexed value is plausibly .NET-derived:
+Severity follows what the subscripted value is:
 
-- the subscripted identifier is itself preceded by the colon member-access
-  punctuation (`:`), as in `dataSet:Tables[0]` or chained
-  `object:Property[0]` (issue #152); or
-- the identifier's most recent assignment (file order) has a right-hand
-  side containing a colon member call or a `LimsNetConnect`/`LimsNetCast`
-  call, as in `aBytes := oInt:ToByteArray(); ... aBytes[0]` (issue #166).
-  A later reassignment from a non-.NET RHS restores the error.
+- **Error** when the receiver is a bare variable (`aValues[0]`) — a native
+  SSL array access.
+- **Info** (the opt-in advisory tier) when the value is plausibly a
+  0-based .NET collection: the receiver is reached through `:` member
+  access (`dataSet:Tables[0]`, `oObj:Prop:Items[0]`), or the variable's
+  most recent assignment (file order) has a right-hand side containing a
+  colon member call or a `LimsNetConnect`/`LimsNetCast` call
+  (`aBytes := oInt:ToByteArray(); ... aBytes[0]`). A later reassignment
+  from a non-.NET right-hand side restores the error. The message says
+  zero-based indexing may be valid for .NET collections.
 
-Any other bare identifier subscript (`aValues[0]`) is a native SSL array
-access and stays an error. The diagnostic code is the same in all
-contexts.
+The diagnostic code is the same in both cases.
 
 The rule is deliberately literal-only and must NOT flag:
 
 - any other literal index (`aItems[1]`, `aItems[10]`);
 - a variable or expression index (`aItems[nIndex]`, `aItems[0 + 1]`) —
   even when it could evaluate to 0, only the bare literal is provable;
-- a `[` not preceded by an identifier (e.g. inside an array literal), where
-  there is no subscripted variable.
+- a subscript whose receiver is a call result or a parenthesized
+  expression (`DoProc("GetRows")[0]`) — what it returns is unknown, and
+  unknown is never evidence;
+- the .NET-path sites when the info tier is off (the default);
+- brackets that are not subscripts — an array literal, a bracket string
+  (`[0]` as a value).
 
 ## Examples
 
@@ -98,11 +120,28 @@ aBytes := oInt:ToByteArray();
 bZero := aBytes[0] == 0;
 ```
 
+### Flags
+
+```ssl
+:DECLARE aRows, sValue;
+aRows := {{1, 2}};
+sValue := aRows[1][0];
+sValue := aRows[1, 0];
+```
+
 ### Does not flag
 
 ```ssl
 :DECLARE aItems, sFirst;
 sFirst := aItems[1];
+```
+
+### Does not flag
+
+```ssl
+:DECLARE sValue;
+sValue := DoProc("GetRows")[0];
+sValue := [0];
 ```
 
 ### Does not flag
@@ -123,16 +162,24 @@ sFirst := aItems[0 + 1];
 
 The zero-index habit from 0-based languages is one of the most common SSL
 porting mistakes (gotcha #5, commit 7261172), and a literal `[0]` has no
-legitimate reading on a native SSL array — hence error severity despite
-this being a heuristic token scan. Values reached through colon member
-access are different (issue #152): SSL code routinely holds .NET objects
-whose collections (`dataSet:Tables[0]`) are legitimately 0-based, so an
-error there is a false positive — but a warning is kept because the
-member could still be a native SSL array and the reader deserves the
-nudge. The derived-variable extension (issue #166) follows the same
-reasoning one assignment further: 0-vs-1 basing is not statically
-decidable without type flow, so a cheap last-assignment heuristic picks
-warning over error for exactly the values that flow from the .NET
-surface. Restricting the match to the exact literal keeps the guarantee
-airtight: everything short of provable (computed indices, variables) is
-left alone, which the variable and expression fences pin.
+legitimate reading on a native SSL array — hence error severity, and the
+style-guide rule `arrays_one_based` (authoritative, error) that the
+authority mirrors. Values reached through colon member access are
+different: SSL code routinely holds .NET objects whose collections are
+0-based, and the style guide prescribes `dataSet:Tables[0]`
+(`net_collections_zero_based`). Issue #152 moved those sites from error to
+warning; issue #255 moved them to the info tier, because over 6,228
+production files every one of the 245 findings was such a site and a
+default-on warning was firing on the prescribed form. "Verify which one
+this is" is advice, not a likely bug, so it belongs to the advisory tier
+(DECISIONS.md D13), where an LLM consumer still gets the nudge. The
+derived-variable extension (issue #166) follows the same reasoning one
+assignment further: 0-vs-1 basing is not statically decidable without
+type flow, so a cheap last-assignment heuristic marks exactly the values
+that flow from the .NET surface. Reading subscripts from the expression
+tree (issue #255) is what catches the multi-dimensional forms in the
+third Flags fence; the token scan only looked at the first bracket after
+an identifier. Restricting the match to the exact literal keeps the
+guarantee airtight: everything short of provable (computed indices,
+variables, call results) is left alone, which the Does-not-flag fences
+pin.

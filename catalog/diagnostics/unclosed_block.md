@@ -26,6 +26,12 @@ history:
       An :ENDFOR closing an open :FOR (endfor_invalid's finding) now
       closes that loop, so the typo no longer also reports
       unclosed_block on the :FOR.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch D)"
+    note: >-
+      Catalog audit: `:ENDFOR` now closes its `:FOR` silently. It is not
+      SSL and endfor_invalid reports it, but leaving the `:FOR` on the
+      stack also reported the loop as unclosed — two errors for one typo.
 issues: []
 ---
 
@@ -55,6 +61,9 @@ user-facing configuration key; per-rule severity/off is available through
 It must NOT flag:
 
 - correctly paired blocks, however deeply nested;
+- a `:FOR` closed by the invalid `:ENDFOR` — `endfor_invalid` reports the
+  token, and the scanner pairs it with the `:FOR` so one typo stays one
+  finding;
 - a stray end keyword with nothing open — that is `unmatched_block_end`;
 - an end keyword that matches no open block at any depth — that is
   `mismatched_block_end`, and no opener is popped;
@@ -98,6 +107,14 @@ It must NOT flag:
 		nCount := 1;
 	:ENDIF;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE i;
+:FOR i := 1 :TO 3;
+:ENDFOR;
 ```
 
 ## Rationale
