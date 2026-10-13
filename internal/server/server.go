@@ -618,67 +618,51 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 }
 
 // applyChange applies an incremental change to content.
+//
+// LSP positions count UTF-16 code units (protocol 3.16 has no other
+// encoding), so a character outside the Basic Multilingual Plane occupies
+// two columns. The offset arithmetic used to count runes, which put every
+// edit after such a character one column late per character and left the
+// server's copy of the document permanently out of step with the editor's
+// (issue #256).
 func applyChange(content string, change protocol.TextDocumentContentChangeEvent) string {
 	if change.Range == nil {
 		return change.Text
 	}
 
-	runes := []rune(content)
-	lines := splitLines(string(runes))
-
-	startLine := int(change.Range.Start.Line)
-	startChar := int(change.Range.Start.Character)
-	endLine := int(change.Range.End.Line)
-	endChar := int(change.Range.End.Character)
-
-	// Calculate byte offsets
-	startOffset := 0
-	for i := 0; i < startLine && i < len(lines); i++ {
-		startOffset += len(lines[i]) + 1 // +1 for newline
+	startOffset := positionOffset(content, int(change.Range.Start.Line), int(change.Range.Start.Character))
+	endOffset := positionOffset(content, int(change.Range.End.Line), int(change.Range.End.Character))
+	if endOffset < startOffset {
+		endOffset = startOffset
 	}
-	if startLine < len(lines) {
-		lineRunes := []rune(lines[startLine])
-		if startChar <= len(lineRunes) {
-			startOffset += len(string(lineRunes[:startChar]))
-		}
-	}
-
-	endOffset := 0
-	for i := 0; i < endLine && i < len(lines); i++ {
-		endOffset += len(lines[i]) + 1
-	}
-	if endLine < len(lines) {
-		lineRunes := []rune(lines[endLine])
-		if endChar <= len(lineRunes) {
-			endOffset += len(string(lineRunes[:endChar]))
-		}
-	}
-
-	// Apply change
-	if startOffset > len(content) {
-		startOffset = len(content)
-	}
-	if endOffset > len(content) {
-		endOffset = len(content)
-	}
-
 	return content[:startOffset] + change.Text + content[endOffset:]
 }
 
-// splitLines splits content into lines.
-func splitLines(content string) []string {
-	var lines []string
-	start := 0
-	for i, r := range content {
-		if r == '\n' {
-			lines = append(lines, content[start:i])
-			start = i + 1
+// positionOffset converts an LSP position (0-based line, UTF-16 column) to
+// a byte offset into content. A line past the end clamps to the end of
+// content; a column past the end of its line clamps to the line end (before
+// the newline), as the LSP specification directs.
+func positionOffset(content string, line, character int) int {
+	offset := 0
+	for i := 0; i < line; i++ {
+		nl := strings.IndexByte(content[offset:], '\n')
+		if nl < 0 {
+			return len(content)
+		}
+		offset += nl + 1
+	}
+	units := 0
+	for i, r := range content[offset:] {
+		if r == '\n' || units >= character {
+			return offset + i
+		}
+		if r >= 0x10000 {
+			units += 2
+		} else {
+			units++
 		}
 	}
-	if start <= len(content) {
-		lines = append(lines, content[start:])
-	}
-	return lines
+	return len(content)
 }
 
 // ptrTo returns a pointer to the value.

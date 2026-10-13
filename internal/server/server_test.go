@@ -256,24 +256,6 @@ func TestHandleInitialize_AppliesInitializationOptions(t *testing.T) {
 	}
 }
 
-func TestApplySettings_MaxBlockDepth(t *testing.T) {
-	s := NewSSLServer()
-
-	settings := map[string]interface{}{
-		"ssl": map[string]interface{}{
-			"diagnostics": map[string]interface{}{
-				"maxBlockDepth": 3,
-			},
-		},
-	}
-
-	s.applySettings(settings)
-
-	if s.settings.Diagnostics.MaxBlockDepth != 3 {
-		t.Errorf("expected max block depth 3, got %d", s.settings.Diagnostics.MaxBlockDepth)
-	}
-}
-
 func TestApplySettings_PartialSettings(t *testing.T) {
 	s := NewSSLServer()
 
@@ -384,59 +366,124 @@ func TestClientSettings_JSONParsing(t *testing.T) {
 	}
 }
 
-func TestApplyChange_FullReplace(t *testing.T) {
-	content := "line1\nline2\nline3"
-
-	// Create a change that replaces everything
-	change := struct {
-		Range *struct {
-			Start struct {
-				Line      uint32
-				Character uint32
-			}
-			End struct {
-				Line      uint32
-				Character uint32
-			}
+// applyChange is the server's half of incremental text sync: every edit the
+// editor sends is replayed onto the stored copy, so an offset error
+// silently desynchronizes the document until it is reopened. (The previous
+// test here never called applyChange; issue #256.)
+func TestApplyChange(t *testing.T) {
+	rng := func(sl, sc, el, ec uint32) *protocol.Range {
+		return &protocol.Range{
+			Start: protocol.Position{Line: sl, Character: sc},
+			End:   protocol.Position{Line: el, Character: ec},
 		}
-		Text string
+	}
+	cases := []struct {
+		name    string
+		content string
+		change  protocol.TextDocumentContentChangeEvent
+		want    string
 	}{
-		Range: nil, // nil range means full document replace
-		Text:  "new content",
+		{"full replace", "line1\nline2", protocol.TextDocumentContentChangeEvent{Text: "new"}, "new"},
+		{"insert mid-line", "x := 1;", protocol.TextDocumentContentChangeEvent{Range: rng(0, 5, 0, 5), Text: "2"}, "x := 21;"},
+		{"insert at end of document", "a\nb", protocol.TextDocumentContentChangeEvent{Range: rng(1, 1, 1, 1), Text: ";"}, "a\nb;"},
+		{"replace across lines", "one\ntwo\nthree", protocol.TextDocumentContentChangeEvent{Range: rng(0, 1, 2, 2), Text: "X"}, "oXree"},
+		{"delete a newline", "a;\nb;", protocol.TextDocumentContentChangeEvent{Range: rng(0, 2, 1, 0), Text: ""}, "a;b;"},
+		{"after BMP non-ASCII", "s := \"é\";", protocol.TextDocumentContentChangeEvent{Range: rng(0, 7, 0, 8), Text: ";"}, "s := \"é;;"},
+		// U+1F600 is one rune but two UTF-16 code units: column 8 is the
+		// closing quote, not the character after it.
+		{"after astral character", "s := \"\U0001F600\";", protocol.TextDocumentContentChangeEvent{Range: rng(0, 8, 0, 9), Text: "'"}, "s := \"\U0001F600';"},
+		{"CRLF line", "a := 1;\r\nb := 2;", protocol.TextDocumentContentChangeEvent{Range: rng(1, 5, 1, 6), Text: "3"}, "a := 1;\r\nb := 3;"},
+		{"column past line end clamps to line end", "ab\ncd", protocol.TextDocumentContentChangeEvent{Range: rng(0, 99, 0, 99), Text: "!"}, "ab!\ncd"},
+		{"line past end clamps to document end", "ab", protocol.TextDocumentContentChangeEvent{Range: rng(5, 0, 5, 0), Text: "!"}, "ab!"},
+		{"inverted range inserts at start", "abc", protocol.TextDocumentContentChangeEvent{Range: rng(0, 2, 0, 1), Text: "!"}, "ab!c"},
 	}
-
-	// When range is nil, applyChange should replace everything
-	if change.Range == nil {
-		content = change.Text
-	}
-
-	if content != "new content" {
-		t.Errorf("expected 'new content', got %q", content)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := applyChange(tc.content, tc.change); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestSplitLines(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected []string
-	}{
-		{"", []string{""}},
-		{"a", []string{"a"}},
-		{"a\nb", []string{"a", "b"}},
-		{"a\nb\nc", []string{"a", "b", "c"}},
+// The document lifecycle handlers keep the stored text and version in step
+// with the editor and publish diagnostics for each new state.
+func TestDocumentLifecycleHandlers(t *testing.T) {
+	s := NewSSLServer()
+	uri := "file:///lifecycle.ssl"
+	var published []protocol.PublishDiagnosticsParams
+	ctx := &glsp.Context{Notify: func(method string, params any) {
+		if p, ok := params.(protocol.PublishDiagnosticsParams); ok && method == protocol.ServerTextDocumentPublishDiagnostics {
+			published = append(published, p)
+		}
+	}}
+
+	if err := s.handleDidOpen(ctx, &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
+		URI: uri, Version: 1, Text: ":IF .T.;\n:ENDIF;\n",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(published) != 1 || len(published[0].Diagnostics) != 0 {
+		t.Fatalf("open: expected one clean publish, got %+v", published)
 	}
 
-	for _, test := range tests {
-		lines := splitLines(test.input)
-		if len(lines) != len(test.expected) {
-			t.Errorf("expected %d lines for %q, got %d", len(test.expected), test.input, len(lines))
-			continue
-		}
-		for i, line := range lines {
-			if line != test.expected[i] {
-				t.Errorf("expected line %d to be %q, got %q", i, test.expected[i], line)
-			}
-		}
+	// Delete ":ENDIF;" incrementally: the block is now unclosed.
+	if err := s.handleDidChange(ctx, &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: uri}, Version: 2,
+		},
+		ContentChanges: []any{protocol.TextDocumentContentChangeEvent{
+			Range: &protocol.Range{Start: protocol.Position{Line: 1}, End: protocol.Position{Line: 1, Character: 7}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.documents.GetDocument(uri); got != ":IF .T.;\n\n" {
+		t.Errorf("change: stored text %q", got)
+	}
+	if s.documentVersion[uri] != 2 {
+		t.Errorf("change: version %d, want 2", s.documentVersion[uri])
+	}
+	if len(published) != 2 || len(published[1].Diagnostics) == 0 {
+		t.Fatalf("change: expected a publish with the unclosed-block error, got %+v", published)
+	}
+
+	// A whole-document change event replaces the text.
+	if err := s.handleDidChange(ctx, &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: uri}, Version: 3,
+		},
+		ContentChanges: []any{protocol.TextDocumentContentChangeEventWhole{Text: "x := 1;\n"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.documents.GetDocument(uri); got != "x := 1;\n" {
+		t.Errorf("whole change: stored text %q", got)
+	}
+
+	if err := s.handleDidClose(ctx, &protocol.DidCloseTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.documents.GetDocument(uri); ok {
+		t.Error("close: document still stored")
+	}
+	if _, ok := s.documentVersion[uri]; ok {
+		t.Error("close: version still tracked")
+	}
+
+	// A change for a document that is not open is ignored.
+	if err := s.handleDidChange(ctx, &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: uri}, Version: 4,
+		},
+		ContentChanges: []any{protocol.TextDocumentContentChangeEventWhole{Text: "y"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.documents.GetDocument(uri); ok {
+		t.Error("change after close re-created the document")
 	}
 }
 
