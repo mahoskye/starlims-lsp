@@ -176,3 +176,28 @@ func checkDataSourceUndeclaredPlaceholders(body string, declared []string, lineO
 	}
 	return diagnostics
 }
+
+// checkDataSourceQuestionPlaceholders reports a `?name?` marker in the
+// body of a SQL-mode data source (issue #260). There, parameters are
+// referenced as `@name`; the `?name?` substitution belongs to SQLExecute
+// in SSL code and does not happen in a SQL-mode body.
+func checkDataSourceQuestionPlaceholders(body string, lineOffset int) []Diagnostic {
+	var diagnostics []Diagnostic
+	for _, t := range NewSQLLexer(body).Tokenize() {
+		if t.Type != SQLTokenPlaceholder || len(t.Text) < 3 || !strings.HasPrefix(t.Text, "?") || !strings.HasSuffix(t.Text, "?") {
+			continue
+		}
+		name := t.Text[1 : len(t.Text)-1]
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range: Range{
+				Start: Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1},
+				End:   Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1 + len(t.Text)},
+			},
+			Message: fmt.Sprintf("A SQL data source references parameters as '@%s'; the '?%s?' marker is SQLExecute's and is not substituted here", name, name),
+			Source:  "ssl-lsp",
+			Code:    CodeDatasourceSQLQuestionPlaceholder,
+		})
+	}
+	return diagnostics
+}

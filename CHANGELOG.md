@@ -303,6 +303,16 @@ code, or output format changes for either distribution.
   the next LSP minor release removes the alias. Nothing changes in this
   release. `--format` callers are unaffected: the CLI cannot select a SQL
   style.
+### Added
+- **Four rules from the reference's data-sources guide (#260).**
+  - `empty_parameters` (error): `:PARAMETERS;` with no names. A parameter
+    list must name at least one parameter, in any file.
+  - `datasource_sql_question_placeholder` (error): a `?name?` marker in a
+    SQL-mode data source. Parameters there are referenced as `@name`.
+  - `nullasblank_value` (warning): `:NULLASBLANK` takes the word `true` or
+    `false`. A value such as `.F.` is silently ignored.
+  - `invariant_date_columns_quoted` (warning): a quoted
+    `:INVARIANTDATECOLUMNS` name keeps its quotes and matches no column.
 
 ## [0.24.0] - 2026-09-21
 

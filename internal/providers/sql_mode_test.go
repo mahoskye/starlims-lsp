@@ -587,7 +587,7 @@ func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T)
 		"*******************************************************/;\n"
 	sql := "SELECT s.SAMPLE_ID, s.STATUS, t.NAME || ' (' || t.CODE || ')'\n" +
 		"FROM SAMPLES s, TESTS t\n" +
-		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = ?sStatus? or s.RUSH = 'Y'\n"
+		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = @sStatus or s.RUSH = 'Y'\n"
 
 	onlySemicolon := func(label, content string) {
 		t.Helper()
@@ -665,7 +665,7 @@ func TestGetDiagnostics_CommentedOutDirectiveIsNotSSLMarker(t *testing.T) {
 
 	clean := ":PARAMETERS sFolderNo := '12345';\n" +
 		"--:PARAMETERS sFolderNo := '';\n" +
-		"SELECT f.FOLDER_NO, f.STATUS FROM FOLDERS f WHERE f.FOLDER_NO = ?sFolderNo?\n"
+		"SELECT f.FOLDER_NO, f.STATUS FROM FOLDERS f WHERE f.FOLDER_NO = @sFolderNo\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected SQL mode for body with commented-out directive, got %+v", diags)
 	}
@@ -734,7 +734,7 @@ func TestSQLModeDataSource_SSLStyleBannerAboveHeader(t *testing.T) {
 // [spec feature.diagnostics_pipeline/A31] The end-to-end consequence: the
 // SQL body of such a document draws no SSL diagnostics.
 func TestDiagnostics_SSLBannerDataSourceBodyIsNotLexedAsSSL(t *testing.T) {
-	content := "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT io.name FROM sample WHERE status = ?sStatus? AND a = 1\n"
+	content := "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT io.name FROM sample WHERE status = @sStatus AND a = 1\n"
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 	opts.IncludeInfoDiagnostics = true

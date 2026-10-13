@@ -182,6 +182,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				sqlBodyDiagnostics = applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(body, offset),
 					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset),
+					checkDataSourceQuestionPlaceholders(body, offset),
 					// The header region, unmasked. The split blanks its
 					// comments and swallows a banner's trailing `;`, so
 					// the SSL pipeline below never sees either.
@@ -195,6 +196,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				return applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(text, 0),
 					checkDataSourceUndeclaredPlaceholders(text, nil, 0),
+					checkDataSourceQuestionPlaceholders(text, 0),
 				), opts.RuleOverrides), opts)
 			}
 		}
@@ -342,6 +344,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNegativeLogic(tokens)...)
 	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens)...)
 	diagnostics = append(diagnostics, checkNilMethodCalls(tokens)...)
+	diagnostics = append(diagnostics, checkParameterListAndDirectives(tokens, opts.IsDataSourceFile)...)
 
 	// Check for assignment to global variables.
 	// Always runs to catch writes to built-in predefined globals (e.g. MYUSERNAME).
