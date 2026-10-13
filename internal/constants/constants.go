@@ -240,7 +240,7 @@ var SSLKeywordDescriptions = map[string]string{
 	"INHERIT":         "Specifies base class for inheritance",
 	"EXITFOR":         "Exits a FOR loop immediately",
 	"EXITWHILE":       "Exits a WHILE loop immediately",
-	"EXITCASE":        "Stops evaluating further CASE blocks in the current BEGINCASE; without it, later :CASE expressions are still evaluated and additional matching bodies may execute. Valid only as the last statement directly in a :CASE or :OTHERWISE branch: a statement after it, or an :EXITCASE nested inside :IF, does not compile",
+	"EXITCASE":        "Stops evaluating further CASE blocks in the current BEGINCASE; without it, later :CASE expressions are still evaluated and additional matching bodies may execute",
 	"LOOP":            "Jump back to start of loop",
 	"BEGININLINECODE": "Begins a legacy named inline-code storage block",
 	"ENDINLINECODE":   "Ends a legacy named inline-code storage block",
