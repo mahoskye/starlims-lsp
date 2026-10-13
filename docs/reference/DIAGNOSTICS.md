@@ -36,7 +36,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | style_only | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
-| `datasource_default_required` | Data source parameter missing its inline default (removed — premise was wrong) | error | authoritative | removed | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
+| `datasource_default_required` | Data source parameter missing its inline default | error | authoritative | active | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
 | `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | error | authoritative | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
 | `datasource_undeclared_placeholder` | Undeclared @name placeholder in a SQL data-source body | warning | authoritative | active | [diag.datasource_undeclared_placeholder](../../catalog/diagnostics/datasource_undeclared_placeholder.md) |
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
@@ -72,6 +72,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `include_quoted_target` | :INCLUDE target written as a string | error | authoritative | active | [diag.include_quoted_target](../../catalog/diagnostics/include_quoted_target.md) |
 | `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
+| `inline_default_outside_datasource` | Inline := default on :PARAMETERS outside a data source | error | authoritative | active | [diag.inline_default_outside_datasource](../../catalog/diagnostics/inline_default_outside_datasource.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |

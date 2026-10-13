@@ -8231,20 +8231,31 @@ func TestGetDiagnostics_DataSource_DefaultStatementFlagged(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_DataSource_ParametersWithoutDefaultsValid(t *testing.T) {
-	// diag.datasource_default_required was removed (issue #147,
-	// ssl-style-guide#48): the data source builder accepts :PARAMETERS
-	// without inline defaults, so no default-related error may fire.
-	code := `:PARAMETERS sName, nCount := 10;`
+func TestGetDiagnostics_DataSource_ParametersWithoutDefaults(t *testing.T) {
+	// diag.datasource_default_required, reinstated (issues #263, #269):
+	// a data source whose script-level :PARAMETERS has a name without an
+	// inline default fails when it runs. Only the defaultless name is
+	// reported; a procedure's own :PARAMETERS inside the data source is not
+	// the data source's interface and is never checked.
+	code := `:PARAMETERS sName, nCount := 10;
+:PROCEDURE Helper;
+:PARAMETERS sInner;
+:RETURN sInner;
+:ENDPROC;`
 
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
-	diagnostics := GetDiagnostics(code, opts)
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "inline ':=' default") || d.Code == "datasource_default_required" {
-			t.Errorf("defaultless data source parameter must not be flagged: %s", d.Message)
+	var got []string
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeDatasourceDefaultRequired {
+			if d.Severity != SeverityError {
+				t.Errorf("severity = %v, want error", d.Severity)
+			}
+			got = append(got, d.Message)
 		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0], "'sName'") {
+		t.Fatalf("want only sName reported, got %v", got)
 	}
 }
 

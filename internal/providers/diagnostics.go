@@ -292,8 +292,10 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	if opts.IsDataSourceFile {
 		diagnostics = append(diagnostics, checkKeywordFormsDataSource(tokens)...)
 		diagnostics = append(diagnostics, checkDataSourceDefaultUsage(tokens)...)
+		diagnostics = append(diagnostics, checkDataSourceParameterDefaults(tokens)...)
 	} else {
 		diagnostics = append(diagnostics, checkKeywordForms(tokens)...)
+		diagnostics = append(diagnostics, checkInlineDefaultOutsideDataSource(tokens)...)
 		diagnostics = append(diagnostics, checkDefaultOnDeclareLine(tokens)...)
 		diagnostics = append(diagnostics, checkParameterPlacement(tokens)...)
 		diagnostics = append(diagnostics, checkDefaultPlacement(tokens)...)
@@ -6133,6 +6135,150 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	return diagnostics
+}
+
+// parametersEntry is one name in a :PARAMETERS statement and whether it
+// carries an inline := default.
+type parametersEntry struct {
+	name       lexer.Token
+	assign     lexer.Token // the := token, when hasDefault
+	hasDefault bool
+}
+
+// parametersStatements returns, for each :PARAMETERS statement, its entries
+// and whether the statement sits inside a :PROCEDURE body. After a name, a
+// := default is consumed through the next top-level , or ; so identifiers
+// inside a default value (including in parentheses, braces or brackets)
+// are never read as parameter names.
+func parametersStatements(tokens []lexer.Token) (stmts [][]parametersEntry, inProc []bool) {
+	procDepth := 0
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if token.Type != lexer.TokenKeyword {
+			continue
+		}
+		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
+		case "PROCEDURE":
+			procDepth++
+			continue
+		case "ENDPROC":
+			if procDepth > 0 {
+				procDepth--
+			}
+			continue
+		case "PARAMETERS":
+		default:
+			continue
+		}
+
+		var entries []parametersEntry
+		expectName := true
+		depth := 0
+		j := i + 1
+		for ; j < len(tokens); j++ {
+			t := tokens[j]
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+			if t.Type == lexer.TokenPunctuation {
+				switch t.Text {
+				case "(", "{", "[":
+					depth++
+					continue
+				case ")", "}", "]":
+					if depth > 0 {
+						depth--
+					}
+					continue
+				case ",":
+					if depth == 0 {
+						expectName = true
+					}
+					continue
+				case ";":
+					if depth == 0 {
+						goto done
+					}
+					continue
+				}
+			}
+			if expectName && depth == 0 && t.Type == lexer.TokenIdentifier {
+				entry := parametersEntry{name: t}
+				k := j + 1
+				for k < len(tokens) && (tokens[k].Type == lexer.TokenWhitespace || tokens[k].Type == lexer.TokenComment) {
+					k++
+				}
+				if k < len(tokens) && tokens[k].Type == lexer.TokenOperator && tokens[k].Text == ":=" {
+					entry.hasDefault = true
+					entry.assign = tokens[k]
+					j = k
+				}
+				entries = append(entries, entry)
+				expectName = false
+			}
+		}
+	done:
+		stmts = append(stmts, entries)
+		inProc = append(inProc, procDepth > 0)
+		i = j
+	}
+	return stmts, inProc
+}
+
+// checkDataSourceParameterDefaults reports each script-level data-source
+// parameter without an inline := default (issues #263, #269). A data
+// source, in SSL or SQL mode, with such a parameter fails when it runs:
+// "No default value for one or more parameters.", whatever the caller
+// passes. A :PARAMETERS inside a :PROCEDURE body is an ordinary procedure
+// signature, not the data source's interface, and is not checked.
+func checkDataSourceParameterDefaults(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+	stmts, inProc := parametersStatements(tokens)
+	for s, entries := range stmts {
+		if inProc[s] {
+			continue
+		}
+		for _, e := range entries {
+			if e.hasDefault {
+				continue
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(e.name),
+				Message:  fmt.Sprintf("Data source parameter '%s' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)", e.name.Text),
+				Source:   "ssl-lsp",
+				Code:     CodeDatasourceDefaultRequired,
+			})
+		}
+	}
+	return diagnostics
+}
+
+// checkInlineDefaultOutsideDataSource reports an inline := default on a
+// :PARAMETERS name in a file that is not a data source (issue #264). Only
+// data sources accept the inline form; in a script or procedure the
+// statement takes names only and does not compile. The range runs from the
+// name through the := so a client fix can rewrite it as a :DEFAULT line.
+func checkInlineDefaultOutsideDataSource(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+	stmts, _ := parametersStatements(tokens)
+	for _, entries := range stmts {
+		for _, e := range entries {
+			if !e.hasDefault {
+				continue
+			}
+			r := tokenToRange(e.name)
+			r.End = tokenToRange(e.assign).End
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    r,
+				Message:  fmt.Sprintf("Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for '%s' to a ':DEFAULT' line after ':PARAMETERS'", e.name.Text),
+				Source:   "ssl-lsp",
+				Code:     CodeInlineDefaultOutsideDatasource,
+			})
+		}
+	}
 	return diagnostics
 }
 
