@@ -156,6 +156,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   placeholder. Without those two classes the residual is 1.21 per
   document. The contract entry records the numbers and the known gaps
   (#262).
+- **A short SQL `WHEN` predicate stays on its `WHEN` line.** `AND`/`OR`
+  inside a `CASE ... WHEN` condition always broke onto new lines. A
+  predicate that fits with its `THEN` now stays inline, as in the style
+  guide's example; only one that overflows breaks before each `AND`/`OR`
+  (#286).
 - **SQL `CASE` lays out the same way in every clause.** Only a `CASE` in
   the SELECT list came out the way the compact SQL reference shows it.
   In `WHERE`, `ORDER BY` and `UPDATE ... SET` the formatter moved `CASE`

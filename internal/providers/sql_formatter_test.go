@@ -1324,11 +1324,46 @@ func TestSQLFormatter_CaseLayoutEveryClause(t *testing.T) {
 			input: "SELECT customer_id, SUM(CASE WHEN status = 'Complete' AND result_value > threshold_value THEN 1 ELSE 0 END) AS done FROM order_tasks",
 			want: "SELECT customer_id,\n" +
 				"       SUM(CASE\n" +
-				"               WHEN status = 'Complete'\n" +
-				"                   AND result_value > threshold_value THEN 1\n" +
+				"               WHEN status = 'Complete' AND result_value > threshold_value THEN 1\n" +
 				"               ELSE 0\n" +
 				"           END) AS done\n" +
 				"FROM order_tasks",
+		},
+	}
+	runSQLLayoutCases(t, cases)
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	for _, tc := range cases {
+		if again := f.FormatSQL(tc.want, ""); again != tc.want {
+			t.Errorf("not idempotent (%s):\n%s", tc.name, again)
+		}
+	}
+}
+
+// Issue #286: a WHEN predicate that fits on its WHEN line keeps its AND/OR
+// inline (style guide §5.2); one that overflows still breaks before each
+// AND/OR, one step past WHEN (Rule B).
+func TestSQLFormatter_WhenPredicateInlineWhenItFits(t *testing.T) {
+	cases := []struct{ name, input, want string }{
+		{
+			name:  "short predicate stays on the WHEN line",
+			input: "SELECT CASE WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent' WHEN s.status = 'B' OR s.status = 'C' THEN 'review' ELSE 'normal' END AS label FROM samples s",
+			want: "SELECT CASE\n" +
+				"           WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent'\n" +
+				"           WHEN s.status = 'B' OR s.status = 'C' THEN 'review'\n" +
+				"           ELSE 'normal'\n" +
+				"       END AS label\n" +
+				"FROM samples s",
+		},
+		{
+			name:  "overflowing predicate breaks before AND",
+			input: "SELECT CASE WHEN s.status_code_for_the_sample = 'A' AND s.priority_level_of_the_sample = 1 AND s.department_code = 'QC' THEN 'urgent' ELSE 'normal' END AS label FROM samples s",
+			want: "SELECT CASE\n" +
+				"           WHEN s.status_code_for_the_sample = 'A'\n" +
+				"               AND s.priority_level_of_the_sample = 1\n" +
+				"               AND s.department_code = 'QC' THEN 'urgent'\n" +
+				"           ELSE 'normal'\n" +
+				"       END AS label\n" +
+				"FROM samples s",
 		},
 	}
 	runSQLLayoutCases(t, cases)

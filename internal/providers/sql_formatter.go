@@ -704,7 +704,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				switch upperText {
 				case "CASE":
 					frame := &sqlCaseFrame{parenDepth: parenDepth, endIdx: findSQLCaseEnd(nonWSTokens, i),
-						flatCol: len(baseIndent) + len(f.indentString)*parenDepth}
+						flatCol: len(baseIndent) + len(f.indentString)*parenDepth, predThen: -1}
 					switch {
 					case (top != nil && top.inline) || (inOverClause && parenDepth >= overParenDepth):
 						frame.inline = true
@@ -751,6 +751,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 							needsBreak = true
 							top.branchCol = top.col + caseBranchIndent
 							extraIndent = colIndent(top.branchCol)
+							top.predThen = -1
+							if upperText == "WHEN" {
+								top.predThen = f.whenPredicateInline(nonWSTokens, i, top.branchCol)
+							}
 							if upperText == "ELSE" {
 								top.breakElse = f.caseValueBreaks(nonWSTokens, i, i+1, top.endIdx, top.branchCol, top.flatCol)
 							}
@@ -777,9 +781,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					}
 				case "AND", "OR":
 					// Rule B: AND/OR continuing a WHEN predicate indents one
-					// step past the WHEN keyword.
+					// step past the WHEN keyword — unless the whole predicate
+					// fits on the WHEN line, where it stays (issue #286).
 					if top != nil {
-						if top.inline {
+						if top.inline || (top.predThen >= 0 && i < top.predThen) {
 							needsBreak = false
 						} else if needsBreak && parenDepth == top.parenDepth {
 							extraIndent = colIndent(top.branchCol + len(f.indentString))
@@ -1038,6 +1043,10 @@ type sqlCaseFrame struct {
 	breakElse  bool // the ELSE value starts its own line
 	// thenWrapped: the current branch's THEN wrapped onto its own line
 	thenWrapped bool
+	// predThen is the index of the current WHEN's THEN when its whole
+	// predicate fits on the WHEN line, so AND/OR inside it stay inline
+	// (issue #286); -1 when the predicate breaks at AND/OR (Rule B).
+	predThen int
 }
 
 // findSQLCaseEnd returns the index of the END keyword closing the CASE at
@@ -1159,13 +1168,15 @@ func (f *SQLFormatter) caseValueBreaks(tokens []SQLToken, kwIdx, valStart, valEn
 	}
 	segStart, segCol := kwIdx, kwCol
 	afterBetween := false
+	// A predicate that fits on its WHEN line is one segment (issue #286).
+	predInline := strings.EqualFold(tokens[kwIdx].Text, "WHEN") && f.whenPredicateInline(tokens, kwIdx, kwCol) >= 0
 	for j := kwIdx + 1; j < valStart; j++ {
 		if isSQLSubqueryOpen(tokens, j) {
 			j = matchingSQLParen(tokens, j)
 			segStart, segCol = j, flatCol
 			continue
 		}
-		if tokens[j].Type != SQLTokenKeyword || f.opts.Style == "standard" {
+		if tokens[j].Type != SQLTokenKeyword || f.opts.Style == "standard" || predInline {
 			continue
 		}
 		switch strings.ToUpper(tokens[j].Text) {
@@ -1188,6 +1199,50 @@ func (f *SQLFormatter) caseValueBreaks(tokens []SQLToken, kwIdx, valStart, valEn
 		}
 	}
 	return segCol+f.projectionRenderLen(tokens, segStart, valEnd) > f.opts.MaxLineLength
+}
+
+// whenPredicateInline returns the index of the THEN ending the WHEN at
+// whenIdx when `WHEN <predicate> THEN`, placed at col, fits within the line
+// length, so the predicate keeps its AND/OR inline (issue #286; style guide
+// §5.2). It returns -1 — break at AND/OR (Rule B) — when the predicate
+// overflows, holds a subquery (placed by the subquery rules), there is no
+// line length to fit against, or no THEN follows. A nested CASE inside the
+// predicate is measured as written.
+func (f *SQLFormatter) whenPredicateInline(tokens []SQLToken, whenIdx, col int) int {
+	if f.opts.MaxLineLength <= 0 {
+		return -1
+	}
+	nest, paren := 0, 0
+	for j := whenIdx + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		upper := strings.ToUpper(t.Text)
+		isKw := t.Type == SQLTokenKeyword
+		if isSQLSubqueryOpen(tokens, j) {
+			return -1
+		}
+		if nest == 0 && paren == 0 && isKw {
+			switch upper {
+			case "THEN":
+				if col+f.projectionRenderLen(tokens, whenIdx, j+1) <= f.opts.MaxLineLength {
+					return j
+				}
+				return -1
+			case "WHEN", "ELSE", "END":
+				return -1
+			}
+		}
+		switch {
+		case t.Text == "(":
+			paren++
+		case t.Text == ")":
+			paren--
+		case isKw && upper == "CASE":
+			nest++
+		case isKw && upper == "END":
+			nest--
+		}
+	}
+	return -1
 }
 
 // caseHeadWidth is the widest WHEN line of the CASE at start — WHEN, its
