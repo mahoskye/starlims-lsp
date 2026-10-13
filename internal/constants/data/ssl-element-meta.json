@@ -783,18 +783,24 @@
       ],
       "caveats": [
         "Calling Branch() without a target stops the script from compiling, so no runtime error can be caught.",
-        "For :LABEL name;, the usual branch target is \"LABEL name\". For mashed labels such as :LABELNAME;, the target text must match that exact token text instead."
+        "For :LABEL name;, the usual branch target is \"LABEL name\". For mashed labels such as :LABELNAME;, the target text must match that exact token text instead.",
+        "A string-literal target that matches no label stops the script from compiling, so none of the script runs and no :TRY can catch the failure. Matching is case-sensitive: a literal Branch(\"label skip\") for :LABEL SKIP; fails the same way.",
+        "A computed target never jumps, at script level or inside a procedure, even when its text exactly matches a label (verified on STARLIMS 12). Execution continues with the next statement, and no error is raised.",
+        "An :ERROR handler can branch back to a label before :ERROR, so a retry loop works. Branching the other way, from the protected statements to a label inside the handler, raises a runtime error: Exception has been thrown by the target of an invocation."
       ],
       "best_practices": {
         "do": [
           "Use descriptive labels that make the jump target obvious, such as CLEANUP or RECOVER.",
           "For labels declared with :LABEL name;, pass the matching target text such as \"LABEL CLEANUP\".",
+          "Pass the target as a string literal. When the target depends on runtime data, choose among literal Branch calls with :IF or :BEGINCASE.",
           "Prefer one shared cleanup or recovery label over repeating the same shutdown logic in several places."
         ],
         "dont": [
           "Pass plain label names such as \"CLEANUP\" for a normal :LABEL CLEANUP; target. The text must match the label exactly as written after the colon.",
+          "Change the case of the target text. Branch(\"label cleanup\") does not match :LABEL CLEANUP;, and the script does not compile.",
+          "Pass a variable, parameter or expression as the target. A computed target never reaches a label. Use a string literal.",
           "Use Branch as a substitute for ordinary :IF, :FOR, :WHILE, or :RETURN flow when structured control is sufficient.",
-          "Assume a computed target will raise an error when it does not match. A computed miss simply falls through to the next statement."
+          "Expect an error from a computed target. It falls through silently, so the jump is lost without any sign."
         ]
       }
     },
@@ -1660,6 +1666,7 @@
         }
       ],
       "caveats": [
+        "In the class-name form, constructor parameters with no matching argument arrive as NIL. That holds when aArgs is omitted, when it is {}, and when it has fewer elements than the constructor's :PARAMETERS. Extra elements beyond the declared parameters are ignored without an error.",
         "Pass the class as Category.ClassName. A bare class name is looked up only among the default categories, so for a class in your own category it raises There is no script with name: <name> among default categories.",
         "Property names in the array form are not checked against identifier rules. In observed runtime behavior, CreateUdObject({\"1abc\"}) creates a property named 1abc instead of raising an error.",
         "An empty aPropertyDefs array is valid and returns an empty dynamic object.",
@@ -1676,6 +1683,7 @@
         "dont": [
           "Use CreateUdObject to instantiate built-in classes. Use curly-brace construction such as Email{} or SSLDataset{} instead.",
           "Pass constructor arguments as separate parameters. The class-name form expects one array argument list.",
+          "Expect an argument-count mismatch to raise. Missing constructor arguments arrive as NIL and extra ones are ignored, so check required arguments in the constructor.",
           "Use empty property names or names that contain spaces, hyphens, or leading digits.",
           "Assume a bare property-name entry gives you a custom default value. It creates the property with \"\"."
         ]
@@ -5417,8 +5425,8 @@
       "source_path": "content/reference/functions/GetInlineCode.md",
       "exceptions": [
         {
-          "trigger": "Inline code blocks are defined but the named block is not among them.",
-          "message": "<name> not in scope."
+          "trigger": "Inline code blocks are stored but the named block is not among them, including when the call runs before execution reaches that block.",
+          "message": "GetInlineCode: <name> not in scope."
         },
         {
           "trigger": "A name in aVariables is not defined in the current scope.",
@@ -5426,12 +5434,16 @@
         }
       ],
       "caveats": [
-        "GetInlineCode retrieves code text; it does not execute that code."
+        "GetInlineCode retrieves code text; it does not execute that code.",
+        "A block is stored when execution reaches its :BEGININLINECODE statement. After DeleteInlineCode removes a name, a later block with the same name stores it again, and GetInlineCode returns the later block's text.",
+        "Called before execution reaches the block, GetInlineCode returns an empty string when no inline block is stored yet, and raises GetInlineCode: <name> not in scope. when another block is already stored. After the block is reached, it returns the block's text.",
+        "Reaching a :BEGININLINECODE block stores its text but does not run its body."
       ],
       "best_practices": {
         "do": [
           "Use GetInlineCode when you need the stored inline code text, with or without variable substitution.",
           "Pass only the variable names that must be resolved into the returned code.",
+          "Call GetInlineCode after execution has passed the :BEGININLINECODE block it reads.",
           "Delete temporary inline code with DeleteInlineCode when you are finished with it."
         ],
         "dont": [
@@ -5767,7 +5779,9 @@
         }
       ],
       "caveats": [
-        "Replacements are applied in order, so overlapping source values can affect the final result."
+        "Replacements are applied in order, so overlapping source values can affect the final result.",
+        "GetRegion sees regions defined in a script pulled in with :INCLUDE, as well as regions in the current script.",
+        "Region markers inside a comment, such as /*:REGION Hidden;, define no region. GetRegion(\"Hidden\") then raises GetRegion: hidden not in scope. when the script defines other regions."
       ],
       "best_practices": {
         "do": [
@@ -12367,13 +12381,16 @@
       "source_path": "content/reference/keywords/BEGININLINECODE.md",
       "exceptions": [],
       "caveats": [
-        "GetInlineCode raises a runtime error if the named block is not in scope.",
+        "A block is stored when execution reaches it. A block with the same name that runs after DeleteInlineCode stores the name again.",
+        "The block's body does not run where the block stands. Retrieve it with GetInlineCode and run it with ExecUdf.",
+        "GetInlineCode called before execution reaches the block returns an empty string when no inline block is stored yet, and raises GetInlineCode: <name> not in scope. when another inline block is already stored.",
         "DeleteInlineCode raises <name> not in scope. when other inline blocks exist but this name is not among them. With no inline blocks defined, it returns .T.."
       ],
       "best_practices": {
         "do": [
           "Use a clear block name that matches how the code will be retrieved.",
           "Keep the inline body valid SSL so the script compiles cleanly.",
+          "Place the block before the GetInlineCode call that reads it, so the block has been stored by the time the call runs.",
           "Delete temporary inline code with DeleteInlineCode after use when the block is no longer needed."
         ],
         "dont": [
@@ -12710,7 +12727,8 @@
         "The handler runs to :ENDPROC. Statements placed after :ERROR never run on the success path.",
         "Without :RESUME, a :TRY block in the protected region keeps its own :CATCH.",
         "With :RESUME, the legacy handler takes errors raised inside a :TRY body before :CATCH can run, and execution continues inside the :TRY body at the next statement. Do not combine resume mode with :TRY/:CATCH in the same procedure. See Error Handling.",
-        "If no error occurs, the handler body is skipped."
+        "If no error occurs, the handler body is skipped.",
+        "The handler can Branch back to a label before :ERROR to retry. Keep a counter so the retry stops. Branching from the protected statements to a label inside the handler raises Exception has been thrown by the target of an invocation."
       ],
       "best_practices": {
         "do": [
@@ -12870,7 +12888,9 @@
       "source_path": "content/reference/keywords/IF.md",
       "exceptions": [],
       "caveats": [
-        ":IF, :ELSE, and :ENDIF are case-sensitive SSL keywords and must be written in uppercase with the leading colon."
+        ":IF, :ELSE, and :ENDIF are case-sensitive SSL keywords and must be written in uppercase with the leading colon.",
+        "A condition that evaluates to a string, number, or other non-logical value raises a runtime error whose message ends invalid operand: <value> (of type <type>) for operator: asBool, the same error :WHILE and :CASE raise. This includes a condition such as .T. .AND. \"\", because .AND. returns a non-boolean right operand unchanged.",
+        "A condition that evaluates to NIL raises a less specific error: Exception has been thrown by the target of an invocation."
       ],
       "best_practices": {
         "do": [
@@ -12881,7 +12901,8 @@
         "dont": [
           "Write complex nested conditions that are difficult to read or debug. Clear conditions reduce maintenance complexity and misinterpretation.",
           "Omit :ENDIF or misalign :ENDIF and :ELSE, which can cause unreachable code or errors.",
-          "Overload a single :IF with unrelated checks connected by complex boolean logic. Keeping blocks focused improves clarity and simplifies future changes."
+          "Overload a single :IF with unrelated checks connected by complex boolean logic. Keeping blocks focused improves clarity and simplifies future changes.",
+          "Use a string, number, or NIL as the condition and expect it to count as true or false. Compare it explicitly, for example :IF ! Empty(sValue);."
         ]
       }
     },
@@ -12896,7 +12917,8 @@
       "caveats": [
         ":INCLUDE must be written in uppercase with the leading colon.",
         "The target name is normally written in identifier syntax (:INCLUDE ScriptName; or :INCLUDE Category.ScriptName;). A quoted-string target (:INCLUDE \"ScriptName\";) is not accepted: it raises unexpected char: '\"'.",
-        "If the target script cannot be loaded, compilation fails."
+        "If the target script cannot be loaded, compilation fails.",
+        ":REGION blocks in the included script are visible to GetRegion in the including script, and the included script's procedures can be called as if they were defined there."
       ],
       "best_practices": {
         "do": [
@@ -12945,12 +12967,15 @@
       "exceptions": [],
       "caveats": [
         ":LABEL name; and :LABELname; are different stored texts and require different Branch() targets.",
-        "Keyword names are case-sensitive and must be uppercase: use :LABEL, not :label."
+        "Keyword names are case-sensitive and must be uppercase: use :LABEL, not :label.",
+        "Label text is matched case-sensitively. Branch(\"label skip\") does not reach :LABEL SKIP;; as a string literal it stops the script from compiling.",
+        "Only a string-literal Branch() target reaches a label. A computed target (a variable, parameter or expression) never matches, even with the exact label text, and falls through silently.",
+        "A label before :ERROR can be reached from the handler, so the handler can branch back and retry. A label inside the handler cannot be reached from the statements before :ERROR: that branch raises a runtime error."
       ],
       "best_practices": {
         "do": [
           "Choose descriptive labels such as CLEANUP or RECOVER that make the jump target obvious.",
-          "Pass the exact stored target text to Branch(), such as Branch(\"LABEL CLEANUP\") for :LABEL CLEANUP;.",
+          "Pass the exact stored target text to Branch() as a string literal, with the same case, such as Branch(\"LABEL CLEANUP\") for :LABEL CLEANUP;.",
           "Reserve labels for shared recovery or cleanup paths when structured flow would be less clear."
         ],
         "dont": [
@@ -13129,7 +13154,9 @@
         ":REGION must be closed by a matching :ENDREGION;.",
         ":REGION and :ENDREGION are case-sensitive keywords and must be uppercase.",
         "GetRegion() raises an error if the requested region name is not in scope.",
-        "Leading and trailing line breaks immediately inside the region body are trimmed before the text is stored."
+        "Leading and trailing line breaks immediately inside the region body are trimmed before the text is stored.",
+        "Region markers inside a comment define nothing. With /*:REGION Hidden; written as a comment line, GetRegion(\"Hidden\") raises GetRegion: hidden not in scope. when the script defines other regions.",
+        "Regions defined in a script pulled in with :INCLUDE are visible to GetRegion() in the including script."
       ],
       "best_practices": {
         "do": [
@@ -13352,6 +13379,8 @@
       "exceptions": [],
       "caveats": [
         ".AND. is a logical operator. Use boolean expressions on both sides.",
+        "A non-boolean right operand does not raise. When the left operand is .F., the right side is not evaluated and the result is .F., so .F. .AND. \"x\" returns .F.. When the left operand is .T., .AND. returns the right operand unchanged, so .T. .AND. \"x\" returns \"x\" and .T. .AND. 5 returns 5, not a boolean. This mirrors .OR..",
+        "A non-boolean left operand raises a runtime error. The message ends invalid operand: <value> (of type <type>) for operator: asBool.",
         "Only the right operand is skipped. Any side effects in the left operand still happen.",
         ".AND. is not the integer bitwise AND operator. For bitwise integer operations, use _AND(a, b)."
       ],
@@ -13364,7 +13393,8 @@
         "dont": [
           "Put an expensive lookup on the left when a simple flag check could reject the condition first.",
           "Access a property, method, or array element on the left and expect a later condition to protect it. The left operand always runs.",
-          "Rely on readers to infer precedence in a long mixed logical expression. Group it explicitly."
+          "Rely on readers to infer precedence in a long mixed logical expression. Group it explicitly.",
+          "Use .AND. with a string, number, or other non-boolean operand. A non-boolean left operand raises an error, and a non-boolean right operand comes back unchanged instead of as a boolean."
         ]
       }
     },
@@ -13438,7 +13468,7 @@
         ],
         "dont": [
           "Assume postfix (variable--) also returns the updated value. The postfix form returns the original before decrementing.",
-          "Use -- on strings, arrays, objects, booleans, or expression results. Unsupported usage raises errors.",
+          "Use -- on literals, expression results, or values other than numbers and dates. The target must be a variable, an array element, or an object property holding a number or a date.",
           "Use -- when a non-unit decrement is needed. Use subtract-assign (-=) instead."
         ]
       }
@@ -13645,7 +13675,7 @@
           "Use the prefix form (++variable) when the incremented value is needed immediately in the same expression."
         ],
         "dont": [
-          "Use ++ on non-variable values or on types other than numbers and dates. Only variables holding numbers or dates can be incremented.",
+          "Use ++ on literals, expression results, or values other than numbers and dates. The target must be a variable, an array element, or an object property holding a number or a date.",
           "Assume prefix and postfix always behave identically inside expressions. Prefix returns the new value; postfix returns the old value."
         ]
       }
@@ -14491,7 +14521,9 @@
         "Constructor is meaningful only as the fixed constructor declaration name inside :CLASS.",
         ":RETURN value; inside a constructor causes a compile-time error.",
         "Constructors run during object creation; they are not invoked like ordinary methods.",
-        "If no constructor is declared, the class can still be created with no arguments."
+        "If no constructor is declared, the class can still be created with no arguments.",
+        "An argument-count mismatch does not raise. Parameters with no matching element in the CreateUdObject argument array arrive as NIL, including when the array is omitted or empty, and extra elements are ignored.",
+        "Declaring Constructor before the class's other methods is allowed. Placing it last is a convention, not a requirement."
       ],
       "best_practices": {
         "do": [

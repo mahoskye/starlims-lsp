@@ -240,6 +240,18 @@
           "right": "boolean",
           "result": "boolean",
           "behavior": "Returns .T. only when both operands are .T.. If the left operand is .F., the right operand is not evaluated."
+        },
+        {
+          "left": "boolean",
+          "right": "any other type",
+          "result": "the right operand",
+          "behavior": "When the left operand is .T., .AND. returns the right operand unchanged, so .T. .AND. \"x\" returns \"x\". When the left operand is .F., the result is .F. and the right operand is not evaluated."
+        },
+        {
+          "left": "any other type",
+          "right": "any",
+          "result": "error",
+          "behavior": "Raises a runtime error. A non-boolean left operand cannot be converted to a logical value."
         }
       ]
     },
@@ -4875,7 +4887,7 @@
           "type": "any",
           "required": "yes",
           "default": "—",
-          "description": "Target label text. A string literal is used directly as the target text. Any other expression is evaluated and converted to a string before SSL compares it to the labels in the current procedure."
+          "description": "Target label text. A string literal is used directly as the target text and must match a label exactly, including case. Any other expression never matches a label, so the call falls through to the next statement."
         }
       ]
     },
@@ -8789,7 +8801,7 @@
       "signature": "GetInlineCode(sValue, [aVariables])",
       "returns": {
         "type": "string",
-        "description": "The inline code text for the named block. Returns an empty string when no inline code blocks are defined in the current execution context. Returns the code unchanged when `aVariables` is omitted or `NIL`."
+        "description": "The inline code text for the named block. Returns an empty string when no inline code blocks are stored in the current execution context, including when the call runs before execution reaches the first `:BEGININLINECODE` block. Returns the code unchanged when `aVariables` is omitted or `NIL`."
       },
       "parameters": [
         {
