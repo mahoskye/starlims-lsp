@@ -13,8 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   statement after it, an `:EXITCASE` nested inside `:IF`, `:WHILE`, `:FOR`
   or `:TRY` within the branch, and an `:EXITCASE` outside any `:BEGINCASE`
   all fail to compile, and none was reported. `prefer_exitcase` still
-  counts a nested `:EXITCASE`, so a clause is reported once. The
-  `:EXITCASE` hover now states the restriction (#265, #273).
+  counts a nested `:EXITCASE`, so a clause is reported once (#265, #273).
 
 ## [0.24.0] - 2026-09-21
 
