@@ -446,11 +446,11 @@ func TestGetDiagnostics_SQLDataSource_FunctionNameColumnsAndInertSemicolons(t *t
 }
 
 // A bare `;` outside comments and string literals in a SQL-mode
-// data-source body warns with datasource_sql_semicolon at the semicolon's
-// position — including in the hybrid shape, where positions are offset
-// past the directive header and the header's own `;` terminators never
-// flag. The warning honors rule overrides and never fires outside
-// data-source files. [spec feature.diagnostics_pipeline/A20]
+// data-source body is an error (datasource_sql_semicolon) at the
+// semicolon's position — including in the hybrid shape, where positions
+// are offset past the directive header and the header's own `;`
+// terminators never flag. The diagnostic honors rule overrides and never
+// fires outside data-source files. [spec feature.diagnostics_pipeline/A20]
 func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
@@ -468,7 +468,7 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	plain := "update A set X = 1;\nupdate B set Y = 2\n"
 	hits := collect(plain, opts)
 	if len(hits) != 1 {
-		t.Fatalf("plain: expected exactly one separator warning, got %+v", hits)
+		t.Fatalf("plain: expected exactly one separator error, got %+v", hits)
 	}
 	// Error, not warning: STARLIMS refuses the document outright with
 	// "Invalid SQL statement: remove any misplaced semicolons(;)"
@@ -483,7 +483,7 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	hybrid := ":DSN := \"LimsDB\";\n:PARAMETERS p1;\n\nselect A from B where C = @p1;\n"
 	hits = collect(hybrid, opts)
 	if len(hits) != 1 {
-		t.Fatalf("hybrid: expected exactly one separator warning (header ';' must not flag), got %+v", hits)
+		t.Fatalf("hybrid: expected exactly one separator error (header ';' must not flag), got %+v", hits)
 	}
 	if hits[0].Range.Start.Line != 3 || hits[0].Range.Start.Character != 29 {
 		t.Errorf("hybrid: expected range at 3:29 (the body ';'), got %+v", hits[0].Range)
@@ -492,12 +492,12 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	override := opts
 	override.RuleOverrides = map[string]string{CodeDatasourceSQLSemicolon: "off"}
 	if hits := collect(plain, override); len(hits) != 0 {
-		t.Errorf("override off: expected no separator warnings, got %+v", hits)
+		t.Errorf("override off: expected no separator errors, got %+v", hits)
 	}
 
 	ssl := DefaultDiagnosticOptions()
 	if hits := collect(":DECLARE nX;\nnX := 1;\n", ssl); len(hits) != 0 {
-		t.Errorf("ssl file: separator warning must not fire outside data sources, got %+v", hits)
+		t.Errorf("ssl file: separator error must not fire outside data sources, got %+v", hits)
 	}
 }
 

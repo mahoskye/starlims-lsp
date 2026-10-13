@@ -181,8 +181,8 @@ SQLExecute("SELECT a FROM t WHERE b = ?sMissing?");
 	}
 }
 
-// [spec diag.unexpected_token] An unexpected token is an error, so it is
-// the one class of #240 finding that flips the CLI's valid flag.
+// [spec diag.unexpected_token] An unexpected token is an error, so —
+// like unterminated_string — it flips the CLI's valid flag.
 func TestValidateFilePath_UnexpectedTokenFlipsValid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "prose.ssl")

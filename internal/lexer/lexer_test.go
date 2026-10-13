@@ -1409,8 +1409,9 @@ func TestLexer_BracketString_DeeperNesting(t *testing.T) {
 
 func TestLexer_ScientificNotation_IncompleteExponent(t *testing.T) {
 	// 1.5e with no digits after 'e' should NOT consume the 'e'.
-	// EBNF: Exponent ::= ("e" | "E") ["-"] Digit {Digit}
-	// Without a following digit or minus sign, the 'e' is not part of the number.
+	// EBNF: Exponent ::= ("e" | "E") ["+"|"-"] Digit {Digit}
+	// Without a following digit (or sign then digit), the 'e' is not part of
+	// the number.
 	input := `1.5e`
 	lex := NewLexer(input)
 	tokens := lex.Tokenize()
@@ -1427,20 +1428,18 @@ func TestLexer_ScientificNotation_IncompleteExponent(t *testing.T) {
 }
 
 func TestLexer_ScientificNotation_ExponentMinusOnly(t *testing.T) {
-	// 1.5e- with minus but no digits should NOT consume 'e-'.
-	// The condition requires peek(1) to be '-' or digit, but then '-' must be
-	// followed by at least one digit. However the lexer currently consumes the
-	// minus sign eagerly. This test documents the actual behavior.
+	// 1.5e- with a sign but no digits should NOT consume 'e-'.
+	// exponentFollows requires a digit after an optional sign (issue #246),
+	// so the number stops at "1.5" and 'e' / '-' lex as separate tokens.
 	input := `1.5e-`
 	lex := NewLexer(input)
 	tokens := lex.Tokenize()
 
-	// The lexer sees 'e' followed by '-' and enters the exponent branch,
-	// consuming "1.5e-" as a number. This is technically incomplete per EBNF
-	// (exponent requires at least one digit after optional minus), but the
-	// lexer is lenient here — the diagnostic layer can catch malformed numbers.
 	if tokens[0].Type != TokenNumber {
 		t.Fatalf("expected TokenNumber, got %s", tokens[0].Type)
+	}
+	if tokens[0].Text != "1.5" {
+		t.Errorf("expected '1.5' (stops before 'e-' with no exponent digit), got %q", tokens[0].Text)
 	}
 }
 
