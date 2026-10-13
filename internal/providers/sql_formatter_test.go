@@ -1318,7 +1318,8 @@ func TestSQLFormatter_KeepDenseRank(t *testing.T) {
 	// sql-canonical-compact-reference §3.5: KEEP (...) gets the WITHIN GROUP
 	// treatment — the compound stays glued to its aggregate, the paren
 	// contents (DENSE_RANK FIRST/LAST ORDER BY ...) stay inline, and KEEP
-	// itself is cased as a keyword instead of lowercased like an identifier.
+	// itself is cased as a keyword (keywordCase) rather than left as written
+	// like an identifier (identifierCase defaults to preserve, D14).
 	runSQLLayoutCases(t, []struct{ name, input, want string }{
 		{
 			name:  "short_inline_with_casing",
@@ -2063,9 +2064,12 @@ func TestSQLFormatter_DecodeArgumentAlignment(t *testing.T) {
 func TestSQLFormatter_DoubleQuotedIdentifierCasingPreserved(t *testing.T) {
 	opts := DefaultSQLFormattingOptions()
 	opts.Style = "canonicalCompact"
+	// The D14 default is identifierCase "preserve", under which nothing is
+	// folded; opt into "lower" so the quoted-vs-unquoted contrast is real.
+	opts.IdentifierCase = "lower"
 	f := NewSQLFormatter(opts)
 
-	input := `SELECT "MyColumn" FROM "MySchema"."MyTable" WHERE status = 'active'`
+	input := `SELECT "MyColumn" FROM "MySchema"."MyTable" WHERE Status = 'active'`
 	result := f.FormatSQL(input, "")
 
 	// Double-quoted identifiers should NOT be lowercased
@@ -2078,8 +2082,8 @@ func TestSQLFormatter_DoubleQuotedIdentifierCasingPreserved(t *testing.T) {
 	if !strings.Contains(result, `"MyTable"`) {
 		t.Errorf("expected double-quoted table to preserve casing, got:\n%s", result)
 	}
-	// Unquoted identifiers should still be lowercased
-	if strings.Contains(result, "Status") {
+	// Unquoted identifiers are still lowercased under identifierCase "lower"
+	if strings.Contains(result, "Status") || !strings.Contains(result, "status") {
 		t.Errorf("expected unquoted identifier to be lowercased, got:\n%s", result)
 	}
 	t.Logf("Formatted SQL:\n%s", result)
@@ -2088,11 +2092,11 @@ func TestSQLFormatter_DoubleQuotedIdentifierCasingPreserved(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Regression tests pinning user-specified formatter rules (anonymized).
 // Rules A–D are SQL-level; rules E/F are SSL-pipeline-level (see formatting_test.go).
-// These are expected to FAIL until the formatter is updated to honor each rule.
+// All six rules have shipped; these tests pin them against regression.
 // ---------------------------------------------------------------------------
 
 // Rule A: every JOIN keyword starts a new line, including bare JOIN, at every
-// nesting level. Currently bare JOIN is left inline after FROM/ON.
+// nesting level; bare JOIN is never left inline after FROM/ON.
 func TestSQLFormatter_RuleA_BareJoinStartsNewLine(t *testing.T) {
 	opts := DefaultSQLFormattingOptions()
 	f := NewSQLFormatter(opts)
@@ -2113,7 +2117,7 @@ func TestSQLFormatter_RuleA_BareJoinStartsNewLine(t *testing.T) {
 }
 
 // Rule B: AND/OR continuing a WHEN predicate is indented past the WHEN keyword.
-// Currently the continuation drops back to a small (~2-space) indent.
+// The continuation never drops back to a small (~2-space) indent.
 func TestSQLFormatter_RuleB_WhenContinuationIndent(t *testing.T) {
 	opts := DefaultSQLFormattingOptions()
 	f := NewSQLFormatter(opts)
@@ -2274,8 +2278,8 @@ func TestSQLFormatter_LongConvolutedQuery_AllRules(t *testing.T) {
 	}
 }
 
-// Rule D: wrapped IN (...) lists hang-indent under the opening '('.
-// Currently the continuation lands at a fixed indent.
+// Rule D: wrapped IN (...) lists hang-indent under the opening '(' rather
+// than landing at a fixed indent.
 func TestSQLFormatter_RuleD_InListHangIndent(t *testing.T) {
 	opts := DefaultSQLFormattingOptions()
 	f := NewSQLFormatter(opts)
@@ -2390,7 +2394,8 @@ func TestIsSQLString_RealQueriesStillDetected(t *testing.T) {
 	}
 }
 
-// Issue #82: first coverage for IsSQLDocument — the data-source classifier
+// Issue #82: classification coverage for IsSQLDocument (see also
+// TestIsSQLDocument in sql_mode_test.go) — the data-source classifier
 // shares the validator, so the stricter rules must not regress plain-SQL
 // data-source files (feature.diagnostics_pipeline A10).
 func TestIsSQLDocument_Classification(t *testing.T) {
@@ -2541,4 +2546,33 @@ func TestSQLFormatter_OverClauseReviewRegressions(t *testing.T) {
 				"FROM ordresult",
 		},
 	})
+}
+
+// Issue #256 (found by FuzzFormat): the SQL lexer classified and copied
+// input byte by byte, so every non-ASCII character outside a quoted string
+// was split into Latin-1 runes and re-encoded — "café" came back as
+// mojibake once the statement overflowed and was reflowed. Tokens must
+// carry whole UTF-8 sequences (and invalid bytes) through verbatim.
+func TestSQLLexer_NonASCIIRoundTrip(t *testing.T) {
+	for _, in := range []string{
+		"SELECT café, ünï FROM tàble WHERE naïve = 1",
+		"SELECT a FROM t WHERE x = 1 \u00a0AND y = 2", // NBSP is whitespace
+		"SELECT a FROM t WHERE x = \xe9\xbe 1",        // invalid bytes
+	} {
+		var b strings.Builder
+		for _, tok := range NewSQLLexer(in).Tokenize() {
+			b.WriteString(tok.Text)
+		}
+		if b.String() != in {
+			t.Errorf("SQL tokens are not lossless:\n in: %q\nout: %q", in, b.String())
+		}
+	}
+
+	in := `sSQL := [SELECT a, b, c, d, e, f FROM some_table WHERE café = 1 AND other_column = 1 ORDER BY ünï, b];`
+	out := formatAll(in, DefaultFormattingOptions())
+	for _, word := range []string{"café", "ünï"} {
+		if !strings.Contains(out, word) {
+			t.Errorf("reflowed SQL lost %q:\n%s", word, out)
+		}
+	}
 }

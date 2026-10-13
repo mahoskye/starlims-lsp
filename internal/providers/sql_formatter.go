@@ -67,6 +67,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// Filter out whitespace tokens for formatting (preserve hints and comments)
 	var nonWSTokens []SQLToken
 	for _, t := range tokens {
+		// An unclosed quote or comment swallows the rest of the text,
+		// including the newline the multi-line layout adds after it, so
+		// every pass grew the string by a line. Leave such SQL as written
+		// (issue #256, found by FuzzFormat).
+		if t.Unterminated {
+			return sql
+		}
 		if t.Type != SQLTokenWhitespace {
 			nonWSTokens = append(nonWSTokens, t)
 		}

@@ -260,6 +260,15 @@ type formatState struct {
 	sqlArgCount           int
 	sqlFormatter          *SQLFormatter
 	pendingComment        *lexer.Token // End-of-line comment to write before newline
+	// orphanColon is true while the last code token is a `:` punctuation
+	// token with no member-access receiver before it. The space
+	// after such a colon is kept: `: a` -> `:a` would re-lex as a keyword
+	// on the next pass (issue #256, found by FuzzFormat).
+	orphanColon bool
+	// tokens and tokenIndex expose the token stream and the position of
+	// the token being formatted to helpers called without them.
+	tokens                []lexer.Token
+	tokenIndex            int
 	pendingStatementBreak bool
 	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
 	// commentBlockStart is the builder offset where the current run of
@@ -367,6 +376,22 @@ func (s *formatState) normalizeProcBoundary() {
 		return
 	}
 
+	// A glued boundary with no separator (":ENDPROC:PROCEDURE") becomes a
+	// line end here, so it takes the semicolon a source newline would have
+	// given it — otherwise the next pass adds it (issue #256, found by
+	// FuzzFormat).
+	if !s.pendingStatementBreak && !s.lineStart && s.opts.SemicolonEnforcement &&
+		needsSemicolonAtLineEnd(s.lastNonWSToken, s.tokens, s.tokenIndex-1) {
+		// Drop the separator space already written (`:ENDPROC :PROCEDURE`).
+		built := strings.TrimRight(s.builder.String(), " \t")
+		s.builder.Reset()
+		s.builder.WriteString(built)
+		s.builder.WriteString(";")
+		if s.commentBlockStart > len(built) {
+			s.commentBlockStart = len(built)
+		}
+	}
+
 	// Complete a pending statement line (e.g. mashed ":ENDPROC;:PROCEDURE")
 	// so the boundary sits after a finished line.
 	if s.pendingStatementBreak {
@@ -401,6 +426,13 @@ func (s *formatState) normalizeProcBoundary() {
 	if strings.HasSuffix(rebuilt, "\n") {
 		s.lineStart = true
 		s.currentLineLen = 0
+		// As after a source newline: an unclosed delimiter continues
+		// (issue #256, found by FuzzFormat).
+		if s.parenDepth > 0 {
+			s.continuationIndent = 1
+		} else {
+			s.continuationIndent = 0
+		}
 	}
 }
 
@@ -435,7 +467,7 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		// the second pass and oscillated (issue #218).
 		isContinuation := s.continuationIndent > 0 ||
 			isContinuationOperator(token) ||
-			isMemberAccessColon(token) ||
+			(isMemberAccessColon(token) && s.colonHasReceiver()) ||
 			s.lastNonWSToken.Text == ":=" ||
 			s.lastNonWSToken.Text == "," ||
 			isContinuationOperator(s.lastNonWSToken)
@@ -471,6 +503,14 @@ func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
 	s.lineStart = true
 	s.currentLineLen = 0
 	s.pendingStatementBreak = false
+	// Mirror the source-newline path: the next pass sees a real newline
+	// here and indents an unclosed delimiter's continuation (issue #256,
+	// found by FuzzFormat).
+	if s.parenDepth > 0 {
+		s.continuationIndent = 1
+	} else {
+		s.continuationIndent = 0
+	}
 }
 
 func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, index int) bool {
@@ -540,9 +580,13 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		// Suppress space around : in member access: "obj : prop" -> "obj:prop"
 		// (colon as TokenPunctuation is member access; := is TokenOperator, :IF is TokenKeyword)
-		if s.lastNonWSToken.Text == ":" && s.lastNonWSToken.Type == lexer.TokenPunctuation {
-			s.prevToken = token
-			return true
+		// Keep the space when the next token starts with `=`: `: =` glued
+		// re-lexes as `:=` (issue #256, found by FuzzFormat).
+		if isMemberAccessColon(s.lastNonWSToken) && !s.orphanColon {
+			if next := findNextNonWS(tokens, index); next == nil || !strings.HasPrefix(next.Text, "=") {
+				s.prevToken = token
+				return true
+			}
 		}
 		// Also suppress before : when preceded by ), ], or identifier (chained access)
 		if s.lastNonWSToken.Type == lexer.TokenIdentifier || s.lastNonWSToken.Text == ")" || s.lastNonWSToken.Text == "]" {
@@ -558,6 +602,13 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		}
 		// Suppress space before closing delimiters: "x )" -> "x)", "x }" -> "x}"
 		if next := findNextNonWS(tokens, index); next != nil && isCloseParen(*next) {
+			s.prevToken = token
+			return true
+		}
+		// Suppress trailing space at end of input: the EOF semicolon
+		// insertion (issue #38) would otherwise land after it ("x ;"), and
+		// the next pass collapses that to "x;" — not idempotent (A6).
+		if next := findNextNonWS(tokens, index); next == nil || next.Type == lexer.TokenEOF {
 			s.prevToken = token
 			return true
 		}
@@ -579,7 +630,7 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 		// separator itself, so source whitespace here compounded into a
 		// third space on the next pass (issue #218).
 		if next := findNextNonWS(tokens, index); next != nil &&
-			next.Type == lexer.TokenComment && !strings.Contains(next.Text, "\n") {
+			next.Type == lexer.TokenComment && isSingleLineComment(next.Text) {
 			s.prevToken = token
 			return true
 		}
@@ -629,6 +680,26 @@ func (s *formatState) isDetectedSQLString(tok lexer.Token) bool {
 	return IsReformattableSQLString(tok.Text[1 : len(tok.Text)-1])
 }
 
+// colonHasReceiver reports whether a `:` punctuation token written next
+// follows something that can end a member-access receiver (an identifier,
+// `)` or `]`) — the lexer's own test for member access versus a keyword.
+// Without a receiver, removing the space after the colon (`: a` -> `:a`)
+// or giving it continuation indent makes the next pass lex a keyword
+// instead, and the two passes disagree (issue #256, found by FuzzFormat).
+func (s *formatState) colonHasReceiver() bool {
+	t := s.lastNonWSToken
+	return t.Type == lexer.TokenIdentifier ||
+		(t.Type == lexer.TokenPunctuation && (t.Text == ")" || t.Text == "]"))
+}
+
+// lineHasOnlyIndent reports whether the output line being built holds
+// nothing but indentation so far.
+func (s *formatState) lineHasOnlyIndent() bool {
+	built := s.builder.String()
+	tail := built[strings.LastIndex(built, "\n")+1:]
+	return strings.TrimLeft(tail, " \t") == ""
+}
+
 // findNextNonWS returns the next non-whitespace token starting from startIdx+1, or nil.
 func findNextNonWS(tokens []lexer.Token, startIdx int) *lexer.Token {
 	for i := startIdx + 1; i < len(tokens); i++ {
@@ -661,9 +732,18 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 		// this is an orphan `*/` after a comment SSL already terminated
 		// at its `;` (`/* note;*/`), which lexes as `*` then `/`
 		// (issue #249).
-		if !s.lineStart && s.prevToken.Type != lexer.TokenWhitespace &&
-			s.prevToken.Type != lexer.TokenOperator &&
-			s.prevToken.Type != lexer.TokenComment && !isOpenParen(s.prevToken) {
+		// A comma glued to the operator (`,#`) already wrote its trailing
+		// space under CommaSpacing, for the same reason (issue #256, found
+		// by FuzzFormat).
+		gluedComma := s.opts.CommaSpacing && s.prevToken.Text == ","
+		// Nor after a member-access colon (`:#`): the whitespace handler
+		// drops the space after `:`, so adding one here oscillated.
+		// Nor does an operator that opens a line after a statement break
+		// (`;#` splits to two lines): only indentation precedes it.
+		if !s.lineStart && !s.lineHasOnlyIndent() && s.prevToken.Type != lexer.TokenWhitespace &&
+			s.prevToken.Type != lexer.TokenOperator && !gluedComma &&
+			s.prevToken.Type != lexer.TokenComment && !isOpenParen(s.prevToken) &&
+			!(isMemberAccessColon(s.prevToken) && !s.orphanColon) {
 			s.builder.WriteString(" ")
 			s.currentLineLen++
 		}
@@ -672,7 +752,11 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 		s.currentLineLen += len(opText)
 		if index+1 < len(tokens) {
 			next := tokens[index+1]
-			if next.Type != lexer.TokenWhitespace && !isCloseParen(next) && next.Text != ";" {
+			// No space before a comma either when the whitespace handler
+			// would drop it (issue #256, found by FuzzFormat).
+			if next.Type != lexer.TokenWhitespace && !isCloseParen(next) && next.Text != ";" &&
+				!(s.opts.CommaSpacing && next.Text == ",") && !trailingComment(tokens, index+1) &&
+				next.Type != lexer.TokenEOF {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
@@ -694,7 +778,7 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			// between passes (`,,)` <-> `,, )`, issue #218).
 			next := tokens[index+1]
 			if next.Type != lexer.TokenWhitespace && next.Type != lexer.TokenEOF &&
-				next.Text != "," && !isCloseParen(next) && next.Text != ";" {
+				next.Text != "," && !isCloseParen(next) && next.Text != ";" && !trailingComment(tokens, index+1) {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
@@ -834,6 +918,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		s.commentBlockStart = -1
 	}
 
+	s.orphanColon = isMemberAccessColon(token) && !s.colonHasReceiver()
 	s.prevToken = token
 	s.lastNonWSToken = token
 }
@@ -842,7 +927,9 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 	state := newFormatState(opts)
 
+	state.tokens = tokens
 	for i, token := range tokens {
+		state.tokenIndex = i
 		if token.Type == lexer.TokenEOF {
 			// A final statement with no trailing newline still gets its
 			// semicolon (issue #38) — mirror the newline-triggered check.
@@ -866,7 +953,24 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 					commentCopy.Text = state.pendingComment.Text + "  " + token.Text
 				}
 				state.pendingComment = &commentCopy
+				// The comment moves to the line end; when it was the only
+				// separator between two words (`A/*;B`, `A/*;:IF`), keep
+				// one space or the words fuse into different tokens on the
+				// next pass (issue #256, found by FuzzFormat).
+				if i+1 < len(tokens) && wordLike(state.lastNonWSToken) && wordLike(tokens[i+1]) {
+					state.builder.WriteString(" ")
+					state.currentLineLen++
+				}
 				continue
+			}
+			// A multi-line comment starting on the same line as a pending
+			// end-of-line comment is written now, so flush the pending one
+			// first: deferring it put it after the later comment, swapping
+			// their order (issue #256, found by FuzzFormat).
+			if state.pendingComment != nil {
+				state.builder.WriteString("  ")
+				state.builder.WriteString(state.pendingComment.Text)
+				state.pendingComment = nil
 			}
 			// A standalone comment at line start opens (or continues) a
 			// comment block; remember where it began for issue #33.
@@ -898,8 +1002,10 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		}
 
 		state.updateForKeyword(token)
-		state.updateParenDepth(token)
+		// The statement break is flushed before this token's own delimiter
+		// depth is counted, as a source newline would be.
 		state.flushPendingStatementBreak(token)
+		state.updateParenDepth(token)
 		state.writeIndentIfNeeded(token)
 		if state.handleWhitespace(token, tokens, i) {
 			continue
@@ -974,6 +1080,34 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 	return formatted
 }
 
+// trailingComment reports whether tokens[idx] is a single-line comment that
+// ends its line (only a newline or end of input follows). Glued to the
+// token before it, such a comment rides the end-of-line path, whose flush
+// writes the canonical two-space separator itself — a space written there
+// as well became three, then two on the next pass (issue #256, found by
+// FuzzFormat; the whitespace-handler side is issue #218). A comment with
+// code after it on the line still needs the space, for that code.
+func trailingComment(tokens []lexer.Token, idx int) bool {
+	if idx >= len(tokens) || tokens[idx].Type != lexer.TokenComment || !isSingleLineComment(tokens[idx].Text) {
+		return false
+	}
+	if idx+1 >= len(tokens) {
+		return true
+	}
+	after := tokens[idx+1]
+	if after.Type == lexer.TokenWhitespace && strings.Contains(after.Text, "\n") {
+		return true
+	}
+	next := findNextNonWS(tokens, idx)
+	return next == nil || next.Type == lexer.TokenEOF
+}
+
+// wordLike reports whether a token is an identifier, number or keyword —
+// a token that fuses with an adjacent word when nothing separates them.
+func wordLike(t lexer.Token) bool {
+	return t.Type == lexer.TokenIdentifier || t.Type == lexer.TokenNumber || t.Type == lexer.TokenKeyword
+}
+
 // isEndOfLineComment checks if a comment token is an end-of-line comment
 // (a comment on the same line as code, following code).
 func isEndOfLineComment(comment lexer.Token, lastNonWSToken lexer.Token) bool {
@@ -985,12 +1119,22 @@ func isEndOfLineComment(comment lexer.Token, lastNonWSToken lexer.Token) bool {
 	// If the comment is on the same line as the last non-whitespace token, it's an end-of-line comment
 	if comment.Line == lastNonWSToken.Line {
 		// Also check that the comment doesn't contain newlines (is single-line)
-		if !strings.Contains(comment.Text, "\n") {
+		if isSingleLineComment(comment.Text) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// isSingleLineComment reports whether a comment's text spans one line. An
+// unterminated comment runs to end of input and so carries the file's
+// final newline (`/*` then EOF, once the formatter has added the newline);
+// that trailing newline does not make it multi-line, or a same-line
+// unterminated comment flipped between end-of-line and standalone layout
+// across passes (issue #256, found by FuzzFormat).
+func isSingleLineComment(text string) bool {
+	return !strings.Contains(strings.TrimRight(text, "\r\n"), "\n")
 }
 
 // writeIndentLen writes indentation and returns the visual length.
@@ -1169,6 +1313,12 @@ func isUnaryContext(lastNonWS lexer.Token, lineStart bool) bool {
 	}
 	if lastNonWS.Text == ":=" {
 		return true
+	}
+	// A mashed `:LABELName` is written as `:LABEL Name`, so on the next
+	// pass the operator follows the name, an operand (issue #256, found
+	// by FuzzFormat).
+	if lastNonWS.Type == lexer.TokenKeyword && isLabelKeywordMashed(lastNonWS.Text) {
+		return false
 	}
 	if lastNonWS.Type == lexer.TokenKeyword {
 		return true
