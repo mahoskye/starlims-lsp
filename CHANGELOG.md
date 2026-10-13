@@ -445,6 +445,15 @@ code, or output format changes for either distribution.
 - **`internal_error` is a cataloged diagnostic.** It gained a code
   constant and a `catalog/diagnostics/internal_error.md` entry; until now
   it was a string literal outside the catalog's code-to-entry rule (#258).
+- **An unknown flag in first position exits 2 instead of starting the
+  server.** `starlims-lsp --valdiate x.ssl` started the language server,
+  which then waited on stdin, so a mistyped mode hung the CI job that ran
+  it. Any dash-prefixed first argument that is not a mode, `--help`,
+  `--version`, `--stdio` or `--clientProcessId` now exits 2 and names the
+  argument on stderr. No arguments, `--stdio` (which LSP clients append),
+  and `--clientProcessId[=<pid>]` still start the server.
+  **Downstream:** an editor configuration that launches the server with
+  some other leading flag must drop it (#258).
 
 ### Deprecated
 - **`ssl.format.sql.style: "compact"`** was already a deprecated alias
@@ -465,6 +474,11 @@ code, or output format changes for either distribution.
   first pass in `GetContextAtPosition`, `isIdentifierPattern`,
   `hasSpecificHungarianPrefix`, `isAssignOp`, and the tracked root scratch
   files `count.go` and `.codex-counts.go` (#258).
+- **`dev/backfill-catalog`**, the one-shot generator that seeded the
+  catalog's first diagnostic entries; the catalog is written by hand now.
+  `dev/` was ignored yet held two tracked tools; it now ignores everything
+  but `dev/exprcoverage`, the expression-AST coverage harness, which the
+  README lists (#258).
 - **The formatter no longer changes string, comment or region contents.**
   The blank-line-between-blocks pass (default on) inserted a blank line
   inside multi-line strings, comments and `:REGION` bodies, which changed a
@@ -892,6 +906,37 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 - **Procedure extraction is linear in the document.** Each procedure's
   docblock and visibility lookup scanned every token; a 500-procedure
   document now extracts about three times faster (#258).
+- **Cross-file features work on Windows.** The URI-to-path conversion
+  kept the slash before the drive letter (`file:///c%3A/x` became
+  `/c:/x`), and the path-to-URI one dropped the slash after `file://`
+  (`file://C:/x`), so the workspace index found no files at all. One pair
+  of helpers now handles drive letters, percent-encoding and UNC paths in
+  both directions (#258).
+- **Cross-file features work in folders whose names contain a space.**
+  VS Code sends `%20`-escaped URIs, and the STARLIMS export layout always
+  has a `Server Scripts` folder, but the workspace index keyed files by an
+  unescaped URI. Two spellings of one file meant cross-file rename skipped
+  call sites, workspace symbols listed an open file twice, closing a file
+  indexed it a second time (so dispatch targets turned ambiguous), Delete
+  events left the entry behind, and unsaved edits never reached
+  go-to-definition. Every URI a client sends is now normalized to the
+  form VS Code uses, which is also the form the index builds. An
+  `ssl.diagnostics.endpointPatterns` entry is matched against the file
+  path as well as the URI, so `Server Scripts/API/` matches as written
+  (#258).
+- **The 100-diagnostic cap keeps errors.** The cap cut the rules'
+  output in the order the rules ran, so a file with 110 warnings from an
+  early rule lost an error a later rule reported. Diagnostics are now
+  sorted errors first, then warnings, info and hints, each in position
+  order, before the cap applies (#258).
+- **One unparseable file no longer stops the server from starting.**
+  Background indexing had no recover, so a file whose parse panicked
+  killed the server on every startup. The panic is now logged and that
+  file skipped. File-watcher re-indexing also moved onto the background
+  worker: it ran on the request goroutine, so a large checkout held up
+  every request until it finished. A Delete now also wins over a
+  re-index of the same file that is still running, which could add the
+  deleted file back (#258).
 
 ## [0.24.0] - 2026-09-21
 
