@@ -29,6 +29,12 @@ history:
       (categories-only level 0 per the noise policy); the pre-existing
       vs-code-ssl-formatter#74 same-file exception is now documented
       here and A5 narrowed to non-dispatch strings.
+  - date: 2026-10-13
+    ref: "issue #267"
+    note: >-
+      A11 pins that a member list is never offered on an SSL scalar or
+      array: SSL-object members do not exist there, and .NET members are
+      case-sensitive and not enumerated (D10).
 issues: []
 ---
 
@@ -92,6 +98,7 @@ trigger policy:
 - A8: Given `ExecFunction("Cat.")` where `Cat` is a workspace category, when completion is requested, then the scripts in that category are offered.
 - A9: Given `ExecFunction("Cat.Script.")` resolving to a workspace script, when completion is requested, then that script's procedures are offered, excluding `/*@private;` and `/*@protected;` ones.
 - A10: Given `DoProc("Script.")` where `Script` matches a flat-layout script basename, when completion is requested, then that script's non-private procedures are offered.
+- A11: Given `aItems:` where aItems holds an SSL array, string, number, logical or date (no class, returns-object or CreateUdObject shape), when completion triggers, then no items are offered — in particular no SSL-object members (`GetProperty`, `IsProperty`, `AddProperty`, ...), which those values do not have, and no guessed .NET members, whose names are case-sensitive and unlisted (issue #267).
 
 ## Rationale
 

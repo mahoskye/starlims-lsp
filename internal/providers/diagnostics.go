@@ -287,6 +287,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	if opts.CheckHungarianTypes {
 		diagnostics = append(diagnostics, checkHungarianTypeMismatch(tokens, stmtExprs)...)
 	}
+	diagnostics = append(diagnostics, checkInvalidNativeMember(tokens, stmtExprs)...)
 
 	// SSL language rule enforcement (always enabled)
 	if opts.IsDataSourceFile {

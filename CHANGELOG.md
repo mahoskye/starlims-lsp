@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`invalid_native_member` (warning).** A colon member that the reference
+  documents as raising on an SSL value is reported, such as `aItems:Count`
+  (`Invalid property: Count`; use `ALen()` or `:Length`), `aItems:Append()`,
+  a wrong-case native member such as `dToday:year`, or any member on a code
+  block. The receiver's type must be certain from structure (every
+  assignment in its scope agrees), never from its Hungarian prefix, because
+  real code labels .NET collections, where `:Count` is valid, with an `a`
+  prefix (#267).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an
