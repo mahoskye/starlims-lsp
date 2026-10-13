@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SQL `CASE` lays out the same way in every clause.** Only a `CASE` in
+  the SELECT list came out the way the compact SQL reference shows it.
+  In `WHERE`, `ORDER BY` and `UPDATE ... SET` the formatter moved `CASE`
+  onto its own line at the clause column with `WHEN`/`ELSE` only 2
+  under it and `END` back at the clause column — reformatting the
+  reference's own `WHERE CASE` example, and in `SET col = CASE` leaving
+  `WHEN` left of the assignment it belongs to. A `CASE` nested in a
+  `THEN` collapsed back to the outer `CASE`'s column, and a `THEN` value
+  was always joined onto its `WHEN` line. Now `CASE` stays where it is
+  written, `WHEN`/`ELSE` sit 4 past it, `END` aligns with it, a nested
+  `CASE` starts 4 past its `WHEN`, and when any branch would overflow
+  with its value inline, every `THEN` value of that `CASE` goes 4 past
+  its `WHEN`. A short `CASE` inside an aggregate's argument list
+  (`SUM(CASE WHEN ... END)`) stays inline, as in the reference. The
+  formatter also no longer alters a token while doing this: `ELSE -1`
+  had become `ELSE - 1`, which reads as a subtraction. SQL-mode data
+  sources are still passed through by `--format` unchanged — that is
+  intended, and `fmt.sql_in_strings` now says so (#271).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an
