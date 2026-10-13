@@ -1,8 +1,15 @@
 # Implementation Spec: Cross-file textDocument/references and textDocument/rename
 
+> **Status (2026-10-13): shipped — historical record.** Implemented as planned in
+> v0.14.0 (2026-07-25; issue #125 closed). This plan describes the code as it
+> stood in July 2026 — line numbers and file layout have since moved. The
+> current contract is [feature.cross_file_resolution](../../catalog/features/cross_file_resolution.md),
+> [feature.references](../../catalog/features/references.md), and
+> [feature.rename](../../catalog/features/rename.md).
+
 > Tracking issue: [#125](https://github.com/mahoskye/starlims-lsp/issues/125). Rev 2, adversarially reviewed 2026-07-24; product decisions resolved — see §7.
 
-Repo: /home/maho/dev/starlims-projects/starlims-lsp (Go LSP for STARLIMS SSL v11)
+Repo: starlims-lsp (Go LSP for STARLIMS SSL v11)
 Date: 2026-07-24 (rev 2 — incorporates senior-engineer review F1-F9)
 
 ## 0. Corrected premise: what already exists
@@ -487,11 +494,11 @@ normatively decided by `cross_file_resolution.md` A14 and implemented at
 
 ## 9. Critical files
 
-- /home/maho/dev/starlims-projects/starlims-lsp/internal/server/workspace_index.go — FileSymbols/CallSites, CallSitesFor, lookup maintenance, IsClass
-- /home/maho/dev/starlims-projects/starlims-lsp/internal/providers/crossfile.go — ExtractCallSites, DispatchTargetAt token port, WorkspaceResolver contract
-- /home/maho/dev/starlims-projects/starlims-lsp/internal/server/cross_file.go — liveResolver, overlayResolutions refactor (F4), siteTargetsDefinition
-- /home/maho/dev/starlims-projects/starlims-lsp/internal/server/handler.go — handleReferences / handlePrepareRename / handleRename rewiring
-- /home/maho/dev/starlims-projects/starlims-lsp/internal/providers/rename.go — PrepareRename dispatch-segment branch, validation (reused)
+- internal/server/workspace_index.go — FileSymbols/CallSites, CallSitesFor, lookup maintenance, IsClass
+- internal/providers/crossfile.go — ExtractCallSites, DispatchTargetAt token port, WorkspaceResolver contract
+- internal/server/cross_file.go — liveResolver, overlayResolutions refactor (F4), siteTargetsDefinition
+- internal/server/handler.go — handleReferences / handlePrepareRename / handleRename rewiring
+- internal/providers/rename.go — PrepareRename dispatch-segment branch, validation (reused)
 - Also: internal/providers/definition.go (FindReferencesWithScope, isDispatchTargetMatch — F2 root cause),
   catalog/features/references.md, catalog/features/rename.md (F3 amendments incl. A4 + rename_test.go:98,114),
   internal/server/cross_file_test.go (pin test replacement, :CLASS cases)

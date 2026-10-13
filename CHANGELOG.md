@@ -250,6 +250,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dev/ssl-style-guide/` checkout as authoritative, which had gone six
   months stale. They now point at the upstream `ssl-style-guide` and
   `starlims-ssl-reference` repos (#254).
+- **The LSP names the STARLIMS version it models.** Decision D17: STARLIMS
+  12 as verified by the SSL reference. A diagnostic's compile-error or
+  run-time claim is judged against that, a known v11/v12 difference
+  reports what fails on either version, and there is no version setting
+  (#261).
+- **The prose docs match the catalog again.** `AGENTS.md`, the README,
+  the docs hub, ARCHITECTURE, ROADMAP, and VISION were brought up to date,
+  and every SSL example in `AGENTS.md` was checked against the SSL
+  reference. About twenty corrections followed. Among them:
+  `CToD("2024-12-25")` returns an empty date under the default date
+  format, `Eval` does not run a string, `:INHERIT` and `CreateUdObject`
+  need category-qualified names, and `UsrMes` had its arguments reversed
+  (#259).
 
 ## [0.24.0] - 2026-09-21
 

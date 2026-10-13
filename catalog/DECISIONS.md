@@ -4,6 +4,28 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D17 — The LSP models STARLIMS 12 as verified by the SSL reference (2026-10-13, issue #261)
+
+The language the LSP models is STARLIMS 12 SSL as verified by the
+published SSL reference
+([starlims-ssl-reference](https://github.com/mahoskye/starlims-ssl-reference)),
+which is written for STARLIMS 11 and verified on STARLIMS 12; its pages
+carry `verified_against: [12]`. A catalog entry's `authority` claim —
+"compile error", "run-time failure" — is judged against that verified
+behavior, not against either version's behavior in the abstract.
+
+Where v11 and v12 are known to differ, a diagnostic reports what fails
+on either version (the stricter reading), and the entry's `## Rationale`
+names the version that fails. A construct valid on both versions is
+never reported. Where a difference is suspected but not confirmed, the
+LSP stays silent, for the same reason as D10: absence of knowledge is
+silence, never a warning.
+
+There is no version setting. One is added only when a confirmed
+difference needs it, and adding it is a new decision. The per-entry
+check of existing `authority` fields against this decision is part of
+the catalog audit (issue #255).
+
 ## D16 — The CLI is a versioned contract; breaks ship in minor releases under `### Breaking` (2026-10-13, issue #262)
 
 `--validate` and `--format` are consumed by programs that gate or score

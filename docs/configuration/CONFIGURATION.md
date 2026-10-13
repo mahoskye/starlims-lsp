@@ -27,7 +27,7 @@ This document specifies all configuration options available in the starlims-lsp 
 
 ### 1.1 Configuration Delivery
 
-Configuration is sent to the language server via the LSP `workspace/didChangeConfiguration` notification.
+Configuration is sent to the language server as `initializationOptions` in the `initialize` request, via the LSP `workspace/didChangeConfiguration` notification, or both. Both routes accept the same `ssl` object and apply only the fields present; a configuration change re-validates every open document.
 
 ### 1.2 Configuration Namespace
 
@@ -148,7 +148,7 @@ Specifies whether to use tabs or spaces for indentation.
 | **Range** | `1` - `8` |
 | **File** | `internal/providers/formatting.go:14,27` |
 
-Number of spaces per indentation level. Only applies when `indentStyle` is `"space"`. The source guide's preferred default is tab indentation; the bundled value `4` is the fallback width for space-indented formatting, not the width of a tab-indented SSL block.
+Number of spaces per indentation level when `indentStyle` is `"space"`. With the default `"tab"` style, indentation is one tab per level and `indentSize` is the width a tab counts for when measuring lines against `maxLineLength` ([fmt.indent_style](../../catalog/formatting/indent_style.md)).
 
 ```json
 { "ssl.format.indentSize": 4 }
@@ -308,7 +308,7 @@ existing vertical whitespace. See catalog entry
 
 ## 4. SQL Formatting Options
 
-### 4.1 sql.format.sql.enabled
+### 4.1 ssl.format.sql.enabled
 
 | Property | Value |
 |----------|-------|
@@ -808,7 +808,7 @@ being dismissed. See issue #9.
 
 ## 8. Internal Options
 
-These options are hardcoded and cannot be changed via client configuration.
+These are provider-level options. Most are fixed; where one is reachable from a client setting or a CLI flag, its section says so.
 
 ### 8.1 CheckUnclosedBlocks
 
@@ -839,7 +839,7 @@ Always checks for unmatched parentheses, brackets, and braces.
 | **Status** | IMPLEMENTED (provider option only) |
 | **File** | `internal/providers/diagnostics.go:47,59` |
 
-Checks for usage of undeclared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks for usage of undeclared variables. It has no editor setting; `--validate --strict` enables it on the CLI.
 
 ### 8.4 CheckUnusedVars
 
@@ -850,7 +850,7 @@ Checks for usage of undeclared variables when enabled directly through `provider
 | **Status** | IMPLEMENTED (provider option only) |
 | **File** | `internal/providers/diagnostics.go:48,60` |
 
-Checks for declared but unused variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks for declared but unused variables. Exposed to clients as `ssl.diagnostics.unusedVariables` (§5.2); `--validate --strict` also enables it.
 
 ### 8.5 CheckSQLParams
 
@@ -861,7 +861,7 @@ Checks for declared but unused variables when enabled directly through `provider
 | **Status** | IMPLEMENTED (provider option only) |
 | **File** | `internal/providers/diagnostics.go:50,64` |
 
-Checks named SQL placeholders against declared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks named SQL placeholders against declared variables. It has no editor setting; `--validate --strict` enables it on the CLI.
 
 ### 8.6 MaxNumberOfProblems
 
@@ -1027,12 +1027,16 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | Option | Default |
 |--------|---------|
 | `ssl.format.indentStyle` | `"tab"` |
-| `ssl.format.indentSize` | `4` (space mode only) |
+| `ssl.format.indentSize` | `4` |
 | `ssl.format.maxLineLength` | `90` |
 | `ssl.format.operatorSpacing` | `true` |
 | `ssl.format.commaSpacing` | `true` |
 | `ssl.format.semicolonEnforcement` | `true` |
 | `ssl.format.blankLinesBetweenProcs` | `1` |
+| `ssl.format.blankLineBetweenBlocks` | `true` |
+| `ssl.format.trimTrailingWhitespace` | `true` |
+| `ssl.format.maxConsecutiveBlankLines` | `0` (disabled) |
+| `ssl.format.builtinFunctionCase` | `"PascalCase"` |
 | `ssl.format.sql.enabled` | `true` |
 | `ssl.format.sql.style` | `"canonicalCompact"` |
 | `ssl.format.sql.keywordCase` | `"upper"` |
@@ -1041,9 +1045,14 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
+| `ssl.diagnostics.hungarianTypes` | `false` |
+| `ssl.diagnostics.unusedVariables` | `false` |
 | `ssl.diagnostics.infoDiagnostics` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
+| `ssl.diagnostics.maxBlockDepth` | `4` |
+| `ssl.diagnostics.rules` | `{}` |
+| `ssl.diagnostics.endpointPatterns` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |
 | `ssl.inlayHints.minParameterCount` | `2` |
 | `ssl.intellisense.signatureHelp.autoTrigger` | `false` |
