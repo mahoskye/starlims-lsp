@@ -27,6 +27,14 @@ history:
       The surface now reaches code-block bodies: `.t.`, `nil` and `me:`
       inside `{|...|}` were left as written because the body is
       normalized by its own re-lex (fmt.code_block_literals).
+  - date: 2026-10-13
+    ref: "issue #304 (corpus triage), reference keywords/LABEL.md"
+    note: >-
+      A joined `:LABELName` is no longer split into `:LABEL Name`. The two
+      store different label text and Branch() matches exactly, so the
+      split changed which label a Branch() reached; on the production
+      corpus, 15 files gained branch_target_label errors after
+      formatting. The joined form is now written verbatim.
 issues: ["#90"]
 ---
 
@@ -46,8 +54,11 @@ formatter may canonicalize mechanically. The surface:
   `:`) canonicalize to `Me`/`Base`. An ordinary identifier that merely
   shares the name (`me := 1;`) is never recased — the rewrite applies only
   where the runtime reserves the word.
-- The mashed `:LABELName;` form normalizes to `:LABEL Name;`
-  (diag.label_keyword_form is the diagnostic side).
+- A joined `:LABELName;` is written verbatim, never split into
+  `:LABEL Name;`: the two store different label text, and `Branch()`
+  matches it exactly (reference keywords/LABEL.md), so splitting would
+  change which label a `Branch()` reaches. A miscased joined form is
+  `diag.label_keyword_form`'s, and is not re-cased either.
 
 The surface applies inside code-block bodies too (`{|o| o != nil}` →
 `{|o| o != NIL}`), except where fmt.code_block_literals passes a literal
@@ -121,6 +132,15 @@ sNote := ":if nil .t.";  /* :endif nil;
 ```ssl
 fnReady := {|o| Me:Check(o) .OR. o == NIL .OR. .F.};
 sNote := ":if nil .t.";  /* :endif nil;
+```
+
+A joined label keeps its exact text:
+
+### Idempotent
+
+```ssl
+:LABELRETRY;
+Branch("LABELRETRY");
 ```
 
 ## Rationale
