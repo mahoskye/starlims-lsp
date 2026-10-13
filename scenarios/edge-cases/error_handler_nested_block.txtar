@@ -2,7 +2,7 @@ A legacy :ERROR handler whose body holds a nested block. fmt.indent_style
 says the scope-based :ERROR indents its body and every enclosing block
 adds one level, so the :IF inside the handler should close at the
 handler-body depth and the statement after it should stay in the body.
-Suspected issue: the formatter dedents ':ENDIF' and the following 'x := 3' one level too far (to the :ERROR line's depth), as if the block closer also ended the :ERROR scope.
+Suspected issue: #326 — the formatter dedents ':ENDIF' and the following 'x := 3' one level too far (to the :ERROR line's depth), as if the block closer also ended the :ERROR scope.
 -- input.ssl --
 :PROCEDURE Recover;
 :DECLARE x;

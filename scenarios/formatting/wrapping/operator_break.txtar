@@ -1,4 +1,4 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
 Breaking before a binary operator: the operator leads its continuation
 line (fmt.max_line_length; style guide ssl_max_line_length Good example).
 -- input.ssl --

@@ -3,7 +3,7 @@ A data-holder class whose fields are set and read only by callers
 unused_variable (strict, hint) reports class-level :DECLARE names that the
 file never mentions again; a class field is a member reachable from other
 files, so single-file analysis cannot see its uses.
-Suspected issue: unused_variable flags class fields (dPlaced, nLineCount) that are public members used from other files; the catalog entry does not address class fields at all.
+Suspected issue: #328 — unused_variable flags class fields (dPlaced, nLineCount) that are public members used from other files; the catalog entry does not address class fields at all.
 -- input.ssl --
 /*
  * Class: OrderRecord

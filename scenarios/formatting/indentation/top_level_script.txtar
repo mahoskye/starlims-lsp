@@ -1,7 +1,7 @@
 A script with top-level code (no :PROCEDURE): script-level :PARAMETERS
 and :DEFAULT, top-level blocks and a trailing procedure. Top-level code
 sits at column 0 and blocks indent from there (fmt.indent_style).
-Suspected issue: no blank line is put between the top-level `:RETURN` and
+Suspected issue: #326 — no blank line is put between the top-level `:RETURN` and
 the following `:PROCEDURE`; fmt.blank_lines_between_procs only acts after
 `:ENDPROC;` / `:ENDREGION;`, but the style guide schema sets
 formatting.blank_lines.before_procedure: 1 (blank_line_between_procedures).

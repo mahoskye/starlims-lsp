@@ -2,7 +2,7 @@ A long SELECT list packs columns onto lines up to the limit, with
 continuation lines aligned under the first column (reference §2.1,
 sql_select_packing / sql_select_continuation), DISTINCT kept on the
 SELECT line, and function calls kept whole.
-Suspected issue: the packed SELECT line reaches 94 columns (tab = 4) inside the procedure; the SQL engine's 90-column budget appears to ignore the SSL statement indent, while the fits-inline test in fmt.sql_in_strings measures the line as written ("fits within ssl.format.maxLineLength on its current line"). Same effect in select/case_outside_select_list (92) and select/cte_and_window (91).
+Suspected issue: #327 — the packed SELECT line reaches 94 columns (tab = 4) inside the procedure; the SQL engine's 90-column budget appears to ignore the SSL statement indent, while the fits-inline test in fmt.sql_in_strings measures the line as written ("fits within ssl.format.maxLineLength on its current line"). Same effect in select/case_outside_select_list (92) and select/cte_and_window (91).
 -- input.ssl --
 :PROCEDURE Wide;
 	:DECLARE aRows;

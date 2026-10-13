@@ -6,7 +6,7 @@ concatenation, and an :ERROR / :RESUME pair. Formatting plus the full
 diagnostic picture of an old maintenance script.
 Also carries a :FOR typed without its colon (For k ...) and a :WHILE
 missing its ';', as hand-edited legacy code does.
-Suspected issue: the validator pairs :ENDFOR with its :FOR (no unclosed_block; the later :NEXT is unmatched_block_end), but the formatter does not treat :ENDFOR as a closer, so every following line, the :PROCEDURE included, is indented one level too deep until a :NEXT.
+Suspected issue: #326 — the validator pairs :ENDFOR with its :FOR (no unclosed_block; the later :NEXT is unmatched_block_end), but the formatter does not treat :ENDFOR as a closer, so every following line, the :PROCEDURE included, is indented one level too deep until a :NEXT.
 The second half adds an archive procedure that sends a SELECT through
 RunSQL (runsql_non_dml), compares strings with '= ""', declares a
 :PUBLIC counter, and crams a :FOR loop body onto its header line.

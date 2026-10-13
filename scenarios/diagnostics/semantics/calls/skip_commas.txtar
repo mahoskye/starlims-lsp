@@ -4,7 +4,7 @@ diag.spaced_skip_commas; skipped slots that end a call's argument list
 fire diag.trailing_skip_commas, one per call over the whole run. A spaced
 run that also ends the list is reported only as trailing (one finding
 per cause).
-Suspected issue: DoProc("Helper", {1},,) also fires builtin_excess_arguments (surplus 1 argument "never evaluated") in the default profile, while trailing_skip_commas' catalog says `Foo(a,,)` "is exactly `Foo(a)`", which has no surplus: one cause, two findings with contradictory explanations.
+Suspected issue: #328 — DoProc("Helper", {1},,) also fires builtin_excess_arguments (surplus 1 argument "never evaluated") in the default profile, while trailing_skip_commas' catalog says `Foo(a,,)` "is exactly `Foo(a)`", which has no surplus: one cause, two findings with contradictory explanations.
 -- input.ssl --
 :PROCEDURE Skips;
 	:DECLARE vOut;

@@ -2,7 +2,7 @@ SSL scientific notation needs a digit, a decimal point, then the
 exponent (diag.scientific_notation, error, on the number token, message
 shows the corrected literal): 7e2, 9E+1 (sign kept in the suggestion) and
 .5e1 all fire.
-Suspected issue: under strict, undeclared_variable also reports the exponent fragments e2, E and e1 as variables; they are part of the malformed literal scientific_notation already reports (one typo, two findings).
+Suspected issue: #328 — under strict, undeclared_variable also reports the exponent fragments e2, E and e1 as variables; they are part of the malformed literal scientific_notation already reports (one typo, two findings).
 -- input.ssl --
 :PROCEDURE Scale;
 	:DECLARE nA, nB, nC;

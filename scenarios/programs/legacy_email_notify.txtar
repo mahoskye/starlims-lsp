@@ -8,7 +8,7 @@ The second half adds a recipient-list helper with crammed lines, a
 :BEGINCASE without :OTHERWISE or :EXITCASE, a :WHILE whose body mixes
 tabs and spaces, and an :ERROR handler placed first so it protects
 nothing (error_handler_structure).
-Suspected issue: inside BuildList the formatter indents everything after the first-placed :ERROR as handler body, then ':ENDCASE' and ':ENDWHILE' each dedent one level too far (see edge-cases/error_handler_nested_block), contradicting fmt.indent_style's one level per enclosing block.
+Suspected issue: #326 — inside BuildList the formatter indents everything after the first-placed :ERROR as handler body, then ':ENDCASE' and ':ENDWHILE' each dedent one level too far (see edge-cases/error_handler_nested_block), contradicting fmt.indent_style's one level per enclosing block.
 -- input.ssl --
 :PARAMETERS recipients, subj, body;
 :DECLARE mail, tries, sent, r, fmtfn, alt;

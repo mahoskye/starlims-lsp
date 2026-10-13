@@ -5,7 +5,7 @@ a data source cannot take inline defaults either (they are ordinary
 signatures, per diag.datasource_default_required), so as recorded a
 procedure inside a data source has no unflagged way to default a
 parameter.
-Suspected issue: datasource_default_required treats a nested procedure's :PARAMETERS as "an ordinary procedure signature, not the data source's interface", yet no_default_statements_in_datasource flags that procedure's ordinary :DEFAULT line; the two rules disagree on the scope of a nested procedure.
+Suspected issue: #328 — datasource_default_required treats a nested procedure's :PARAMETERS as "an ordinary procedure signature, not the data source's interface", yet no_default_statements_in_datasource flags that procedure's ordinary :DEFAULT line; the two rules disagree on the scope of a nested procedure.
 -- input.ds --
 :PARAMETERS sAisle := "A";
 :PROCEDURE Pad;

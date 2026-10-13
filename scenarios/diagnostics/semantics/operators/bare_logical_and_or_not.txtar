@@ -3,7 +3,7 @@ Bare AND/OR/NOT in operator position are not SSL operators
 a parenthesis is still the operator, so it is not also a
 direct_procedure_call, and the operand after a prefix Not is not also an
 unexpected_token (issue #255): one finding per typo.
-Suspected issue: under strict, undeclared_variable also reports 'AND' (line 3) and 'Not' (line 9) — the catalog says the sibling rules defer so "one typo is one finding" (issue #255); 'or (' and the later 'NOT (' are not reported, so the extra finding is also inconsistent.
+Suspected issue: #328 — under strict, undeclared_variable also reports 'AND' (line 3) and 'Not' (line 9) — the catalog says the sibling rules defer so "one typo is one finding" (issue #255); 'or (' and the later 'NOT (' are not reported, so the extra finding is also inconsistent.
 -- input.ssl --
 :PROCEDURE CanRelease;
 	:PARAMETERS bApproved, bPaid, bOnHold;

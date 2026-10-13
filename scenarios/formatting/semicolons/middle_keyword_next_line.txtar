@@ -1,4 +1,4 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
 A statement line without `;` followed by a continuation keyword
 (:ELSE, :CASE, :OTHERWISE, :CATCH, :FINALLY): records whether the
 missing terminator is supplied before the middle keyword

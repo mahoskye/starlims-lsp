@@ -2,7 +2,7 @@ Filtering predicates: BETWEEN … AND keeps its AND with the range rather
 than breaking it like a boolean AND (reference §2.3,
 sql_between_and_align), alongside LIKE, IS NOT NULL and a parenthesized
 OR group under WHERE.
-Suspected issue: the parenthesized OR group breaks before OR although '  AND (status = 'Logged' OR status = 'Pending')' fits; reference §2.3 "Compound conditions" keeps '(status = 'Logged' OR status = 'Pending')' inline.
+Suspected issue: #327 — the parenthesized OR group breaks before OR although '  AND (status = 'Logged' OR status = 'Pending')' fits; reference §2.3 "Compound conditions" keeps '(status = 'Logged' OR status = 'Pending')' inline.
 -- input.ssl --
 :PROCEDURE Window;
 	:PARAMETERS dFrom, dTo;

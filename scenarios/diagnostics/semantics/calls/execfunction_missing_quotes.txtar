@@ -2,7 +2,7 @@ An unquoted dotted path as the first argument of ExecFunction or DoProc
 (diag.execfunction_missing_quotes, error, from the identifier through the
 dotted fragment). dot_property_access stays silent on that fragment
 (issue #255): one finding per defect.
-Suspected issue: for a three-part path (Billing.Tax.Rate) the range stops after "Billing.Tax." instead of spanning the whole path, and under strict the tail "Rate" (and each leading segment, Billing/Reports) is also reported as an undeclared variable, though the catalog says the range "spans from the first-argument identifier through the dotted fragment" and the defect "reports once, here".
+Suspected issue: #328 — for a three-part path (Billing.Tax.Rate) the range stops after "Billing.Tax." instead of spanning the whole path, and under strict the tail "Rate" (and each leading segment, Billing/Reports) is also reported as an undeclared variable, though the catalog says the range "spans from the first-argument identifier through the dotted fragment" and the defect "reports once, here".
 -- input.ssl --
 :PROCEDURE Dispatch;
 	:DECLARE nOut;

@@ -1,4 +1,4 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
 An :IF condition the author split before `.AND.` / `.OR.`: each
 continuation sits one level past the :IF line, the same column as the
 body, the leading operator telling them apart (fmt.indent_style; style

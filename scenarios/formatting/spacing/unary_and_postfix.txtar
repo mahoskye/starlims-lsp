@@ -2,7 +2,7 @@ Unary `-` after `:=`, an operator, an opening delimiter or a comma, and
 `!`, `++`, `--`, written with and without a space before the operand;
 no space is added after `(` or before `)` / `;` (fmt.operator_spacing
 exceptions). Unary `+` is left out: the parser rejects it.
-Suspected issue: a source space between a unary `-` (or `!`, `++`) and its operand is kept (`nR := - 5;`, `{- nA}`, `! bR`, `nA ++`), though fmt.operator_spacing says unary signs "attach directly to their operand" and `!`, `++`, `--` "attach to their operand".
+Suspected issue: #326 — a source space between a unary `-` (or `!`, `++`) and its operand is kept (`nR := - 5;`, `{- nA}`, `! bR`, `nA ++`), though fmt.operator_spacing says unary signs "attach directly to their operand" and `!`, `++`, `--` "attach to their operand".
 -- input.ssl --
 :PROCEDURE Unary;
 :PARAMETERS nA;

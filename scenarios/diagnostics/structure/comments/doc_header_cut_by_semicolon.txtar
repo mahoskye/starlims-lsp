@@ -3,7 +3,7 @@ line. The comment ends there and the next line starts with `Parameters`,
 an SSL keyword name: the bare-keyword break-out path escalates
 comment_text_after_terminator to error. The stranded header line also
 fails to parse (diag.comment_text_after_terminator second Flags fence).
-Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+Suspected issue: #328 — the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
 -- input.ssl --
 /*
  BuildSummary writes the nightly summary row;

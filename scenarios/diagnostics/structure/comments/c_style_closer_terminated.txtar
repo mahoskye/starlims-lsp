@@ -2,7 +2,7 @@ Near miss for comment_swallows_code: banners closed with `*/;` really end
 at the `;`, so nothing is hidden. The inert-but-stylistic `*/` tail is
 c_style_comment_closer, info tier only, so it appears only under --info
 (diag.comment_swallows_code first bullet, diag.c_style_comment_closer).
-Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+Suspected issue: #328 — the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
 -- input.ssl --
 /*******************************************
  Module: shipment label printing

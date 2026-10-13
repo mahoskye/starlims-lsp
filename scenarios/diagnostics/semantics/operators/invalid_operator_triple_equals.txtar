@@ -1,4 +1,4 @@
-Known failure: no-gained-errors — the formatter splits glued === and !== into '== =' / '!= =', adding unexpected_token (issue to file)
+Known failure: no-gained-errors — the formatter splits glued === and !== into '== =' / '!= =', adding unexpected_token (#326)
 JavaScript-style strict operators === and !== are not SSL; the
 invalid_operator_sequence rule reports them, and formatting must not
 re-tokenize them into a different error.

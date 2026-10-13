@@ -1,7 +1,7 @@
 A lone ':' as a statement, a ':' with a space before a keyword name, and
 a ':' at end of file. The validator must report each without panicking,
 and the formatter must not glue the colon onto a neighboring token.
-Suspected issue: no diagnostic for ':;', ': IF nCount > 0;' or a trailing ':' (only the then-unmatched :ENDIF is reported); unexpected_token says it flags the first token a statement cannot accept, and a lone ':' can begin no SSL statement.
+Suspected issue: #328 — no diagnostic for ':;', ': IF nCount > 0;' or a trailing ':' (only the then-unmatched :ENDIF is reported); unexpected_token says it flags the first token a statement cannot accept, and a lone ':' can begin no SSL statement.
 -- input.ssl --
 :DECLARE nCount;
 :;

@@ -4,7 +4,7 @@ the comment. comment_swallows_code (warning) names the swallowed
 fragment; the orphaned :ENDPROC then surfaces as unmatched_block_end,
 the puzzling symptom the catalog rationale describes
 (diag.comment_swallows_code).
-Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+Suspected issue: #328 — the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
 -- input.ssl --
 /* Helper: trims and upper-cases a code
 */

@@ -3,7 +3,7 @@ its pieces: a top-level :TRY before a procedure and a top-level :ERROR
 handler after it meet, so mixed_error_handling_families fires on the
 :ERROR. The procedure in between uses neither family
 (diag.mixed_error_handling_families second Flags fence).
-Suspected issue: the message says the families "are mixed in the same procedure" although this span is top-level script code (diag.mixed_error_handling_families: "all top-level script code is one further span").
+Suspected issue: #328 — the message says the families "are mixed in the same procedure" although this span is top-level script code (diag.mixed_error_handling_families: "all top-level script code is one further span").
 -- input.ssl --
 :DECLARE nCount;
 :TRY;

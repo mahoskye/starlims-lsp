@@ -2,7 +2,7 @@ The three SSL string delimiters: a double-quoted string and a
 bracket-quoted string holding single-quoted SQL literals both reflow,
 the bracket string closing with ']' (issue #81); a single-quoted SSL
 string holding double-quoted SQL identifiers is recorded as-is.
-Suspected issue: the single-quoted string with double-quoted identifiers overflows (121 columns) but is never reflowed, because detection rejects quoted identifiers as table/column names; the reference treats them as formattable ("Double-quoted identifiers ("MixedCase") are never re-cased", sql-canonical-compact-reference §1) and fmt.sql_in_strings says overflowing SQL is reflowed.
+Suspected issue: #327 — the single-quoted string with double-quoted identifiers overflows (121 columns) but is never reflowed, because detection rejects quoted identifiers as table/column names; the reference treats them as formattable ("Double-quoted identifiers ("MixedCase") are never re-cased", sql-canonical-compact-reference §1) and fmt.sql_in_strings says overflowing SQL is reflowed.
 -- input.ssl --
 :PROCEDURE Quotes;
 	:PARAMETERS sStatus;

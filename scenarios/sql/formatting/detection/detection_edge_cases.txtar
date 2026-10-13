@@ -3,8 +3,8 @@ an overflowing SQL statement led by a SQL block comment, one holding
 COLLATE, one with a leading WITH (detected and reflowed), and an
 overflowing single-line query that the SSL wrapper moves to the next
 line after ':=' instead of the SQL engine reflowing it.
-Suspected issue: the comment-led and COLLATE statements overflow but are not detected as SQL, so they are never reflowed (fmt.sql_in_strings: "Single-line SQL that overflows the line ... is reflowed"); detection requires the first token to be a command keyword and reads "custname COLLATE Latin1_General_CI_AS" as a three-bare-word prose run.
-Suspected issue: the last query overflows its line (95 columns) yet is not reflowed; the statement wraps after ':=' instead, a shape fmt.sql_in_strings never names ("Single-line SQL that overflows the line ... is reflowed ... A rewrite ALWAYS takes the rule-F multi-line form").
+Suspected issue: #327 — the comment-led and COLLATE statements overflow but are not detected as SQL, so they are never reflowed (fmt.sql_in_strings: "Single-line SQL that overflows the line ... is reflowed"); detection requires the first token to be a command keyword and reads "custname COLLATE Latin1_General_CI_AS" as a three-bare-word prose run.
+Suspected issue: #327 — the last query overflows its line (95 columns) yet is not reflowed; the statement wraps after ':=' instead, a shape fmt.sql_in_strings never names ("Single-line SQL that overflows the line ... is reflowed ... A rewrite ALWAYS takes the rule-F multi-line form").
 -- input.ssl --
 :PROCEDURE Edges;
 	:DECLARE aRows;
