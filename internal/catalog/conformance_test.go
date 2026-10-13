@@ -240,7 +240,13 @@ func TestCriterionTraceability(t *testing.T) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".git" || name == "bin" || name == "node_modules" || name == "dev" || name == "snapshots" {
+			// Hidden directories (.git, and tool state such as .claude,
+			// which can hold whole git worktrees of other branches) are
+			// not this checkout's tests.
+			if path != repoRoot && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			if name == "bin" || name == "node_modules" || name == "dev" || name == "snapshots" {
 				return filepath.SkipDir
 			}
 			return nil
