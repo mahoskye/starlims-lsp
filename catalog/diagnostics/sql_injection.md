@@ -32,6 +32,18 @@ history:
       -> mangled call sites, walked back again). Settled stance for the LSP:
       never parse or rewrite the SQL text itself; judge only the visible
       token shape of the call argument, which is what this rule does.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Rewritten on the expression AST (CollectCalls): the first argument's
+      `+` chain is flattened and flagged only when a string-literal operand
+      meets a runtime operand. Fixes: constant-only concatenation no longer
+      flags; a leading BuildStringForIn(...) no longer hides a later splice;
+      a leading call or parenthesized argument is seen through. The
+      BuildStringForIn fence now appends the builder's own parenthesized list
+      (`IN " + BuildStringForIn(a)`), as the function reference documents.
+      Production corpus: 1,702 -> 1,652 (50 constant-only concatenations
+      dropped, 2 newly caught, 4 ranges moved to the runtime operand's `+`).
 issues: []
 ---
 
@@ -41,18 +53,20 @@ Flags string concatenation in the **first argument** of a call to a known
 SQL function (`SQLExecute` plus the parameterized family: `RunSQL`,
 `LSearch`, `LSelect`, `LSelect1`, `LSelectC`, `GetDataSet`, `GetDataSetEx`,
 `GetDataSetWithSchemaFromSelect`, `GetDataSetXMLFromSelect`,
-`GetNETDataSet`, `GetTables`, `XmlExportSql`). Two shapes fire, both
-warning severity with the range on the `+` operator:
+`GetNETDataSet`, `GetTables`, `XmlExportSql`). The argument is judged on
+its expression tree: the `+` chain is flattened (parentheses unwrapped)
+into operands, and the call is flagged when
 
-- a string literal followed by `+` (e.g. `SQLExecute("... WHERE X = '" +
-  sValue ...)`), unless the operand after `+` is a call to a known-safe SQL
-  builder (`BuildStringForIn(...)`);
-- an identifier followed by `+` followed by a string literal (e.g.
-  `SQLExecute(sSql + " WHERE ...")`).
+- at least one operand is a string literal — the concatenation builds
+  SQL text; and
+- at least one operand is a runtime value — anything other than a string
+  or number literal, `.T.`/`.F.`/`NIL`, or a call to a known-safe SQL
+  builder (`BuildStringForIn(...)`).
 
-Only the first significant token of the first argument is judged, and at
-most one diagnostic is emitted per call. The rule never inspects the SQL
-text inside the string — only the concatenation shape at the call site.
+Warning severity, at most one diagnostic per call, with the range on the
+`+` next to the first runtime operand (the one before it, or after it
+when it leads the chain). The rule never inspects the SQL text inside
+the strings, only the shape of the SSL expression.
 
 It must NOT flag:
 
@@ -61,10 +75,12 @@ It must NOT flag:
 - a plain variable argument (`SQLExecute(sSql)`), even if that variable was
   built by concatenation elsewhere — chasing dataflow was deliberately left
   out;
-- concatenation with `BuildStringForIn(...)` after the leading string
-  literal (safe escaped IN-clause values, 788e5b2);
-- concatenation outside a SQL function call, e.g. in an ordinary
-  assignment;
+- concatenation of constants only (`"SELECT …" + " WHERE …"`) — no
+  runtime value reaches the SQL text;
+- concatenation whose only non-literal operand is `BuildStringForIn(...)`
+  (safe escaped IN-clause values, 788e5b2) — but a safe builder does not
+  excuse a later runtime operand in the same chain;
+- concatenation outside a SQL function call, or in a later argument;
 - identifier `+` identifier in the first argument (no string literal
   involved).
 
@@ -92,6 +108,40 @@ aRows := LSearch(sSql + " WHERE STATUS = 'OPEN'");
 :ENDPROC;
 ```
 
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE aIds, sName, aRows;
+aIds := {"A1", "B2"};
+sName := "O'Brien";
+aRows := SQLExecute("SELECT ID FROM CUSTOMERS WHERE ID IN " + BuildStringForIn(aIds) + " AND NAME = '" + sName + "'");
+:RETURN aRows;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE sSql, sName, aRows;
+sSql := "SELECT ID FROM CUSTOMERS";
+sName := "O'Brien";
+aRows := SQLExecute(Upper(sSql) + " WHERE NAME = '" + sName + "'");
+:RETURN aRows;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE aRows;
+aRows := SQLExecute("SELECT ID FROM CUSTOMERS" + " WHERE STATUS = 'OPEN'");
+:RETURN aRows;
+:ENDPROC;
+```
+
 ### Does not flag
 
 ```ssl
@@ -108,8 +158,8 @@ aRows := SQLExecute("SELECT ID FROM CUSTOMERS WHERE NAME = ?sName?");
 ```ssl
 :PROCEDURE Demo;
 :DECLARE aIds, aRows;
-aIds := {1, 2, 3};
-aRows := SQLExecute("SELECT ID FROM CUSTOMERS WHERE ID IN (" + BuildStringForIn(aIds) + ")");
+aIds := {"A1", "B2"};
+aRows := SQLExecute("SELECT ID FROM CUSTOMERS WHERE ID IN " + BuildStringForIn(aIds));
 :RETURN aRows;
 :ENDPROC;
 ```
@@ -129,13 +179,16 @@ aRows := SQLExecute(sSql);
 
 The schema declares `lints.security.prevent_sql_injection: true` and
 `parameterized_queries_required: true` (inheriting the lints section's
-advisory level — no per-rule severity is given, so the tool chose warning:
-loud enough to read, not blocking, since concatenation of constants is
-sometimes legitimate). The rule's precision budget was set by the
+advisory level; the style-guide record `prevent_sql_injection` sets
+warning). Warning, not error: a concatenated runtime value is a likely
+defect, not a certain one, because the record's own exception allows a
+fixed fragment chosen by the code itself. Constant-only concatenation is
+never flagged, since no runtime value reaches the SQL text. The rule's precision budget was set by the
 SQL-in-strings policy churn (extension #28 → #50/#51 → #64): tools that
 tried to understand SQL inside string literals broke real code twice, so
 this check judges only the concatenation shape visible in the call
-argument. That is also why the plain-variable and outside-the-call cases
+argument — since issue #255 on the argument's expression tree rather than
+its first token. That is also why the plain-variable and outside-the-call cases
 are permanent Does-not-flag fences — extending the rule with dataflow
 would reopen that class of false positives. `BuildStringForIn` is the one
 audited-safe concatenation (788e5b2).

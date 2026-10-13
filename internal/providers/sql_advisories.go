@@ -66,26 +66,27 @@ func checkSQLAdvisories(tokens []lexer.Token, opts DiagnosticOptions) []Diagnost
 	}
 
 	spliceFlaggedCall := -1
-	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
-		tok := tokens[strIdx]
-		content := unquoteSSLString(tok.Text)
+	sqlCallFirstArgPieces(tokens, func(p sqlArgPiece) {
+		tok := tokens[p.strIdx]
 
-		// I4 — a spliced character literal: the string ends (or begins)
-		// inside an open SQL '…' literal continued across concatenation.
-		// The SQL lexer cannot tokenize such a fragment coherently, so it
-		// is also the only advisory that fires on it — once per call, not
-		// once per concatenation piece.
-		if strings.Count(content, "'")%2 == 1 {
-			if callIdx == spliceFlaggedCall {
-				return
+		// A piece that opens or closes inside a '…' character literal is a
+		// fragment the SQL lexer cannot read as a statement, so the six
+		// structural advisories skip it.
+		if p.startsInLiteral || p.endsInLiteral {
+			// I4 — a spliced character literal: a concatenated piece that
+			// leaves a '…' literal open for the next piece to close
+			// (`"… = '" + sName + "'"`). Reported once per call, on the
+			// opening piece. Quotes are counted outside SQL comments, so
+			// `-- it's` never reads as an open literal.
+			if p.endsInLiteral && !p.startsInLiteral && p.concatenated && p.callIdx != spliceFlaggedCall {
+				spliceFlaggedCall = p.callIdx
+				add(tok, CodeSQLLiteralSplice,
+					"SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface")
 			}
-			spliceFlaggedCall = callIdx
-			add(tok, CodeSQLLiteralSplice,
-				"SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface")
 			return
 		}
 
-		sqlToks := significantSQLTokens(content)
+		sqlToks := significantSQLTokens(p.toks)
 		if len(sqlToks) == 0 {
 			return
 		}
@@ -101,10 +102,95 @@ func checkSQLAdvisories(tokens []lexer.Token, opts DiagnosticOptions) []Diagnost
 	return diagnostics
 }
 
-// significantSQLTokens lexes SQL content and drops whitespace and comments.
-func significantSQLTokens(content string) []SQLToken {
+// sqlArgPiece is one string token of a recognized embedded-SQL call's
+// first argument, lexed as SQL with character-literal state carried
+// across the call's concatenated pieces.
+type sqlArgPiece struct {
+	callIdx int // function-name token index
+	strIdx  int // string token index
+	// toks is the piece lexed as SQL, whitespace and comments kept. When
+	// the piece opens inside a literal continued from an earlier piece, a
+	// synthetic opening quote is prepended before lexing so the lexer
+	// stays in step with the literal (`"' and flag = 'N'"` lexes as the
+	// literal's tail, then `flag`, `=`, `'N'`).
+	toks []SQLToken
+	// startsInLiteral: the piece begins inside a '…' literal left open by
+	// an earlier piece of the same argument.
+	startsInLiteral bool
+	// endsInLiteral: the piece ends inside an open '…' literal.
+	endsInLiteral bool
+	// concatenated: the string is an operand of SSL `+`.
+	concatenated bool
+}
+
+// sqlCallFirstArgPieces yields every string piece of the first argument of
+// each recognized embedded-SQL call (SQLExecute plus the positional
+// family), in source order, lexed as SQL. Every rule that reads SQL text
+// inside a call argument goes through here, so SQL comments, character
+// literals, and ?…? placeholders can never false-trigger a keyword match.
+func sqlCallFirstArgPieces(tokens []lexer.Token, yield func(p sqlArgPiece)) {
+	lastCall := -1
+	inLiteral := false
+	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
+		if callIdx != lastCall {
+			lastCall = callIdx
+			inLiteral = false
+		}
+		text := unquoteSSLString(tokens[strIdx].Text)
+		if inLiteral {
+			text = "'" + text
+		}
+		toks := NewSQLLexer(text).Tokenize()
+		p := sqlArgPiece{
+			callIdx:         callIdx,
+			strIdx:          strIdx,
+			toks:            toks,
+			startsInLiteral: inLiteral,
+			endsInLiteral:   sqlEndsInsideLiteral(toks),
+			concatenated:    isConcatenationOperand(tokens, strIdx),
+		}
+		inLiteral = p.endsInLiteral
+		yield(p)
+	})
+}
+
+// sqlEndsInsideLiteral reports whether a lexed SQL fragment ends inside an
+// open single-quoted literal. Single quotes are counted outside SQL
+// comments and double-quoted identifiers, so an apostrophe in `-- it's`
+// never reads as an open literal; a doubled `”` escape counts two.
+func sqlEndsInsideLiteral(toks []SQLToken) bool {
+	n := 0
+	for _, t := range toks {
+		switch t.Type {
+		case SQLTokenComment, SQLTokenHint:
+			continue
+		case SQLTokenString:
+			if strings.HasPrefix(t.Text, `"`) {
+				continue
+			}
+		}
+		n += strings.Count(t.Text, "'")
+	}
+	return n%2 == 1
+}
+
+// isConcatenationOperand reports whether the token at idx is an operand of
+// an SSL `+`: the nearest significant token on either side is `+`.
+func isConcatenationOperand(tokens []lexer.Token, idx int) bool {
+	if prev := previousSignificantTokenIndex(tokens, idx-1); prev >= 0 && tokens[prev].Text == "+" {
+		return true
+	}
+	if next := nextSignificantTokenIndex(tokens, idx+1); next >= 0 && tokens[next].Text == "+" {
+		return true
+	}
+	return false
+}
+
+// significantSQLTokens drops whitespace and comments from a SQL token
+// stream.
+func significantSQLTokens(toks []SQLToken) []SQLToken {
 	var out []SQLToken
-	for _, t := range NewSQLLexer(content).Tokenize() {
+	for _, t := range toks {
 		switch t.Type {
 		case SQLTokenWhitespace, SQLTokenComment, SQLTokenHint:
 			continue
@@ -197,6 +283,13 @@ func checkInconsistentAlias(tok lexer.Token, sqlToks []SQLToken, add func(lexer.
 	}
 	for i := 1; i < len(sqlToks); i++ {
 		t := sqlToks[i]
+		// A TOP clause is not part of the first item: skip the keyword,
+		// its count (`10` or `(10)`), and any PERCENT / WITH TIES, so
+		// `select top 10 col` never reads `10 col` as a bare alias.
+		if len(item) == 0 && t.Type == SQLTokenKeyword && strings.EqualFold(t.Text, "TOP") {
+			i = skipTopClause(sqlToks, i)
+			continue
+		}
 		switch t.Text {
 		case "(":
 			depth++
@@ -214,9 +307,8 @@ func checkInconsistentAlias(tok lexer.Token, sqlToks []SQLToken, add func(lexer.
 				continue
 			}
 		}
-		// DISTINCT/TOP prefixes are not part of the first item.
-		if len(item) == 0 && t.Type == SQLTokenKeyword &&
-			(strings.EqualFold(t.Text, "DISTINCT") || strings.EqualFold(t.Text, "TOP")) {
+		// A DISTINCT prefix is not part of the first item.
+		if len(item) == 0 && t.Type == SQLTokenKeyword && strings.EqualFold(t.Text, "DISTINCT") {
 			continue
 		}
 		item = append(item, t)
@@ -225,6 +317,36 @@ func checkInconsistentAlias(tok lexer.Token, sqlToks []SQLToken, add func(lexer.
 		add(tok, CodeSQLInconsistentAlias,
 			"SELECT list mixes explicit 'AS alias' and bare 'expr alias' forms - a uniform explicit AS keeps aliases scannable")
 	}
+}
+
+// skipTopClause returns the index of the last token of the TOP clause
+// whose keyword sits at i: the count (a number or a parenthesized
+// expression), then an optional PERCENT and WITH TIES.
+func skipTopClause(sqlToks []SQLToken, i int) int {
+	j := i + 1
+	if j < len(sqlToks) && sqlToks[j].Type == SQLTokenNumber {
+		j++
+	} else if j < len(sqlToks) && sqlToks[j].Text == "(" {
+		depth := 0
+		for ; j < len(sqlToks); j++ {
+			if sqlToks[j].Text == "(" {
+				depth++
+			} else if sqlToks[j].Text == ")" {
+				depth--
+				if depth == 0 {
+					j++
+					break
+				}
+			}
+		}
+	}
+	if j < len(sqlToks) && strings.EqualFold(sqlToks[j].Text, "PERCENT") {
+		j++
+	}
+	if j+1 < len(sqlToks) && strings.EqualFold(sqlToks[j].Text, "WITH") && strings.EqualFold(sqlToks[j+1].Text, "TIES") {
+		j += 2
+	}
+	return j - 1
 }
 
 // checkDialectMix (I5): Oracle-only and MSSQL-only idioms in one statement.
@@ -260,10 +382,16 @@ func checkDialectMix(tok lexer.Token, sqlToks []SQLToken, add func(lexer.Token, 
 }
 
 // checkSelectStar (I6): `SELECT *` / `SELECT t.*` at the head of a select
-// list. COUNT(*) and other in-paren stars never match.
+// list. COUNT(*) and other in-paren stars never match, nor does the
+// subquery of an EXISTS probe.
 func checkSelectStar(tok lexer.Token, sqlToks []SQLToken, add func(lexer.Token, string, string)) {
 	for i, t := range sqlToks {
 		if t.Type != SQLTokenKeyword || !strings.EqualFold(t.Text, "SELECT") {
+			continue
+		}
+		// `EXISTS (select * …)` is a probe, not a projection: its columns
+		// are never read, so the column-coupling concern does not apply.
+		if i >= 2 && sqlToks[i-1].Text == "(" && strings.EqualFold(sqlToks[i-2].Text, "EXISTS") {
 			continue
 		}
 		j := i + 1

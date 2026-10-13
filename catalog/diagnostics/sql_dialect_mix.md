@@ -3,7 +3,7 @@ id: diag.sql_dialect_mix
 title: Oracle-only and SQL Server-only idioms in one statement
 kind: diagnostic
 status: active
-authority: style_only
+authority: tool
 schema_ref: null
 default_severity: info
 config:
@@ -21,6 +21,13 @@ history:
       Introduced as part of the info-tier SQL advisory batch: seven
       observations the formatter cannot act on, aimed at the
       assistant/LLM consumers the tier serves.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Authority corrected style_only -> tool: no style-guide record or
+      schema key covers this rule, so it is an LSP product decision. Behavior
+      now states that each concatenated piece is judged alone and that
+      literal-splice fragments are skipped.
 issues: []
 ---
 
@@ -33,6 +40,10 @@ dialect-exclusive idiom sets: Oracle (`SYSDATE`, `NVL`, `NVL2`,
 `DATEADD`, `DATEDIFF`, `NEWID`, `NOLOCK`). The message names the
 markers found on each side. One diagnostic per string; the range covers
 the string token.
+Each string piece of a concatenated argument is judged on its own. A
+piece that opens or closes inside a `'…'` literal continued across
+concatenation is a fragment, not a statement, so it is left to
+`sql_literal_splice` and skipped here.
 
 It must NOT flag:
 

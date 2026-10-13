@@ -386,6 +386,67 @@ Two follow-ups were filed rather than changed here. #291: rules that
 `unknown_keyword`, `unknown_token`) let a statement that does not parse
 validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 `:FINALLY`, or `:ELSE` outside its block.
+### Changed
+- **`sql_injection` now judges the whole first argument, not its first
+  token.** The rule reads the argument's expression tree. It flattens the
+  `+` chain and reports the call when a string literal (SQL text) meets a
+  runtime value. Concatenating constants only (`"SELECT …" + " WHERE …"`)
+  no longer warns, because no runtime value reaches the SQL. A leading
+  `BuildStringForIn(...)` no longer hides a value spliced in later in the
+  same chain. A leading call (`Upper(sSql) + "…"`) or a parenthesized
+  argument is no longer missed. On a production corpus the default
+  surface drops by 50 warnings, all of them constant-only concatenations,
+  and 2 real splices are newly caught (#255).
+- **`sql_select_star` no longer flags `EXISTS (select * …)`.** An
+  existence probe never reads its columns, so the coupling concern does
+  not apply. The catalog entry already listed it as a non-goal while the
+  code flagged it. These probes were 301 of the corpus's 447 hits. The
+  rule is now linked to the schema's `lints.performance.avoid_select_star`
+  (#255).
+- **Catalog authorities now mirror the style guide.**
+  `udobject_array_in_clause` is `authoritative`, as its style-guide
+  record says. `sql_literal_splice` is `advisory` (the
+  `prevent_sql_injection` record's Bad example is exactly this idiom).
+  `sql_comma_join`, `sql_dialect_mix`, `sql_legacy_outer_join`,
+  `sql_inconsistent_alias` and `sql_suspect_placeholder` are `tool`,
+  because no style-guide record covers them (#255).
+
+### Fixed
+- **A non-ASCII character in a SQL string could wipe out a file's
+  diagnostics.** `udobject_array_in_clause` upper-cased the string and
+  then sliced the copy by offsets into the original. Case mapping can
+  change byte length: a dotless `ı` is two bytes, and its upper case `I`
+  is one. Enough of them before an `IN (?oX:aIds?)` placeholder sliced
+  past the end, and the panic guard replaced every diagnostic in the file
+  with a single `internal_error`. The lookback now upper-cases ASCII
+  only, so offsets stay aligned (#255).
+- **Placeholder ranges are right in multi-line SQL strings.**
+  `udobject_array_in_clause`, `complex_sql_placeholder` and
+  `invalid_sql_param` put the range on the string's first line, at a
+  column past its end, wherever the placeholder actually was. Multi-line
+  strings are the style guide's layout for SQL, so this was the common
+  case, and it also misplaced the extension's quick-fix. The three
+  checks now share one helper that follows the string's newlines (#255).
+- **`unicode_literal_prefix` no longer flags `'N'`.** The check was a raw
+  `\bN'` regex. The quote before `N` counts as a word boundary, so every
+  `'N'` flag literal matched, along with `?'N'?` placeholders and `N'`
+  text in SQL comments. It now runs on the SQL lexer's token stream: an
+  `N` word directly followed by a quoted literal. On a production corpus
+  it went from 691 hits to 0; none of the 691 was a real `N'…'` literal
+  (#255).
+- **`unjustified_collate` ignores `COLLATE` inside SQL literals and
+  comments.** It now matches the lexed SQL word rather than a regex over
+  the raw string (#255).
+- **`sql_literal_splice` no longer counts an apostrophe in a SQL
+  comment.** `-- it's fine` read as an open literal. That flagged a
+  splice where nothing was concatenated, and it also hid every other SQL
+  advisory on that string. Quotes are now counted on the SQL lexer's
+  stream, outside comments, and only a piece that is an operand of `+`
+  counts as a splice (#255).
+- **`sql_inconsistent_alias` no longer reads a `TOP 10` count as a
+  column.** `select top 10 col, x as y` treated `10 col` as a bare alias
+  and flagged a consistent list. The whole TOP clause (`TOP n`,
+  `TOP (n)`, `PERCENT`, `WITH TIES`) is now skipped (#255).
 
 ## [0.24.0] - 2026-09-21
 

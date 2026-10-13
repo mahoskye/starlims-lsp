@@ -394,7 +394,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkInvalidLimsTypeExComparison(tokens)...)
 	diagnostics = append(diagnostics, checkRegionEndMismatch(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
-	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens)...)
+	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens, calls)...)
 
 	diagnostics = applySuppressionComments(tokens, diagnostics)
 	diagnostics = applyRuleOverrides(diagnostics, opts.RuleOverrides)
@@ -1373,16 +1373,12 @@ func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
 				placeholders := ParseSQLPlaceholders(content)
 				for _, ph := range placeholders {
 					if ph.IsNamed && !isSimpleNamedPlaceholder(ph.Name) {
-						paramColumn := t.Column + 1 + ph.Start
 						diagnostics = append(diagnostics, Diagnostic{
 							Severity: SeverityInfo,
-							Range: Range{
-								Start: Position{Line: t.Line - 1, Character: paramColumn - 1},
-								End:   Position{Line: t.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2},
-							},
-							Message: fmt.Sprintf("Complex expression '?%s?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.", ph.Name),
-							Source:  "ssl-lsp",
-							Code:    CodeComplexSqlPlaceholder,
+							Range:    stringContentRange(t, ph.Start, len(ph.Name)+2),
+							Message:  fmt.Sprintf("Complex expression '?%s?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.", ph.Name),
+							Source:   "ssl-lsp",
+							Code:     CodeComplexSqlPlaceholder,
 						})
 					}
 				}
@@ -1392,6 +1388,41 @@ func checkComplexSQLPlaceholders(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// asciiUpper upper-cases ASCII letters only, so the result has exactly the
+// byte length and offsets of s — safe to slice by offsets computed on s.
+func asciiUpper(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if c >= 'a' && c <= 'z' {
+			b[i] = c - ('a' - 'A')
+		}
+	}
+	return string(b)
+}
+
+// stringContentRange returns the source range of the `length` bytes that
+// start at byte offset `start` of a string token's content (the text
+// between its delimiters). A multi-line string is handled: the line
+// advances past every newline before the offset, and the character
+// restarts from that line's first column (issue #255 — the range used to
+// stay on the token's first line, past its end).
+func stringContentRange(tok lexer.Token, start, length int) Range {
+	line := tok.Line - 1
+	// tok.Column is 1-based; +1 skips the opening delimiter.
+	char := tok.Column + start
+	if end := 1 + start; end <= len(tok.Text) {
+		before := tok.Text[1:end]
+		if nl := strings.LastIndexByte(before, '\n'); nl >= 0 {
+			line += strings.Count(before, "\n")
+			char = len(before) - nl - 1
+		}
+	}
+	return Range{
+		Start: Position{Line: line, Character: char},
+		End:   Position{Line: line, Character: char + length},
+	}
 }
 
 // checkUDObjectArrayInClause detects UDObject property access in SQL IN clause
@@ -1414,7 +1445,11 @@ func checkUDObjectArrayInClause(tokens []lexer.Token) []Diagnostic {
 		// Strip surrounding quotes
 		content = content[1 : len(content)-1]
 
-		upper := strings.ToUpper(content)
+		// ASCII-only upper-casing keeps every byte offset aligned with
+		// content: strings.ToUpper can change a string's byte length (a
+		// Turkish dotless ı is two bytes but upper-cases to the one-byte I),
+		// and slicing the result by a content offset panicked (issue #255).
+		upper := asciiUpper(content)
 		placeholders := ParseSQLPlaceholders(content)
 
 		for _, ph := range placeholders {
@@ -1444,13 +1479,9 @@ func checkUDObjectArrayInClause(tokens []lexer.Token) []Diagnostic {
 				}
 			}
 
-			paramColumn := token.Column + 1 + ph.Start
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,
-				Range: Range{
-					Start: Position{Line: token.Line - 1, Character: paramColumn - 1},
-					End:   Position{Line: token.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2},
-				},
+				Range:    stringContentRange(token, ph.Start, len(ph.Name)+2),
 				Message: fmt.Sprintf(
 					"UDObject array property '?%s?' in IN clause causes runtime error "+
 						"'The current array has more than 1 dimmension.' — "+
@@ -5875,20 +5906,12 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 			if !declaredVars[paramUpper] {
 				reported[paramUpper][token.Line] = true
 
-				// Calculate the position of the parameter within the string token
-				// token.Column is 1-based, ph.Start is 0-based offset in content
-				// +1 for the opening quote
-				paramColumn := token.Column + 1 + ph.Start
-
 				diagnostics = append(diagnostics, Diagnostic{
 					Severity: SeverityWarning,
-					Range: Range{
-						Start: Position{Line: token.Line - 1, Character: paramColumn - 1},
-						End:   Position{Line: token.Line - 1, Character: paramColumn - 1 + len(ph.Name) + 2}, // +2 for surrounding ?
-					},
-					Message: fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
-					Source:  "ssl-lsp",
-					Code:    CodeInvalidSqlParam,
+					Range:    stringContentRange(token, ph.Start, len(ph.Name)+2), // +2 for surrounding ?
+					Message:  fmt.Sprintf("SQL parameter '%s' does not match any declared variable", ph.Name),
+					Source:   "ssl-lsp",
+					Code:     CodeInvalidSqlParam,
 				})
 			}
 		}
@@ -6439,6 +6462,72 @@ func checkDataSourceDefaultUsage(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// checkSQLConcatenationInjection detects string concatenation in the first
+// argument of a SQL function call, which may indicate a SQL injection
+// vulnerability (diag.sql_injection).
+// Source of truth: ssl-style-guide.schema.yaml lints.security.prevent_sql_injection.
+//
+// The argument is judged on its expression tree (issue #255): the `+`
+// chain is flattened into operands, and the call is flagged when at least
+// one operand is a string literal (the concatenation builds SQL text) and
+// at least one is a runtime value — anything but a string or number
+// literal, a logical/NIL literal, or a call to a known-safe SQL builder.
+// Constant-only concatenation stays silent, a safe builder no longer hides
+// a later spliced value, and identifier + identifier (no literal SQL text)
+// stays out of scope. The range is the `+` adjoining the first runtime
+// operand; one diagnostic per call.
+func checkSQLConcatenationInjection(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	for _, call := range calls {
+		if !constants.IsSQLFunction(strings.ToUpper(call.Name)) {
+			continue
+		}
+		args := call.EffectiveArgs()
+		if len(args) == 0 {
+			continue
+		}
+		operands, ops := flattenConcatenation(tokens, args[0])
+		if len(operands) < 2 {
+			continue
+		}
+		hasSQLText := false
+		firstRuntime := -1
+		for i, operand := range operands {
+			switch {
+			case isStringLiteralExpr(operand):
+				hasSQLText = true
+			case isConstantLiteralExpr(operand), isSafeSQLBuilderExpr(operand):
+			default:
+				if firstRuntime < 0 {
+					firstRuntime = i
+				}
+			}
+		}
+		if !hasSQLText || firstRuntime < 0 {
+			continue
+		}
+		// ops[i] is the `+` between operands[i] and operands[i+1]: use the
+		// one before the runtime operand, or after it when it leads.
+		opIdx := ops[0]
+		if firstRuntime > 0 {
+			opIdx = ops[firstRuntime-1]
+		}
+		if opIdx < 0 {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(tokens[opIdx]),
+			Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", call.Name),
+			Source:   "ssl-lsp",
+			Code:     CodeSqlInjection,
+		})
+	}
+
+	return diagnostics
+}
+
 // safeSQLBuilderFunctions lists functions that produce safe SQL fragments
 // (e.g. properly escaped IN-clause value lists). Concatenating their return
 // value into a SQL string is not an injection risk.
@@ -6446,103 +6535,66 @@ var safeSQLBuilderFunctions = map[string]bool{
 	"BUILDSTRINGFORIN": true,
 }
 
-// isSafeSQLBuilderCall checks if the token at idx is the start of a call to a
-// known-safe SQL builder function (e.g. BuildStringForIn(...)).
-func isSafeSQLBuilderCall(tokens []lexer.Token, idx int) bool {
-	if idx >= len(tokens) || tokens[idx].Type != lexer.TokenIdentifier {
-		return false
+// flattenConcatenation splits a `+` chain (parentheses unwrapped) into its
+// operands in source order, plus the token index of each `+` between
+// consecutive operands (-1 when it cannot be located). A non-`+`
+// expression is a single operand.
+func flattenConcatenation(tokens []lexer.Token, e *parser.Expr) ([]*parser.Expr, []int) {
+	var operands []*parser.Expr
+	var ops []int
+	var walk func(e *parser.Expr)
+	walk = func(e *parser.Expr) {
+		for e != nil && e.Kind == parser.ExprGroup && len(e.Children) == 1 {
+			e = e.Children[0]
+		}
+		if e != nil && e.Kind == parser.ExprBinary && e.Op == "+" && len(e.Children) == 2 {
+			walk(e.Children[0])
+			ops = append(ops, findOperatorToken(tokens, e.Children[0].End+1, e.Children[1].Start-1, "+"))
+			walk(e.Children[1])
+			return
+		}
+		operands = append(operands, e)
 	}
-	if !safeSQLBuilderFunctions[strings.ToUpper(tokens[idx].Text)] {
-		return false
-	}
-	// Verify it's actually a call — next significant token should be "("
-	nextIdx := nextSignificantTokenIndex(tokens, idx+1)
-	return nextIdx >= 0 && tokens[nextIdx].Text == "("
+	walk(e)
+	return operands, ops
 }
 
-// checkSQLConcatenationInjection detects string concatenation in SQL function arguments,
-// which may indicate SQL injection vulnerability.
-// Source of truth: ssl-style-guide.schema.yaml lints.security.prevent_sql_injection.
-func checkSQLConcatenationInjection(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-
-	for i, token := range tokens {
-		if token.Type != lexer.TokenIdentifier {
-			continue
-		}
-
-		upper := strings.ToUpper(token.Text)
-		if !constants.IsSQLFunction(upper) {
-			continue
-		}
-
-		// Walk into the function call to find the first string argument
-		parenDepth := 0
-		inCall := false
-		for j := i + 1; j < len(tokens); j++ {
-			t := tokens[j]
-			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
-				continue
-			}
-
-			if t.Text == "(" {
-				if !inCall {
-					inCall = true
-				}
-				parenDepth++
-				continue
-			}
-
-			if t.Text == ")" {
-				parenDepth--
-				if parenDepth <= 0 {
-					break
-				}
-				continue
-			}
-
-			// Check if first arg has concatenation with + operator
-			if inCall && parenDepth == 1 {
-				if t.Type == lexer.TokenString {
-					nextIdx := nextSignificantTokenIndex(tokens, j+1)
-					if nextIdx >= 0 && tokens[nextIdx].Text == "+" {
-						// Skip if concatenating with a known-safe builder function
-						afterPlusIdx := nextSignificantTokenIndex(tokens, nextIdx+1)
-						if afterPlusIdx >= 0 && isSafeSQLBuilderCall(tokens, afterPlusIdx) {
-							break
-						}
-						diagnostics = append(diagnostics, Diagnostic{
-							Severity: SeverityWarning,
-							Range:    tokenToRange(tokens[nextIdx]),
-							Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
-							Source:   "ssl-lsp",
-							Code:     CodeSqlInjection,
-						})
-					}
-					break
-				}
-				if t.Type == lexer.TokenIdentifier {
-					nextIdx := nextSignificantTokenIndex(tokens, j+1)
-					if nextIdx >= 0 && tokens[nextIdx].Text == "+" {
-						afterPlusIdx := nextSignificantTokenIndex(tokens, nextIdx+1)
-						if afterPlusIdx >= 0 && tokens[afterPlusIdx].Type == lexer.TokenString {
-							diagnostics = append(diagnostics, Diagnostic{
-								Severity: SeverityWarning,
-								Range:    tokenToRange(tokens[nextIdx]),
-								Message:  fmt.Sprintf("String concatenation in '%s' argument may cause SQL injection. Use parameterized queries instead.", token.Text),
-								Source:   "ssl-lsp",
-								Code:     CodeSqlInjection,
-							})
-						}
-					}
-					break
-				}
-				break
-			}
+// findOperatorToken returns the index of the first token in [from, to]
+// whose text is op, or -1.
+func findOperatorToken(tokens []lexer.Token, from, to int, op string) int {
+	for i := from; i <= to && i < len(tokens); i++ {
+		if i >= 0 && tokens[i].Text == op {
+			return i
 		}
 	}
+	return -1
+}
 
-	return diagnostics
+func isStringLiteralExpr(e *parser.Expr) bool {
+	if e == nil || e.Kind != parser.ExprLiteral || e.Name == "" {
+		return false
+	}
+	switch e.Name[0] {
+	case '"', '\'', '[':
+		return true
+	}
+	return false
+}
+
+// isConstantLiteralExpr reports a non-string literal: a number, .T./.F.,
+// or NIL. Concatenating one cannot carry injected SQL.
+func isConstantLiteralExpr(e *parser.Expr) bool {
+	return e != nil && e.Kind == parser.ExprLiteral && !isStringLiteralExpr(e)
+}
+
+// isSafeSQLBuilderExpr reports a call to a known-safe SQL builder
+// (BuildStringForIn(...)), whose escaped output may be concatenated.
+func isSafeSQLBuilderExpr(e *parser.Expr) bool {
+	if e == nil || e.Kind != parser.ExprCall || len(e.Children) == 0 {
+		return false
+	}
+	callee := e.Children[0]
+	return callee.Kind == parser.ExprIdentifier && safeSQLBuilderFunctions[strings.ToUpper(callee.Name)]
 }
 
 // checkClassNameCollision warns when a `:CLASS Foo;` declaration uses a
@@ -6917,8 +6969,6 @@ func stripLeadingSQLComments(s string) string {
 var (
 	sqlDMLVerbPattern       = regexp.MustCompile(`(?i)\b(insert|update|delete|merge)\b`)
 	sqlSelectIntoPattern    = regexp.MustCompile(`(?i)\binto\b`)
-	unicodePrefixPattern    = regexp.MustCompile(`(?i)\bN'`)
-	collateKeywordPattern   = regexp.MustCompile(`(?i)\bcollate\b`)
 	leadingSQLWordExtractor = regexp.MustCompile(`^[A-Za-z]+`)
 )
 
@@ -6985,12 +7035,16 @@ func checkRunSQLNonDML(tokens []lexer.Token, calls []parser.CallSite) []Diagnost
 // checkUnicodeLiteralPrefix flags N'...' Unicode literal prefixes in
 // embedded SQL (diag.unicode_literal_prefix, issue #196). Info-tier style
 // note: most schemas don't need the prefix and it creeps in via
-// copy-paste. One diagnostic per string token.
+// copy-paste. Detection runs over the SQL lexer's token stream — an `N`
+// identifier immediately followed by a '…' literal — so a 'N' flag
+// literal, a ?'N'? placeholder, or N'…' text in a SQL comment never
+// matches (issue #255). One diagnostic per string token.
 func checkUnicodeLiteralPrefix(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
-		if !unicodePrefixPattern.MatchString(unquoteSSLString(tokens[strIdx].Text)) {
+	sqlCallFirstArgPieces(tokens, func(p sqlArgPiece) {
+		strIdx := p.strIdx
+		if !hasUnicodeLiteralPrefix(p.toks) {
 			return
 		}
 		diagnostics = append(diagnostics, Diagnostic{
@@ -7007,14 +7061,16 @@ func checkUnicodeLiteralPrefix(tokens []lexer.Token) []Diagnostic {
 
 // checkCollateJustification flags COLLATE in embedded SQL when no comment
 // directly precedes the containing statement (diag.unjustified_collate,
-// issue #197). Info-tier style note: forcing collation is occasionally
+// issue #197). COLLATE is matched as a lexed SQL word, never inside a SQL
+// character literal or comment (issue #255). Info-tier style note: forcing collation is occasionally
 // necessary but should carry a documented reason; an unexplained COLLATE
 // is usually cargo-culted.
 func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	sqlCallFirstArgStrings(tokens, constants.IsSQLFunction, func(callIdx, strIdx int) {
-		if !collateKeywordPattern.MatchString(unquoteSSLString(tokens[strIdx].Text)) {
+	sqlCallFirstArgPieces(tokens, func(p sqlArgPiece) {
+		callIdx, strIdx := p.callIdx, p.strIdx
+		if !hasSQLWord(p.toks, "COLLATE") {
 			return
 		}
 		// Justified when a comment sits between the previous statement's
@@ -7084,6 +7140,35 @@ func trailingSkipCommaRuns(tokens []lexer.Token, calls []parser.CallSite) []skip
 	}
 	sort.Slice(runs, func(a, b int) bool { return runs[a].first < runs[b].first })
 	return runs
+}
+
+// hasUnicodeLiteralPrefix reports whether a lexed SQL fragment holds an
+// N'…' literal: an `N` word token immediately followed (no whitespace) by
+// a single-quoted string token.
+func hasUnicodeLiteralPrefix(toks []SQLToken) bool {
+	for i := 0; i+1 < len(toks); i++ {
+		t := toks[i]
+		if (t.Type == SQLTokenIdentifier || t.Type == SQLTokenKeyword) && strings.EqualFold(t.Text, "N") &&
+			toks[i+1].Type == SQLTokenString && strings.HasPrefix(toks[i+1].Text, "'") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSQLWord reports whether a lexed SQL fragment holds the word (keyword,
+// function, or identifier — case-insensitive) outside literals and
+// comments.
+func hasSQLWord(toks []SQLToken, word string) bool {
+	for _, t := range toks {
+		switch t.Type {
+		case SQLTokenIdentifier, SQLTokenKeyword, SQLTokenFunction:
+			if strings.EqualFold(t.Text, word) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // checkTrailingSkipCommas flags skip-commas immediately preceding a call's
