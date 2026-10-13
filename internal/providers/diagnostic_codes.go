@@ -86,6 +86,7 @@ const (
 	CodeBaseStandalone              = "base_standalone"
 	CodeBaseOutsideClass            = "base_outside_class"
 	CodeBaseRequiresInherit         = "base_requires_inherit"
+	CodeInvalidNativeMember         = "invalid_native_member"
 	CodeUnmatchedDelimiter          = "unmatched_delimiter"
 	CodeMismatchedDelimiter         = "mismatched_delimiter"
 	CodeUnclosedDelimiter           = "unclosed_delimiter"

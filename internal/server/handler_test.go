@@ -848,6 +848,37 @@ func TestHandleCompletion_ColonTriggerSuppressedAfterIdentifier(t *testing.T) {
 	}
 }
 
+// Issue #267: an SSL array (or scalar) has no SSL-object members and no
+// enumerable native members, so `aItems:` offers nothing.
+//
+// [spec feature.completion/A11]
+func TestHandleCompletion_NoMembersOnSSLValues(t *testing.T) {
+	s := newTestServerWithDocument(":DECLARE aItems, sName;\naItems := {1, 2};\nsName := \"x\";\naItems:")
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 7},
+		},
+		Context: &protocol.CompletionContext{
+			TriggerKind:      protocol.CompletionTriggerKindTriggerCharacter,
+			TriggerCharacter: ptrTo(":"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, _ := result.([]protocol.CompletionItem)
+	for _, label := range []string{"GetProperty", "IsProperty", "AddProperty", "Count"} {
+		if containsCompletionLabel(items, label) {
+			t.Errorf("did not expect %q after an array receiver", label)
+		}
+	}
+	if len(items) != 0 {
+		t.Errorf("expected no completions after an array receiver, got %d", len(items))
+	}
+}
+
 // Issue #11: ':' trigger SHOULD surface keyword completions when ':' begins
 // a new token (preceded by whitespace or SOL).
 //

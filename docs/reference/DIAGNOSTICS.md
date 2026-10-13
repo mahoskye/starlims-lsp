@@ -76,6 +76,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `inline_default_outside_datasource` | Inline := default on :PARAMETERS outside a data source | error | authoritative | active | [diag.inline_default_outside_datasource](../../catalog/diagnostics/inline_default_outside_datasource.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
+| `invalid_native_member` | Colon member that raises on an SSL value | warning | authoritative | active | [diag.invalid_native_member](../../catalog/diagnostics/invalid_native_member.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
 | `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |

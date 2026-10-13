@@ -92,6 +92,7 @@ trigger policy:
 - A8: Given `ExecFunction("Cat.")` where `Cat` is a workspace category, when completion is requested, then the scripts in that category are offered.
 - A9: Given `ExecFunction("Cat.Script.")` resolving to a workspace script, when completion is requested, then that script's procedures are offered, excluding `/*@private;` and `/*@protected;` ones.
 - A10: Given `DoProc("Script.")` where `Script` matches a flat-layout script basename, when completion is requested, then that script's non-private procedures are offered.
+- A11: Given `aItems:` where aItems holds an SSL array, string, number, logical or date (no class, returns-object or CreateUdObject shape), when completion triggers, then no items are offered — in particular no SSL-object members (`GetProperty`, `IsProperty`, `AddProperty`, ...), which those values do not have, and no guessed .NET members, whose names are case-sensitive and unlisted (issue #267).
 
 ## Rationale
 
