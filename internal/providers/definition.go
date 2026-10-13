@@ -15,9 +15,6 @@ type Location struct {
 	Range Range
 }
 
-// doProcPattern matches DoProc or ExecFunction calls to extract the procedure name
-var doProcPattern = regexp.MustCompile(`(?i)\b(DoProc|ExecFunction)\s*\(\s*["']([^"']+)["']`)
-
 // FindDefinition finds the definition for a symbol.
 // Respects scope precedence: local/parameter variables take precedence over public variables.
 // Also supports go-to-definition for DoProc/ExecFunction string targets.
@@ -25,6 +22,13 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 	// First, check if cursor is inside a DoProc/ExecFunction string target
 	if loc := findDoProcDefinition(text, line, column, uri, procedures); loc != nil {
 		return loc
+	}
+
+	// A word inside a comment or a non-dispatch string is prose, not a
+	// symbol use; dispatch strings were handled above (issue #255).
+	tokens := lexer.NewLexer(text).Tokenize()
+	if ctx := lexer.GetContextAtPosition(tokens, line, column); ctx == lexer.ContextComment || ctx == lexer.ContextString {
+		return nil
 	}
 
 	word := lexer.GetWordAtPosition(text, line, column)
@@ -51,18 +55,9 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 	}
 
 	// Check if it's a procedure
-	for _, proc := range procedures {
-		if cursorRole == parser.RoleVariable || cursorRole == parser.RoleDeclaredName {
-			break
-		}
-		if strings.ToLower(proc.Name) == wordLower {
-			return &Location{
-				URI: uri,
-				Range: Range{
-					Start: Position{Line: proc.StartLine - 1, Character: 0},
-					End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name) + 11}, // :PROCEDURE + name
-				},
-			}
+	if cursorRole != parser.RoleVariable && cursorRole != parser.RoleDeclaredName {
+		if loc := procedureLocation(tokens, word, uri, procedures); loc != nil {
+			return loc
 		}
 	}
 
@@ -186,6 +181,33 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 		}
 	}
 
+	// A file-wide subject (a top-level or :PUBLIC variable) is shadowed
+	// inside any procedure that declares the same name as a local or
+	// parameter — mirroring definition's local-over-global precedence
+	// (A4). Those procedures' variable occurrences belong to their own
+	// local (issue #258).
+	var shadowingProcs []parser.ProcedureInfo
+	if !isLocalScope && procedures != nil {
+		for _, proc := range procedures {
+			for _, v := range variables {
+				if strings.ToLower(v.Name) == wordLower &&
+					(v.Scope == parser.ScopeLocal || v.Scope == parser.ScopeParameter) &&
+					v.Line >= proc.StartLine && v.Line <= proc.EndLine {
+					shadowingProcs = append(shadowingProcs, proc)
+					break
+				}
+			}
+		}
+	}
+	inShadowingProc := func(lineNum int) bool {
+		for _, proc := range shadowingProcs {
+			if lineNum >= proc.StartLine && lineNum <= proc.EndLine {
+				return true
+			}
+		}
+		return false
+	}
+
 	var locations []Location
 
 	// Simple text-based search for the word
@@ -245,17 +267,21 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 
 		matches := wordRegex.FindAllStringIndex(lineText, -1)
 		for _, match := range matches {
+			// Regex matches are byte offsets; positions are rune columns
+			// like every other range the server emits (issue #258).
+			startChar := utf8.RuneCountInString(lineText[:match[0]])
+			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
+
 			// Skip declaration if not including it
 			if !includeDeclaration && declarationFound {
-				if i == declarationLine && match[0] <= declarationChar && declarationChar < match[1] {
+				if i == declarationLine && startChar <= declarationChar && declarationChar < startChar+matchLen {
 					continue
 				}
 			}
 
 			// Skip matches inside comments and non-dispatch strings; keep
 			// DoProc/ExecFunction first-argument dispatch targets (issue #43).
-			matchOffset := lineStartOffsets[i] + utf8.RuneCountInString(lineText[:match[0]])
-			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
+			matchOffset := lineStartOffsets[i] + startChar
 			if !isReferenceMatch(tokens, matchOffset, matchLen) {
 				continue
 			}
@@ -263,15 +289,30 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 			// Drop occurrences that name a different kind of symbol
 			// (issue #184). Unclassified positions keep the word-match
 			// behavior — the tree makes no claim there.
-			if !rolesReferToSameSymbol(cursorRole, roleAtOffset(tokens, roles, matchOffset)) {
+			// A surviving string match is a DoProc/ExecFunction dispatch
+			// target, which names a procedure — never a member or a
+			// variable (issue #255).
+			matchRole := roleAtOffset(tokens, roles, matchOffset)
+			inString := offsetInString(tokens, matchOffset)
+			if matchRole == parser.RoleUnclassified && inString {
+				matchRole = parser.RoleCall
+			}
+			if !rolesReferToSameSymbol(cursorRole, matchRole) {
+				continue
+			}
+
+			// Variable occurrences inside a procedure that shadows a
+			// file-wide subject belong to that procedure's local.
+			if !inString && inShadowingProc(i+1) &&
+				(symbolFamily(matchRole) == 1 || matchRole == parser.RoleUnclassified) {
 				continue
 			}
 
 			locations = append(locations, Location{
 				URI: uri,
 				Range: Range{
-					Start: Position{Line: i, Character: match[0]},
-					End:   Position{Line: i, Character: match[0] + len(word)},
+					Start: Position{Line: i, Character: startChar},
+					End:   Position{Line: i, Character: startChar + matchLen},
 				},
 			})
 		}
@@ -281,7 +322,7 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 }
 
 // resolveDeclarationPosition locates the symbol's declaration from the parsed
-// procedures/variables (0-based line, byte column within the line). Scope
+// procedures/variables (0-based line, rune column within the line). Scope
 // precedence mirrors FindDefinition: local/parameter in the cursor's
 // procedure, then public, then any declared variable. Returns found=false
 // when the symbol has no known declaration or no symbol info was provided.
@@ -296,7 +337,7 @@ func resolveDeclarationPosition(wordLower string, wordRegex *regexp.Regexp, line
 			return 0, 0, false
 		}
 		if m := wordRegex.FindStringIndex(lines[declLine]); m != nil {
-			return declLine, m[0], true
+			return declLine, utf8.RuneCountInString(lines[declLine][:m[0]]), true
 		}
 		return declLine, 0, true
 	}
@@ -407,52 +448,29 @@ func escapeRegex(s string) string {
 	})
 }
 
-// findDoProcDefinition checks if the cursor is inside a DoProc/ExecFunction string argument
-// and returns the definition location of the referenced procedure.
+// findDoProcDefinition checks if the cursor is inside a 1-part
+// DoProc/ExecFunction string target and returns the same-file procedure it
+// names. The target is found by the token walk (ExtractCallSites), so a call
+// split across lines resolves and a call-shaped comment never does
+// (issue #255).
 func findDoProcDefinition(text string, line, column int, uri string, procedures []parser.ProcedureInfo) *Location {
-	lines := strings.Split(text, "\n")
-	if line < 1 || line > len(lines) {
+	tokens := lexer.NewLexer(text).Tokenize()
+	dt := DispatchTargetAt(tokens, line, column)
+	if dt == nil || len(dt.Parts) != 1 {
 		return nil
 	}
+	return procedureLocation(tokens, dt.Parts[0], uri, procedures)
+}
 
-	lineText := lines[line-1]
-
-	// Find all DoProc/ExecFunction calls on this line
-	matches := doProcPattern.FindAllStringSubmatchIndex(lineText, -1)
-	if matches == nil {
-		return nil
-	}
-
-	// Check if cursor is inside any of the procedure name strings
-	for _, match := range matches {
-		if len(match) < 6 {
-			continue
-		}
-
-		// match[4] and match[5] are the start/end of the procedure name (capture group 2)
-		procNameStart := match[4] + 1 // +1 for 1-based column
-		procNameEnd := match[5] + 1
-
-		// Check if cursor is within the procedure name
-		if column >= procNameStart && column <= procNameEnd {
-			procName := lineText[match[4]:match[5]]
-
-			// Look for this procedure in the document
-			procNameLower := strings.ToLower(procName)
-			for _, proc := range procedures {
-				if strings.ToLower(proc.Name) == procNameLower {
-					return &Location{
-						URI: uri,
-						Range: Range{
-							Start: Position{Line: proc.StartLine - 1, Character: 0},
-							End:   Position{Line: proc.StartLine - 1, Character: len(proc.Name) + 11}, // :PROCEDURE + name
-						},
-					}
-				}
-			}
+// procedureLocation returns the location of the same-file procedure named
+// name (case-insensitive), ranged over exactly the name on its :PROCEDURE
+// line, or nil.
+func procedureLocation(tokens []lexer.Token, name, uri string, procedures []parser.ProcedureInfo) *Location {
+	for _, proc := range procedures {
+		if strings.EqualFold(proc.Name, name) {
+			return &Location{URI: uri, Range: procedureNameSelectionRange(tokens, proc)}
 		}
 	}
-
 	return nil
 }
 
@@ -473,6 +491,20 @@ func roleAtOffset(tokens []lexer.Token, roles []parser.IdentifierRole, offset in
 		return parser.RoleUnclassified
 	}
 	return parser.RoleUnclassified
+}
+
+// offsetInString reports whether a rune offset falls inside a string token.
+func offsetInString(tokens []lexer.Token, offset int) bool {
+	for i := range tokens {
+		tok := &tokens[i]
+		if tok.Type == lexer.TokenEOF || tok.Offset > offset {
+			break
+		}
+		if offset < tok.Offset+utf8.RuneCountInString(tok.Text) {
+			return tok.Type == lexer.TokenString
+		}
+	}
+	return false
 }
 
 // roleAtPosition returns the identifier role at a 0-based line/character.
@@ -512,6 +544,27 @@ func symbolFamily(role parser.IdentifierRole) int {
 	default:
 		return 0
 	}
+}
+
+// CursorMayNameProcedure reports whether the identifier at a 1-based
+// line/column of text can name a procedure: a procedure header, a call
+// callee, or a position the expression tree makes no claim about (a word
+// inside a DoProc/ExecFunction string is unclassified). A member name, a
+// variable, a declared name, or a class name never names the file's
+// procedure of the same spelling (issue #255).
+func CursorMayNameProcedure(text string, line, column int) bool {
+	switch roleAtTextPosition(text, line-1, column-1) {
+	case parser.RoleUnclassified, parser.RoleProcedureName, parser.RoleCall:
+		return true
+	default:
+		return false
+	}
+}
+
+// cursorOnMember reports whether the identifier at a 1-based line/column is
+// the member name of a `:` access.
+func cursorOnMember(text string, line, column int) bool {
+	return roleAtTextPosition(text, line-1, column-1) == parser.RoleMember
 }
 
 // roleAtTextPosition classifies the identifier at a 0-based line/character

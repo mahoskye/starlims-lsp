@@ -29,6 +29,12 @@ history:
       scheme was drafted, then retired in maintainer review: the canonical
       closer '/* endregion;' takes no name — pairing is LIFO and trailing
       text on the closer is prose (A5/A6 rewritten accordingly).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      :REGION/:ENDREGION and :BEGININLINECODE/:ENDINLINECODE keyword
+      blocks fold like control flow (A8) — both are current SSL with
+      multi-line bodies, and neither folded before.
 issues: []
 ---
 
@@ -39,7 +45,9 @@ element:
 
 - Block keywords, kind `region`: `:PROCEDURE`/`:ENDPROC`, `:IF`/`:ENDIF`,
   `:WHILE`/`:ENDWHILE`, `:FOR`/`:NEXT`, `:BEGINCASE`/`:ENDCASE`,
-  `:TRY`/`:ENDTRY`. Nested blocks each get their own range.
+  `:TRY`/`:ENDTRY`, `:REGION`/`:ENDREGION`,
+  `:BEGININLINECODE`/`:ENDINLINECODE`. Nested blocks each get their own
+  range.
 - Region comment markers, kind `region`: `/* region <name>;` …
   `/* endregion;` (marker keyword case-insensitive). A region with no name
   is treated as named "Region".
@@ -73,6 +81,7 @@ Region end markers pair innermost-first (LIFO):
 - A6: Given `/* endregion;` with no open region followed by a balanced `/* region A;` … `/* endregion;` pair, when folding ranges are requested, then the orphan closer closes nothing (surfaced by diag.region_end_mismatch) and region A still folds correctly.
 - A7: Given a multi-line comment that is not a region marker, when folding
   ranges are requested, then it folds with kind `comment`, not `region`.
+- A8: Given a multi-line `:REGION Name;` … `:ENDREGION;` block or a multi-line `:BEGININLINECODE Name;` … `:ENDINLINECODE;` block, when folding ranges are requested, then each folds with kind `region` from its opener line to its closer line.
 
 ## Rationale
 

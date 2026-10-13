@@ -74,7 +74,8 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 
 	classMethodContext := isClassMethodContext(cache.Tokens, cache.Procedures, line)
 	dsFile := isDataSourceURI(uri)
-	completions := providers.GetAllCompletions(cache.Procedures, cache.Variables, classMethodContext, dsFile, endpointFile)
+	visibleVars := providers.VisibleVariables(cache.Procedures, cache.Variables, line)
+	completions := providers.GetAllCompletions(cache.Procedures, visibleVars, classMethodContext, dsFile, endpointFile)
 	snippets := providers.GetSnippetCompletions(dsFile)
 
 	items := make([]protocol.CompletionItem, 0, len(completions)+len(snippets))
@@ -585,7 +586,7 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 	// procedure's name keeps the scope-aware single-file result (F3).
 	if s.workspaceIndex != nil {
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
-			if procName, ok := procedureSubjectAt(cache, word, line); ok {
+			if procName, ok := procedureSubjectAt(cache, content, word, line, column); ok {
 				locations = append(locations, s.dispatchSiteReferences(uri, procName, locations)...)
 			}
 		}
@@ -1054,7 +1055,7 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 		// scope-aware single-file path. A refusal (class file, D8) falls
 		// back to the same-file path below.
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
-			if procName, ok := procedureSubjectAt(cache, word, line); ok {
+			if procName, ok := procedureSubjectAt(cache, content, word, line, column); ok {
 				if changes := s.crossFileRename(uri, procName, params.NewName); changes != nil {
 					return toWorkspaceEdit(changes), nil
 				}

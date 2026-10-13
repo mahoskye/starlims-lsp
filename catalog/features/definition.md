@@ -10,6 +10,7 @@ tests:
   - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
   - internal/server/handler_test.go
+  - internal/providers/crossfile_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 / f27f727"
@@ -59,6 +60,16 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issues #255, #258"
+    note: >-
+      1-part dispatch targets are found by the token walk, so a call split
+      across lines resolves and a call-shaped comment never navigates
+      (A17); procedure locations range over exactly the name; a receiver
+      holding a built-in class instance is never treated as a shaped
+      UDObject (A18); a word inside a non-dispatch string or a comment
+      returns null (A19). Stale "unshaped receivers keep word matching",
+      Known gaps, and Rationale text removed.
 issues: ["#41"]
 ---
 
@@ -72,7 +83,13 @@ issues: ["#41"]
 - Procedure names inside the first string argument of `DoProc("Name", ...)`
   and `ExecFunction("Name", ...)` MUST resolve to the same-file
   `:PROCEDURE Name` declaration when one exists; single-quoted targets
-  (`DoProc('Name')`) resolve the same way.
+  (`DoProc('Name')`) resolve the same way. Targets are found by the token
+  walk shared with feature.references, so a call whose string sits on the
+  line after `DoProc(` resolves, and call-shaped text inside a comment
+  does not.
+- A word inside a comment or a non-dispatch string literal is prose:
+  definition returns null for it, even when a declaration of that name
+  exists.
 - Matching MUST be case-insensitive (`myproc` finds `:PROCEDURE MyProc`).
 - Scope resolution MUST prefer the local declaration: a `:DECLARE` inside the
   current procedure shadows a file-global declaration of the same name; only
@@ -105,8 +122,11 @@ issues: ["#41"]
   navigates to the property's definition: the initializer literal's key
   or the first `:prop :=` augmentation, wherever the shape learned it.
   A shaped receiver whose shape lacks the member is null — never a
-  fallback to an unrelated same-named symbol. Unshaped receivers keep
-  the prior word-based behavior.
+  fallback to an unrelated same-named symbol. A receiver holding a
+  built-in class instance (`oMail := Email{}`) is never shaped, even
+  after `oMail:Subject := …`: its members belong to the class (D10).
+  Unshaped receivers return null: a member name never resolves to a
+  like-named variable or procedure (A16).
 
 ## Acceptance
 
@@ -126,22 +146,19 @@ issues: ["#41"]
 - A14: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;` and later uses, when go-to-definition is invoked on `Name` or `Total` after `oObj:`, then the Location is the initializer key or the first augmenting assignment respectively.
 - A15: Given the same shaped `oObj` and go-to-definition on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
 - A16: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when definition is requested, then no location is returned — a property is not the like-named local, and no answer beats a wrong one.
+- A17: Given `:PROCEDURE Helper;` and a call `DoProc(` whose `"Helper"` string sits on the next line, when go-to-definition is invoked inside the string, then the Location ranges over exactly the name `Helper` on its `:PROCEDURE` line; given `/* see DoProc("Helper") ;` in a comment, then the response is null.
+- A18: Given `oMail := Email{};` followed by `oMail:Subject := "x";`, when go-to-definition is invoked on a later `oMail:Subject`, then the response is null — a built-in class instance is not a shaped UDObject.
+- A19: Given `:DECLARE sName;` and the word `sName` inside `"sName is bad"` or a comment, when go-to-definition is invoked on that word, then the response is null.
 
 ## Rationale
 
 SSL dispatch is string-based (`DoProc`/`ExecFunction`), so treating those
 first-argument strings as navigable call sites (15102d6, v0.2.0) is what
-makes definition useful at all in this language; restricting it to same-file
-targets keeps the result trustworthy until namespace path resolution lands on
-the workspace index (vs-code-ssl-formatter#16, planned as part of cross-file
-navigation). Local-over-global preference (d56cbfe) mirrors SSL's actual
-scoping (variables are procedure-scoped, `:PUBLIC` is file-global).
+makes definition useful at all in this language; dotted targets resolve
+across the workspace through feature.cross_file_resolution, whose
+truthful-null rule keeps the answer trustworthy. Local-over-global
+preference (d56cbfe) mirrors SSL's actual scoping (variables are
+procedure-scoped, `:PUBLIC` is file-global).
 Built-ins and keywords return null rather than an error because "no
 definition" is the truthful answer — their documentation belongs to hover,
 not navigation.
-
-## Known gaps
-
-- Diagnostics remain `:INCLUDE`-unaware (included symbols do not count
-  as declared) — a later milestone; navigation resolves the include
-  itself.

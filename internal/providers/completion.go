@@ -446,10 +446,49 @@ func GetProcedureNameCompletions(procedures []parser.ProcedureInfo) []Completion
 	return items
 }
 
-// GetVariableCompletions returns variable completions from the current document.
+// VisibleVariables returns the declarations visible at a 1-based line:
+// those inside the cursor's procedure, then script-level declarations
+// (outside every procedure) and :PUBLIC names. Another procedure's locals
+// and parameters are out of scope (issue #258). Names are de-duplicated
+// case-insensitively, the nearest scope winning.
+func VisibleVariables(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, line int) []parser.VariableInfo {
+	cursorProc := parser.FindProcedureAtLine(procedures, line)
+	inCursorProc := func(v parser.VariableInfo) bool {
+		return cursorProc != nil && v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine
+	}
+	var local, outer []parser.VariableInfo
+	for _, v := range variables {
+		switch {
+		case inCursorProc(v):
+			local = append(local, v)
+		case v.Scope == parser.ScopePublic || parser.FindProcedureAtLine(procedures, v.Line) == nil:
+			outer = append(outer, v)
+		}
+	}
+	seen := make(map[string]bool)
+	var visible []parser.VariableInfo
+	for _, v := range append(local, outer...) {
+		key := strings.ToLower(v.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		visible = append(visible, v)
+	}
+	return visible
+}
+
+// GetVariableCompletions returns variable completions from the given
+// declarations, one item per name (case-insensitive; first wins).
 func GetVariableCompletions(variables []parser.VariableInfo) []CompletionItem {
 	var items []CompletionItem
+	seen := make(map[string]bool)
 	for _, v := range variables {
+		key := strings.ToLower(v.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		items = append(items, CompletionItem{
 			Label:            v.Name,
 			Kind:             CompletionKindVariable,

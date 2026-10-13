@@ -20,6 +20,7 @@ config:
   - ssl.format.sql.enabled
   - ssl.format.sql.style
   - ssl.format.sql.keywordCase
+  - ssl.format.sql.identifierCase
   - ssl.format.sql.indentSize
   - ssl.format.sql.maxLineLength
   - ssl.format.sql.detectSQLStrings
@@ -28,6 +29,7 @@ tests:
   - internal/providers/sql_formatter_test.go
   - internal/server/server_test.go
   - internal/server/handler_test.go
+  - cmd/starlims-lsp/format_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 (v0.1.0)"
@@ -63,6 +65,14 @@ history:
       semicolons into SQL and re-cased bind variables. Formatting them
       with the SQL engine is deferred until the SQL lexer understands
       Oracle-style :bind variables.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      The CLI's SQL-mode passthrough is gated to data sources (.ds/.ds.txt
+      paths, or the new --format --ds flag), matching D15: the classifier
+      defaults marker-free content to SQL, so an ordinary script with no
+      colon keyword and no `:=` used to pass through unformatted (A11).
+      ssl.format.sql.identifierCase added to config.
 issues: []
 ---
 
@@ -110,9 +120,11 @@ not restate them.
   builder-directive / inline-defaults `:PARAMETERS` header followed by SQL
   (the classifier shared with feature.diagnostics_pipeline A10/A13) — get
   no edits from either formatting request: the SSL formatter would inject
-  statement semicolons into SQL and re-case `:bind` variables. The CLI,
-  which has no file-type context, applies the same content classifier to
-  every input. SSL-mode data sources format normally.
+  statement semicolons into SQL and re-case `:bind` variables. The CLI
+  applies the same content classifier only to data sources — `.ds`/`.ds.txt`
+  paths, or any input under `--format --ds` — because the classifier
+  defaults marker-free content to SQL (D15); every other input is
+  formatted as SSL. SSL-mode data sources format normally.
 
 ## Acceptance
 
@@ -126,6 +138,7 @@ not restate them.
 - A8: Given different `ssl.format.*` option values (e.g. indentStyle tab vs space), when the same document is formatted under each, then the outputs differ accordingly — the configured options are honored.
 - A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
 - A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
+- A11: Given CLI `--format` input that is not a data source (no `.ds`/`.ds.txt` path, no `--ds`) whose content has no colon keyword and no `:=`, when formatted, then it is formatted as SSL; given SQL-mode content from a data-source path or under `--ds`, then it passes through unchanged.
 
 ## Rationale
 

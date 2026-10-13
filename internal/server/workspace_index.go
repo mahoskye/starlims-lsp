@@ -183,6 +183,12 @@ func (wi *WorkspaceIndex) StartBackgroundIndex() {
 				}
 
 				if d.IsDir() {
+					// Dot-directories (.git, .claude, .history, ...) hold
+					// copies of scripts — history snapshots, worktrees —
+					// that would index every procedure twice (issue #255).
+					if path != rootPath && strings.HasPrefix(d.Name(), ".") {
+						return filepath.SkipDir
+					}
 					return nil
 				}
 
@@ -213,6 +219,35 @@ func (wi *WorkspaceIndex) StartBackgroundIndex() {
 
 		wg.Wait()
 	}()
+}
+
+// InHiddenDir reports whether uri lies inside a dot-directory below one of
+// the workspace roots (.git, .claude, .history, ...). The background walk
+// skips those directories; file-watcher events for them are ignored too so
+// the index never gains the copies (issue #255).
+func (wi *WorkspaceIndex) InHiddenDir(uri string) bool {
+	path := uriToPath(uri)
+	if path == "" {
+		return false
+	}
+	for _, rootURI := range wi.rootURIs {
+		rootPath := uriToPath(rootURI)
+		if rootPath == "" {
+			continue
+		}
+		rel, err := filepath.Rel(rootPath, path)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		comps := strings.Split(filepath.ToSlash(rel), "/")
+		for _, c := range comps[:len(comps)-1] {
+			if strings.HasPrefix(c, ".") {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // IndexFile reads a file from disk and indexes its symbols.
@@ -530,9 +565,10 @@ func orderResolutions(res []IndexResolution) []IndexResolution {
 // 2-part "A.B": category A + script B -> entry point; script-basename A
 // with procedure B -> procedure (flat form); both rule sets are returned
 // when both hit. 3+-part "...Cat.Script.Proc": category chain first, then
-// script-basename degradation ignoring the category. Final fallback for
-// either shape: a workspace-unique procedure name (last segment) when no
-// other rule hit.
+// script-basename degradation ignoring the category when the chain found
+// no script. Final fallback for either shape: a workspace-unique procedure
+// name (last segment) when no rule found the named script — a found script
+// lacking the procedure is a truthful null.
 func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution {
 	parts := strings.Split(target, ".")
 	if len(parts) < 2 {
@@ -548,17 +584,24 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 	defer wi.mu.RUnlock()
 
 	var results []IndexResolution
+	// scriptMatched records whether any rule found the named SCRIPT, with
+	// or without the procedure. A found script that lacks the procedure is
+	// a truthful null: no later rule may land in a different script
+	// (issue #255).
+	scriptMatched := false
 
 	if len(parts) == 2 {
 		// Rule 1: Category.Script -> entry point.
 		for _, uri := range wi.byCategory[strings.ToLower(parts[0])][strings.ToLower(parts[1])] {
 			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
+				scriptMatched = true
 				results = append(results, entryResolutionLocked(fs))
 			}
 		}
 		// Rule 2: Script.Procedure (flat form).
 		for _, uri := range wi.byScriptName[strings.ToLower(parts[0])] {
 			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
+				scriptMatched = true
 				if r, ok := procResolutionLocked(fs, parts[1]); ok {
 					results = append(results, r)
 				}
@@ -572,15 +615,18 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 		// Rule 1: Category.Script.Proc.
 		for _, uri := range wi.byCategory[category][script] {
 			if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
+				scriptMatched = true
 				if r, ok := procResolutionLocked(fs, procName); ok {
 					results = append(results, r)
 				}
 			}
 		}
-		// Rule 2: degrade to script-basename match, ignoring the category.
-		if len(results) == 0 {
+		// Rule 2: degrade to script-basename match, ignoring the category —
+		// only when the category chain found no script at all.
+		if !scriptMatched {
 			for _, uri := range wi.byScriptName[script] {
 				if fs := wi.files[uri]; fs != nil && !fs.IsDataSource {
+					scriptMatched = true
 					if r, ok := procResolutionLocked(fs, procName); ok {
 						results = append(results, r)
 					}
@@ -590,8 +636,9 @@ func (wi *WorkspaceIndex) ResolveDispatchTarget(target string) []IndexResolution
 	}
 
 	// Final fallback: workspace-unique procedure name (uniqueness gate
-	// keeps flat-layout guessing from producing noise).
-	if len(results) == 0 {
+	// keeps flat-layout guessing from producing noise), only when no rule
+	// found the named script.
+	if !scriptMatched {
 		procName := parts[len(parts)-1]
 		if uris := wi.byProcName[strings.ToLower(procName)]; len(uris) == 1 {
 			if fs := wi.files[uris[0]]; fs != nil && !fs.IsDataSource {

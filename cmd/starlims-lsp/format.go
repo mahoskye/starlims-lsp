@@ -13,6 +13,7 @@ type formatCLIOptions struct {
 	stdin bool
 	write bool
 	check bool
+	ds    bool // --ds: treat every input as a data source
 	fmt   providers.FormattingOptions
 	files []string
 }
@@ -33,7 +34,7 @@ func runFormat(args []string) {
 			fmt.Fprintf(os.Stderr, "Error reading stdin: %v\n", err)
 			os.Exit(1)
 		}
-		formatted := formatContent(string(content), opts.fmt)
+		formatted := formatContent(string(content), opts.fmt, opts.ds)
 		if opts.check {
 			if formatted != string(content) {
 				fmt.Fprintln(os.Stderr, "<stdin> is not formatted")
@@ -54,7 +55,7 @@ func runFormat(args []string) {
 			hasErrors = true
 			continue
 		}
-		formatted := formatContent(string(content), opts.fmt)
+		formatted := formatContent(string(content), opts.fmt, opts.ds || isDataSourcePath(filePath))
 
 		switch {
 		case opts.check:
@@ -117,6 +118,8 @@ func parseFormatArgs(args []string) (formatCLIOptions, error) {
 			opts.write = true
 		case "--check":
 			opts.check = true
+		case "--ds":
+			opts.ds = true
 		case "--indent-style":
 			v, err := next(arg)
 			if err != nil {
@@ -190,10 +193,12 @@ func printFormatHelp() {
 	fmt.Println("  --indent-size <n>      Spaces per level in space mode; tab width for line accounting (default 4)")
 	fmt.Println("  --max-line-length <n>  Wrap limit in columns; 0 disables (default 90)")
 	fmt.Println("  --no-sql               Disable embedded SQL formatting")
+	fmt.Println("  --ds                   Treat input as a data source (implied for .ds/.ds.txt files)")
 	fmt.Println("  --help                 Print this help message")
 	fmt.Println()
-	fmt.Println("Documents whose content is SQL-mode data-source content (plain SQL,")
-	fmt.Println("or builder directives followed by SQL) pass through unchanged.")
+	fmt.Println("Data sources (.ds/.ds.txt files, or any input under --ds) whose content")
+	fmt.Println("is SQL-mode (plain SQL, or builder directives followed by SQL) pass")
+	fmt.Println("through unchanged. Other inputs are always formatted as SSL.")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  starlims-lsp --format --write *.ssl")
@@ -201,12 +206,14 @@ func printFormatHelp() {
 	fmt.Println("  starlims-lsp --format --indent-style space --stdin < script.ssl")
 }
 
-func formatContent(content string, opts providers.FormattingOptions) string {
-	// The CLI has no file-type context, so it gates on content alone: a
-	// document that classifies as SQL-mode data-source content (plain SQL,
-	// or builder directives followed by SQL) passes through unchanged —
-	// the SSL formatter would corrupt it (issues #84/#104).
-	if providers.IsSQLModeDataSource(content) {
+func formatContent(content string, opts providers.FormattingOptions, dataSource bool) string {
+	// A data source (a .ds/.ds.txt path, or --ds) whose content classifies
+	// as SQL-mode (plain SQL, or builder directives followed by SQL) passes
+	// through unchanged — the SSL formatter would corrupt it (issues
+	// #84/#104). The classifier defaults marker-free content to SQL (D15),
+	// so it must only ever see known data sources: an ordinary script with
+	// no colon keyword and no `:=` is still SSL (issue #255).
+	if dataSource && providers.IsSQLModeDataSource(content) {
 		return content
 	}
 

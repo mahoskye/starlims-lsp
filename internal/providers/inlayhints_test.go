@@ -320,7 +320,7 @@ func TestFindFunctionCalls(t *testing.T) {
 	code := `x := Substr(s, 1, 5);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 1 {
 		t.Errorf("Expected 1 function call, got %d", len(calls))
@@ -340,7 +340,7 @@ func TestFindFunctionCalls_NestedParens(t *testing.T) {
 	code := `x := Outer(Inner(a, b), c);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 2 {
 		t.Errorf("Expected 2 function calls, got %d", len(calls))
@@ -476,5 +476,22 @@ func TestGetInlayHints_CaseInsensitiveDoProc(t *testing.T) {
 		if len(hints) != 2 {
 			t.Errorf("Expected 2 hints for '%s', got %d", code, len(hints))
 		}
+	}
+}
+
+// [spec feature.inlay_hints/A9] — a member call is not the like-named
+// built-in: `sName:Replace(...)` (a .NET passthrough) and `Me:Left(...)`
+// (a class method) get no built-in parameter-name hints (issue #255).
+func TestGetInlayHints_MemberCallsGetNoBuiltinHints(t *testing.T) {
+	text := "sOut := sName:Replace(\"a\", \"b\");\nx := Me:Left(\"abc\", 2);\ny := Left(\"abc\", 2);"
+	tokens := lexer.NewLexer(text).Tokenize()
+	hints := GetInlayHints(tokens, nil, 1, 3, DefaultInlayHintOptions())
+	for _, h := range hints {
+		if h.Line != 3 {
+			t.Errorf("member calls must get no hints, got %q on line %d", h.Label, h.Line)
+		}
+	}
+	if len(hints) != 2 {
+		t.Errorf("expected the plain Left(...) call on line 3 to keep its two hints, got %+v", hints)
 	}
 }

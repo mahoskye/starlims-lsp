@@ -7,6 +7,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 	"starlims-lsp/internal/providers"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -1482,5 +1484,182 @@ func TestHandleRename_UnsavedOverlayCannotDisambiguateWrite(t *testing.T) {
 	}
 	if _, present := edit.Changes[protocol.DocumentUri(callerURI)]; present {
 		t.Error("disk-ambiguous site edited on the strength of an unsaved buffer (F4)")
+	}
+}
+
+// roleSubjectDefScript defines CalcTotal and, in another procedure, uses a
+// UDObject member of the same spelling plus a 1-part dispatch string.
+const roleSubjectDefScript = `:PROCEDURE CalcTotal;
+:RETURN 1;
+:ENDPROC;
+
+:PROCEDURE Main;
+:DECLARE oRec;
+oRec := CreateUdObject();
+oRec:CalcTotal := 5;
+:RETURN DoProc("CalcTotal");
+:ENDPROC;`
+
+const roleSubjectCallerScript = `:PROCEDURE Run;
+:RETURN ExecFunction("LIMS_UTILS.HELPERS.CalcTotal");
+:ENDPROC;`
+
+// roleSubjectFileLevelScript declares a file-level variable spelled like a
+// procedure of the same file.
+const roleSubjectFileLevelScript = `:DECLARE Tally;
+Tally := 1;
+:PROCEDURE Tally;
+:RETURN 1;
+:ENDPROC;`
+
+func refParamsAt(uri string, line, char uint32) *protocol.ReferenceParams {
+	return &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: line, Character: char},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	}
+}
+
+func openRoleSubjectWorkspace(t *testing.T) (*SSLServer, string, string) {
+	t.Helper()
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	defURI := writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", roleSubjectDefScript)
+	callerURI := writeAndIndex(t, wi, dir, "Server Scripts/ORDERS/PROCESS.srvscr", roleSubjectCallerScript)
+	s.documents.SetDocument(defURI, roleSubjectDefScript, 1)
+	s.documentVersion[defURI] = 1
+	return s, defURI, callerURI
+}
+
+// [spec feature.rename/A19] — with a workspace index, renaming from a member
+// access or a variable spelled like a procedure never takes the
+// procedure's cross-file path (issue #255).
+func TestHandleRename_RoleBlindSubjectsStayOffProcedurePath(t *testing.T) {
+	s, defURI, callerURI := openRoleSubjectWorkspace(t)
+
+	// Cursor on the member name in `oRec:CalcTotal := 5;` (0-based line 7).
+	edit, err := s.handleRename(nil, renameParamsAt(defURI, 7, 7, "Renamed"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit != nil {
+		if len(edit.Changes[protocol.DocumentUri(callerURI)]) != 0 {
+			t.Error("a member rename must not edit the procedure's dispatch site in another file")
+		}
+		for _, te := range edit.Changes[protocol.DocumentUri(defURI)] {
+			if te.Range.Start.Line == 0 {
+				t.Error("a member rename must not edit the like-named procedure header")
+			}
+		}
+	}
+
+	// File-level variable spelled like a procedure: the variable renames,
+	// the procedure header does not.
+	wi := s.workspaceIndex
+	flURI := writeAndIndex(t, wi, filepath.Dir(filepath.Dir(filepath.Dir(uriToPath(defURI)))),
+		"Server Scripts/LIMS_UTILS/TALLY.srvscr", roleSubjectFileLevelScript)
+	s.documents.SetDocument(flURI, roleSubjectFileLevelScript, 1)
+	s.documentVersion[flURI] = 1
+	edit, err = s.handleRename(nil, renameParamsAt(flURI, 1, 1, "Counter"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if edit == nil {
+		t.Fatal("expected the variable rename to produce edits")
+	}
+	lines := map[uint32]bool{}
+	for _, te := range edit.Changes[protocol.DocumentUri(flURI)] {
+		lines[te.Range.Start.Line] = true
+	}
+	if lines[2] {
+		t.Error("a variable rename must not edit the like-named :PROCEDURE header")
+	}
+	if !lines[0] || !lines[1] {
+		t.Errorf("expected the variable's declaration and use to be edited, got lines %v", lines)
+	}
+}
+
+// [spec feature.references/A17] — with a workspace index, references from a
+// member access spelled like a procedure return no dispatch sites of that
+// procedure; a word inside a 1-part dispatch string still names it.
+func TestHandleReferences_RoleBlindSubjectsStayOffProcedurePath(t *testing.T) {
+	s, defURI, callerURI := openRoleSubjectWorkspace(t)
+
+	refs, err := s.handleReferences(nil, refParamsAt(defURI, 7, 7))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if refsContain(refs, callerURI) {
+		t.Error("references from a member access must not include the procedure's dispatch sites")
+	}
+	for _, ref := range refs {
+		if ref.Range.Start.Line == 0 || ref.Range.Start.Line == 8 {
+			t.Errorf("references from a member access must not include procedure occurrences, got line %d", ref.Range.Start.Line)
+		}
+	}
+
+	// Cursor inside the 1-part DoProc("CalcTotal") string (line 8): the
+	// position is unclassified, so the procedure subject still applies.
+	refs, err = s.handleReferences(nil, refParamsAt(defURI, 8, 18))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !refsContain(refs, callerURI) {
+		t.Error("references from a 1-part dispatch string must still include cross-file dispatch sites")
+	}
+}
+
+// [spec feature.cross_file_resolution/A7] — a resolved script lacking the
+// procedure is null even when another script defines a workspace-unique
+// procedure of that name (the unique-name fallback must not run).
+func TestResolveDispatch_FoundScriptLackingProc_NoFallback(t *testing.T) {
+	wi, dir := newResolverIndex(t)
+	writeAndIndex(t, wi, dir, "Server Scripts/LIMS_UTILS/HELPERS.srvscr", helperScript)
+	writeAndIndex(t, wi, dir, "Server Scripts/OTHER/ELSEWHERE.srvscr", ":PROCEDURE NoSuchProc;\n:ENDPROC;")
+
+	for _, target := range []string{"LIMS_UTILS.HELPERS.NoSuchProc", "HELPERS.NoSuchProc"} {
+		if res := wi.ResolveDispatchTarget(target); len(res) != 0 {
+			t.Errorf("%s: a found script lacking the procedure must be null, got %+v", target, res)
+		}
+	}
+	// The fallback still applies when no rule names a script at all.
+	if res := wi.ResolveDispatchTarget("Nowhere.NoSuchProc"); len(res) != 1 {
+		t.Errorf("expected the unique-name fallback for an unknown script, got %+v", res)
+	}
+}
+
+// [spec feature.cross_file_resolution/A20] — a target whose candidates mix
+// a class file and an ordinary script is not class-only.
+func TestDispatchResolvesToClassOnly_MixedCandidates(t *testing.T) {
+	wi, dir := newResolverIndex(t)
+	writeAndIndex(t, wi, dir, "Server Scripts/LIB/WIDGET.srvscr", ":CLASS Widget;\n:PROCEDURE Build;\n:ENDPROC;")
+	if !wi.DispatchResolvesToClassOnly("Widget.Build") {
+		t.Error("expected a class-only target to classify as class-only")
+	}
+	writeAndIndex(t, wi, dir, "lib/Widget.ssl", ":PROCEDURE Build;\n:ENDPROC;")
+	if wi.DispatchResolvesToClassOnly("Widget.Build") {
+		t.Error("a target that also matches an ordinary script is not class-only")
+	}
+}
+
+// [spec feature.references/A18] — the declaration-name search runs on the
+// original line: case mapping that changes byte length (`İ`, `ẞ`) before
+// the keyword can neither panic nor misplace the name, and the column is
+// in characters (issue #255).
+func TestProcedureNamePosition_NonASCIIBeforeKeyword(t *testing.T) {
+	content := "/* İİİİ ẞẞ; :PROCEDURE CalcTotal;\n:ENDPROC;"
+	tokens := lexer.NewLexer(content).Tokenize()
+	p := parser.NewParser(tokens)
+	procs := p.ExtractProcedures(p.Parse())
+	if len(procs) != 1 {
+		t.Fatalf("expected one procedure, got %+v", procs)
+	}
+	line, col := procedureNamePosition(content, procs, "CalcTotal")
+	wantCol := len([]rune("/* İİİİ ẞẞ; :PROCEDURE ")) + 1
+	if line != 1 || col != wantCol {
+		t.Errorf("expected (1, %d), got (%d, %d)", wantCol, line, col)
 	}
 }
