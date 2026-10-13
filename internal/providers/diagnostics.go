@@ -304,6 +304,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	}
 	diagnostics = append(diagnostics, checkDeclareInitializer(tokens)...)
 	diagnostics = append(diagnostics, checkMissingExitCase(tokens)...)
+	diagnostics = append(diagnostics, checkExitCaseLastInBranch(tokens)...)
 	diagnostics = append(diagnostics, checkMissingOtherwise(tokens)...)
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
 	diagnostics = append(diagnostics, checkInvalidOperatorSequences(tokens)...)
@@ -2643,6 +2644,106 @@ func checkMissingExitCase(tokens []lexer.Token) []Diagnostic {
 					reportMissing(top.currentCaseToken)
 				}
 				stack = stack[:len(stack)-1]
+			}
+		}
+	}
+
+	return diagnostics
+}
+
+// checkExitCaseLastInBranch reports an :EXITCASE that is not the last
+// statement directly in its :CASE/:OTHERWISE branch body (issue #265). The
+// compiler accepts :EXITCASE only there: a statement after it in the same
+// branch, an :EXITCASE nested inside a block (:IF, :WHILE, :FOR, :TRY)
+// within the branch, and an :EXITCASE outside any :BEGINCASE all fail to
+// compile with "unexpected token". Comments are transparent.
+func checkExitCaseLastInBranch(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	// One frame per open block. A case frame is a :BEGINCASE; any other
+	// frame is a nested statement block (:IF, :WHILE, :FOR, :TRY).
+	type frame struct {
+		isCase       bool
+		inBranch     bool // a :CASE/:OTHERWISE has opened a branch
+		exited       bool // a direct :EXITCASE ended the branch
+		reportedTail bool // the statement after it is already reported
+	}
+	var stack []frame
+	insideCase := func(stack []frame) bool {
+		for _, f := range stack {
+			if f.isCase {
+				return true
+			}
+		}
+		return false
+	}
+
+	report := func(token lexer.Token, message string) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  message,
+			Source:   "ssl-lsp",
+			Code:     CodeExitCaseLastInBranch,
+		})
+	}
+
+	statementStart := true
+	for i := range tokens {
+		token := tokens[i]
+		switch token.Type {
+		case lexer.TokenWhitespace, lexer.TokenComment:
+			continue
+		}
+		if token.Type == lexer.TokenPunctuation && token.Text == ";" {
+			statementStart = true
+			continue
+		}
+		isStart := statementStart
+		statementStart = false
+		if !isStart {
+			continue
+		}
+
+		normalized := ""
+		if token.Type == lexer.TokenKeyword {
+			normalized = strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+		}
+
+		// A statement after a direct :EXITCASE, before the branch ends.
+		if n := len(stack); n > 0 && stack[n-1].isCase && stack[n-1].exited {
+			switch normalized {
+			case "CASE", "OTHERWISE", "ENDCASE":
+			default:
+				if !stack[n-1].reportedTail {
+					stack[n-1].reportedTail = true
+					report(token, "Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch")
+				}
+			}
+		}
+
+		switch normalized {
+		case "BEGINCASE":
+			stack = append(stack, frame{isCase: true})
+		case "IF", "WHILE", "FOR", "TRY":
+			stack = append(stack, frame{})
+		case "ENDIF", "ENDWHILE", "NEXT", "ENDTRY", "ENDCASE":
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
+			}
+		case "CASE", "OTHERWISE":
+			if n := len(stack); n > 0 && stack[n-1].isCase {
+				stack[n-1] = frame{isCase: true, inBranch: true}
+			}
+		case "EXITCASE":
+			n := len(stack)
+			switch {
+			case n > 0 && stack[n-1].isCase && stack[n-1].inBranch:
+				stack[n-1].exited = true
+			case insideCase(stack):
+				report(token, "':EXITCASE' inside a nested block does not compile: it must be the last statement directly in its ':CASE' or ':OTHERWISE' branch")
+			default:
+				report(token, "':EXITCASE' outside a ':BEGINCASE' branch does not compile")
 			}
 		}
 	}

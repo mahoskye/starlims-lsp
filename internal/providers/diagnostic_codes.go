@@ -39,6 +39,7 @@ const (
 	CodeMaxParamsWarning        = "max_params_warning"
 	CodeLimitPublicVars         = "limit_public_vars"
 	CodePreferExitCase          = "prefer_exitcase"
+	CodeExitCaseLastInBranch    = "exitcase_last_in_branch"
 	CodeParametersFirst         = "parameters_first"
 	CodeDefaultAfterParameters  = "default_after_parameters"
 	CodeIncludeEarly            = "include_early"

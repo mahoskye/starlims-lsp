@@ -17,6 +17,14 @@ history:
       Introduced from the runtime-verification batch: the guidance to end
       every :CASE with :EXITCASE makes the redundant :RETURN + :EXITCASE
       pair a common generated/refactored pattern.
+  - date: 2026-10-13
+    ref: "issue #265"
+    note: >-
+      Re-checked against the reference's last-in-branch rule: no change.
+      In the `:RETURN x; :EXITCASE;` pair the :EXITCASE is still the last
+      statement directly in its branch, so the pair compiles and this
+      stays a warning about unreachable code. exitcase_last_in_branch
+      never fires on it.
 issues: []
 ---
 

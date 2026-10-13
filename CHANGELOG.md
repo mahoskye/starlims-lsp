@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   they can be read in any script, so `undeclared_variable` no longer flags
   them outside endpoint scripts (DECISIONS.md D4, amended). Completion
   still offers them only in endpoint scripts.
+### Added
+- **`exitcase_last_in_branch` (error).** `:EXITCASE` is valid only as the
+  last statement directly in a `:CASE` or `:OTHERWISE` branch. A
+  statement after it, an `:EXITCASE` nested inside `:IF`, `:WHILE`, `:FOR`
+  or `:TRY` within the branch, and an `:EXITCASE` outside any `:BEGINCASE`
+  all fail to compile, and none was reported. `prefer_exitcase` still
+  counts a nested `:EXITCASE`, so a clause is reported once (#265, #273).
 
 ## [0.24.0] - 2026-09-21
 

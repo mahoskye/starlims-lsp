@@ -28,6 +28,13 @@ history:
       :EXITCASE after it would be unreachable. Only the final-statement
       position counts: a conditional :RETURN mid-clause (inside :IF etc.)
       still flags because fall-through remains possible.
+  - date: 2026-10-13
+    ref: "issue #265"
+    note: >-
+      Re-checked against the reference's last-in-branch rule. A nested
+      :EXITCASE still satisfies this rule on purpose: the new
+      exitcase_last_in_branch error reports it, and reporting the clause
+      here too would double-count one mistake.
 issues: []
 ---
 
@@ -44,8 +51,11 @@ style guide says to always include `:EXITCASE`.
 
 It must NOT flag:
 
-- clauses that end with `:EXITCASE` (anywhere in the clause body,
-  including inside nested `:IF`s at the same BEGINCASE depth);
+- clauses that contain an `:EXITCASE` anywhere in the clause body,
+  including inside nested `:IF`s at the same BEGINCASE depth. A nested
+  `:EXITCASE` does not compile; `exitcase_last_in_branch` reports it as an
+  error, so this rule does not report the same clause a second time
+  (issue #265);
 - clauses whose **final statement** is a `:RETURN` (issue #139) — the
   procedure exits, so an `:EXITCASE` after it would never execute.
   Only the final-statement position qualifies: a `:RETURN` earlier in

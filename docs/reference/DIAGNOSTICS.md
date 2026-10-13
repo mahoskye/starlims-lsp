@@ -54,6 +54,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `execfunction_class_target` | ExecFunction targets a class file | error | authoritative | active | [diag.execfunction_class_target](../../catalog/diagnostics/execfunction_class_target.md) |
 | `execfunction_missing_quotes` | Unquoted namespace path in ExecFunction/DoProc | error | tool | active | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
 | `exitcase_after_return` | Unreachable :EXITCASE after a branch-level :RETURN | hint | tool | active | [diag.exitcase_after_return](../../catalog/diagnostics/exitcase_after_return.md) |
+| `exitcase_last_in_branch` | EXITCASE not the last statement directly in its branch | error | authoritative | active | [diag.exitcase_last_in_branch](../../catalog/diagnostics/exitcase_last_in_branch.md) |
 | `exitfor_in_finally` | :EXITFOR inside a :FINALLY block | error | authoritative | active | [diag.exitfor_in_finally](../../catalog/diagnostics/exitfor_in_finally.md) |
 | `exitfor_outside_loop` | EXITFOR outside a FOR loop | error | authoritative | active | [diag.exitfor_outside_loop](../../catalog/diagnostics/exitfor_outside_loop.md) |
 | `exitwhile_in_finally` | EXITWHILE inside a FINALLY block | error | authoritative | active | [diag.exitwhile_in_finally](../../catalog/diagnostics/exitwhile_in_finally.md) |
