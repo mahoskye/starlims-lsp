@@ -13,16 +13,10 @@ var (
 	buildTime = "unknown"
 )
 
-// versionLine is what --version prints. The version it names is the same
-// value --validate stamps on every result object (feature.cli_contract).
-func versionLine() string {
-	return fmt.Sprintf("starlims-lsp version %s (built %s)", version, buildTime)
-}
-
 func main() {
 	// Handle version flag
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Println(versionLine())
+		fmt.Printf("starlims-lsp version %s (built %s)\n", version, buildTime)
 		os.Exit(0)
 	}
 
