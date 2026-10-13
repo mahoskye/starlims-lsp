@@ -56,6 +56,13 @@ history:
       style is applied whatever the file's existing indentation. A line
       that is the operand of a keyword ending the previous line
       (`:RETURN ⏎ nValue;`) is now a continuation too.
+  - date: 2026-10-13
+    ref: "ssl-style-guide#120"
+    note: >-
+      A wrapped declaration list (:DECLARE, :PARAMETERS, :PUBLIC) aligns
+      its hanging lines with the list's first item, per the style guide's
+      wrapped_list_alignment; it used to take the one-level continuation
+      indent like any other statement.
 issues: ["#36", "#86", "#101"]
 ---
 
@@ -86,6 +93,14 @@ indents one level past the `:IF` line — the same column as the body; the
 leading operator is what distinguishes it. The extra level is fixed, never proportional
 to nesting depth, and a closing delimiter that leads a line aligns with
 the statement line itself.
+
+A declaration list is the exception (style guide wrapped_list_alignment,
+ssl-style-guide#120): every hanging line of a `:DECLARE`, `:PARAMETERS` or
+`:PUBLIC` statement whose first item shares the keyword's line aligns with
+that first item — the statement's indent in the configured style, then
+spaces up to the item's column (9 for `:DECLARE`, 12 for `:PARAMETERS`, 8
+for `:PUBLIC`). A list that starts on the line after its keyword has no
+first item to align with and keeps the rules above.
 
 Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:
@@ -201,6 +216,26 @@ nValue := 1;
 :ENDPROC;
 ```
 
+A wrapped declaration list aligns its hanging lines with the first item:
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE sFirstName, sLastName, sMiddleName,
+sSuffix, sTitle;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sFirstName, sLastName, sMiddleName,
+	         sSuffix, sTitle;
+:ENDPROC;
+```
+
 A `:REGION` body is opaque and keeps its own layout:
 
 ### Idempotent
@@ -219,7 +254,9 @@ SELECT a FROM t
 Tabs-by-default matches the style guide's indentation guidance while
 letting space-standardized teams configure width (style_only). The fixed
 single-level continuation indent follows the schema's
-`continuation_indent: 1`. Until issue #36 the indent writer skipped comment
+`continuation_indent: 1`; declaration lists follow the style guide's
+`wrapped_list_alignment` instead, so the hanging names read as one list
+rather than as statements of their own. Until issue #36 the indent writer skipped comment
 tokens entirely, flushing standalone comments to column 0; comments
 document the code they sit next to, so they take the same block indent as
 statements.

@@ -60,6 +60,14 @@ history:
       A comment after a comma is no longer a break candidate: breaking
       there moved the end-of-line comment onto its own line, and two
       production files oscillated at narrow widths.
+  - date: 2026-10-13
+    ref: "ssl-style-guide#120"
+    note: >-
+      A wrapped declaration list (:DECLARE, :PARAMETERS, :PUBLIC) continues
+      at its first item's column (fmt.indent_style) instead of one level
+      deeper; the no-gain guard measures against that column, so a
+      `:PARAMETERS p := "..."` default too long to fit there now stays on
+      the keyword's line.
 issues: ["#85"]
 ---
 
@@ -79,7 +87,9 @@ counts as `indentSize` columns) is re-flowed at its legal break points:
 
 Packing is greedy latest-fitting: each output line keeps as much as fits,
 and continuation lines sit exactly one indent level past the original line
-(fixed, not proportional to paren depth — fmt.indent_style). A break is
+(fixed, not proportional to paren depth — fmt.indent_style), except that a
+declaration list's continuation lines align with its first item
+(fmt.indent_style, ssl-style-guide#120). A break is
 only taken when the following segment actually fits within the limit on
 its continuation line (the issue-#85 no-gain guard), so an over-long
 atomic token — typically a long string — leaves its line over-long rather
@@ -174,6 +184,22 @@ oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyN
 ```ssl
 oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyName
 	+ nAdjustmentValue;
+```
+
+A declaration list wraps at its commas and its continuation lines align
+with the first item:
+
+### Before
+
+```ssl
+:DECLARE sRequestIdentifier, sRouteCode, sSettingKey, nRetryCount, nRetryLimit, bStarted, bCommit;
+```
+
+### After
+
+```ssl
+:DECLARE sRequestIdentifier, sRouteCode, sSettingKey, nRetryCount, nRetryLimit, bStarted,
+         bCommit;
 ```
 
 An end-of-line comment counts toward the width, so the code before it

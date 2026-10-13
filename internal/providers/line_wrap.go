@@ -28,7 +28,8 @@ import (
 // taken when the following segment fits within the limit on its
 // continuation line, so over-long atomic tokens stay put
 // (fmt.max_line_length). Continuation lines take exactly one extra indent
-// level past the original line.
+// level past the original line, except a declaration list's, which align
+// with its first item.
 func wrapLongLines(text string, opts FormattingOptions) string {
 	if opts.MaxLineLength <= 0 {
 		return text
@@ -180,6 +181,12 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 	contIndent := indent + oneIndentLevel(opts)
 	if isContinuationLine {
 		contIndent = indent
+	} else if len(toks) > 1 && isDeclListKeyword(toks[0]) && toks[1].Type != lexer.TokenComment &&
+		toks[1].Line == toks[0].Line {
+		// A declaration list's hanging lines align with its first item
+		// (wrapped_list_alignment, ssl-style-guide#120); the stream
+		// formatter writes the same column on the next pass.
+		contIndent = indent + strings.Repeat(" ", toks[1].Column-toks[0].Column)
 	}
 	contWidth := visualWidth(contIndent, opts)
 
