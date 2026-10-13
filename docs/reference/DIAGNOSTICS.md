@@ -79,6 +79,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `inherit_qualified_name` | :INHERIT parent written as a plain class name | error | authoritative | active | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | authoritative | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `inline_default_outside_datasource` | Inline := default on :PARAMETERS outside a data source | error | authoritative | active | [diag.inline_default_outside_datasource](../../catalog/diagnostics/inline_default_outside_datasource.md) |
+| `internal_error` | Internal error during diagnostic collection | error | tool | active | [diag.internal_error](../../catalog/diagnostics/internal_error.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | authoritative | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_native_member` | Colon member that raises on an SSL value | warning | authoritative | active | [diag.invalid_native_member](../../catalog/diagnostics/invalid_native_member.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |

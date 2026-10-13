@@ -177,3 +177,11 @@ const (
 	CodeEndClassInvalid                   = "endclass_invalid"
 	CodeBuilderDirectiveOutsideDatasource = "builder_directive_outside_datasource"
 )
+
+// Pipeline-level codes: emitted by the diagnostics pipeline itself rather
+// than by a rule.
+const (
+	// CodeInternalError reports a panic recovered during diagnostic
+	// collection (feature.diagnostics_pipeline A7).
+	CodeInternalError = "internal_error"
+)

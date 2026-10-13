@@ -4,6 +4,9 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"runtime/debug"
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -26,7 +29,22 @@ func NewWrapperHandler(inner *protocol.Handler, server *SSLServer) *WrapperHandl
 
 // Handle implements the glsp.Handler interface.
 // It intercepts LSP 3.17 methods and delegates others to the wrapped handler.
+//
+// Every request and notification passes through here, so this is the one
+// place a panic in any handler or provider is contained: glsp does not
+// recover, and an unrecovered panic would end the server process, taking
+// every open document's features down with it (issue #258). The panic is
+// logged with its stack to stderr (the editor's LSP output channel) and
+// the request fails with an error response instead.
 func (w *WrapperHandler) Handle(context *glsp.Context) (r any, validMethod bool, validParams bool, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			fmt.Fprintf(os.Stderr, "ssl-lsp: panic handling %s: %v\n%s\n", context.Method, rec, debug.Stack())
+			r, validMethod, validParams = nil, true, true
+			err = fmt.Errorf("ssl-lsp internal error handling %s: %v", context.Method, rec)
+		}
+	}()
+
 	// Intercept inlayHint requests (LSP 3.17)
 	if context.Method == MethodTextDocumentInlayHint {
 		var params InlayHintParams

@@ -103,9 +103,11 @@ type DiagnosticOptions struct {
 	ClassFileDispatchTargets []string
 
 	// RuleOverrides maps a diagnostic Code (rule slug) to a severity override.
-	// Recognized values: "off" (drop the diagnostic), "info", "warn",
-	// "warning", "error". Diagnostics whose Code is not in the map pass
-	// through unchanged.
+	// Recognized values: "off" (drop the diagnostic), "hint", "info",
+	// "warn", "warning", "error". Keys and values are matched
+	// case-insensitively; an entry with any other value is ignored as if
+	// absent. Diagnostics whose Code is not in the map pass through
+	// unchanged.
 	RuleOverrides map[string]string
 }
 
@@ -135,7 +137,17 @@ func concatDiagnostics(groups ...[]Diagnostic) []Diagnostic {
 	return out
 }
 
-func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
+func GetDiagnostics(text string, opts DiagnosticOptions) (result []Diagnostic) {
+	opts.RuleOverrides = normalizeRuleOverrides(opts.RuleOverrides)
+	// collectDiagnostics contains its own panics; this covers the rest of
+	// the text path — data-source SQL-mode classification and its SQL-body
+	// checks, lexing, and parsing (issue #258).
+	defer func() {
+		if r := recover(); r != nil {
+			result = applyRuleOverrides([]Diagnostic{internalErrorDiagnostic("GetDiagnostics", r)}, opts.RuleOverrides)
+		}
+	}()
+
 	// A data-source document whose content is plain SQL gets no SSL
 	// diagnostics at all — every SSL check would false-flag SQL syntax
 	// such as dot-qualified column names (feature.diagnostics_pipeline
@@ -216,10 +228,16 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 // Note: A parser instance is created even when AST is provided because
 // ExtractVariables requires parser helper methods to traverse the AST.
 // Parser creation is O(1) as it just stores a reference to the tokens.
-func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts DiagnosticOptions) []Diagnostic {
+func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts DiagnosticOptions) (result []Diagnostic) {
 	if len(tokens) == 0 {
 		return nil
 	}
+	opts.RuleOverrides = normalizeRuleOverrides(opts.RuleOverrides)
+	defer func() {
+		if r := recover(); r != nil {
+			result = applyRuleOverrides([]Diagnostic{internalErrorDiagnostic("GetDiagnosticsFromTokens", r)}, opts.RuleOverrides)
+		}
+	}()
 
 	p := parser.NewParser(tokens)
 	if ast == nil {
@@ -230,30 +248,20 @@ func GetDiagnosticsFromTokens(tokens []lexer.Token, ast *parser.Node, opts Diagn
 }
 
 func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser, opts DiagnosticOptions) (result []Diagnostic) {
-	// Defense in depth: if a check function panics, surface it as a single
-	// error diagnostic instead of letting the panic propagate and kill the
-	// LSP server (which manifests on the client as
-	// "all goroutines are asleep - deadlock"). Also log to stderr so the
-	// stack trace shows up in the editor's LSP output channel and bug
-	// reports include enough context to localize the panic.
+	var diagnostics []Diagnostic
+
+	// Defense in depth: if a check function panics, surface it as an
+	// internal_error diagnostic instead of letting the panic propagate and
+	// kill the LSP server (which manifests on the client as
+	// "all goroutines are asleep - deadlock"). Everything the checks before
+	// the panicking one collected is kept, post-processed as usual (issue
+	// #258: the recovery used to discard it). The stack goes to stderr so
+	// it shows up in the editor's LSP output channel.
 	defer func() {
 		if r := recover(); r != nil {
-			stack := debug.Stack()
-			fmt.Fprintf(os.Stderr, "ssl-lsp: panic in collectDiagnostics: %v\n%s\n", r, stack)
-			result = append(result, Diagnostic{
-				Severity: SeverityError,
-				Range: Range{
-					Start: Position{Line: 0, Character: 0},
-					End:   Position{Line: 0, Character: 1},
-				},
-				Message: fmt.Sprintf("ssl-lsp internal error: %v. Other diagnostics for this file may be missing. Please file an issue with the file contents — full stack trace is in the LSP output channel.", r),
-				Source:  "ssl-lsp",
-				Code:    "internal_error",
-			})
+			result = finishAfterPanic(tokens, diagnostics, internalErrorDiagnostic("collectDiagnostics", r), opts)
 		}
 	}()
-
-	var diagnostics []Diagnostic
 
 	// Check for lexer-level issues
 	diagnostics = append(diagnostics, checkTokenErrors(tokens)...)
@@ -410,6 +418,65 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	return
 }
 
+// internalErrorDiagnostic logs a recovered panic with its stack to stderr
+// and returns the internal_error diagnostic reporting it. Call it from the
+// deferred function that recovered, so the stack still shows the panic.
+func internalErrorDiagnostic(where string, r any) Diagnostic {
+	fmt.Fprintf(os.Stderr, "ssl-lsp: panic in %s: %v\n%s\n", where, r, debug.Stack())
+	return Diagnostic{
+		Severity: SeverityError,
+		Range: Range{
+			Start: Position{Line: 0, Character: 0},
+			End:   Position{Line: 0, Character: 1},
+		},
+		Message: fmt.Sprintf("ssl-lsp internal error: %v. Other diagnostics for this file may be missing. Please file an issue with the file contents — full stack trace is in the LSP output channel.", r),
+		Source:  "ssl-lsp",
+		Code:    CodeInternalError,
+	}
+}
+
+// finishAfterPanic completes collection after a check panicked: the
+// diagnostics collected so far plus the internal_error go through
+// suppression, rule overrides, and the info gate like any other result.
+// Should post-processing itself panic, the unprocessed list is returned.
+func finishAfterPanic(tokens []lexer.Token, collected []Diagnostic, internal Diagnostic, opts DiagnosticOptions) (out []Diagnostic) {
+	raw := append(append([]Diagnostic(nil), collected...), internal)
+	out = raw
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "ssl-lsp: panic post-processing recovered diagnostics: %v\n", r)
+			out = raw
+		}
+	}()
+	processed := append([]Diagnostic(nil), raw...)
+	processed = applySuppressionComments(tokens, processed)
+	processed = applyRuleOverrides(processed, opts.RuleOverrides)
+	return applyInfoGate(processed, opts)
+}
+
+// normalizeRuleOverrides returns overrides keyed by the lower-cased,
+// trimmed rule slug with lower-cased, trimmed values, keeping only entries
+// whose value applyRuleOverrides recognizes (issue #258). Codes are
+// lower-case snake_case, so `"Hungarian_Notation"` now configures the rule
+// as suppression slugs already did; and an unrecognized value such as a
+// typo is dropped here, so it neither changes the severity nor exempts the
+// rule from the info gate — an entry that does nothing must not do half a
+// thing.
+func normalizeRuleOverrides(overrides map[string]string) map[string]string {
+	if len(overrides) == 0 {
+		return overrides
+	}
+	out := make(map[string]string, len(overrides))
+	for k, v := range overrides {
+		v = strings.ToLower(strings.TrimSpace(v))
+		switch v {
+		case "off", "hint", "info", "warn", "warning", "error":
+			out[strings.ToLower(strings.TrimSpace(k))] = v
+		}
+	}
+	return out
+}
+
 // applyInfoGate drops info-severity diagnostics unless the info tier is
 // enabled (ssl.diagnostics.infoDiagnostics). Rules the user explicitly
 // configured in RuleOverrides are exempt — an explicit per-rule severity
@@ -437,11 +504,14 @@ func applyInfoGate(diagnostics []Diagnostic, opts DiagnosticOptions) []Diagnosti
 // entry pass through unchanged. Recognized override values:
 //
 //	"off"                  — drop the diagnostic entirely
+//	"hint"                 — remap to SeverityHint
 //	"info"                 — remap to SeverityInformation
 //	"warn" / "warning"     — remap to SeverityWarning
 //	"error"                — remap to SeverityError
 //
-// Any other value is treated as no-op rather than silently dropping.
+// Any other value is treated as no-op rather than silently dropping. The
+// pipeline entry points normalize the map first (normalizeRuleOverrides),
+// which drops such entries and makes keys case-insensitive.
 func applyRuleOverrides(diagnostics []Diagnostic, overrides map[string]string) []Diagnostic {
 	if len(overrides) == 0 {
 		return diagnostics
@@ -460,6 +530,8 @@ func applyRuleOverrides(diagnostics []Diagnostic, overrides map[string]string) [
 		switch strings.ToLower(strings.TrimSpace(raw)) {
 		case "off":
 			continue
+		case "hint":
+			d.Severity = SeverityHint
 		case "info":
 			d.Severity = SeverityInfo
 		case "warn", "warning":
@@ -1038,25 +1110,6 @@ func endsMemberReceiver(t lexer.Token) bool {
 		return t.Text == ")" || t.Text == "]"
 	}
 	return false
-}
-
-// isIdentifierPattern checks if a string looks like an identifier.
-func isIdentifierPattern(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
-	// First char must be letter or underscore
-	first := rune(s[0])
-	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
-		return false
-	}
-	// Rest can be letter, digit, or underscore
-	for _, ch := range s[1:] {
-		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_') {
-			return false
-		}
-	}
-	return true
 }
 
 // extractIdentifier extracts the identifier portion from the start of a string.
@@ -5007,11 +5060,6 @@ func inferTypeFromName(name string) string {
 	}
 }
 
-func hasSpecificHungarianPrefix(name string, prefix string) bool {
-	_, ok := hasHungarianPrefix(name, []string{prefix})
-	return ok
-}
-
 // hasStrictHungarianPrefix is the case-sensitive variant used for type
 // inference. The original name must start with the lowercase prefix and the
 // next non-underscore rune must be uppercase. This avoids classifying names
@@ -7804,11 +7852,19 @@ func trailingSkipCommaRuns(tokens []lexer.Token, calls []parser.CallSite) []skip
 }
 
 // hasUnicodeLiteralPrefix reports whether a lexed SQL fragment holds an
-// N'…' literal: an `N` word token immediately followed (no whitespace) by
-// a single-quoted string token.
+// N'…' literal: one string token starting `N'`, or an `N` word token
+// immediately followed (no whitespace) by a single-quoted string token.
 func hasUnicodeLiteralPrefix(toks []SQLToken) bool {
-	for i := 0; i+1 < len(toks); i++ {
+	for i := 0; i < len(toks); i++ {
 		t := toks[i]
+		// The SQL lexer reads a prefixed literal as one string token
+		// (`N'x'`, issue #258).
+		if t.Type == SQLTokenString && len(t.Text) > 1 && (t.Text[0] == 'N' || t.Text[0] == 'n') && t.Text[1] == '\'' {
+			return true
+		}
+		if i+1 >= len(toks) {
+			break
+		}
 		if (t.Type == SQLTokenIdentifier || t.Type == SQLTokenKeyword) && strings.EqualFold(t.Text, "N") &&
 			toks[i+1].Type == SQLTokenString && strings.HasPrefix(toks[i+1].Text, "'") {
 			return true

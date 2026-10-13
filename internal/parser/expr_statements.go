@@ -105,24 +105,17 @@ func ExtractStatementExpressions(tokens []lexer.Token) []StatementExprs {
 	return out
 }
 
-// statementEnd returns the index of the statement's terminating `;` at
-// bracket depth zero, or the last token index when unterminated.
+// statementEnd returns the index of the statement's terminating `;`, or
+// the last token index when unterminated. Bracket depth is deliberately
+// not tracked: a `;` can never legally sit inside brackets (strings,
+// comments, and code blocks are single tokens), so the first `;` always
+// ends the statement. Tracking depth let one unclosed bracket while
+// typing swallow every later statement — and every call site in them —
+// into one span (issue #258).
 func statementEnd(tokens []lexer.Token, start int) int {
-	depth := 0
 	for j := start; j < len(tokens); j++ {
-		t := tokens[j]
-		if t.Type != lexer.TokenPunctuation {
-			continue
-		}
-		switch t.Text {
-		case "(", "[", "{":
-			depth++
-		case ")", "]", "}":
-			depth--
-		case ";":
-			if depth <= 0 {
-				return j
-			}
+		if t := tokens[j]; t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			return j
 		}
 	}
 	return len(tokens) - 1

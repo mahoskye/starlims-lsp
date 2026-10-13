@@ -238,11 +238,15 @@ diagnostic entry is `suppressible: true` unless it documents otherwise.
 
 ## D2 — Per-rule severity overrides (2026-05-01, PR #4, v0.5.0)
 
-`ssl.diagnostics.rules` maps a code slug to `off | info | warn | warning |
-error`; unknown slugs pass through unchanged. Applied server-side after
-collection, so every entry is `severity_overridable: true` unless it
-documents otherwise. `default_severity` in each entry is the pre-override
-severity.
+`ssl.diagnostics.rules` maps a code slug to `off | hint | info | warn |
+warning | error`; unknown slugs pass through unchanged. Keys and values
+match case-insensitively, and an entry with any other value is ignored as
+if absent — it neither changes the severity nor exempts the rule from the
+info gate (D13). Applied server-side after collection, so every entry is
+`severity_overridable: true` unless it documents otherwise.
+`default_severity` in each entry is the pre-override severity. (`hint`
+and the case-insensitive, ignore-unknown matching: 2026-10-13, issue
+#258.)
 
 ## D1 — Stable diagnostic code slugs (2026-05-01, PR #3, v0.4.0)
 

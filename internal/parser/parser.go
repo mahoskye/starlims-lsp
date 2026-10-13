@@ -123,6 +123,13 @@ var (
 // Parser parses SSL tokens into an AST.
 type Parser struct {
 	tokens []lexer.Token
+	// tokenIndex maps a token's Offset to its index in tokens. Nodes hold
+	// copies of tokens, so this is how a node's token is located in the
+	// stream without a linear scan per lookup (built on first use).
+	tokenIndex map[int]int
+	// paramDecls maps the token index of each :PARAMETERS keyword to its
+	// declaration statement (built on first use).
+	paramDecls map[int]DeclarationStatement
 }
 
 // NewParser creates a new Parser.
@@ -191,16 +198,16 @@ func (p *Parser) findProcedures(node *Node, procedures *[]ProcedureInfo) {
 		firstToken := p.getFirstSignificantToken(child)
 		if firstToken != nil && p.getNormalizedText(firstToken) == "PROCEDURE" {
 			name := p.extractProcedureName(child)
-			parameters := p.extractParameters(node, child)
 			if name != "" {
+				idx := p.indexOf(firstToken)
 				*procedures = append(*procedures, ProcedureInfo{
 					Name:       name,
-					Parameters: parameters,
+					Parameters: p.procedureParameters(idx),
 					StartLine:  child.StartLine,
 					EndLine:    p.findProcedureEndLine(node, child),
 					Node:       child,
-					Doc:        p.extractProcedureDoc(firstToken),
-					IsPrivate:  p.isPrivateProcedure(firstToken),
+					Doc:        p.extractProcedureDoc(idx),
+					IsPrivate:  p.isPrivateProcedure(idx),
 				})
 			}
 		}
@@ -208,20 +215,96 @@ func (p *Parser) findProcedures(node *Node, procedures *[]ProcedureInfo) {
 	}
 }
 
-// extractProcedureDoc walks backward from the :PROCEDURE token in the global
-// token stream to find the immediately preceding /* ... ; comment block. The
+// indexOf returns the index in the token stream of a token copied out of
+// it, or -1. The Offset index is built once per parser, so per-procedure
+// lookups stay O(1) and ExtractProcedures stays linear in the document
+// (issue #258).
+func (p *Parser) indexOf(token *lexer.Token) int {
+	if p.tokenIndex == nil {
+		p.tokenIndex = make(map[int]int, len(p.tokens))
+		for i := range p.tokens {
+			p.tokenIndex[p.tokens[i].Offset] = i
+		}
+	}
+	if i, ok := p.tokenIndex[token.Offset]; ok && p.tokens[i].Line == token.Line {
+		return i
+	}
+	return -1
+}
+
+// procedureParameters returns the names declared by the :PARAMETERS
+// statement of the procedure whose :PROCEDURE keyword is at token index
+// procIdx, or nil when it has none. Names come from the declaration
+// statement (CollectDeclarations), so layout cannot hide one: an inline
+// comment in the list, a bare `:PARAMETERS` with its names on later
+// lines, and any number of comments between :PROCEDURE and :PARAMETERS
+// all keep every name (issue #258). The search covers the procedure's
+// leading statements and stops at a nested block, the procedure's end,
+// or the next procedure — a later :PARAMETERS is never borrowed from
+// outside the procedure.
+func (p *Parser) procedureParameters(procIdx int) []string {
+	if procIdx < 0 {
+		return nil
+	}
+	if p.paramDecls == nil {
+		p.paramDecls = map[int]DeclarationStatement{}
+		for _, decl := range CollectDeclarations(p.tokens) {
+			if decl.Scope == ScopeParameter {
+				p.paramDecls[decl.Start] = decl
+			}
+		}
+	}
+
+	// The header runs to its `;` — or, when that is missing, up to the
+	// next keyword, so an unterminated header cannot swallow the
+	// :PARAMETERS statement on the following line.
+	i := procIdx + 1
+	for ; i < len(p.tokens); i++ {
+		t := &p.tokens[i]
+		if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			i++
+			break
+		}
+		if t.Type == lexer.TokenKeyword {
+			break
+		}
+	}
+
+	for i < len(p.tokens) {
+		t := &p.tokens[i]
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+			i++
+			continue
+		}
+		if t.Type == lexer.TokenKeyword {
+			kw := p.getNormalizedText(t)
+			if kw == "PARAMETERS" {
+				decl, ok := p.paramDecls[i]
+				if !ok {
+					return nil
+				}
+				var names []string
+				for _, v := range decl.Names {
+					names = append(names, v.Name)
+				}
+				return names
+			}
+			if kw == "ENDPROC" || constants.IsBlockStartKeyword(kw) {
+				return nil
+			}
+		}
+		i = statementEnd(p.tokens, i) + 1
+	}
+	return nil
+}
+
+// extractProcedureDoc walks backward from the :PROCEDURE token (at token
+// index idx) in the global token stream to find the immediately preceding /* ... ; comment block. The
 // search skips whitespace tokens; any non-whitespace, non-comment token aborts
 // (the comment isn't "attached" to this procedure). Multiple adjacent comment
 // blocks are concatenated, with the closest one to the procedure taking
 // precedence for parsed fields.
-func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
-	idx := -1
-	for i := range p.tokens {
-		if p.tokens[i].Offset == procToken.Offset && p.tokens[i].Line == procToken.Line {
-			idx = i
-			break
-		}
-	}
+func (p *Parser) extractProcedureDoc(idx int) ProcedureDoc {
 	if idx <= 0 {
 		return ProcedureDoc{}
 	}
@@ -252,19 +335,12 @@ func (p *Parser) extractProcedureDoc(procToken *lexer.Token) ProcedureDoc {
 }
 
 // isPrivateProcedure reports whether an effective visibility annotation
-// precedes the :PROCEDURE token: the nearest comment is the exact form
-// (`/*@private;` / `/*@protected;`) on the line immediately before. A
-// blank line, an intervening comment, or a near-miss spelling leaves the
-// procedure public — the same verdict the visibility_annotation
+// precedes the :PROCEDURE token at index idx: the nearest comment is the
+// exact form (`/*@private;` / `/*@protected;`) on the line immediately
+// before. A blank line, an intervening comment, or a near-miss spelling
+// leaves the procedure public — the same verdict the visibility_annotation
 // diagnostic reports (issue #255).
-func (p *Parser) isPrivateProcedure(procToken *lexer.Token) bool {
-	idx := -1
-	for i := range p.tokens {
-		if p.tokens[i].Offset == procToken.Offset && p.tokens[i].Line == procToken.Line {
-			idx = i
-			break
-		}
-	}
+func (p *Parser) isPrivateProcedure(idx int) bool {
 	if idx <= 0 {
 		return false
 	}
@@ -287,28 +363,56 @@ func (p *Parser) isPrivateProcedure(procToken *lexer.Token) bool {
 }
 
 // ExtractTopLevelParameters returns the names and 1-based line of the
-// script's entry-point :PARAMETERS statement — the first top-level
-// :PARAMETERS appearing before any :PROCEDURE. Cross-script 2-part
+// script's entry-point :PARAMETERS statement. Cross-script 2-part
 // ExecFunction("Category.Script") calls bind their arguments to this list.
 // Returns (nil, -1) when the script has none.
+//
+// The placement rule is diag.parameters_first's script level: the
+// statement must come before any top-level executable statement, and
+// leading :PROCEDURE ... :ENDPROC blocks are allowed before it (issue
+// #258: the walk used to give up at the first :PROCEDURE). Comments,
+// :INCLUDE directives, and :BEGININLINECODE blocks are transparent, as
+// they are to that rule. The root argument is retained for API
+// compatibility; the walk reads the token stream.
 func (p *Parser) ExtractTopLevelParameters(root *Node) ([]string, int) {
-	for _, child := range root.Children {
-		firstToken := p.getFirstSignificantToken(child)
-		if firstToken == nil {
+	depth := 0 // nesting inside :PROCEDURE / :BEGININLINECODE scopes
+	for i := 0; i < len(p.tokens); {
+		t := &p.tokens[i]
+		switch t.Type {
+		case lexer.TokenWhitespace, lexer.TokenComment, lexer.TokenEOF:
+			i++
 			continue
 		}
-		switch p.getNormalizedText(firstToken) {
-		case "PROCEDURE":
-			return nil, -1
-		case "PARAMETERS":
-			var params []string
-			for _, token := range child.Tokens {
-				if token.Type == lexer.TokenIdentifier && p.getNormalizedText(&token) != "PARAMETERS" {
-					params = append(params, token.Text)
-				}
+		end := statementEnd(p.tokens, i)
+		if t.Type != lexer.TokenKeyword {
+			if depth == 0 {
+				return nil, -1
 			}
-			return params, firstToken.Line
+			i = end + 1
+			continue
 		}
+		switch p.getNormalizedText(t) {
+		case "PROCEDURE", "BEGININLINECODE":
+			depth++
+		case "ENDPROC", "ENDINLINECODE":
+			if depth > 0 {
+				depth--
+			}
+		case "INCLUDE":
+		case "PARAMETERS":
+			if depth == 0 {
+				var params []string
+				for _, v := range CollectDeclarations(p.tokens[i : end+1])[0].Names {
+					params = append(params, v.Name)
+				}
+				return params, t.Line
+			}
+		default:
+			if depth == 0 {
+				return nil, -1
+			}
+		}
+		i = end + 1
 	}
 	return nil, -1
 }
@@ -407,63 +511,6 @@ func (p *Parser) extractProcedureName(stmt *Node) string {
 	return ""
 }
 
-func (p *Parser) extractParameters(parent *Node, procedureStmt *Node) []string {
-	blockNode := p.findProcedureBlock(parent, procedureStmt)
-	if blockNode != nil {
-		params := p.extractParametersFromStatements(blockNode.Children)
-		if len(params) > 0 {
-			return params
-		}
-	}
-
-	startIdx := -1
-	for i, child := range parent.Children {
-		if child == procedureStmt {
-			startIdx = i
-			break
-		}
-	}
-	if startIdx == -1 {
-		return nil
-	}
-
-	return p.extractParametersFromStatements(parent.Children[startIdx+1:])
-}
-
-func (p *Parser) findProcedureBlock(parent *Node, procedureStmt *Node) *Node {
-	for i, child := range parent.Children {
-		if child == procedureStmt {
-			if i+1 < len(parent.Children) && parent.Children[i+1].Type == NodeBlock {
-				return parent.Children[i+1]
-			}
-			break
-		}
-	}
-	return nil
-}
-
-func (p *Parser) extractParametersFromStatements(statements []*Node) []string {
-	var params []string
-	for i, child := range statements {
-		if i >= 5 {
-			break
-		}
-		firstToken := p.getFirstSignificantToken(child)
-		if firstToken != nil && p.getNormalizedText(firstToken) == "PARAMETERS" {
-			for _, token := range child.Tokens {
-				if token.Type == lexer.TokenIdentifier && p.getNormalizedText(&token) != "PARAMETERS" {
-					params = append(params, token.Text)
-				}
-			}
-			break
-		}
-		if firstToken != nil && constants.IsBlockStartKeyword(p.getNormalizedText(firstToken)) {
-			break
-		}
-	}
-	return params
-}
-
 func (p *Parser) findProcedureEndLine(parent *Node, procedureStmt *Node) int {
 	startIdx := -1
 
@@ -555,6 +602,31 @@ func (p *Parser) handleBlockMiddle(stmt *Node, currentNode *Node, stack *[]*Node
 
 func (p *Parser) handleBlockEnd(stmt *Node, currentNode *Node, stack *[]*Node) *Node {
 	activeNode := currentNode
+
+	first := p.getFirstSignificantToken(stmt)
+	// :ENDPROC closes its procedure even when a block inside it was left
+	// open: everything above the nearest PROCEDURE block is closed with
+	// it, so an unclosed :IF cannot stretch the procedure — and nest every
+	// later procedure inside it — to the end of the file (issue #258).
+	// The unclosed inner block is reported by diag.unclosed_block.
+	if first != nil && p.getNormalizedText(first) == "ENDPROC" {
+		for k := len(*stack) - 1; k > 0; k-- {
+			starter := p.getBlockStarter((*stack)[k])
+			if starter == nil {
+				continue
+			}
+			if st := p.getFirstSignificantToken(starter); st == nil || p.getNormalizedText(st) != "PROCEDURE" {
+				continue
+			}
+			for len(*stack) > k {
+				popped := (*stack)[len(*stack)-1]
+				*stack = (*stack)[:len(*stack)-1]
+				popped.EndLine = stmt.EndLine
+			}
+			return (*stack)[len(*stack)-1]
+		}
+	}
+
 	if len(*stack) > 1 {
 		popped := (*stack)[len(*stack)-1]
 		*stack = (*stack)[:len(*stack)-1]
@@ -562,7 +634,6 @@ func (p *Parser) handleBlockEnd(stmt *Node, currentNode *Node, stack *[]*Node) *
 		activeNode = (*stack)[len(*stack)-1]
 	}
 
-	first := p.getFirstSignificantToken(stmt)
 	if first != nil && p.getNormalizedText(first) == "ENDCASE" {
 		if len(*stack) > 1 {
 			currentBlock := (*stack)[len(*stack)-1]
@@ -621,6 +692,14 @@ func (p *Parser) groupStatements(tokens []lexer.Token) []*Node {
 			statements = append(statements, p.createNode(currentTokens))
 			currentTokens = nil
 		} else if token.Type == lexer.TokenComment {
+			// A comment inside an unfinished statement belongs to it:
+			// splitting it out used to discard the statement's earlier
+			// tokens, so `:IF bA .AND. /* why;` lost its :IF from the
+			// tree (issue #258). A comment with nothing significant before
+			// it stands alone, as before.
+			if hasSignificantToken(currentTokens[:len(currentTokens)-1]) {
+				continue
+			}
 			statements = append(statements, p.createNode([]lexer.Token{token}))
 			currentTokens = nil
 		} else if token.Type == lexer.TokenRegionBody {
@@ -639,6 +718,17 @@ func (p *Parser) groupStatements(tokens []lexer.Token) []*Node {
 	return statements
 }
 
+// hasSignificantToken reports whether tokens holds anything other than
+// whitespace and comments.
+func hasSignificantToken(tokens []lexer.Token) bool {
+	for _, t := range tokens {
+		if t.Type != lexer.TokenWhitespace && t.Type != lexer.TokenComment {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *Parser) isStatementContinuation(tokens []lexer.Token, currentIndex int, currentStatementTokens []lexer.Token) bool {
 	j := currentIndex + 1
 	for j < len(tokens) && tokens[j].Type == lexer.TokenWhitespace {
@@ -650,8 +740,11 @@ func (p *Parser) isStatementContinuation(tokens []lexer.Token, currentIndex int,
 	}
 
 	next := tokens[j]
+	// The last significant token decides: a comment trailing an operator
+	// (`bA .AND. /* why;`) leaves the statement open.
 	k := len(currentStatementTokens) - 2
-	for k >= 0 && currentStatementTokens[k].Type == lexer.TokenWhitespace {
+	for k >= 0 && (currentStatementTokens[k].Type == lexer.TokenWhitespace ||
+		currentStatementTokens[k].Type == lexer.TokenComment) {
 		k--
 	}
 

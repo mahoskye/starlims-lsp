@@ -81,6 +81,8 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 			tokens = append(tokens, l.readBlockComment())
 		case char == '\'' || char == '"':
 			tokens = append(tokens, l.readString())
+		case l.atPrefixedString():
+			tokens = append(tokens, l.readPrefixedString())
 		case char == '?':
 			tokens = append(tokens, l.readSSLParameter())
 		case unicode.IsDigit(r):
@@ -262,7 +264,100 @@ func (l *SQLLexer) readNumber() SQLToken {
 		l.consumeRune(&text, size)
 	}
 
+	// An exponent — `1.5e-3`, `2E+5`, `1e10` — belongs to the number. The
+	// marker is taken only when digits follow it (after an optional sign),
+	// so `3e` stays a number followed by an identifier (issue #258).
+	if l.pos < len(l.input) && (l.input[l.pos] == 'e' || l.input[l.pos] == 'E') {
+		j := l.pos + 1
+		if j < len(l.input) && (l.input[j] == '+' || l.input[j] == '-') {
+			j++
+		}
+		if j < len(l.input) && isASCIIDigit(l.input[j]) {
+			for l.pos < j || (l.pos < len(l.input) && isASCIIDigit(l.input[l.pos])) {
+				text.WriteByte(l.input[l.pos])
+				l.advance()
+			}
+		}
+	}
+
 	return SQLToken{Type: SQLTokenNumber, Text: text.String(), Line: line, Column: col}
+}
+
+func isASCIIDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+
+// atPrefixedString reports whether the read position starts a prefixed
+// string literal: SQL Server's national-character N'...', or Oracle's
+// alternative quoting q'[...]' and its national form nq'[...]' (any case).
+// The prefix must touch the quote; `N 'x'` is an identifier and a string.
+func (l *SQLLexer) atPrefixedString() bool {
+	rest := l.input[l.pos:]
+	isN := func(c byte) bool { return c == 'N' || c == 'n' }
+	isQ := func(c byte) bool { return c == 'Q' || c == 'q' }
+	switch {
+	case len(rest) >= 2 && isN(rest[0]) && rest[1] == '\'':
+		return true
+	case len(rest) >= 3 && isQ(rest[0]) && rest[1] == '\'':
+		return true
+	case len(rest) >= 4 && isN(rest[0]) && isQ(rest[1]) && rest[2] == '\'':
+		return true
+	}
+	return false
+}
+
+// readPrefixedString lexes a literal atPrefixedString recognized as one
+// string token, prefix included, so the formatter never separates the
+// prefix from its quote (issue #258). An Oracle q-quote ends at its
+// closing delimiter followed by a quote — `[`, `{`, `(`, `<` close with
+// their mirror, any other delimiter with itself — and may contain bare
+// quotes.
+func (l *SQLLexer) readPrefixedString() SQLToken {
+	line := l.line
+	col := l.column
+	var text strings.Builder
+
+	if c := l.input[l.pos]; c == 'N' || c == 'n' {
+		text.WriteByte(c)
+		l.advance()
+	}
+	if l.input[l.pos] == '\'' {
+		str := l.readString()
+		text.WriteString(str.Text)
+		return SQLToken{Type: SQLTokenString, Text: text.String(), Line: line, Column: col, Unterminated: str.Unterminated}
+	}
+
+	// q'<delim> ... <close>'
+	text.WriteString(l.input[l.pos : l.pos+2])
+	l.advance()
+	l.advance()
+	closed := false
+	if l.pos < len(l.input) {
+		open, size := l.current()
+		closer := open
+		switch open {
+		case '[':
+			closer = ']'
+		case '{':
+			closer = '}'
+		case '(':
+			closer = ')'
+		case '<':
+			closer = '>'
+		}
+		l.consumeRune(&text, size)
+		for l.pos < len(l.input) {
+			r, size := l.current()
+			l.consumeRune(&text, size)
+			if r == closer && l.pos < len(l.input) && l.input[l.pos] == '\'' {
+				text.WriteByte('\'')
+				l.advance()
+				closed = true
+				break
+			}
+		}
+	}
+	return SQLToken{Type: SQLTokenString, Text: text.String(), Line: line, Column: col, Unterminated: !closed}
 }
 
 func (l *SQLLexer) readIdentifierOrKeyword() SQLToken {

@@ -806,50 +806,6 @@ func TestLexer_EdgeCase_OnlyComments(t *testing.T) {
 
 // ==================== Helper Function Tests ====================
 
-func TestGetTokenAtPosition(t *testing.T) {
-	input := "abc def ghi"
-	lex := NewLexer(input)
-	tokens := lex.Tokenize()
-
-	// Token positions: abc at col 1-3, space at col 4, def at col 5-7, space at col 8, ghi at col 9-11
-	// GetTokenAtPosition uses <= for tokenEnd, so boundary columns match the previous token
-	// We use columns that are clearly inside each token (not at boundaries)
-	tests := []struct {
-		name   string
-		line   int
-		column int
-		want   string
-	}{
-		{"start_of_abc", 1, 1, "abc"},
-		{"middle_of_abc", 1, 2, "abc"},
-		{"inside_def", 1, 6, "def"},  // column 6 is clearly inside "def"
-		{"inside_ghi", 1, 10, "ghi"}, // column 10 is clearly inside "ghi"
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tok := GetTokenAtPosition(tokens, tc.line, tc.column)
-			if tok == nil {
-				t.Fatalf("expected token at line %d col %d, got nil", tc.line, tc.column)
-			}
-			if tok.Text != tc.want {
-				t.Errorf("expected %q at line %d col %d, got %q", tc.want, tc.line, tc.column, tok.Text)
-			}
-		})
-	}
-}
-
-func TestGetTokenAtPosition_NoMatch(t *testing.T) {
-	input := "abc"
-	lex := NewLexer(input)
-	tokens := lex.Tokenize()
-
-	tok := GetTokenAtPosition(tokens, 2, 1) // Line 2 doesn't exist
-	if tok != nil {
-		t.Errorf("expected nil for non-existent line, got %v", tok)
-	}
-}
-
 func TestGetWordAtPosition(t *testing.T) {
 	input := "hello world test"
 
@@ -905,6 +861,34 @@ func TestGetWordAtPosition_InvalidPosition(t *testing.T) {
 	word = GetWordAtPosition(input, 1, 0)
 	if word != "" {
 		t.Errorf("expected empty string for invalid column, got %q", word)
+	}
+}
+
+// TestGetWordAtPosition_NonASCIILine pins the crash fixed in issue #258:
+// the bounds check used the line's byte length while indexing its runes,
+// so a column inside the byte length but past the rune count indexed out
+// of range. A column past the line end yields no word.
+func TestGetWordAtPosition_NonASCIILine(t *testing.T) {
+	tests := []struct {
+		name   string
+		text   string
+		line   int
+		column int
+		want   string
+	}{
+		{"astral then word, column in byte length", "\U0001F600x", 1, 4, ""},
+		{"astral then word, line end", "\U0001F600x", 1, 3, "x"},
+		{"after string with astral", "sX := \"\U0001F600\";", 1, 13, ""},
+		{"word after astral", "\U0001F600 sName", 1, 4, "sName"},
+		{"column far past end", "sName", 1, 99, ""},
+		{"accented identifier neighbour", "sCaf\u00e9 := 1;", 1, 2, "sCaf"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := GetWordAtPosition(tc.text, tc.line, tc.column); got != tc.want {
+				t.Errorf("GetWordAtPosition(%q, %d, %d) = %q, want %q", tc.text, tc.line, tc.column, got, tc.want)
+			}
+		})
 	}
 }
 

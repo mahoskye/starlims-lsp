@@ -115,6 +115,11 @@ type ExtendedServerCapabilities struct {
 	protocol.ServerCapabilities
 	// InlayHintProvider indicates inlay hint support (LSP 3.17).
 	InlayHintProvider bool `json:"inlayHintProvider,omitempty"`
+	// PositionEncoding names the encoding of every position's Character
+	// (LSP 3.17). Always "utf-16": it is the LSP default every client
+	// must support, so stating it explicitly changes nothing for a 3.16
+	// client and tells a 3.17 client not to expect any other encoding.
+	PositionEncoding string `json:"positionEncoding,omitempty"`
 }
 
 // ExtendedInitializeResult is the initialize result with extended capabilities.
@@ -264,6 +269,7 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 		Capabilities: ExtendedServerCapabilities{
 			ServerCapabilities: capabilities,
 			InlayHintProvider:  true,
+			PositionEncoding:   positionEncodingUTF16,
 		},
 		ServerInfo: &protocol.InitializeResultServerInfo{
 			Name:    serverName,

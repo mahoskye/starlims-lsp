@@ -155,6 +155,16 @@ history:
       hungarian_type_mismatch, which is gated behind an editor setting the
       CLI did not expose. The flags are also now covered by an acceptance
       criterion (A28); --info had none.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      Audit fixes. Panic recovery keeps the diagnostics collected before
+      the panicking check (A7; the recovery used to return only the
+      internal_error), and now also covers the data-source SQL-mode path,
+      lexing, and parsing; internal_error gained a code constant and its
+      own catalog entry. Rule overrides: keys match case-insensitively,
+      "hint" is a recognized value, and an unrecognized value no longer
+      exempts the rule from the info gate (A2, A3).
 issues: []
 ---
 
@@ -172,10 +182,12 @@ rules (those are `diag.*` entries).
   slug (canonical list in `internal/providers/diagnostic_codes.go`) and
   `Source: "ssl-lsp"`, propagated to the LSP wire.
 - Severity overrides: `ssl.diagnostics.rules` maps a Code slug to one of
-  `off` (drop the diagnostic), `info`, `warn`/`warning`, or `error` (remap
-  severity). Diagnostics whose Code is not in the map pass through
-  unchanged; an unrecognized override value is a no-op, never a silent
-  drop.
+  `off` (drop the diagnostic), `hint`, `info`, `warn`/`warning`, or
+  `error` (remap severity). Keys and values are matched
+  case-insensitively, like suppression slugs. Diagnostics whose Code is
+  not in the map pass through unchanged; an entry with an unrecognized
+  value is ignored as if absent — never a silent drop, and never an
+  exemption from the info gate (issue #258).
 - Suppression comments in source are honored (grammar pinned in
   DECISIONS.md D3):
   - `/* @ssl-disable <slug>[, <slug>...]; */` — file scope: drops every
@@ -255,18 +267,22 @@ rules (those are `diag.*` entries).
   formatter emits bodies verbatim (no reindent, no semicolon enforcement).
 - A panic in any diagnostic check MUST NOT crash the server: it is
   recovered, the stack trace is logged to stderr, and a single
-  error-severity diagnostic with Code `internal_error` and Source `ssl-lsp`
-  is emitted at the top of the file.
+  error-severity diagnostic with Code `internal_error` (diag.internal_error)
+  and Source `ssl-lsp` is emitted at the top of the file, alongside every
+  diagnostic the checks before the panicking one collected (issue #258).
+  The rest of the pipeline — data-source SQL-mode classification and its
+  SQL-body checks, lexing, and parsing — is covered the same way, as are
+  the server's document parse and every LSP request.
 
 ## Acceptance
 
 - A1: Given any SSL document producing diagnostics, when diagnostics are collected, then every diagnostic has a non-empty Code and Source `ssl-lsp`.
-- A2: Given `ssl.diagnostics.rules: {"<slug>": "off"}`, when a document that would emit that slug is checked, then no diagnostic with that Code is produced; and given `"info"`, the diagnostic is produced with Information severity.
-- A3: Given an override map with an unrecognized value (e.g. `"bogus"`), when diagnostics are collected, then the diagnostic passes through unchanged — an unknown value never drops anything.
+- A2: Given `ssl.diagnostics.rules: {"<slug>": "off"}`, when a document that would emit that slug is checked, then no diagnostic with that Code is produced; given `"info"` or `"hint"`, the diagnostic is produced with Information or Hint severity; and keys and values match case-insensitively (`"Unknown_Token": "OFF"` configures `unknown_token`), like suppression slugs.
+- A3: Given an override map with an unrecognized value (e.g. `"bogus"`), when diagnostics are collected, then the entry is ignored as if absent — the diagnostic passes through unchanged (an unknown value never drops anything) and an info-tier rule is not exempted from the info gate by it.
 - A4: Given a file containing `/* @ssl-disable <slug>; */`, when diagnostics are collected, then no diagnostic with that Code appears anywhere in the file, while the same file without the directive does emit it.
 - A5: Given `/* @ssl-disable-next-line <slug>; */` directly above an offending line, when diagnostics are collected, then that line's matching diagnostic is dropped but the same violation on any other line still flags.
 - A6: Given `/* @ssl-disable *; */`, when diagnostics are collected, then every coded diagnostic in the file is silenced.
-- A7: Given a diagnostic check that panics, when diagnostics are collected, then the panic does not propagate and the result is a single error-severity `internal_error` diagnostic.
+- A7: Given a diagnostic check that panics, when diagnostics are collected, then the panic does not propagate and the result is the diagnostics collected before the panicking check — suppression, overrides, and the info gate applied as usual — plus a single error-severity `internal_error` diagnostic.
 - A8: Given a URI matching an `ssl.diagnostics.endpointPatterns` substring or a file with a leading-docblock `Endpoint:` marker, when the document is classified, then it is treated as an endpoint script; an `Endpoint:` marker past the leading region does NOT activate endpoint mode.
 - A9: Given open documents and a `workspace/didChangeConfiguration` notification, when the new settings are applied, then diagnostics are re-published for every open document.
 - A10: Given a data-source document containing only a SQL statement (optionally preceded by `--` or `/* */` SQL comments), when diagnostics are collected, then the result is empty — no SSL diagnostic (dot_property_access or otherwise) fires on SQL syntax.
@@ -330,10 +346,3 @@ leading `/*` — detected by masking terminated leading comments and seeing
 whether a bare `/*` remains, which sidesteps the SSL lexer's habit of
 stopping a comment at the first `;` — marks SSL and keeps its
 comment-termination diagnostic.
-
-## Known gaps
-
-- A7's regression test (TestGetDiagnostics_PanicRecovery) verifies the
-  recovery contract with a synthetic panic rather than driving a real check
-  panic through collectDiagnostics — a panic cannot be injected from input
-  alone without instrumenting production code.

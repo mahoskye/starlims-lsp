@@ -806,6 +806,90 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   server's copy of the document drifted from the editor's until the file
   was reopened. Out-of-range positions now clamp as the specification
   directs (#256).
+### Added
+- **`ssl.diagnostics.rules` accepts `"hint"`.** A rule can now be remapped
+  to Hint severity, alongside `off`, `info`, `warn`/`warning` and
+  `error` (#258).
+- **The server advertises its position encoding.** The initialize result
+  states `positionEncoding: "utf-16"` — the LSP default, now explicit
+  (#258).
+
+### Changed
+- **Rule overrides match keys case-insensitively, and an unrecognized
+  value is ignored.** `"Unknown_Token": "OFF"` now configures
+  `unknown_token`, as suppression slugs already did. An entry whose value
+  is not a recognized severity (a typo such as `"wraning"`) is treated as
+  absent: before, it left the severity alone but still exempted an
+  info-tier rule from the info gate, so a typo silently turned the rule
+  on (#258).
+- **`internal_error` is a cataloged diagnostic.** It gained a code
+  constant and a `catalog/diagnostics/internal_error.md` entry; until now
+  it was a string literal outside the catalog's code-to-entry rule (#258).
+
+### Fixed
+- **Hover, definition and rename no longer crash the server on a line
+  with an emoji.** Word lookup bounded the column by the line's byte
+  length but indexed its characters, so on `😀x`, or at the end of a line
+  holding a string with an emoji, it indexed past the end and panicked —
+  and because the request handler did not recover, the whole server
+  exited. Every request and notification now runs under a recover that
+  logs the stack and answers with an error instead, and a panic while
+  parsing a document leaves it a degraded cache entry rather than a dead
+  server (#258).
+- **Cursor positions after an emoji are read correctly.** LSP positions
+  count UTF-16 code units; the server passed them to the providers as
+  character indexes, so after a character outside the Basic Multilingual
+  Plane the cursor landed one character late per such character. Every
+  request position is now converted, as incremental edits already are
+  (#256, #258). Ranges the server *sends* still count characters; that
+  half is #307.
+- **Procedure parameters are read from the declaration, not the layout.**
+  A procedure's parameter list — used by hover, signature help,
+  completion, document symbols, cross-file resolution and
+  `max_params_warning` — was empty when the list held an inline comment,
+  when a bare `:PARAMETERS` had its names on the following lines, or when
+  more than a few comment lines separated `:PROCEDURE` from
+  `:PARAMETERS`; inline defaults were counted as names; and a procedure
+  with no `:PARAMETERS` took the script's. The names now come from the
+  declaration statement (#258).
+- **A script's entry parameters are found after leading procedures.** The
+  entry-point `:PARAMETERS` that `ExecFunction("Category.Script")` binds
+  to may follow `:PROCEDURE` blocks, as `parameters_first` already
+  allows; the lookup gave up at the first `:PROCEDURE`, so such a script
+  resolved to line 1 with no parameters (#258).
+- **A comment inside a statement no longer removes the statement from the
+  structure tree.** `:IF bA .AND. /* why;` followed by `bB;` on the next
+  line lost its `:IF`, so block depth, folding and symbols saw no block
+  there. In a production corpus this hid two `max_block_depth` findings
+  (#258).
+- **`:ENDPROC` closes its procedure even with a block left open inside
+  it.** An unclosed `:IF` made the procedure run to the end of the file
+  and nested every later procedure inside it (#258).
+- **One unclosed bracket no longer hides the rest of the file from
+  expression rules.** A statement ran to the next `;` at bracket depth
+  zero, so while typing `Len(sA;` every later statement — and every call
+  in it — was swallowed into one span. A `;` can never sit inside
+  brackets, so it now always ends the statement (#258).
+- **SQL reflow keeps prefixed strings and exponents intact.**
+  `N'multi   space'` became `N 'multi   space'`, Oracle `q'[it's]'` was
+  split at its inner quote, and `1.5e-3` became `1.5 e - 3`. Each is now
+  one token. Non-ASCII text in reflowed SQL is decoded as UTF-8 (shared
+  with #306, #256) (#258).
+- **A panicking rule no longer discards every other rule's findings.**
+  The recovery in diagnostic collection returned only the
+  `internal_error`; it now returns everything collected before the
+  panicking rule, with suppression, overrides and the info gate applied,
+  plus the `internal_error`. The data-source SQL-mode path, lexing and
+  parsing are now covered too (#258).
+- **Procedure extraction is linear in the document.** Each procedure's
+  docblock and visibility lookup scanned every token; a 500-procedure
+  document now extracts about three times faster (#258).
+
+### Removed
+- **Dead code with no callers:** `lexer.GetTokenAtPosition`, a dead
+  first pass in `GetContextAtPosition`, `isIdentifierPattern`,
+  `hasSpecificHungarianPrefix`, `isAssignOp`, and the tracked root scratch
+  files `count.go` and `.codex-counts.go` (#258).
 
 ## [0.24.0] - 2026-09-21
 

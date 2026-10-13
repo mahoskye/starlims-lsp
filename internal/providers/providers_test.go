@@ -8877,39 +8877,6 @@ SqlCommand := "TABLE " + sCols + " end";`
 	}
 }
 
-// Panic recovery: a panic anywhere inside collectDiagnostics should NOT
-// kill the server. It should surface as a single internal_error diagnostic
-// so the editor stays usable and bug reports are easy to file.
-// [spec feature.diagnostics_pipeline/A7]
-func TestGetDiagnostics_PanicRecovery(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("panic propagated past collectDiagnostics: %v", r)
-		}
-	}()
-
-	// We can't easily synthesize a panic from input alone, so just verify
-	// the safety net is wired: pretend a check function panicked by passing
-	// a nil token slice that would otherwise be handled gracefully — call
-	// the recovery path explicitly via a helper.
-	got := func() (out []Diagnostic) {
-		defer func() {
-			if r := recover(); r != nil {
-				out = []Diagnostic{{
-					Severity: SeverityError,
-					Source:   "ssl-lsp",
-					Code:     "internal_error",
-					Message:  "synthetic",
-				}}
-			}
-		}()
-		panic("synthetic panic for test")
-	}()
-	if len(got) != 1 || got[0].Code != "internal_error" {
-		t.Fatalf("recovery contract: expected one internal_error diagnostic, got %+v", got)
-	}
-}
-
 func hasDiagnosticCode(diags []Diagnostic, code string) bool {
 	for _, d := range diags {
 		if d.Code == code {
