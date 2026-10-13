@@ -135,6 +135,13 @@ func concatDiagnostics(groups ...[]Diagnostic) []Diagnostic {
 }
 
 func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
+	// The leading-docblock Endpoint: marker (DECISIONS.md D4) is read from
+	// the text here, so every text-path caller classifies an endpoint
+	// script the way the editor does — the CLI included, which has no
+	// endpointPatterns setting (feature.diagnostics_pipeline A32).
+	if !opts.IsEndpointFile && HasEndpointMarker(text) {
+		opts.IsEndpointFile = true
+	}
 	// A data-source document whose content is plain SQL gets no SSL
 	// diagnostics at all — every SSL check would false-flag SQL syntax
 	// such as dot-qualified column names (feature.diagnostics_pipeline

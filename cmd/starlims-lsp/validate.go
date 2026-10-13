@@ -279,7 +279,6 @@ func validateContent(name string, content string, flags validateFlags) Diagnosti
 	opts.CheckUndeclaredVars = flags.strict
 	opts.CheckUnusedVars = flags.strict
 	opts.CheckSQLParams = flags.strict
-	opts.IsEndpointFile = providers.HasEndpointMarker(content)
 	diagnostics := providers.GetDiagnostics(content, opts)
 
 	// Convert to output format
