@@ -747,6 +747,52 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   symbols listed every procedure twice and cross-file resolution saw
   phantom duplicates. The background walk and watcher events now ignore
   them (#255).
+### Added
+- **Go native fuzz targets** for the lexer (`FuzzTokenize`, which also
+  checks the token stream is lossless), the structural and expression
+  parsers (`FuzzParse`, `FuzzStatementExpressions`), the diagnostics
+  pipeline (`FuzzGetDiagnostics`, which checks every range is well-formed)
+  and the formatter (`FuzzFormat`, which checks format-twice stability,
+  and `FuzzFormatRange`). They are seeded from the idempotence corpus;
+  minimized findings live under `testdata/fuzz/` and run with
+  `go test ./...` (#256).
+
+### Fixed
+- **Embedded SQL formatting no longer corrupts non-ASCII text.** The SQL
+  lexer classified and copied its input one byte at a time, so any
+  non-ASCII character outside a quoted literal — an accented identifier,
+  a non-breaking space — came back as mojibake once the statement was
+  long enough to be reflowed (the `é` of `café` came back as an invalid
+  byte followed by `©`). It
+  now reads whole UTF-8 sequences and carries invalid bytes through
+  untouched. No file in the production corpus hit this shape, which is
+  why it went unseen; the formatter fuzz target found it (#256).
+- **An unclosed quote or comment inside an SQL string no longer grows the
+  file on every format.** The unclosed span swallowed the newline the
+  multi-line layout adds, so each pass added a blank line. SQL with an
+  unterminated quote, quoted identifier or block comment is now left as
+  written (#256).
+- **Formatting is idempotent on a further set of malformed or glued
+  inputs** found by the formatter fuzz target (feature.formatting A6):
+  trailing whitespace before an end-of-file semicolon (`x := 1 ` became
+  `x := 1 ;`, then `x := 1;`); an operator glued to a comma, a member
+  colon, or a statement break; an operator or comma directly before an
+  end-of-line comment; a colon with no receiver (`: a` was joined into a
+  keyword the next pass re-read); `: =` joined into `:=`; two words
+  separated only by a comment being fused; an end-of-line comment
+  followed on the same line by a multi-line comment (the two swapped
+  places); a glued `:ENDPROC:PROCEDURE`
+  boundary missing its semicolon; continuation indent after a statement
+  break inside an unclosed delimiter; and a mashed `:LABELName` followed
+  by an operator. None of these occur in the production corpus, whose
+  formatted output is byte-identical before and after (#256).
+- **Incremental document sync counts UTF-16 code units.** LSP positions
+  are UTF-16, but the server applied edits by rune index, so every edit
+  after a character outside the Basic Multilingual Plane (an emoji in a
+  comment or string) landed one column late per such character and the
+  server's copy of the document drifted from the editor's until the file
+  was reopened. Out-of-range positions now clamp as the specification
+  directs (#256).
 
 ## [0.24.0] - 2026-09-21
 

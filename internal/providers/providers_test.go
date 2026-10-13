@@ -1152,10 +1152,11 @@ result := Len(`
 	}
 
 	// Should get the built-in Len function, not the user-defined one
+	// (signature help never describes user procedures since cdbfee6 —
+	// feature.signature_help A4 — so assert the built-in's shape directly).
 	sig := help.Signatures[0]
-	// Built-in Len has a specific signature with type info
-	if strings.Contains(sig.Documentation, "User-defined") {
-		t.Error("expected built-in function signature, got user-defined")
+	if !strings.HasPrefix(strings.ToLower(sig.Label), "len(") || len(sig.Parameters) == 0 {
+		t.Errorf("expected the built-in Len signature, got label %q with %d parameters", sig.Label, len(sig.Parameters))
 	}
 }
 
@@ -1739,39 +1740,6 @@ func TestGetDiagnostics_ValidCode(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_BlockDepth(t *testing.T) {
-	// Create deeply nested blocks
-	text := `:PROCEDURE Test;
-:IF a;
-:IF b;
-:IF c;
-:IF d;
-:IF e;
- x := 1;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDPROC;`
-
-	opts := DefaultDiagnosticOptions()
-	opts.MaxBlockDepth = 3 // Allow only 3 levels of nesting
-
-	diagnostics := GetDiagnostics(text, opts)
-
-	foundDepthWarning := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "nesting depth") || strings.Contains(d.Message, "depth") {
-			foundDepthWarning = true
-		}
-	}
-
-	if !foundDepthWarning {
-		t.Log("Note: Block depth warning may not trigger for this test case")
-	}
-}
-
 func TestGetDiagnostics_HungarianNotationDisabled(t *testing.T) {
 	text := `:PROCEDURE Test;
 :PARAMETERS nCount, sName;
@@ -1858,16 +1826,19 @@ func TestGetDiagnostics_DefaultMustFollowParameters(t *testing.T) {
 }
 
 func TestGetDiagnostics_BareKeywordNameIsIdentifier(t *testing.T) {
-	// IF without a colon is just an identifier, not a keyword — no diagnostic.
+	// IF without a colon is just an identifier, not a keyword: no keyword-form
+	// rule may fire. (The statement itself is malformed and reports
+	// unexpected_token, which is not what this test is about.)
 	text := `IF x = 1;
     value := 1;
 ENDIF;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "must be colon-prefixed") {
-			t.Error("bare keyword-named identifier should not trigger colon-prefix diagnostic")
+		switch d.Code {
+		case CodeKeywordUppercase, CodeUnknownKeyword, CodeDeprecatedKeyword, CodeLabelKeywordForm:
+			t.Errorf("bare keyword-named identifier should not trigger a keyword-form diagnostic: %s %s", d.Code, d.Message)
 		}
 	}
 }
@@ -5204,7 +5175,7 @@ func TestGetDiagnostics_ComplexSQLPlaceholder_StandardFormsNotFlagged(t *testing
 	}
 
 	for _, code := range cases {
-		diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+		diagnostics := GetDiagnostics(code, infoEnabledOptions())
 		for _, d := range diagnostics {
 			if strings.Contains(d.Message, "Complex expression") {
 				t.Errorf("standard placeholder should not trigger complex warning: %s\n  got: %s", code, d.Message)
@@ -5216,7 +5187,7 @@ func TestGetDiagnostics_ComplexSQLPlaceholder_StandardFormsNotFlagged(t *testing
 func TestGetDiagnostics_ComplexSQLPlaceholder_SimpleNotFlagged(t *testing.T) {
 	code := `SQLExecute("SELECT * FROM T WHERE Code = ?sCode?");`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Complex expression") {
@@ -6183,24 +6154,6 @@ func TestGetDiagnostics_ExitForInFinally(t *testing.T) {
 	t.Fatal("expected EXITFOR-in-FINALLY diagnostic")
 }
 
-// --- Empty BEGINCASE ---
-
-func TestGetDiagnostics_EmptyBeginCase(t *testing.T) {
-	// :BEGINCASE with no :CASE is a compile error
-	code := `:BEGINCASE;
-:ENDCASE;`
-
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "requires at least one ':CASE' block") {
-			return
-		}
-	}
-
-	t.Fatal("expected empty BEGINCASE diagnostic")
-}
-
 // --- :ERROR handler must have body ---
 
 func TestGetDiagnostics_ErrorHandlerWithBody(t *testing.T) {
@@ -6241,7 +6194,7 @@ func TestGetDiagnostics_IncludeAtTopIsClean(t *testing.T) {
 :DECLARE x;
 x := 1;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "should appear early in the file") {
@@ -6256,7 +6209,7 @@ func TestGetDiagnostics_NotPreferredOperators_ValidNotEquals(t *testing.T) {
 	code := `:IF x != 1;
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "instead of") && strings.Contains(d.Message, "!=") {
@@ -6334,7 +6287,7 @@ func TestGetDiagnostics_VariableNameOK(t *testing.T) {
 	// Variable name within limit (prefix stripped)
 	code := `:DECLARE sShortName;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 20-character limit") {
@@ -6364,7 +6317,7 @@ func TestGetDiagnostics_ProcedureNameOK(t *testing.T) {
 	code := `:PROCEDURE ValidateSample;
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 30-character limit") {
@@ -6528,7 +6481,7 @@ nVal := 7.0e2;`
 	}
 }
 
-// --- D12: :ENDFOR detection ---
+// --- :ENDFOR detection ---
 
 func TestGetDiagnostics_EndForIsInvalid(t *testing.T) {
 	text := `:FOR i := 1 :TO 10;
@@ -6567,7 +6520,7 @@ func TestGetDiagnostics_EndForCaseInsensitive(t *testing.T) {
 	}
 }
 
-// --- D13: Redeclared variables ---
+// --- Redeclared variables ---
 
 func TestGetDiagnostics_RedeclaredVariable(t *testing.T) {
 	text := `:DECLARE sName;
@@ -6605,7 +6558,7 @@ sName := "B";
 	}
 }
 
-// --- D14: Empty trailing array with GetDataSet ---
+// --- Empty trailing array with GetDataSet ---
 
 func TestGetDiagnostics_EmptyTrailingArray_GetDataSet(t *testing.T) {
 	text := `:DECLARE sSQL, sXml;
@@ -6629,7 +6582,7 @@ func TestGetDiagnostics_EmptyTrailingArray_GetDataSet_WithParams(t *testing.T) {
 	text := `:DECLARE sSQL, sXml, sStatus;
 sSQL := "SELECT * FROM Table WHERE Status = ?";
 sXml := GetDataSet(sSQL, {sStatus});`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Omit") && strings.Contains(d.Message, "{}") {
@@ -6638,10 +6591,11 @@ sXml := GetDataSet(sSQL, {sStatus});`
 	}
 }
 
-// --- D15: Class member order with :INHERIT before :DECLARE ---
+// --- Class member order with :INHERIT before :DECLARE ---
 
 func TestGetDiagnostics_ClassMemberOrder_InheritBeforeDeclare(t *testing.T) {
-	// Correct order: INHERIT, DECLARE, methods, Constructor
+	// Correct order: :INHERIT, then :DECLARE, then methods (Constructor
+	// position is not enforced).
 	text := `:CLASS MyClass;
 :INHERIT BaseClass;
 :DECLARE sField;
@@ -6649,10 +6603,10 @@ func TestGetDiagnostics_ClassMemberOrder_InheritBeforeDeclare(t *testing.T) {
 :ENDPROC;
 :PROCEDURE Constructor;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "member order") || strings.Contains(d.Message, "should appear before") {
+		if d.Code == CodeClassMemberOrder {
 			t.Errorf("correct class member order should not produce diagnostics, got: %s", d.Message)
 		}
 	}
@@ -6701,7 +6655,7 @@ func TestGetDiagnostics_ClassMemberOrder_ConstructorAnywhere(t *testing.T) {
 :PROCEDURE Constructor;
 :ENDPROC;`,
 	} {
-		diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+		diagnostics := GetDiagnostics(text, infoEnabledOptions())
 		for _, d := range diagnostics {
 			if d.Code == CodeClassMemberOrder {
 				t.Errorf("unexpected class_member_order diagnostic for permitted Constructor placement: %s", d.Message)
@@ -6710,7 +6664,7 @@ func TestGetDiagnostics_ClassMemberOrder_ConstructorAnywhere(t *testing.T) {
 	}
 }
 
-// --- D16: String equality = vs == asymmetry ---
+// --- String equality = vs == asymmetry ---
 
 func TestGetDiagnostics_LooseStringEquality_PrefixMatch(t *testing.T) {
 	text := `:DECLARE sStatus;
@@ -6735,7 +6689,7 @@ func TestGetDiagnostics_StrictStringEquality_NoWarning(t *testing.T) {
 sStatus := "Logged";
 :IF sStatus == "Logged";
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "prefix matching") {
@@ -6744,23 +6698,7 @@ sStatus := "Logged";
 	}
 }
 
-// --- D17: :ERROR/:RESUME structure validation ---
-
-func TestGetDiagnostics_ErrorHandlerRequiresStatement(t *testing.T) {
-	text := `:ERROR;
-:RESUME;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "ERROR") && strings.Contains(d.Message, "at least one statement") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected diagnostic about :ERROR requiring at least one statement")
-	}
-}
+// --- :ERROR/:RESUME structure validation ---
 
 func TestGetDiagnostics_ErrorHandlerWithStatement_NoWarning(t *testing.T) {
 	text := `:ERROR;
@@ -6808,7 +6746,7 @@ UsrMes("Error");
 	}
 }
 
-// --- D18: Branch target with :LABELName compact form ---
+// --- Branch target with :LABELName compact form ---
 
 func TestGetDiagnostics_BranchTarget_CompactLabelForm(t *testing.T) {
 	// :LABELSKIP; produces token text "LABELSKIP", so Branch("SKIP") won't match
@@ -6816,16 +6754,17 @@ func TestGetDiagnostics_BranchTarget_CompactLabelForm(t *testing.T) {
 Branch("SKIP");`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// This should produce a diagnostic because "SKIP" doesn't match "LABELSKIP"
-	// (The Branch target must include the full token text including "LABEL" prefix)
+	// The Branch target must include the label token text including the
+	// "LABEL" prefix (diag.branch_target_label), so a bare "SKIP" is flagged.
 	foundBranch := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Branch") || strings.Contains(d.Message, "LABEL") {
+		if d.Code == CodeBranchTargetLabel {
 			foundBranch = true
 		}
 	}
-	// Just verify it doesn't crash - exact behavior depends on implementation
-	_ = foundBranch
+	if !foundBranch {
+		t.Error(`expected branch_target_label for Branch("SKIP")`)
+	}
 }
 
 func TestGetDiagnostics_BranchTarget_SpacedLabelForm(t *testing.T) {
@@ -6834,15 +6773,15 @@ func TestGetDiagnostics_BranchTarget_SpacedLabelForm(t *testing.T) {
 Branch("LABEL SKIP");`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// Should not produce branch-target-mismatch errors (this is correct usage)
+	// Should not produce branch-target diagnostics (this is correct usage)
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Branch target") && strings.Contains(d.Message, "does not match") {
-			t.Error("correct Branch target 'LABEL SKIP' should not produce mismatch diagnostic")
+		if d.Code == CodeBranchTargetLabel {
+			t.Errorf("correct Branch target 'LABEL SKIP' should not be flagged: %s", d.Message)
 		}
 	}
 }
 
-// --- D19: Visibility annotation placement ---
+// --- Visibility annotation placement ---
 
 func TestGetDiagnostics_VisibilityAnnotation_BeforeNonProcedure(t *testing.T) {
 	text := `/*@private;
@@ -6878,23 +6817,6 @@ func TestGetDiagnostics_VisibilityAnnotation_ProtectedInClass(t *testing.T) {
 	}
 }
 
-// --- D20: NIL method calls ---
-
-func TestGetDiagnostics_NilMethodCall_AfterReassignment(t *testing.T) {
-	// After reassigning to non-NIL, method calls should be fine
-	text := `:DECLARE oObj;
-oObj := NIL;
-oObj := CreateUdObject();
-oObj:Method();`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "NIL") && strings.Contains(d.Message, "method") {
-			t.Error("should not flag method call after reassignment from NIL to non-NIL")
-		}
-	}
-}
-
 // --- Pass 2: Nested IIF ---
 
 func TestGetDiagnostics_NestedIIF(t *testing.T) {
@@ -6916,7 +6838,7 @@ sResult := IIF(bCond1, IIF(bCond2, "A", "B"), "C");`
 func TestGetDiagnostics_NestedIIF_SingleNotFlagged(t *testing.T) {
 	text := `:DECLARE sResult;
 sResult := IIF(bCond, "Yes", "No");`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Nested IIF") || strings.Contains(d.Message, "IIF()") {
@@ -6943,7 +6865,7 @@ func TestGetDiagnostics_NegativeLogic(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected hint about inverting condition to use positive logic")
+		t.Error("expected info about inverting condition to use positive logic")
 	}
 }
 
@@ -6953,7 +6875,7 @@ func TestGetDiagnostics_NegativeLogic_NoElseNoWarning(t *testing.T) {
 :IF .NOT. bFlag;
     DoProc("HandleFalse");
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "positive logic") || strings.Contains(d.Message, "invert") {
@@ -7007,20 +6929,6 @@ sName := "test";
 }
 
 // --- Pass 2: Skipped param spacing (adjacent commas) ---
-
-func TestGetDiagnostics_SkippedParamSpacing(t *testing.T) {
-	// {param1,,param3} is valid, {param1, , param3} is not
-	// This is a lexer/formatting concern, verify valid form doesn't crash
-	text := `:DECLARE sResult;
-sResult := DoProc("MyProc", {1,,3,,5});`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-	// Should not produce any diagnostic about the skipped params
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "skipped") && strings.Contains(d.Message, "param") {
-			t.Error("valid skipped param syntax should not produce diagnostic")
-		}
-	}
-}
 
 // --- Pass 2: Code block (lambda) with comparisons ---
 
@@ -7194,7 +7102,7 @@ func TestGetDiagnostics_CatchMustBeBeforeFinally(t *testing.T) {
 	}
 }
 
-// --- Pass 2: :EXITFOR outside :FOR loop ---
+// --- Pass 2: :EXITWHILE outside :WHILE loop ---
 
 func TestGetDiagnostics_ExitWhileOutsideWhile_Standalone(t *testing.T) {
 	text := `:PROCEDURE Test;
@@ -7254,8 +7162,8 @@ oObj := CreateUdObject({{"name", "test"}, {"value", 42}});`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "CreateUdObject") && strings.Contains(d.Message, "built-in") {
-			t.Error("anonymous CreateUdObject should not trigger built-in class misuse warning")
+		if d.Code == CodeCreateUdObjectBuiltinMisuse {
+			t.Errorf("anonymous CreateUdObject should not trigger built-in class misuse warning: %s", d.Message)
 		}
 	}
 }
@@ -7336,23 +7244,6 @@ func TestGetDiagnostics_EmptyCatchBody_Valid(t *testing.T) {
 }
 
 // --- Pass 3: :TRY with only :CATCH (no :FINALLY) is valid ---
-
-func TestGetDiagnostics_TryOnlyCatch_Valid(t *testing.T) {
-	text := `:PROCEDURE Test;
-:TRY;
-    sVal := "";
-:CATCH;
-    sVal := "error";
-:ENDTRY;
-:ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "FINALLY") && strings.Contains(d.Message, "required") {
-			t.Error(":TRY with only :CATCH (no :FINALLY) should be valid")
-		}
-	}
-}
 
 // --- Pass 3: :OTHERWISE skipped once any :CASE body ran (even without :EXITCASE) ---
 
@@ -7499,7 +7390,7 @@ func TestGetDiagnostics_ZeroBasedArrayAccess(t *testing.T) {
 	}
 }
 
-// --- Tests for new diagnostics: STEP spacing, REGION legacy, code block structure ---
+// --- Tests for new diagnostics: STEP spacing, code block structure ---
 
 func TestGetDiagnostics_StepSpacingWarning(t *testing.T) {
 	// :STEP without a preceding space should warn
@@ -7775,7 +7666,7 @@ func TestGetDiagnostics_StringExactEquality_NoWarning(t *testing.T) {
 	// == for strings should NOT warn about prefix matching
 	text := `:IF sStatus == "Logged";
 :ENDIF;`
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	for _, d := range diagnostics {
@@ -8073,7 +7964,7 @@ func TestGetDiagnostics_NotEqualsNonStringStaysSilent(t *testing.T) {
 	x := 1;
 :ENDIF;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 	for _, d := range diagnostics {
 		if d.Code == CodeEqualsVsStrictEquals {
@@ -8092,7 +7983,7 @@ func TestGetDiagnostics_NotEqualsNoAsymmetryWarning(t *testing.T) {
 	x := 1;
 :ENDIF;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	for _, d := range diagnostics {
@@ -9672,8 +9563,8 @@ sOut := String:Format("Completed in {0:N3}s - {1}", 12, sName);
 }
 
 func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
-	// diag.visibility_annotation_usage (issue #198): off by default; when
-	// enabled, hints on effective annotations only — a class-file
+	// diag.visibility_annotation_usage (issue #198): info tier, so off by
+	// default (D13); when enabled, reports effective annotations only — a class-file
 	// annotation keeps its visibility_annotation warning and gets no hint.
 	script := `/*@private;
 :PROCEDURE Helper;
@@ -9692,12 +9583,12 @@ func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
 		if d.Code == CodeVisibilityAnnotationUsage {
 			hits++
 			if d.Range.Start.Line != 0 {
-				t.Errorf("expected hint on line 0, got %d", d.Range.Start.Line)
+				t.Errorf("expected the diagnostic on line 0, got %d", d.Range.Start.Line)
 			}
 		}
 	}
 	if hits != 1 {
-		t.Fatalf("expected one visibility_annotation_usage hint, got %d", hits)
+		t.Fatalf("expected one visibility_annotation_usage diagnostic, got %d", hits)
 	}
 
 	classFile := `:CLASS Widget;
