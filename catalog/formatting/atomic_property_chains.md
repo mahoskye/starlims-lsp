@@ -16,6 +16,13 @@ history:
       Line wrapping split oVar:property and a:b:c chains across lines,
       producing code that reads as separate statements. canWrapBefore now
       refuses to break immediately before or after a member-access ':'.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Behavior text aligned with the issue-#89 wrap engine: chain
+      atomicity follows from its three break classes (no candidate is
+      ever adjacent to a member-access ':'), and author-split chains are
+      preserved.
 issues: []
 ---
 
@@ -25,11 +32,16 @@ When a line exceeds `ssl.format.maxLineLength` and must wrap, a member-access
 chain (`oVar:property`, `a:b:c`, including call forms `oVar:Method(...)`) is
 never split at a `:` boundary: the wrapper refuses to break immediately
 before or immediately after a member-access `:` (the `:` of `:=` and of
-keywords like `:IF` is unaffected — those are different token kinds). The
-wrap point moves to an earlier legal boundary (after a comma, after `:=`,
-at an argument start), carrying the whole chain to the continuation line.
-If the only way to satisfy the limit would be splitting a chain, the line is
-left over-long instead.
+keywords like `:IF` is unaffected — those are different token kinds). None
+of the wrapper's break classes (fmt.max_line_length) is ever adjacent to a
+member-access `:`, so the wrap point moves to an earlier legal boundary
+(after a comma, after `:=`, before a binary operator), carrying the whole
+chain to the continuation line. If the only way to satisfy the limit would
+be splitting a chain, the line is left over-long instead.
+
+A chain the author already split with a leading member-access `:`
+(`txt:ToString()` then `:Replace(...)` on the next line) is preserved and
+indented as a continuation (fmt.indent_style).
 
 ## Examples
 
@@ -56,6 +68,27 @@ long rather than split (this line is 94 columns and stays that way):
 
 ```ssl
 DoSomething(oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString);
+```
+
+A chain between `:=` and a binary operator wraps at those boundaries and
+stays whole on its own continuation line:
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+sValue := oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString + sSuffix;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	sValue :=
+		oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString
+		+ sSuffix;
+:ENDPROC;
 ```
 
 ## Rationale

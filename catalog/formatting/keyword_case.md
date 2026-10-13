@@ -21,6 +21,12 @@ history:
       Dot logical operators (.and. -> .AND.) and Me/Base receivers joined
       the casing surface; both had been missed because they do not lex as
       keyword tokens. Entry created to document the full surface.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      The surface now reaches code-block bodies: `.t.`, `nil` and `me:`
+      inside `{|...|}` were left as written because the body is
+      normalized by its own re-lex (fmt.code_block_literals).
 issues: ["#90"]
 ---
 
@@ -43,7 +49,10 @@ formatter may canonicalize mechanically. The surface:
 - The mashed `:LABELName;` form normalizes to `:LABEL Name;`
   (diag.label_keyword_form is the diagnostic side).
 
-Content inside strings and comments is never recased (D7).
+The surface applies inside code-block bodies too (`{|o| o != nil}` →
+`{|o| o != NIL}`), except where fmt.code_block_literals passes a literal
+through verbatim (nested or multi-line). Content inside strings and
+comments is never recased (D7).
 
 ## Examples
 
@@ -96,6 +105,22 @@ nT := base:Compute(1);
 ```ssl
 me := 1;
 nX := me + 1;
+```
+
+Inside a code-block body, and never inside a string or comment:
+
+### Before
+
+```ssl
+fnReady := {|o| me:Check(o) .or. o == nil .or. .f.};
+sNote := ":if nil .t.";  /* :endif nil;
+```
+
+### After
+
+```ssl
+fnReady := {|o| Me:Check(o) .OR. o == NIL .OR. .F.};
+sNote := ":if nil .t.";  /* :endif nil;
 ```
 
 ## Rationale

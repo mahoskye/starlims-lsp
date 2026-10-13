@@ -47,27 +47,43 @@ history:
       extra level; the lexer now reads that colon as member access rather
       than a keyword, which used to make the formatter treat the line as
       a new statement.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Behavior text corrected: :REGION bodies are opaque and pass through
+      verbatim (issue #164) rather than being indented; an :IF
+      condition's continuation sits at the body's column; the configured
+      style is applied whatever the file's existing indentation. A line
+      that is the operand of a keyword ending the previous line
+      (`:RETURN ⏎ nValue;`) is now a continuation too.
 issues: ["#36", "#86", "#101"]
 ---
 
 ## Behavior
 
 Code lines are re-indented one level per enclosing block (`:PROCEDURE`,
-`:IF`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:TRY`, `:REGION`,
-`:BEGININLINECODE`; middle keywords `:ELSE`, `:CASE`, `:OTHERWISE`,
-`:CATCH`, `:FINALLY` dedent themselves and indent their content; the
-scope-based `:ERROR` / `:RESUME` also indent their bodies). With the
-default `ssl.format.indentStyle: "tab"` each level is one tab character;
-with `"space"` each level is `ssl.format.indentSize` spaces (default 4).
-For line-length accounting a tab is counted as `indentSize` columns.
+`:IF`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:TRY`, `:BEGININLINECODE`; middle
+keywords `:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY` dedent
+themselves and indent their content; the scope-based `:ERROR` / `:RESUME`
+also indent their bodies). A `:REGION` body is opaque payload and passes
+through byte-for-byte (issue #164); only its `:REGION` / `:ENDREGION` lines
+are indented. With the default `ssl.format.indentStyle: "tab"` each level
+is one tab character; with `"space"` each level is `ssl.format.indentSize`
+spaces (default 4). The configured style is applied whatever indentation
+the file already uses — there is no detection of an existing
+space-indented file. For line-length accounting a tab is counted as
+`indentSize` columns.
 
 Continuation lines — inside an unclosed `(`/`{`/`[`, beginning with a
-binary operator or with a member-access `:` continuing a call chain, or
-following a line that ended in `:=` or a binary operator — sit exactly one
-level past the line that opened the statement (issues #86/#89; the
-member-access form is the issue #240 follow-up). The anchor is lexical, not block depth: an `:IF`
-condition's continuation indents one level past the `:IF` line even though
-the body will indent further. The extra level is fixed, never proportional
+binary operator or with a member-access `:` continuing a call chain,
+following a line that ended in `:=`, a comma or a binary operator, or
+supplying the operand of a keyword that ended the previous line
+(`:RETURN ⏎ nValue;`, fmt.semicolon_enforcement) — sit exactly one level
+past the line that opened the statement (issues #86/#89; the member-access
+form is the issue #240 follow-up; the keyword-operand form is issue #255).
+The anchor is lexical, not block depth: an `:IF` condition's continuation
+indents one level past the `:IF` line — the same column as the body; the
+leading operator is what distinguishes it. The extra level is fixed, never proportional
 to nesting depth, and a closing delimiter that leads a line aligns with
 the statement line itself.
 
@@ -159,6 +175,43 @@ sOut := txt:ToString()
 sOut := txt:ToString()
 	:Replace("##TITLE##", sTitle)
 	:Replace("##USER##", sUser);
+```
+
+A wrapped `:IF` condition anchors on the `:IF` line, so its continuation
+shares the body's column:
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:IF bAlphaConditionValue .AND. oConfigurationManager:databaseSettings:connectionIsAvailable;
+nValue := 1;
+:ENDIF;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:IF bAlphaConditionValue
+		.AND. oConfigurationManager:databaseSettings:connectionIsAvailable;
+		nValue := 1;
+	:ENDIF;
+:ENDPROC;
+```
+
+A `:REGION` body is opaque and keeps its own layout:
+
+### Idempotent
+
+```ssl
+:PROCEDURE Demo;
+	:REGION Payload;
+SELECT a FROM t
+  WHERE b = 1
+	:ENDREGION;
+:ENDPROC;
 ```
 
 ## Rationale

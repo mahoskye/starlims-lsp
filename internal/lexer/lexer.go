@@ -586,11 +586,29 @@ func (l *Lexer) readCodeBlock() Token {
 	col := l.column
 	var text strings.Builder
 	depth := 0
+	var prevSig rune // last non-whitespace character consumed
 
 	for l.pos < len(l.input) {
+		// String literals in the body are opaque: a brace inside one must
+		// neither open nor close the literal (issue #255). `"{"` used to
+		// swallow the rest of the file and `"}"` ended the block early.
+		if depth > 0 {
+			if end := l.codeBlockStringEnd(prevSig); end > 0 {
+				for l.pos < end {
+					text.WriteRune(l.input[l.pos])
+					l.advance()
+				}
+				prevSig = '"'
+				continue
+			}
+		}
+
 		char := l.input[l.pos]
 		text.WriteRune(char)
 		l.advance()
+		if !unicode.IsSpace(char) {
+			prevSig = char
+		}
 
 		if char == '{' {
 			depth++
@@ -603,6 +621,46 @@ func (l *Lexer) readCodeBlock() Token {
 	}
 
 	return Token{Type: TokenCodeBlock, Text: text.String(), Line: line, Column: col, Offset: start}
+}
+
+// codeBlockStringEnd reports whether a string literal starts at the current
+// position inside a code-block body and, if so, returns the input position
+// just past its closing delimiter (0 otherwise). Quoted strings run to the
+// next matching quote. A `[` opens a bracket string only where it could not
+// be a subscript — mirroring isArrayAccessContext, a `[` after an
+// identifier, number, string, `)` or `]` indexes. An unterminated literal is
+// not treated as a string, so the brace scan degrades to its old behavior
+// instead of consuming the file.
+func (l *Lexer) codeBlockStringEnd(prevSig rune) int {
+	quote := l.input[l.pos]
+	switch quote {
+	case '"', '\'':
+		for i := l.pos + 1; i < len(l.input); i++ {
+			if l.input[i] == quote {
+				return i + 1
+			}
+		}
+		return 0
+	case '[':
+		if l.isIdentifierPart(prevSig) || prevSig == ')' || prevSig == ']' ||
+			prevSig == '"' || prevSig == '\'' {
+			return 0
+		}
+		// One level of bracket nesting, as in readString.
+		nested := false
+		for i := l.pos + 1; i < len(l.input); i++ {
+			switch {
+			case l.input[i] == '[' && !nested:
+				nested = true
+			case l.input[i] == ']' && nested:
+				nested = false
+			case l.input[i] == ']':
+				return i + 1
+			}
+		}
+		return 0
+	}
+	return 0
 }
 
 // readRegionBody consumes the raw text of a :REGION body: everything from

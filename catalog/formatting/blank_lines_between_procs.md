@@ -22,17 +22,28 @@ history:
       the boundary regardless of source whitespace, and the blank lines are
       placed above a doc-comment block attached to the next procedure
       instead of between the comment and its :PROCEDURE line.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Mixed boundaries (:ENDPROC; then :REGION, :ENDREGION; then
+      :PROCEDURE) are now normalized too; only same-kind pairs were,
+      leaving a procedure and an adjacent region unseparated against the
+      schema's blank_lines.before_procedure / before_region of 1.
 issues: ["#33"]
 ---
 
 ## Behavior
 
-When a `:PROCEDURE` (or `:REGION`) keyword follows a `:ENDPROC;` (or
-`:ENDREGION;`), the formatter normalizes the separation at that boundary to
-exactly `ssl.format.blankLinesBetweenProcs` blank lines (default 1) —
-whatever blank lines the source had there are replaced, never stacked on. A
-setting of 0 disables the normalization entirely (source whitespace at the
-boundary is left to fmt.max_consecutive_blank_lines).
+When a `:PROCEDURE` or `:REGION` keyword follows a `:ENDPROC;` or
+`:ENDREGION;` — any of the four pairings — the formatter normalizes the
+separation at that boundary to exactly `ssl.format.blankLinesBetweenProcs`
+blank lines (default 1) — whatever blank lines the source had there are
+replaced, never stacked on. The boundary holds across intervening
+statements that do not start with a keyword (a stray top-level assignment
+between two procedures): the blank lines go directly above the
+`:PROCEDURE` / `:REGION`. A setting of 0 disables the normalization
+entirely (source whitespace at the boundary is left to
+fmt.max_consecutive_blank_lines).
 
 A standalone comment block immediately preceding the `:PROCEDURE` with no
 blank line between the comments and the keyword is *attached* to that
@@ -107,6 +118,35 @@ goes above the comment block:
 :ENDPROC;
 
 /* Documentation for Second;
+:PROCEDURE Second;
+:ENDPROC;
+```
+
+A procedure and an adjacent region are separated the same way, in either
+order:
+
+### Before
+
+```ssl
+:PROCEDURE First;
+:ENDPROC;
+:REGION Payload;
+raw text
+:ENDREGION;
+:PROCEDURE Second;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE First;
+:ENDPROC;
+
+:REGION Payload;
+raw text
+:ENDREGION;
+
 :PROCEDURE Second;
 :ENDPROC;
 ```

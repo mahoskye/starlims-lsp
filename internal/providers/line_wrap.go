@@ -116,11 +116,16 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 		// stay at ITS indent; indenting one further produced a level the
 		// second pass flattened back, oscillating forever (issue #218,
 		// 784 corpus files).
+		// A line led by a member-access ':' continues a call chain; the
+		// stream formatter already indents it as a continuation, so its
+		// fragments must stay at its indent too (issue #255).
 		isCont := delimsAtLine[i] > 0 ||
 			isContinuationOperator(firstTokOfLine[i]) ||
+			isMemberAccessColon(firstTokOfLine[i]) ||
 			lastTokBeforeLine[i].Text == ":=" ||
 			lastTokBeforeLine[i].Text == "," ||
-			isContinuationOperator(lastTokBeforeLine[i])
+			isContinuationOperator(lastTokBeforeLine[i]) ||
+			(awaitsOperand(lastTokBeforeLine[i]) && firstTokOfLine[i].Type != lexer.TokenKeyword)
 		wrapped := wrapOneLine(line, perLine[i], stackAtLine[i], isCont, opts)
 		out = append(out, wrapped...)
 	}
@@ -152,7 +157,11 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 		if havePrev && subDepth == 0 {
 			pos := t.Column - 1
 			switch {
-			case prev.Text == "," && t.Text != "," && t.Text != ";" && !isCloseParen(t):
+			// A comment is never a break target: breaking before an
+			// end-of-line comment detaches it onto a line of its own, and
+			// the next pass re-classifies it (issue #258).
+			case prev.Text == "," && t.Text != "," && t.Text != ";" && !isCloseParen(t) &&
+				t.Type != lexer.TokenComment:
 				cands = append(cands, pos)
 			case prev.Text == ":=" && t.Type != lexer.TokenComment:
 				cands = append(cands, pos)
@@ -174,16 +183,25 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 	}
 	contWidth := visualWidth(contIndent, opts)
 
-	// Spans between candidates; span 0 includes the line's indent.
+	// Spans between candidates; span 0 includes the line's indent. Each
+	// span remembers the whitespace that separated it from the previous
+	// span in the source line: when two spans stay on one line they rejoin
+	// with exactly those bytes, so a line the wrapper does not break at a
+	// candidate keeps the spacing the formatter (or, with commaSpacing /
+	// operatorSpacing off, the author) gave it (issue #255).
 	bounds := append(append([]int{0}, cands...), len(runes))
 	type span struct {
 		text  string
 		width int
+		sep   string // whitespace before this span in the source line
 	}
 	var spans []span
+	prevSep := ""
 	for k := 0; k+1 < len(bounds); k++ {
-		txt := strings.TrimRight(string(runes[bounds[k]:bounds[k+1]]), " \t")
-		spans = append(spans, span{txt, visualWidth(txt, opts)})
+		raw := string(runes[bounds[k]:bounds[k+1]])
+		txt := strings.TrimRight(raw, " \t")
+		spans = append(spans, span{txt, visualWidth(txt, opts), prevSep})
+		prevSep = raw[len(txt):]
 	}
 
 	// Greedy packing with no-gain guard: break only when the next span fits
@@ -193,13 +211,14 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 	cur := spans[0].text
 	curWidth := spans[0].width
 	for _, sp := range spans[1:] {
-		fitsHere := curWidth+1+sp.width <= opts.MaxLineLength
+		sepWidth := visualWidth(sp.sep, opts)
+		fitsHere := curWidth+sepWidth+sp.width <= opts.MaxLineLength
 		fitsCont := contWidth+sp.width <= opts.MaxLineLength
 		if fitsHere || !fitsCont {
 			// Keep packing — either it fits, or moving it gains nothing
 			// (the span overflows a continuation line too).
-			cur = cur + " " + sp.text
-			curWidth += 1 + sp.width
+			cur = cur + sp.sep + sp.text
+			curWidth += sepWidth + sp.width
 			continue
 		}
 		outLines = append(outLines, cur)

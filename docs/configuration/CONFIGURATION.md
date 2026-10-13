@@ -148,7 +148,7 @@ Specifies whether to use tabs or spaces for indentation.
 | **Range** | `1` - `8` |
 | **File** | `internal/providers/formatting.go` |
 
-Number of spaces per indentation level when `indentStyle` is `"space"`. When `indentStyle` is `"tab"` it is the visual width of one tab, used to measure lines against `maxLineLength` (the VS Code extension sends `editor.tabSize` here in tab mode). The source guide's preferred default is tab indentation.
+Number of spaces per indentation level when `indentStyle` is `"space"`. In tab mode it is the width a tab counts as for line-length accounting (`maxLineLength`), so it affects where long lines wrap either way. The source guide's preferred default is tab indentation; the bundled value `4` is the fallback width for space-indented formatting. The configured style is applied whatever indentation a file already uses — an existing space-indented file is not detected and preserved. See catalog entry `fmt.indent_style`.
 
 ```json
 { "ssl.format.indentSize": 4 }
@@ -220,9 +220,13 @@ DoProc("CallProc", {a, b, c});
 When enabled, ensures statements end with semicolons.
 
 **Note:** Does NOT add semicolons after:
-- Opening delimiters (`(`, `[`, `{`)
-- Incomplete expressions
-- Continuation keywords (`:TO`, `:STEP`)
+- Opening delimiters (`(`, `[`, `{`), operators, `:=`, or a trailing comma
+- A line inside an unclosed `(` / `{` / `[`
+- Continuation keywords (`:TO`, `:STEP`), or before one (`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY`)
+- Declaration keywords whose operand list starts on the next line (`:PARAMETERS`, `:DECLARE`, `:PUBLIC`, `:DEFAULT`, `:INCLUDE`, `:INHERIT`)
+- A keyword whose operand starts on the next line (`:IF ⏎ bReady;`, `:RETURN ⏎ nValue;`)
+
+See catalog entry `fmt.semicolon_enforcement`.
 
 ### 3.7 ssl.format.blankLinesBetweenProcs
 
@@ -233,7 +237,7 @@ When enabled, ensures statements end with semicolons.
 | **Range** | `0` - `3` |
 | **File** | `internal/providers/formatting.go` |
 
-Number of blank lines to insert between procedure definitions.
+Exact number of blank lines between procedure (and `:REGION`) definitions. The count is normalized, not added: whatever blank lines the source has at an `:ENDPROC;`/`:ENDREGION;` → `:PROCEDURE`/`:REGION` boundary are replaced with this many. `0` leaves the boundary as written. See catalog entry `fmt.blank_lines_between_procs`.
 
 ```json
 { "ssl.format.blankLinesBetweenProcs": 1 }
@@ -265,7 +269,9 @@ blocks read as distinct units. See catalog entry
 | **File** | `internal/providers/formatting.go` |
 
 Remove trailing space/tab characters from every formatted line (post-pass,
-added in v0.5.0). See catalog entry `fmt.trim_trailing_whitespace`.
+added in v0.5.0). Line ends inside a multi-line string literal, code block
+or `:REGION` body are user content and are never trimmed. See catalog entry
+`fmt.trim_trailing_whitespace`.
 
 ```json
 { "ssl.format.trimTrailingWhitespace": true }
@@ -295,11 +301,10 @@ existing vertical whitespace. See catalog entry
 | **Default** | `"PascalCase"` |
 | **File** | `internal/providers/formatting.go` |
 
-`"preserve"` keeps the author's casing of built-in function names;
-`"PascalCase"` rewrites call sites to the canonical inventory casing
-(e.g. `sqlexecute(` → `SQLExecute(`). See catalog entry
-`fmt.builtin_function_case`. The default was flipped from `"preserve"` to
-`"PascalCase"` in v0.13.0 (catalog DECISIONS.md D12, issue #92).
+`"PascalCase"` (default) rewrites built-in call sites to the canonical
+inventory casing (e.g. `sqlexecute(` → `SQLExecute(`); member calls such as
+`oVar:upper(...)` are never re-cased. `"preserve"` keeps the author's
+casing. See catalog entry `fmt.builtin_function_case`.
 
 ```json
 { "ssl.format.builtinFunctionCase": "PascalCase" }
@@ -1054,6 +1059,14 @@ audience is authors writing new SSL, turns them on.
 {
   "ssl.format.indentStyle": "tab",
   "ssl.format.wrapLength": 90,
+  "ssl.format.operatorSpacing": true,
+  "ssl.format.commaSpacing": true,
+  "ssl.format.semicolonEnforcement": true,
+  "ssl.format.blankLinesBetweenProcs": 1,
+  "ssl.format.trimTrailingWhitespace": true,
+  "ssl.format.maxConsecutiveBlankLines": 0,
+  "ssl.format.builtinFunctionCase": "PascalCase",
+  "ssl.format.sql.enabled": true,
   "ssl.format.sql.style": "canonicalCompact",
   "ssl.format.sql.indentSpaces": 4,
   "ssl.naming.hungarianNotation.enabled": false,
@@ -1072,7 +1085,7 @@ Settings changed in VS Code are sent to the server immediately, except
 from the server defaults and takes flags instead (`--info`, `--hungarian`,
 `--hungarian-types`, `--strict`, `--ds`); `--format` starts from the
 formatting defaults and takes `--indent-style`, `--indent-size`,
-`--max-line-length`, and `--no-sql`. See `starlims-lsp --validate --help`
+`--max-line-length`, `--no-sql`, and `--ds`. See `starlims-lsp --validate --help`
 and `starlims-lsp --format --help`.
 
 ---
@@ -1082,7 +1095,7 @@ and `starlims-lsp --format --help`.
 | Option | Default |
 |--------|---------|
 | `ssl.format.indentStyle` | `"tab"` |
-| `ssl.format.indentSize` | `4` |
+| `ssl.format.indentSize` | `4` (spaces per level; tab width for line length) |
 | `ssl.format.maxLineLength` | `90` |
 | `ssl.format.operatorSpacing` | `true` |
 | `ssl.format.commaSpacing` | `true` |

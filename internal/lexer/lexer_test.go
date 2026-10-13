@@ -1756,3 +1756,34 @@ func TestLexer_LeadingByteOrderMark(t *testing.T) {
 		}
 	}
 }
+
+// Issue #255: braces inside a string literal in a code-block body are
+// string content — they must neither open nor close the literal.
+func TestLexer_CodeBlockBracesInsideStrings(t *testing.T) {
+	cases := []struct{ input, want string }{
+		{`{|x| x + "{"}`, `{|x| x + "{"}`},
+		{`{|x| x + "}"}`, `{|x| x + "}"}`},
+		{`{|x| x + '}{'}`, `{|x| x + '}{'}`},
+		{`{|x| x + [}]}`, `{|x| x + [}]}`},
+		{`{|a| a[1] + {a}[1]}`, `{|a| a[1] + {a}[1]}`},
+		{`{|x| x + "{|"}`, `{|x| x + "{|"}`},
+	}
+	for _, c := range cases {
+		tokens := NewLexer(c.input + "; aArr := {1, 2};").Tokenize()
+		if tokens[0].Type != TokenCodeBlock {
+			t.Fatalf("%s: expected TokenCodeBlock, got %s", c.input, tokens[0].Type)
+		}
+		if tokens[0].Text != c.want {
+			t.Errorf("%s: code block text = %q, want %q", c.input, tokens[0].Text, c.want)
+		}
+	}
+}
+
+// An unterminated quote inside a code block is not treated as a string, so
+// the brace scan still closes the literal at its matching brace.
+func TestLexer_CodeBlockUnterminatedQuoteFallsBack(t *testing.T) {
+	tokens := NewLexer(`{|x| x + "}`).Tokenize()
+	if tokens[0].Type != TokenCodeBlock || tokens[0].Text != `{|x| x + "}` {
+		t.Fatalf("got %s %q", tokens[0].Type, tokens[0].Text)
+	}
+}

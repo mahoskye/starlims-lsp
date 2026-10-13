@@ -46,6 +46,15 @@ history:
       as a keyword, so the formatter ended the statement before it and
       recased it to `:REPLACE`, splitting valid code into three broken
       statements.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      An operand-taking keyword ending its line (`:IF`, `:WHILE`, `:CASE`,
+      `:FOR`, `:RETURN`, ...) no longer gets a `;` when its operand starts
+      the next line. The forced semicolon turned `:IF ⏎ bReady;` into a
+      compile error and `:RETURN ⏎ nValue;` into a bare return — the same
+      truncation #216 fixed for the declaration keywords. Behavior text
+      now also lists the #99 postfix, :BEGINCASE and region-body rules.
 issues: ["#38", "#89"]
 ---
 
@@ -54,9 +63,12 @@ issues: ["#38", "#89"]
 With `ssl.format.semicolonEnforcement` on (default), the formatter appends
 a `;` at the end of a line that finishes a complete statement but lacks
 one. A semicolon is only added when the line ends in statement content (an
-identifier, number, string, closing delimiter, or keyword) AND the next
-significant token starts a new statement (an identifier or a
-statement-starting keyword).
+identifier, number, string, code-block literal, closing delimiter, postfix
+`++`/`--` (issue #99), or keyword) AND the next significant token starts a
+new statement (an identifier or a statement-starting keyword).
+`:BEGINCASE`, which takes no operand and is always followed by `:CASE` or
+`:OTHERWISE`, always ends with a semicolon. Raw `:REGION` body text never
+receives one (issue #164).
 
 No semicolon is added when the expression continues past the line break:
 
@@ -66,6 +78,15 @@ No semicolon is added when the expression continues past the line break:
 - the line ends with `:TO` / `:STEP`, or the next line starts with a
   continuation keyword (`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`,
   `:FINALLY`, `:TO`, `:STEP`);
+- the line ends with a declaration keyword (`:PARAMETERS`, `:DECLARE`,
+  `:PUBLIC`, `:DEFAULT`, `:INCLUDE`, `:INHERIT`) — its operand list is on
+  the following lines (issue #216);
+- the line ends with a keyword that takes an operand (`:IF`, `:WHILE`,
+  `:CASE`, `:FOR`, `:RETURN`, `:PROCEDURE`, `:CLASS`, `:LABEL`, `:REGION`,
+  `:BEGININLINECODE`) and the next line does not start with a keyword —
+  that line is the operand, and it takes one level of continuation indent
+  (fmt.indent_style). When a keyword does follow, the operand really is
+  absent and the statement is terminated as usual (issue #255);
 - the next line starts with a member-access `:` continuing a call chain
   (`txt:ToString()` then `:Replace(...)`). The lexer reads that colon as
   member access, not a keyword, so the chain is one statement and its
@@ -158,6 +179,44 @@ chartNo, strRules, Mean
 (Continuation-line reindentation for split declaration lists is a
 separate open layout question; this fence pins only the no-forced-';'
 guarantee.)
+
+An operand-taking keyword whose operand starts the next line keeps that
+operand — a forced `;` would make `:IF` a compile error and `:RETURN` a
+bare return (issue #255). A keyword on the next line means the operand is
+absent, and the bare `:RETURN` is terminated:
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:IF
+bReady;
+nValue := 1;
+:ENDIF;
+:RETURN
+nValue;
+:ENDPROC;
+:PROCEDURE Bare;
+:RETURN
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:IF
+		bReady;
+		nValue := 1;
+	:ENDIF;
+	:RETURN
+		nValue;
+:ENDPROC;
+
+:PROCEDURE Bare;
+	:RETURN;
+:ENDPROC;
+```
 
 ### Before
 

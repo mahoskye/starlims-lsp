@@ -15,6 +15,15 @@ history:
     note: >-
       Introduced default-on: consecutive sibling blocks at the same indent
       read as one wall of code without separation.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      The pass is line-based and used to inspect lines inside multi-line
+      literals: a string whose content had `:ENDIF;` and `:IF` lines got a
+      blank line inserted — a changed string value — and comment and
+      :REGION interiors were edited the same way. Lines inside a
+      multi-line string, comment, code block or :REGION body are now
+      skipped (D7).
 issues: []
 ---
 
@@ -33,6 +42,10 @@ identical leading indentation. No blank line is inserted:
   parent's closer, a nested opener);
 - around `:PROCEDURE` / `:REGION` boundaries — those are handled by
   fmt.blank_lines_between_procs.
+
+Lines inside a multi-line string, comment, code block or `:REGION` body
+are literal text (D7): they are never examined as closers or openers, and
+nothing is ever inserted among them.
 
 ## Examples
 
@@ -79,6 +92,17 @@ closer stay untouched:
 	:ENDWHILE;
 	nCount := 1;
 :ENDPROC;
+```
+
+Keyword-shaped lines inside a multi-line string are string content, not
+blocks:
+
+### Idempotent
+
+```ssl
+sTxt := "header
+:ENDIF;
+:IF x";
 ```
 
 ## Rationale
