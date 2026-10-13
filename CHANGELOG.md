@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Wrapped declaration lists align under their first item.** The
+  hanging lines of a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list now line
+  up with the list's first item (the statement's indent, then spaces), as
+  the style guide's `wrapped_list_alignment` rule requires. They used to
+  take one continuation tab (ssl-style-guide#120). This applies to lists
+  the source already wrapped and to lists the line wrapper breaks. On the
+  production corpus 760 of 6,228 files reformat, and only declaration
+  hanging lines move. Three data-source `:PARAMETERS p := "..."` lines
+  whose long default no longer fits at the aligned column stay on one
+  line.
+
 ## [0.25.0] - 2026-10-13
 
 The drift audit (epic #253). A deliberate re-read of the whole project

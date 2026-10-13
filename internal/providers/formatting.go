@@ -348,6 +348,17 @@ type formatState struct {
 	// breaks the run. Used by normalizeProcBoundary (issue #33) to place
 	// procedure-separating blank lines above an attached doc comment.
 	commentBlockStart int
+	// stmtIndentWidth is the visual width of the indent written for the
+	// current statement's first line.
+	stmtIndentWidth int
+	// declPending is true from a declaration keyword (:DECLARE,
+	// :PARAMETERS, :PUBLIC) that began its line until the next token, which
+	// is the list's first item when it shares that line.
+	declPending bool
+	// declListAlign is the column, counted from the statement's indent, of
+	// the first item of the declaration list being written; its hanging
+	// lines align there (wrapped_list_alignment). 0 when not in such a list.
+	declListAlign int
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
@@ -547,6 +558,17 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 			s.lastNonWSToken.Text == "," ||
 			isContinuationOperator(s.lastNonWSToken) ||
 			(awaitsOperand(s.lastNonWSToken) && token.Type != lexer.TokenKeyword)
+		s.declPending = false
+		if isContinuation && s.declListAlign > 0 {
+			// A hanging line of a wrapped declaration list aligns with the
+			// list's first item: the statement's indent, then spaces
+			// (style guide wrapped_list_alignment, ssl-style-guide#120).
+			s.currentLineLen = writeIndentLen(s.builder, s.lastLineIndent, s.opts)
+			s.builder.WriteString(strings.Repeat(" ", s.declListAlign))
+			s.currentLineLen += s.declListAlign
+			s.lineStart = false
+			return
+		}
 		var totalIndent int
 		if isContinuation {
 			totalIndent = s.lastLineIndent + 1
@@ -558,10 +580,42 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		} else {
 			totalIndent = s.indent
 			s.lastLineIndent = totalIndent
+			s.declListAlign = 0
 		}
 		s.currentLineLen = writeIndentLen(s.builder, totalIndent, s.opts)
+		if !isContinuation {
+			s.stmtIndentWidth = s.currentLineLen
+		}
 		s.lineStart = false
 	}
+}
+
+// noteDeclListStart records where a declaration list's first item sits,
+// called for each written token before it is written. Only an item on the
+// keyword's own line fixes the column; a list that starts on the next line
+// (`:DECLARE ⏎ a, b;`) has nothing to align with and keeps the ordinary
+// one-level continuation indent.
+func (s *formatState) noteDeclListStart(token lexer.Token) {
+	if !s.declPending {
+		return
+	}
+	s.declPending = false
+	if token.Type != lexer.TokenComment {
+		s.declListAlign = s.currentLineLen - s.stmtIndentWidth
+	}
+}
+
+// declListKeywords open a comma-separated declaration list whose wrapped
+// lines align under the first item (wrapped_list_alignment).
+var declListKeywords = map[string]bool{
+	"DECLARE": true, "PARAMETERS": true, "PUBLIC": true,
+}
+
+// isDeclListKeyword reports whether tok is a colon-prefixed declaration-list
+// keyword.
+func isDeclListKeyword(tok lexer.Token) bool {
+	return tok.Type == lexer.TokenKeyword && strings.HasPrefix(tok.Text, ":") &&
+		declListKeywords[strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))]
 }
 
 func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
@@ -982,6 +1036,12 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 	if token.Text == ";" {
 		s.pendingStatementBreak = true
 		s.prevKeyword = ""
+		s.declListAlign = 0
+	}
+
+	// A declaration keyword that began its line opens an alignable list.
+	if isDeclListKeyword(token) && s.currentLineLen-len(token.Text) == s.stmtIndentWidth {
+		s.declPending = true
 	}
 
 	// A statement following a standalone comment on the same source line
@@ -1096,6 +1156,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			continue
 		}
 
+		state.noteDeclListStart(token)
 		state.updateSQLFunctionState(token)
 		tokenWritten := state.writeOperatorOrComma(token, tokens, i)
 		if !tokenWritten {
