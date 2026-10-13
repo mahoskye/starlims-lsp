@@ -424,15 +424,41 @@ func emitTypes(ref *referenceFile) []byte {
 			}
 			buf.WriteString("\t\t},\n")
 		}
-		if len(entry.Members) > 0 {
+		// The Members section holds one of two table shapes: a member
+		// table (Member | Kind | ... — the object type) or, for value
+		// types with no SSL-defined `:` members, a Task | Use table naming
+		// the function or operator to reach for instead. A row matching
+		// neither shape fails generation: an unrecognized table must not
+		// silently become empty members again.
+		var members, tasks []tableRow
+		for _, row := range entry.Members {
+			switch {
+			case cell(row, "member", "name") != "":
+				members = append(members, row)
+			case cell(row, "task") != "":
+				tasks = append(tasks, row)
+			default:
+				fail("type %q: members row has neither a member/name nor a task column: %v", k, row)
+			}
+		}
+		if len(members) > 0 {
 			buf.WriteString("\t\tMembers: []TypeMember{\n")
-			for _, row := range entry.Members {
+			for _, row := range members {
 				fmt.Fprintf(&buf, "\t\t\t{Name: %s, Kind: %s, Returns: %s, Description: %s, Group: %s},\n",
 					quote(cell(row, "member", "name")),
 					quote(cell(row, "kind")),
 					quote(cell(row, "returns")),
 					quote(cell(row, "description")),
 					quote(cell(row, "group")))
+			}
+			buf.WriteString("\t\t},\n")
+		}
+		if len(tasks) > 0 {
+			buf.WriteString("\t\tTasks: []TypeTask{\n")
+			for _, row := range tasks {
+				fmt.Fprintf(&buf, "\t\t\t{Task: %s, Use: %s},\n",
+					quote(cell(row, "task")),
+					quote(cell(row, "use")))
 			}
 			buf.WriteString("\t\t},\n")
 		}

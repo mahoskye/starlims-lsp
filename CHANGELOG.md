@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`--version` names the SSL reference data it was built with.** A
+  second line reads `SSL reference data: <repo>@<commit> (<date>)`, from
+  a new `internal/constants/data/provenance.json` that every data refresh
+  updates. `go test -v ./internal/constants/` logs the same commit and
+  how many days old it is. Until now nothing showed the vendored data was
+  behind until someone noticed wrong hover text (#254).
+
+### Changed
+- **The bundled SSL reference data is current again.** Both vendored
+  files were re-synced from `starlims-ssl-reference`, which had gathered
+  two months of corrections since the last sync (2026-08-07). No element
+  was added or removed (still 460). The changes are corrections to
+  existing entries: 88 functions (signatures, parameter defaults and
+  descriptions, return descriptions), 9 classes, 1 returned object, 4
+  keywords, 8 operators, and all 8 core types. 171 elements have revised exception lists, most
+  now quoting the exact runtime message. Hover, signature help, and
+  completion pick these up directly. Two corrections are worth knowing:
+  the `!=` operator hover now says strings compare exactly (it described
+  prefix matching before), and `SSLExpando{}` is no longer offered as a
+  constructor, because it does not compile (#254).
+- **Hover on a core type no longer lists members it does not have.** The
+  reference now documents `aValues:Append(x)`, `sValue:IsEmpty()` and the
+  like as runtime errors for array, boolean, codeblock, date, netobject,
+  number, and string values. Their hover says the type has no
+  SSL-defined `:` members and names the function to use for each common
+  task (`ALen`, `AAdd`, `Empty`, ...). `object` keeps its member table.
+  The inventory generator now fails on a members table it does not
+  recognize, so this cannot silently turn into empty rows again (#254).
+- **The docs point at the upstream sources of truth.** `AGENTS.md`,
+  `README.md`, and `docs/README.md` named a gitignored local
+  `dev/ssl-style-guide/` checkout as authoritative, which had gone six
+  months stale. They now point at the upstream `ssl-style-guide` and
+  `starlims-ssl-reference` repos (#254).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

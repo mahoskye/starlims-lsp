@@ -1,0 +1,12 @@
+{
+  "reference": {
+    "repo": "mahoskye/starlims-ssl-reference",
+    "commit": "87233722ee2ae2ba7153e96c1c70a0aab741f502",
+    "date": "2026-10-13"
+  },
+  "generator": {
+    "repo": "mahoskye/ssl-style-guide",
+    "commit": "6d7a5a80b8360ef9ab463632a467da412d1a9824",
+    "date": "2026-10-13"
+  }
+}

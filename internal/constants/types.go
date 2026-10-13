@@ -77,6 +77,15 @@ type TypeMember struct {
 	Group       string // optional H3 sub-group label such as "properties" or "methods"
 }
 
+// TypeTask is one row of a value type's Task | Use table. Value types with
+// no SSL-defined `:` members (array, boolean, codeblock, date, netobject,
+// number, string) document the function or operator to use for each common
+// task instead.
+type TypeTask struct {
+	Task string
+	Use  string
+}
+
 // TypeOperatorRow describes one entry on a type's operators table (e.g. how
 // `==` behaves on arrays).
 type TypeOperatorRow struct {
@@ -95,6 +104,7 @@ type TypeDetails struct {
 	RuntimeType string
 	Operators   []TypeOperatorRow
 	Members     []TypeMember
+	Tasks       []TypeTask
 }
 
 // SpecialFormDetails holds the canonical syntax block and summary for one of

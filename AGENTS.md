@@ -2,7 +2,7 @@
 
 This document provides essential SSL (STARLIMS Scripting Language) coding conventions for AI agents working on this codebase. Following these conventions ensures generated code is syntactically correct and stylistically consistent.
 
-When this file conflicts with anything under `dev/ssl-style-guide/`, treat `dev/ssl-style-guide/` as the source of truth.
+When this file conflicts with the upstream sources, they win: [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) for language and style rules, and the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) for element behavior (functions, classes, keywords, operators). Read them upstream, not from a local `dev/` copy, which goes stale.
 
 ---
 

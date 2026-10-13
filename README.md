@@ -224,7 +224,7 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
 
 `indentStyle: "tab"` is the style-guide default. `indentSize` is only used when `indentStyle` is `"space"`; the bundled value `4` is the fallback space width, not the width of a tab-indented SSL block.
 
-Diagnostics settings default to server defaults. When `hungarianNotation` is enabled, the LSP warns on declared variables that do not use an allowed Hungarian prefix. Global variables can be declared via `globals` array; assignments to these variables will trigger an error. Always-on diagnostics enforce major rules from the authoritative material under `dev/ssl-style-guide/`; [`docs/ssl-reference/style-guide.md`](docs/ssl-reference/style-guide.md) is the bundled public summary.
+Diagnostics settings default to server defaults. When `hungarianNotation` is enabled, the LSP warns on declared variables that do not use an allowed Hungarian prefix. Global variables can be declared via `globals` array; assignments to these variables will trigger an error. Always-on diagnostics enforce major rules from the upstream [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) (language rules) and [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) (element behavior); [`docs/ssl-reference/style-guide.md`](docs/ssl-reference/style-guide.md) is the bundled public summary.
 
 ## SSL Language Overview
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/server"
 )
 
@@ -13,10 +14,18 @@ var (
 	buildTime = "unknown"
 )
 
+// versionText is the --version output. The second line names the upstream
+// commit the bundled SSL reference data was vendored from, so a stale
+// snapshot is visible without reading the source (issue #254).
+func versionText() string {
+	return fmt.Sprintf("starlims-lsp version %s (built %s)\nSSL reference data: %s\n",
+		version, buildTime, constants.DataProvenance.Reference)
+}
+
 func main() {
 	// Handle version flag
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("starlims-lsp version %s (built %s)\n", version, buildTime)
+		fmt.Print(versionText())
 		os.Exit(0)
 	}
 

@@ -5,26 +5,34 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"testing"
+	"time"
 )
 
 // Drift guards for the vendored element data (issue #123). The 446→460
 // staleness went unnoticed because nothing compared the vendored JSONs to
-// their canonical source or to each other. Two layers now do:
+// their canonical source or to each other. Three layers now do:
 //
-//   - TestVendoredDataMatchesSibling compares byte-for-byte against the
-//     canonical copies in a sibling ssl-style-guide checkout (the documented
-//     refresh is a plain cp, so byte equality is the contract — mirroring
-//     ssl-style-guide's check-reference-drift.mjs). Dev-machine guard only:
-//     it skips when the sibling checkout is absent, as in CI.
+//   - TestVendoredDataMatchesSibling compares each file byte-for-byte
+//     against the copy published by its producer in a sibling checkout:
+//     the reference JSON against ssl-style-guide (whose generator writes
+//     it), the meta JSON against starlims-ssl-reference (checked out as
+//     ssl-docs, whose extractor writes it). The refresh is a plain cp, so
+//     byte equality is the contract — mirroring ssl-style-guide's
+//     check-reference-drift.mjs. Dev-machine guard only: each comparison
+//     skips when its sibling checkout is absent, as in CI.
 //
 //   - TestVendoredDataInternallyConsistent is hermetic and always runs:
 //     the vendored files must agree with their own totals blocks and with
 //     the generated InventoryTotals (catches an edited JSON without
 //     `go generate`, complementing CI's regen-freshness step).
-
-var vendoredFiles = []string{"ssl-element-reference.json", "ssl-element-meta.json"}
+//
+//   - TestDataProvenance (issue #254) is hermetic and always runs: it
+//     checks data/provenance.json is well-formed and logs which upstream
+//     commit the data came from and how old it is, so staleness shows up
+//     in `go test -v` output and not only as wrong hover text.
 
 // repoRoot resolves the repository root from this source file's location.
 func repoRoot(t *testing.T) string {
@@ -36,35 +44,72 @@ func repoRoot(t *testing.T) string {
 	return filepath.Dir(filepath.Dir(filepath.Dir(file)))
 }
 
+// vendoredSources maps each vendored file to the sibling checkout that
+// publishes it: an env override, and a default path relative to this
+// repository's root.
+var vendoredSources = []struct {
+	name       string
+	envVar     string
+	defaultDir []string
+}{
+	// Note the doubled directory: the ssl-style-guide repo holds a
+	// same-named subdirectory containing the JSON.
+	{"ssl-element-reference.json", "SSL_STYLE_GUIDE_DIR", []string{"..", "ssl-style-guide", "ssl-style-guide"}},
+	{"ssl-element-meta.json", "SSL_DOCS_DIR", []string{"..", "ssl-docs", "content", "data"}},
+}
+
 func TestVendoredDataMatchesSibling(t *testing.T) {
 	root := repoRoot(t)
-	canonicalDir := os.Getenv("SSL_STYLE_GUIDE_DIR")
-	if canonicalDir == "" {
-		// Note the doubled directory: the ssl-style-guide repo holds a
-		// same-named subdirectory containing the JSONs.
-		canonicalDir = filepath.Join(root, "..", "ssl-style-guide", "ssl-style-guide")
-	}
-	if _, err := os.Stat(canonicalDir); os.IsNotExist(err) {
-		t.Skipf("sibling ssl-style-guide checkout not found at %s (set SSL_STYLE_GUIDE_DIR to override)", canonicalDir)
-	}
-
-	for _, name := range vendoredFiles {
-		canonical, err := os.ReadFile(filepath.Join(canonicalDir, name))
-		if err != nil {
-			t.Errorf("reading canonical %s: %v", name, err)
+	for _, src := range vendoredSources {
+		canonicalDir := os.Getenv(src.envVar)
+		if canonicalDir == "" {
+			canonicalDir = filepath.Join(append([]string{root}, src.defaultDir...)...)
+		}
+		if _, err := os.Stat(canonicalDir); os.IsNotExist(err) {
+			t.Logf("skipping %s: sibling checkout not found at %s (set %s to override)", src.name, canonicalDir, src.envVar)
 			continue
 		}
-		vendored, err := os.ReadFile(filepath.Join(root, "internal", "constants", "data", name))
+		canonical, err := os.ReadFile(filepath.Join(canonicalDir, src.name))
 		if err != nil {
-			t.Errorf("reading vendored %s: %v", name, err)
+			t.Errorf("reading canonical %s: %v", src.name, err)
+			continue
+		}
+		vendored, err := os.ReadFile(filepath.Join(root, "internal", "constants", "data", src.name))
+		if err != nil {
+			t.Errorf("reading vendored %s: %v", src.name, err)
 			continue
 		}
 		if !bytes.Equal(canonical, vendored) {
-			t.Errorf("vendored %s has drifted from the canonical copy.\nRefresh with:\n"+
+			t.Errorf("vendored %s has drifted from the canonical copy (vendored from %s).\nRefresh per internal/constants/data/README.md:\n"+
 				"  cp %s internal/constants/data/%s\n"+
+				"  update internal/constants/data/provenance.json\n"+
 				"  go generate ./internal/constants/...",
-				name, filepath.Join(canonicalDir, name), name)
+				src.name, DataProvenance.Reference, filepath.Join(canonicalDir, src.name), src.name)
 		}
+	}
+}
+
+func TestDataProvenance(t *testing.T) {
+	commit := regexp.MustCompile(`^[0-9a-f]{40}$`)
+	for _, entry := range []struct {
+		label string
+		u     UpstreamCommit
+	}{
+		{"reference", DataProvenance.Reference},
+		{"generator", DataProvenance.Generator},
+	} {
+		if entry.u.Repo == "" {
+			t.Errorf("provenance %s: repo is empty (is data/provenance.json well-formed?)", entry.label)
+		}
+		if !commit.MatchString(entry.u.Commit) {
+			t.Errorf("provenance %s: commit %q is not a full 40-character hash", entry.label, entry.u.Commit)
+		}
+		date, err := time.Parse("2006-01-02", entry.u.Date)
+		if err != nil {
+			t.Errorf("provenance %s: date %q is not YYYY-MM-DD: %v", entry.label, entry.u.Date, err)
+			continue
+		}
+		t.Logf("vendored element data %s: %s, %d days old", entry.label, entry.u, int(time.Since(date).Hours()/24))
 	}
 }
 
