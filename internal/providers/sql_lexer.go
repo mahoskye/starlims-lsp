@@ -247,6 +247,18 @@ func (l *SQLLexer) readNumber() SQLToken {
 		if !unicode.IsDigit(r) && r != '.' {
 			break
 		}
+		// A '.' belongs to the number only before a digit (`1.5`) or at
+		// the literal's end (`1.` before whitespace or end of input).
+		// Anything else glued to it is a separate token: the formatter
+		// glues both sides of a '.', so `0 .A` became `0.A`, and reading
+		// that back as the number `0.` followed by `A` re-spaced it to
+		// `0. A` on the next pass (issue #303, found by FuzzFormat).
+		if r == '.' {
+			next, nextSize := utf8.DecodeRuneInString(l.input[l.pos+size:])
+			if nextSize > 0 && !unicode.IsDigit(next) && !unicode.IsSpace(next) {
+				break
+			}
+		}
 		l.consumeRune(&text, size)
 	}
 
@@ -327,6 +339,15 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 	tempPos := l.pos
 	foundClosing := false
 	parenDepth := 0
+
+	// A placeholder opens only on a name, a quoted expression, or the
+	// empty `??`. A lone `?` the formatter glued to a following unknown
+	// character or '.' must not pair with a later `?` on the next pass:
+	// `?# ?x?` formatted to `?#?x?`, which then read `?#?` as one
+	// placeholder and re-spaced the rest (issue #303, found by FuzzFormat).
+	if first, _ := utf8.DecodeRuneInString(l.input[l.pos:]); !isSQLIdentRune(first) && first != '\'' && first != '?' {
+		tempPos = len(l.input)
+	}
 
 	for tempPos < len(l.input) {
 		c := l.input[tempPos]

@@ -2212,6 +2212,13 @@ func TestFormat_IdempotentOnMalformedInput(t *testing.T) {
 		{"mashed label then operator", "0:LABEL0+000000"},
 		{"end-of-line comment before a multi-line one", "0/*;/*\n;"},
 		{"unterminated quote in SQL", "[SELECT A\"" + strings.Repeat("0", 80) + "]"},
+		// Issue #303 — embedded-SQL reflow shapes.
+		{"SQL number before spaced dot", "\"SELECT 0 A00000000) A0000000000 FROM A00000\xad\xad\xadA00000000000000000 0  A00000! AND A00000 !# 000 .A0000000000000000\""},
+		{"SQL unknown character before placeholder", "\"SELECT 00FRO!00000000000000000000000000'0'00000000000000000000000\xa9?\x880\xa80\xf9 ?000000?\""},
+		{"SQL lone placeholder glued to symbol or dot", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = ?# ?x? AND c = ?. ?y? AND d = 0 .e\""},
+		{"SQL number before dot and operator", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = 0 .! AND c = 1. AND d = 1.5\""},
+		{"SQL sign after sign", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = (-\n- 1)\""},
+		{"unterminated quote in multi-line SQL", "[SELECT\n00000!\"000000000000000]"},
 	}
 	opts := DefaultFormattingOptions()
 	for _, tc := range cases {
