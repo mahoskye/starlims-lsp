@@ -4,6 +4,7 @@ package providers
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 )
@@ -131,7 +132,7 @@ func checkDataSourceUndeclaredPlaceholders(body string, declared []string, lineO
 	}
 
 	adjacent := func(a, b SQLToken) bool {
-		return a.Line == b.Line && a.Column+len(a.Text) == b.Column
+		return a.Line == b.Line && a.Column+utf8.RuneCountInString(a.Text) == b.Column
 	}
 	isAt := func(t SQLToken) bool {
 		return t.Type == SQLTokenUnknown && t.Text == "@"
@@ -167,7 +168,7 @@ func checkDataSourceUndeclaredPlaceholders(body string, declared []string, lineO
 			Severity: SeverityWarning,
 			Range: Range{
 				Start: Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1},
-				End:   Position{Line: lineOffset + name.Line - 1, Character: name.Column - 1 + len(name.Text)},
+				End:   Position{Line: lineOffset + name.Line - 1, Character: name.Column - 1 + utf8.RuneCountInString(name.Text)},
 			},
 			Message: fmt.Sprintf("SQL data-source placeholder '@%s' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.", name.Text),
 			Source:  "ssl-lsp",

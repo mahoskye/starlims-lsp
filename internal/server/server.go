@@ -603,14 +603,15 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 		diagnostics = providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 	}
 
-	// Convert to protocol diagnostics
+	// Convert to protocol diagnostics, ranges in UTF-16 units (issue #307).
+	m := newUTF16Mapper(content)
 	protocolDiags := make([]protocol.Diagnostic, 0, len(diagnostics))
 	for i, d := range diagnostics {
 		if i >= s.settings.MaxNumberOfProblems {
 			break
 		}
 		pd := protocol.Diagnostic{
-			Range:    toProtocolRange(d.Range),
+			Range:    m.rng(d.Range),
 			Severity: ptrTo(protocol.DiagnosticSeverity(d.Severity)),
 			Source:   &d.Source,
 			Message:  d.Message,

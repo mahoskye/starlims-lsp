@@ -11,6 +11,7 @@ tests:
   - internal/providers/providers_test.go
   - internal/server/handler_test.go
   - internal/providers/crossfile_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 / f27f727"
@@ -74,6 +75,13 @@ history:
       UDObject (A18); a word inside a non-dispatch string or a comment
       returns null (A19). Stale "unshaped receivers keep word matching",
       Known gaps, and Rationale text removed.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Location ranges count UTF-16 code units (A20): they carried
+      rune columns, one unit early per emoji before the target on
+      the same line. A cross-file target is converted against its
+      own file's text.
 issues: ["#41"]
 ---
 
@@ -131,6 +139,11 @@ issues: ["#41"]
   after `oMail:Subject := …`: its members belong to the class (D10).
   Unshaped receivers return null: a member name never resolves to a
   like-named variable or procedure (A16).
+- Location ranges count characters in UTF-16 code units, the encoding
+  the server advertises, converted against the target document's
+  current text (the open buffer, or the file on disk), so a character
+  outside the Basic Multilingual Plane before the target on its line
+  cannot shift the range (issue #307).
 
 ## Acceptance
 
@@ -153,6 +166,7 @@ issues: ["#41"]
 - A17: Given `:PROCEDURE Helper;` and a call `DoProc(` whose `"Helper"` string sits on the next line, when go-to-definition is invoked inside the string, then the Location ranges over exactly the name `Helper` on its `:PROCEDURE` line; given `/* see DoProc("Helper") ;` in a comment, then the response is null.
 - A18: Given `oMail := Email{};` followed by `oMail:Subject := "x";`, when go-to-definition is invoked on a later `oMail:Subject`, then the response is null — a built-in class instance is not a shaped UDObject.
 - A19: Given `:DECLARE sName;` and the word `sName` inside `"sName is bad"` or a comment, when go-to-definition is invoked on that word, then the response is null.
+- A20: Given a declaration preceded on its line by an emoji (one character, two UTF-16 code units), when go-to-definition is invoked on a use, then the returned range starts and ends at the declared name's UTF-16 offsets (issue #307).
 
 ## Rationale
 

@@ -12,6 +12,7 @@ tests:
   - internal/providers/crossfile_test.go
   - internal/server/handler_test.go
   - internal/server/cross_file_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "f27f727 (v0.2.0)"
@@ -60,6 +61,14 @@ history:
       references never include `DoProc("Calc")`. File-wide subjects skip
       procedures that shadow them with a local or parameter, and ranges
       are character columns after non-ASCII text (A18).
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Locations count UTF-16 code units (A19). The word-match search
+      reported byte columns, so any non-ASCII text before a match
+      on the same line shifted it; each location is now converted
+      against its own document's text, including closed files
+      reached cross-file.
 issues: ["#42", "#43", "#125"]
 ---
 
@@ -126,6 +135,11 @@ issues: ["#42", "#43", "#125"]
   (case-insensitive) and the match spans the entire string content — the
   dispatch-target case. Code-context matches (including code blocks) are
   kept.
+- Locations count characters in UTF-16 code units, the encoding the
+  server advertises. Each location is converted against its own
+  document's current text (the open buffer, or the file on disk for a
+  closed file), so a character outside the Basic Multilingual Plane
+  earlier on the line cannot shift it (issue #307).
 
 ## Acceptance
 
@@ -147,6 +161,7 @@ issues: ["#42", "#43", "#125"]
 - A16: Given a variable and a procedure sharing a name, when references are requested from one of them, then only that symbol's own occurrences are returned.
 - A17: Given a workspace index and the cursor on a member access (`oRec:CalcTotal`) spelled like a procedure of the file, when references are requested, then no procedure occurrence and no dispatch site in any file is returned; given the cursor inside a 1-part `DoProc("CalcTotal")` string, then the procedure's cross-file dispatch sites are still returned.
 - A18: Given a file-level `:DECLARE sX;` used as `sX := "é" + sX;` and a procedure declaring its own `:PARAMETERS sX;`, when references are requested on the file-level variable, then the procedure's occurrences are NOT returned and each location's column counts characters, not bytes.
+- A19: Given an emoji (one character, two UTF-16 code units) or an accented letter before an occurrence on the same line — in the current document, or in a closed caller file reached cross-file — when references are requested, then the location starts and ends at the occurrence's UTF-16 offsets (issue #307).
 
 ## Rationale
 

@@ -3,6 +3,7 @@ package providers
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
@@ -77,12 +78,14 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 	formatted := formatTokens(tokens, opts)
 	formatted = applyPostFormatPasses(formatted, opts)
 
-	// Return a single edit replacing the entire document
+	// Return a single edit replacing the entire document. Its end is the
+	// last line's length in runes, the unit every provider position
+	// counts in (issue #307).
 	lines := strings.Split(text, "\n")
 	endLine := len(lines) - 1
 	endChar := 0
-	if endLine >= 0 && len(lines[endLine]) > 0 {
-		endChar = len(lines[endLine])
+	if endLine >= 0 {
+		endChar = utf8.RuneCountInString(lines[endLine])
 	}
 
 	return []TextEdit{
@@ -116,7 +119,7 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// This ensures we format complete statements
 	startChar = 0
 	if endLine < len(lines) {
-		endChar = len(lines[endLine])
+		endChar = utf8.RuneCountInString(lines[endLine])
 	}
 
 	// Extract the text in range

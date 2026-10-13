@@ -9,6 +9,7 @@ config: []
 tests:
   - internal/providers/providers_test.go
   - internal/server/handler_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 (v0.1.0)"
@@ -41,6 +42,11 @@ history:
       name (A1). Nested regions nest, with each procedure listed once
       under its innermost region (A8); region selectionRanges cover the
       name. Stale "selectionRange starts at column 0" text removed.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Symbol ranges count UTF-16 code units (A9): they carried rune
+      columns, one unit early per emoji before the name on its line.
 issues: ["#44"]
 ---
 
@@ -72,6 +78,9 @@ Serves `textDocument/documentSymbol` with a hierarchical symbol tree:
 - Local `:DECLARE` variables and `:CLASS` blocks MUST NOT be emitted as
   symbols — the outline stays signal-dense.
 - An empty or symbol-free document returns an empty result, not an error.
+- `range` and `selectionRange` count characters in UTF-16 code units,
+  the encoding the server advertises, so a character outside the Basic
+  Multilingual Plane earlier on the line cannot shift them (issue #307).
 
 ## Acceptance
 
@@ -83,6 +92,7 @@ Serves `textDocument/documentSymbol` with a hierarchical symbol tree:
 - A6: Given a procedure containing only `:DECLARE` locals, when symbols are requested, then those locals do NOT appear as symbols at any level.
 - A7: Given an empty document, when symbols are requested, then the result is empty and the server does not error.
 - A8: Given `/* region Outer;` containing `/* region Inner;` that contains a procedure, when symbols are requested, then Inner is a child of Outer, the procedure appears exactly once (under Inner), and each region's selectionRange covers exactly its name.
+- A9: Given `:PUBLIC sTarget;` preceded on its line by a comment holding an emoji (one character, two UTF-16 code units), when symbols are requested, then the symbol's `selectionRange` starts and ends at the name's UTF-16 offsets (issue #307).
 
 ## Rationale
 

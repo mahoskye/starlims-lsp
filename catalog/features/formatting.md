@@ -30,6 +30,7 @@ tests:
   - internal/server/server_test.go
   - internal/server/handler_test.go
   - cmd/starlims-lsp/format_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 (v0.1.0)"
@@ -73,6 +74,12 @@ history:
       defaults marker-free content to SQL, so an ordinary script with no
       colon keyword and no `:=` used to pass through unformatted (A11).
       ssl.format.sql.identifierCase added to config.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      The full-document edit ends at the last line's length in UTF-16
+      code units (A12). It used the byte length, an overshoot
+      clients clamped to the line end.
 issues: []
 ---
 
@@ -125,6 +132,10 @@ not restate them.
   paths, or any input under `--format --ds` — because the classifier
   defaults marker-free content to SQL (D15); every other input is
   formatted as SSL. SSL-mode data sources format normally.
+- Edit ranges count characters in UTF-16 code units, the encoding the
+  server advertises: the full-document edit ends at the last line's
+  UTF-16 length, and a range edit ends at the UTF-16 length of its last
+  line (issue #307).
 
 ## Acceptance
 
@@ -139,6 +150,7 @@ not restate them.
 - A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
 - A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
 - A11: Given CLI `--format` input that is not a data source (no `.ds`/`.ds.txt` path, no `--ds`) whose content has no colon keyword and no `:=`, when formatted, then it is formatted as SSL; given SQL-mode content from a data-source path or under `--ds`, then it passes through unchanged.
+- A12: Given a document whose last line holds an emoji (one character, two UTF-16 code units), when `textDocument/formatting` is requested, then the full-document edit ends at that line's UTF-16 length (issue #307).
 
 ## Rationale
 

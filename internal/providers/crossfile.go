@@ -278,7 +278,7 @@ func includePathAfter(tokens []lexer.Token, i int) (string, int, int) {
 		if startCol < 0 {
 			startCol = t.Column - 1
 		}
-		endCol = t.Column - 1 + len(t.Text)
+		endCol = t.Column - 1 + utf8.RuneCountInString(t.Text)
 	}
 
 	target := strings.TrimSuffix(strings.TrimSpace(raw.String()), ";")

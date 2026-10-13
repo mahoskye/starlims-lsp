@@ -841,8 +841,21 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   character indexes, so after a character outside the Basic Multilingual
   Plane the cursor landed one character late per such character. Every
   request position is now converted, as incremental edits already are
-  (#256, #258). Ranges the server *sends* still count characters; that
-  half is #307.
+  (#256, #258). The ranges the server sends are the other half, below
+  (#307).
+- **Ranges after an emoji land where they belong.** The ranges the server
+  sends — diagnostics, definition and references locations, rename and
+  prepare-rename ranges, document and workspace symbols, inlay hints and
+  formatting edits — carried character counts, so after a character
+  outside the Basic Multilingual Plane each range started one UTF-16 unit
+  early: on `sX := "😀" + Len(sY);` a range for `Len` began on `+`. Every
+  outgoing position is now converted against its document's text, the
+  open buffer or, for a cross-file location or edit in a closed file, the
+  file on disk; a line without such characters skips the work. Three
+  sources were further off and count characters now too: the reference
+  search and the prepare-rename range used byte offsets, and the SQL
+  lexer behind the data-source diagnostics counted bytes, so accented
+  text before a match also shifted it (#307).
 - **Procedure parameters are read from the declaration, not the layout.**
   A procedure's parameter list — used by hover, signature help,
   completion, document symbols, cross-file resolution and

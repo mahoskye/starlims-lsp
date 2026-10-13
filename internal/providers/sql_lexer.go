@@ -41,7 +41,10 @@ type SQLLexer struct {
 	input  string
 	pos    int
 	line   int
-	column int
+	column int // 1-based, in runes
+	// runeEnd is the byte offset just past the rune the column last
+	// counted; a byte before it continues that rune.
+	runeEnd int
 }
 
 // NewSQLLexer creates a new SQL lexer.
@@ -60,6 +63,7 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 	l.pos = 0
 	l.line = 1
 	l.column = 1
+	l.runeEnd = 0
 
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
@@ -127,12 +131,20 @@ func (l *SQLLexer) peek() byte {
 	return l.input[l.pos+1]
 }
 
+// advance moves past one byte. Columns count runes, the unit every
+// provider position counts in, so only the first byte of a UTF-8
+// sequence moves the column; counting bytes put a diagnostic after a
+// non-ASCII character too far right (issue #307).
 func (l *SQLLexer) advance() {
 	if l.pos < len(l.input) {
-		if l.input[l.pos] == '\n' {
+		switch {
+		case l.input[l.pos] == '\n':
 			l.line++
 			l.column = 1
-		} else {
+			l.runeEnd = l.pos + 1
+		case l.pos >= l.runeEnd:
+			_, size := utf8.DecodeRuneInString(l.input[l.pos:])
+			l.runeEnd = l.pos + size
 			l.column++
 		}
 		l.pos++

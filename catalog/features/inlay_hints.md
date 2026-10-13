@@ -10,6 +10,7 @@ config:
   - ssl.inlayHints.minParameterCount
 tests:
   - internal/providers/inlayhints_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-02-02
     ref: "b44eaf9"
@@ -42,6 +43,12 @@ history:
       labelled with the like-named SSL built-in's parameters (D10). Stale
       "inner-array hints not implemented" text removed; minParameterCount
       wording now matches what it gates.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Hint positions count UTF-16 code units (A11): they carried rune
+      columns, one unit early per emoji before the argument on its
+      line.
 issues: ["#46"]
 ---
 
@@ -78,6 +85,9 @@ Serves `textDocument/inlayHint` with parameter-name hints:
   DoProc/ExecFunction array hints for target procedures with fewer
   parameters. The `sProcName:`/`aParams:` outer hints are always shown.
 - Only calls within the client-requested line range are processed.
+- Hint positions count characters in UTF-16 code units, the encoding
+  the server advertises, so a character outside the Basic Multilingual
+  Plane earlier on the line cannot shift a hint (issue #307).
 
 ## Acceptance
 
@@ -91,6 +101,7 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
 - A9: Given `o := CreateUdObject("Cat.Cls", {1});`, when hints are requested, then `sClassName:` and `aArgs:` are hinted; given the one-argument `CreateUdObject(vDefs)` (property-definition or class-name form), then no hint is produced.
 - A10: Given `sOut := sName:Replace("a", "b");` or `x := Me:Left("abc", 2);`, when hints are requested, then no hints are produced for the member call, while a plain `Left("abc", 2)` call keeps its hints.
+- A11: Given `sX := "<emoji>" + Left(sX, 1);` with an emoji (one character, two UTF-16 code units) in the string, when hints are requested, then each hint sits at its argument's UTF-16 offset (issue #307).
 
 ## Rationale
 

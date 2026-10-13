@@ -528,13 +528,9 @@ func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.Def
 		return nil, nil
 	case 1:
 		// Preserve the historical single-Location wire shape.
-		return toProtocolLocation(locations[0]), nil
+		return s.outputPositions().location(locations[0]), nil
 	default:
-		out := make([]protocol.Location, 0, len(locations))
-		for _, loc := range locations {
-			out = append(out, toProtocolLocation(loc))
-		}
-		return out, nil
+		return s.outputPositions().locations(locations), nil
 	}
 }
 
@@ -564,7 +560,7 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 		if dt := providers.DispatchTargetAt(cache.Tokens, line, column); dt != nil && len(dt.Parts) >= 2 {
 			res := (liveResolver{s}).overlayResolutions(s.workspaceIndex.ResolveDispatchTarget(dt.Raw))
 			if len(res) > 0 && !res[0].IsEntry {
-				return toProtocolLocations(s.crossFileProcedureReferences(
+				return s.outputPositions().locations(s.crossFileProcedureReferences(
 					res[0].URI, res[0].ProcName, params.Context.IncludeDeclaration)), nil
 			}
 		}
@@ -592,26 +588,15 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 		}
 	}
 
-	return toProtocolLocations(locations), nil
-}
-
-// toProtocolLocations converts provider locations, mapping empty to nil.
-func toProtocolLocations(locations []providers.Location) []protocol.Location {
-	if locations == nil {
-		return nil
-	}
-	result := make([]protocol.Location, 0, len(locations))
-	for _, loc := range locations {
-		result = append(result, toProtocolLocation(loc))
-	}
-	return result
+	return s.outputPositions().locations(locations), nil
 }
 
 // handleDocumentSymbol handles document symbol requests.
 func (s *SSLServer) handleDocumentSymbol(context *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
 	uri := params.TextDocument.URI
 
-	if _, ok := s.documents.GetDocument(uri); !ok {
+	content, ok := s.documents.GetDocument(uri)
+	if !ok {
 		return nil, nil
 	}
 
@@ -619,9 +604,10 @@ func (s *SSLServer) handleDocumentSymbol(context *glsp.Context, params *protocol
 	cache := s.documents.ParseDocument(uri, version)
 	symbols := providers.GetDocumentSymbolsFromTokens(cache.Tokens, cache.AST)
 
+	m := newUTF16Mapper(content)
 	result := make([]protocol.DocumentSymbol, 0, len(symbols))
 	for _, sym := range symbols {
-		docSym := convertDocumentSymbol(sym)
+		docSym := convertDocumentSymbol(m, sym)
 		result = append(result, docSym)
 	}
 
@@ -635,6 +621,7 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 
 	query := params.Query
 	results := make([]protocol.SymbolInformation, 0)
+	out := s.outputPositions()
 
 	// Phase 1: Results from open documents (highest priority — most up-to-date)
 	openURIs := s.documents.OpenURIs()
@@ -658,7 +645,7 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 			results = append(results, protocol.SymbolInformation{
 				Name:     proc.Name,
 				Kind:     kind,
-				Location: protocol.Location{URI: uri, Range: toProtocolRange(rangeInfo)},
+				Location: protocol.Location{URI: uri, Range: out.rng(uri, rangeInfo)},
 			})
 		}
 	}
@@ -673,7 +660,7 @@ func (s *SSLServer) handleWorkspaceSymbol(context *glsp.Context, params *protoco
 			results = append(results, protocol.SymbolInformation{
 				Name:     sym.Name,
 				Kind:     protocol.SymbolKind(sym.Kind),
-				Location: protocol.Location{URI: sym.URI, Range: toProtocolRange(rangeInfo)},
+				Location: protocol.Location{URI: sym.URI, Range: out.rng(sym.URI, rangeInfo)},
 			})
 		}
 	}
@@ -794,16 +781,17 @@ func isPositionAfter(left providers.Position, right providers.Position) bool {
 	return left.Character > right.Character
 }
 
-// convertDocumentSymbol converts our DocumentSymbol to protocol.DocumentSymbol.
-func convertDocumentSymbol(sym providers.DocumentSymbol) protocol.DocumentSymbol {
+// convertDocumentSymbol converts our DocumentSymbol to protocol.DocumentSymbol,
+// its ranges mapped to UTF-16 by m.
+func convertDocumentSymbol(m *utf16Mapper, sym providers.DocumentSymbol) protocol.DocumentSymbol {
 	rangeToUse := ensureRangeContainsSelection(sym.Range, sym.SelectionRange)
 	selectionRange := sym.SelectionRange
 
 	docSym := protocol.DocumentSymbol{
 		Name:           sym.Name,
 		Kind:           protocol.SymbolKind(sym.Kind),
-		Range:          toProtocolRange(rangeToUse),
-		SelectionRange: toProtocolRange(selectionRange),
+		Range:          m.rng(rangeToUse),
+		SelectionRange: m.rng(selectionRange),
 	}
 
 	if sym.Detail != "" {
@@ -813,7 +801,7 @@ func convertDocumentSymbol(sym providers.DocumentSymbol) protocol.DocumentSymbol
 	if len(sym.Children) > 0 {
 		children := make([]protocol.DocumentSymbol, 0, len(sym.Children))
 		for _, child := range sym.Children {
-			children = append(children, convertDocumentSymbol(child))
+			children = append(children, convertDocumentSymbol(m, child))
 		}
 		docSym.Children = children
 	}
@@ -931,13 +919,7 @@ func (s *SSLServer) handleFormatting(context *glsp.Context, params *protocol.Doc
 	// Get formatting edits
 	edits := providers.FormatDocument(content, s.settings.Formatting)
 
-	// Convert to protocol text edits
-	result := make([]protocol.TextEdit, 0, len(edits))
-	for _, edit := range edits {
-		result = append(result, toProtocolTextEdit(edit))
-	}
-
-	return result, nil
+	return newUTF16Mapper(content).textEdits(edits), nil
 }
 
 // handleRangeFormatting handles document range formatting requests.
@@ -954,7 +936,9 @@ func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protoco
 		return nil, nil
 	}
 
-	// Get formatting edits for the specified range
+	// Get formatting edits for the specified range. The provider widens
+	// the range to whole lines and ignores both characters, so they need
+	// no conversion from UTF-16.
 	edits := providers.FormatDocumentRange(
 		content,
 		int(params.Range.Start.Line),
@@ -964,13 +948,7 @@ func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protoco
 		s.settings.Formatting,
 	)
 
-	// Convert to protocol text edits
-	result := make([]protocol.TextEdit, 0, len(edits))
-	for _, edit := range edits {
-		result = append(result, toProtocolTextEdit(edit))
-	}
-
-	return result, nil
+	return newUTF16Mapper(content).textEdits(edits), nil
 }
 
 // handlePrepareRename handles prepare rename requests.
@@ -1000,7 +978,7 @@ func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.
 	}
 
 	return protocol.RangeWithPlaceholder{
-		Range:       toProtocolRange(result.Range),
+		Range:       newUTF16Mapper(content).rng(result.Range),
 		Placeholder: result.Placeholder,
 	}, nil
 }
@@ -1031,7 +1009,7 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 			res := (liveResolver{s}).overlayResolutions(s.workspaceIndex.ResolveDispatchTarget(dt.Raw))
 			if len(res) == 1 && !res[0].IsEntry {
 				if changes := s.crossFileRename(res[0].URI, res[0].ProcName, params.NewName); changes != nil {
-					return toWorkspaceEdit(changes), nil
+					return s.outputPositions().workspaceEdit(changes), nil
 				}
 			}
 			return nil, nil
@@ -1043,7 +1021,7 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 		if word := lexer.GetWordAtPosition(content, line, column); word != "" {
 			if procName, ok := procedureSubjectAt(cache, content, word, line, column); ok {
 				if changes := s.crossFileRename(uri, procName, params.NewName); changes != nil {
-					return toWorkspaceEdit(changes), nil
+					return s.outputPositions().workspaceEdit(changes), nil
 				}
 			}
 		}
@@ -1063,29 +1041,15 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 		return nil, nil
 	}
 
-	return toWorkspaceEdit(result.Changes), nil
-}
-
-// toWorkspaceEdit converts provider edit maps to a protocol WorkspaceEdit.
-func toWorkspaceEdit(providerChanges map[string][]providers.TextEdit) *protocol.WorkspaceEdit {
-	changes := make(map[protocol.DocumentUri][]protocol.TextEdit)
-	for docUri, edits := range providerChanges {
-		protocolEdits := make([]protocol.TextEdit, 0, len(edits))
-		for _, edit := range edits {
-			protocolEdits = append(protocolEdits, toProtocolTextEdit(edit))
-		}
-		changes[docUri] = protocolEdits
-	}
-	return &protocol.WorkspaceEdit{
-		Changes: changes,
-	}
+	return s.outputPositions().workspaceEdit(result.Changes), nil
 }
 
 // handleInlayHint handles textDocument/inlayHint requests.
 func (s *SSLServer) handleInlayHint(context *glsp.Context, params *InlayHintParams) ([]InlayHint, error) {
 	uri := params.TextDocument.URI
 
-	if _, ok := s.documents.GetDocument(uri); !ok {
+	content, ok := s.documents.GetDocument(uri)
+	if !ok {
 		return nil, nil
 	}
 
@@ -1109,14 +1073,15 @@ func (s *SSLServer) handleInlayHint(context *glsp.Context, params *InlayHintPara
 		return nil, nil
 	}
 
-	// Convert to protocol format
+	// Convert to protocol format: 0-based, the rune column as UTF-16.
+	m := newUTF16Mapper(content)
 	result := make([]InlayHint, 0, len(hints))
 	kind := InlayHintKindParameter
 	for _, h := range hints {
 		result = append(result, InlayHint{
 			Position: InlayHintPosition{
-				Line:      uint32(h.Line - 1),      // Convert to 0-based
-				Character: uint32(h.Character - 1), // Convert to 0-based
+				Line:      uint32(h.Line - 1),
+				Character: uint32(m.character(h.Line-1, h.Character-1)),
 			},
 			Label:        h.Label + ":",
 			Kind:         &kind,
