@@ -5507,6 +5507,26 @@ func checkSQLParameterValidation(tokens []lexer.Token, ast *parser.Node, p *pars
 		declaredVars[strings.ToUpper(g)] = true
 	}
 
+	// A variable created by assignment (`sName := ...;` with no
+	// :DECLARE) exists at run time, so ?sName? substitutes it. This is the
+	// same rule undeclared_variable applies: the assignment target counts
+	// as declared. Without it the two --strict rules disagreed about one
+	// name, and every ?name? marker for an assigned variable was reported.
+	for k, tok := range tokens {
+		if tok.Type != lexer.TokenIdentifier {
+			continue
+		}
+		next := nextSignificantTokenIndex(tokens, k+1)
+		if next < 0 || tokens[next].Type != lexer.TokenOperator || tokens[next].Text != ":=" {
+			continue
+		}
+		if prev := prevSignificantTokenIndex(tokens, k-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+			continue // a member assignment, oObj:Name := ...
+		}
+		declaredVars[strings.ToUpper(tok.Text)] = true
+	}
+
 	// Add procedure parameters to declared vars
 	procedures := p.ExtractProcedures(ast)
 	for _, proc := range procedures {

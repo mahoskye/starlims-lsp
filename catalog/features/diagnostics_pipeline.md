@@ -155,6 +155,13 @@ history:
       hungarian_type_mismatch, which is gated behind an editor setting the
       CLI did not expose. The flags are also now covered by an acceptance
       criterion (A28); --info had none.
+  - date: 2026-10-13
+    ref: "#262 follow-up (strict-profile measurement)"
+    note: >-
+      The CLI ignored the Endpoint: marker, so under --strict an endpoint
+      script's Request and Response were reported as undeclared. The
+      marker check moved into providers.HasEndpointMarker and both the
+      server and the CLI call it.
 issues: []
 ---
 
@@ -196,7 +203,9 @@ rules (those are `diag.*` entries).
   substrings (case-insensitive) or a leading-docblock `Endpoint:` marker
   appears in the first ~30 lines. The default-empty pattern list means zero
   false positives out of the box; a marker deeper in the file MUST NOT
-  activate endpoint mode.
+  activate endpoint mode. The CLI (`--validate`), which has no settings,
+  applies the marker alone, so an endpoint script reads `Request` and
+  `Response` the same way in the editor and under `--strict`.
 - The info severity tier is opt-in: info diagnostics are advisory detail —
   style observations and idiom notes aimed at assistant/LLM consumers and
   teams that want the full picture — and are dropped by default
@@ -291,6 +300,7 @@ rules (those are `diag.*` entries).
 - A29: Given the `--validate` CLI, when `--strict` is passed, then `undeclared_variable`, `unused_variable`, and `invalid_sql_param` are all enabled for that run, and no other opt-in option is — `--strict` implies neither `--info` nor the Hungarian checks; without it all three stay off, so the CLI default matches the editor default. None of the three is error severity, so a document whose only findings are strict findings stays `valid` (issue #249).
 - A30: Given a data-source document, when a caller enables `CheckUndeclaredVars`, `CheckUnusedVars`, or `CheckSQLParams`, then none of the three runs — the data-source dialect does not follow SSL scoping (directive values are bare identifiers used as values, `:PARAMETERS` carries inline `:=` defaults, and the SQL body names columns and keywords), and `checkDataSourceUndeclaredPlaceholders` is its placeholder check instead. The same options on an ordinary SSL document still report (issue #249).
 - A31: Given a `.ds` document whose builder-directive / `:PARAMETERS` header is preceded by a banner written in SSL comment style (a `/*` run closed by `;` rather than `*/`), when the header is split, then the banner is masked to blanks like the terminated form and the header scan reaches the directives beneath it — so the body classifies on its own content and a SQL body stays in SQL mode. The leading-unterminated-comment signal decides only the headerless shapes: a comment-only stub and an SSL data source opening with an unterminated comment both still classify as SSL (issue #249, preserving A16/A22).
+- A32: Given a file with a leading-docblock `Endpoint:` marker, when it is validated with `--validate --strict`, then `Request` and `Response` are not reported as undeclared, exactly as in the editor.
 
 ## Rationale
 

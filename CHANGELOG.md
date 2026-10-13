@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`--strict`: `invalid_sql_param` agrees with `undeclared_variable`.** A
+  variable created by assignment (`sStatus := "A";` with no `:DECLARE`)
+  exists at run time, and `undeclared_variable` already treated that
+  assignment as a declaration, but `invalid_sql_param` reported every
+  `?sStatus?` marker for it. On the production corpus `--strict` reported
+  9,478 of these findings; 540 remain.
+- **The CLI recognizes the `Endpoint:` header marker.** `--validate`
+  ignored the leading-docblock `Endpoint:` marker that the editor uses, so
+  under `--strict` an endpoint script's `Request` and `Response` were
+  reported as undeclared.
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

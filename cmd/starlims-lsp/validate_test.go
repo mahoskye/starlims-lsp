@@ -203,3 +203,26 @@ func TestValidateFilePath_UnexpectedTokenFlipsValid(t *testing.T) {
 		t.Errorf("expected an unexpected_token error at 3:6, got: %+v", result.Diagnostics)
 	}
 }
+
+// The CLI applies the leading-docblock Endpoint: marker, so an endpoint
+// script's Request and Response are ambients under --strict, as in the
+// editor; without the marker they are still undeclared.
+// [spec feature.diagnostics_pipeline/A32]
+func TestValidateStrictEndpointMarker(t *testing.T) {
+	body := ":PROCEDURE Handle;\nResponse:Write(Request:Form(\"id\"));\n:ENDPROC;\n"
+	count := func(content string) int {
+		n := 0
+		for _, d := range validateContent("stdin", content, validateFlags{strict: true}).Diagnostics {
+			if d.Code == "undeclared_variable" {
+				n++
+			}
+		}
+		return n
+	}
+	if got := count("/*\n * Endpoint: /api/orders\n;\n" + body); got != 0 {
+		t.Errorf("endpoint script: got %d undeclared findings, want 0", got)
+	}
+	if got := count(body); got != 2 {
+		t.Errorf("ordinary script: got %d undeclared findings, want 2 (Request, Response)", got)
+	}
+}
