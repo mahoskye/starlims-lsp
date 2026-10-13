@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block. The receiver's type must be certain from structure (every
   assignment in its scope agrees), never from its Hungarian prefix, because
   real code labels .NET collections, where `:Count` is valid, with an `a`
-  prefix (#267).
+  prefix. `++`/`--` on a value that is certainly a string is reported too
+  (#267).
 
 ## [0.24.0] - 2026-09-21
 

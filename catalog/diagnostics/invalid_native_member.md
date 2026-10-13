@@ -27,6 +27,12 @@ history:
       receivers there are .NET collections where `:Count` is valid, which
       is why the receiver's type comes from structure, never from its
       Hungarian prefix.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Also reports ++/-- on a value that is certainly a string, which the
+      reference (operators/increment.md, decrement.md) documents as a
+      run-time invalid-operand error.
 issues: []
 ---
 
@@ -57,7 +63,9 @@ assignment of unknown type or `NIL`, or is passed to `DoProc`,
   verified property in another case (`dToday:year`);
 - any of those value types: the SSL-object members `:IsEmpty()`,
   `:ToJson()`, `:clone()`, `:value`;
-- code block: any member.
+- code block: any member;
+- string: the `++` and `--` operators (`sText--;`), which the reference
+  documents as raising an invalid-operand error on a string.
 
 It must NOT flag:
 
@@ -90,6 +98,17 @@ It must NOT flag:
 	dToday := Today();
 	nYear := dToday:year;
 	:RETURN nYear;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sText;
+	sText := "abc";
+	sText--;
+	:RETURN sText;
 :ENDPROC;
 ```
 

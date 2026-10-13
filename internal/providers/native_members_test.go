@@ -74,3 +74,25 @@ vX := CreateUdObject();
 		t.Fatalf("want only procedure A's finding, got %v", got)
 	}
 }
+
+// ++/-- on a certain string raises (operators/increment.md, decrement.md);
+// on a number, a date or an uncertain receiver it is silent.
+func TestInvalidNativeMemberIncrementOnString(t *testing.T) {
+	script := `:PROCEDURE Demo;
+:PARAMETERS vIn;
+:DECLARE sText, nCount, dDay;
+sText := "a";
+sText--;
+++sText;
+nCount := 1;
+nCount++;
+dDay := Today();
+dDay--;
+vIn++;
+:RETURN sText;
+:ENDPROC;`
+	got := nativeMemberFindings(t, script)
+	if len(got) != 2 || !strings.HasPrefix(got[0], "'--' on a string") || !strings.HasPrefix(got[1], "'++' on a string") {
+		t.Fatalf("want -- and ++ on the string only, got %v", got)
+	}
+}

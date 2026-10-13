@@ -143,6 +143,22 @@ func checkInvalidNativeMember(tokens []lexer.Token, stmts []parser.StatementExpr
 		if e.Kind == parser.ExprMember && len(e.Children) == 1 && e.End < len(tokens) {
 			report(e, parentCallsIt)
 		}
+		// `++`/`--` on a value that is certainly a string raises an
+		// invalid-operand error (operators/increment.md, decrement.md).
+		if e.Kind == parser.ExprIncrement && len(e.Children) == 1 && e.Children[0].Kind == parser.ExprIdentifier {
+			target := e.Children[0]
+			if types[scopedName(target.Start, target.Name)] == typeString {
+				if rng, ok := exprRange(tokens, e); ok {
+					diagnostics = append(diagnostics, Diagnostic{
+						Severity: SeverityWarning,
+						Range:    rng,
+						Message:  fmt.Sprintf("'%s' on a string raises at run time: %s works on numbers and dates only", e.Op, e.Op),
+						Source:   "ssl-lsp",
+						Code:     CodeInvalidNativeMember,
+					})
+				}
+			}
+		}
 		for i, c := range e.Children {
 			walk(c, e.Kind == parser.ExprCall && i == 0)
 		}
