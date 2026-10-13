@@ -316,11 +316,3 @@ func binaryType(e *parser.Expr, useNames bool, depth int) sslType {
 	}
 	return operatorResults[operandPair{op, left, right}]
 }
-
-func isAssignOp(op string) bool {
-	switch op {
-	case ":=", "+=", "-=", "*=", "/=", "^=", "%=":
-		return true
-	}
-	return false
-}
