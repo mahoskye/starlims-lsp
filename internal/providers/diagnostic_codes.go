@@ -42,6 +42,7 @@ const (
 	CodeParametersFirst         = "parameters_first"
 	CodeDefaultAfterParameters  = "default_after_parameters"
 	CodeIncludeEarly            = "include_early"
+	CodeIncludeQuotedTarget     = "include_quoted_target"
 	CodeConstructorOutsideClass = "constructor_outside_class"
 
 	// Schema lints — datasource.

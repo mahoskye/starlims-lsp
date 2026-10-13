@@ -308,6 +308,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
 	diagnostics = append(diagnostics, checkInvalidOperatorSequences(tokens)...)
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
+	diagnostics = append(diagnostics, checkIncludeQuotedTarget(tokens)...)
 	diagnostics = append(diagnostics, checkInlineCodeNaming(tokens)...)
 	diagnostics = append(diagnostics, checkBeginCaseHasCase(tokens)...)
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
@@ -2885,6 +2886,40 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	return diagnostics
+}
+
+// checkIncludeQuotedTarget reports an :INCLUDE whose target is a string
+// literal (issue #266). The target is an identifier or a qualified
+// identifier (`:INCLUDE Common.Helpers;`); a quoted target does not compile.
+// The range covers the string token, so a client quick fix can replace it
+// with its unquoted text.
+func checkIncludeQuotedTarget(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword ||
+			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INCLUDE") {
+			continue
+		}
+		j := i + 1
+		for j < len(tokens) && (tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment) {
+			j++
+		}
+		if j >= len(tokens) || tokens[j].Type != lexer.TokenString {
+			continue
+		}
+		target := tokens[j].Text
+		if len(target) >= 2 {
+			target = target[1 : len(target)-1]
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(tokens[j]),
+			Message:  fmt.Sprintf("':INCLUDE' target must be an identifier, not a string: write ':INCLUDE %s;'", target),
+			Source:   "ssl-lsp",
+			Code:     CodeIncludeQuotedTarget,
+		})
+	}
 	return diagnostics
 }
 

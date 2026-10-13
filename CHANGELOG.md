@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`include_quoted_target` (error).** A quoted `:INCLUDE` target, such as
+  `:INCLUDE "Common.Helpers";`, does not compile, and it validated clean.
+  The target must be an identifier or a qualified identifier. The range
+  covers the string, and the message gives the unquoted statement, so a
+  client quick fix can unquote it. Go-to-definition still resolves the
+  quoted form while it's being fixed (#266).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

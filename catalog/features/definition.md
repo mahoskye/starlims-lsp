@@ -59,6 +59,10 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issue #266"
+    note: >-
+      A10 notes that the quoted :INCLUDE form does not compile; resolution still reads it so navigation works while it is being fixed.
 issues: ["#41"]
 ---
 
@@ -119,7 +123,7 @@ issues: ["#41"]
 - A7: Given `ExecFunction("Calculate")` with a same-file `:PROCEDURE Calculate;`, when go-to-definition is invoked inside the string, then the `Calculate` declaration is returned.
 - A8: Given `ExecFunction("Cat.Script.Proc")` where the workspace contains that script with that procedure, when go-to-definition is invoked inside the string, then a Location in the target file at the procedure's line is returned.
 - A9: Given `ExecFunction("Cat.Script")` resolving to a workspace script with a file-level `:PARAMETERS`, when go-to-definition is invoked, then the Location is that script's entry point at the `:PARAMETERS` line.
-- A10: Given `:INCLUDE SharedLib;`, `:INCLUDE Cat.SharedLib;`, or `:INCLUDE "SharedLib";` with the cursor on the keyword or path, when go-to-definition is invoked, then the resolved file is returned at line 0.
+- A10: Given `:INCLUDE SharedLib;`, `:INCLUDE Cat.SharedLib;`, or the non-compiling quoted form `:INCLUDE "SharedLib";` (which `include_quoted_target` reports) with the cursor on the keyword or path, when go-to-definition is invoked, then the resolved file is returned at line 0.
 - A11: Given a dispatch target matching two workspace files (one anchored, one flat), when go-to-definition is invoked, then multiple Locations are returned with the anchored candidate first.
 - A12: Given a dotted target differing from the indexed names only by case, when go-to-definition is invoked, then it resolves identically to the exact-case form.
 - A13: Given `RunDS("QUERIES.ORDERS")` with a workspace data source `Data Sources/QUERIES/ORDERS.ds`, or `RunDS("Orders")` with a flat `Orders.ds`, when go-to-definition is invoked inside the string, then a Location in the data-source file is returned; a RunDS target resolving nowhere is null.
