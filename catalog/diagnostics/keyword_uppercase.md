@@ -22,6 +22,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code keyword_uppercase assigned.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12
+      (keywords/IF.md and getting-started.md: colon keywords are
+      case-sensitive and must be uppercase). Behavior already matches;
+      fences pin lowercase and mixed-case procedure keywords.
 issues: []
 ---
 
@@ -60,6 +67,24 @@ without the leading colon (identifiers).
 :IF nTotal > 0;
 	nTotal := 0;
 :EndIf;
+```
+
+### Flags
+
+```ssl
+:procedure Totals;
+:return 1;
+:endproc;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Totals;
+:DECLARE nCount;
+nCount := 1;
+:Return nCount;
+:ENDPROC;
 ```
 
 ### Does not flag

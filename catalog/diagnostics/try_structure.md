@@ -19,6 +19,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12
+      (keywords/TRY.md: the :TRY body must contain at least one
+      statement). Behavior already matches; a fence pins an empty body
+      followed directly by :FINALLY.
 issues: []
 ---
 
@@ -72,6 +79,18 @@ nCount := 0;
 :DECLARE nCount;
 :TRY;
 /* a comment is not a statement;
+:FINALLY;
+nCount := 2;
+:ENDTRY;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE nCount;
+:TRY;
 :FINALLY;
 nCount := 2;
 :ENDTRY;

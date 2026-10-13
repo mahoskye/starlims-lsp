@@ -76,6 +76,17 @@ history:
       with the point, glued to an `e` identifier). A well-formed number
       glued to a stray `E` — `2.0E+nVar`, which used to defer to a rule
       that then stayed silent — is now reported here.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12. Three
+      behaviors already matched and are now pinned by fences: `**=` is
+      not an SSL compound assignment (operators/index.md lists only
+      `:=`, `+=`, `-=`, `*=`, `/=`, `%=`, `^=`), so its `=` is
+      unexpected; a `*****` banner line left outside a comment is code
+      and does not parse; and `++`/`--` on a variable, an array element,
+      or an object property, prefix or postfix, are complete statements
+      (operators/increment.md, operators/decrement.md).
 issues: ["#240", "#244", "#246"]
 ---
 
@@ -113,6 +124,13 @@ operand is optional the terminator is expected: `:RETURN;` is complete.
 SSL has no unary plus — its unary operators are `-`, `!`, and `.NOT.`, and
 a numeric literal never carries a leading sign — so in `x := +5;` the `+`
 is unexpected where an expression was due (issue #244).
+
+`++` and `--` take a variable, an array element, or an object property
+(`nHits++`, `aCounts[1]++`, `oStats:nHits++`), in prefix or postfix
+position; each is a complete statement. The compound assignments are
+`+=`, `-=`, `*=`, `/=`, `%=` and `^=` only: `**` is a power operator but
+`**=` is not an assignment, so in `nX **= 3;` the `=` is unexpected
+where the right operand of `**` was due (issue #260).
 
 Assignment is an expression wherever an operand can stand. `a := b := c;`,
 `oObj:Prop := oObj:Items[1] := x;`, `:RETURN x := .T.;`, `{ .T., n += 1 }`,
@@ -295,6 +313,45 @@ x := +5;
 ```ssl
 :DECLARE nX, nVar;
 nX := 2.0E+nVar;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX;
+nX := 2;
+nX **= 3;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX;
+/* Totals for the day;
+**********************
+nX := 1;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE nHits, aCounts, oStats;
+nHits := 0;
+aCounts := {0, 0};
+oStats := CreateUdObject();
+oStats:nHits := 0;
+nHits++;
+nHits--;
+++nHits;
+--nHits;
+aCounts[1]++;
+aCounts[2]--;
+++aCounts[1];
+--aCounts[2];
+oStats:nHits++;
+oStats:nHits--;
+++oStats:nHits;
+--oStats:nHits;
 ```
 
 ## Rationale

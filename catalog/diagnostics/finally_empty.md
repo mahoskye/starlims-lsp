@@ -19,6 +19,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code finally_empty assigned.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12
+      (keywords/FINALLY.md: a :FINALLY block must contain at least one
+      statement). Behavior already matches; a fence pins an empty
+      :FINALLY that follows a :CATCH.
 issues: []
 ---
 
@@ -57,6 +64,17 @@ It must NOT flag when:
 	nCount := 1;
 :FINALLY;
 	/* cleanup goes here someday;
+:ENDTRY;
+```
+
+### Flags
+
+```ssl
+:TRY;
+	nCount := 1;
+:CATCH;
+	nCount := -1;
+:FINALLY;
 :ENDTRY;
 ```
 
