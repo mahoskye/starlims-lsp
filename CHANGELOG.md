@@ -671,6 +671,82 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 - **Dot-style access after a call or a subscript is named as such.**
   `oObj:Get().Value` and `aRows[1].Value` are `dot_property_access` with
   its colon fix-it, not a generic `unknown_token` (#255).
+### Added
+- **`--format --ds` treats input as a data source.** It mirrors
+  `--validate --ds` for extensionless input such as stdin. `.ds` and
+  `.ds.txt` paths imply it (#255).
+- **`:REGION`/`:ENDREGION` and `:BEGININLINECODE`/`:ENDINLINECODE` fold.**
+  Both are current SSL with multi-line bodies, but neither produced a
+  folding range (#255).
+
+### Fixed
+- **Rename and references no longer cross into a different symbol of
+  the same name.** With a workspace open, the server chose the
+  procedure's cross-file path from the spelling alone. Renaming the
+  member in `oRec:CalcTotal`, or a script-level variable named like a
+  procedure, renamed the *procedure* in every calling file and left the
+  intended name untouched. The choice now uses the identifier's role, as
+  the single-file path already did. A dispatch string now counts as a
+  procedure occurrence, so renaming a variable `Calc` no longer rewrites
+  `DoProc("Calc")` (#255, #258).
+- **Member names are no longer renameable.** A receiver's type is not
+  resolved, so renaming `oA:Subject` edited every `:Subject` in the file,
+  including the built-in property of an `Email{}` object. Prepare-rename
+  and rename now refuse a member name. Rename also repeats prepare's
+  string and comment guard for clients that skip prepare, and rejects
+  `NIL` and built-in class names as new names (#255, #258).
+- **Rename and references respect a procedure's own local.** Renaming a
+  script-level or `:PUBLIC` variable also renamed another procedure's own
+  `:DECLARE` of that name and its uses. Definition already treats that
+  local as shadowing the outer name, and rename and references now agree
+  (#258).
+- **Rename and references use character columns after non-ASCII text.**
+  Ranges were byte offsets, so `sName := "Größe" + sName;` renamed to
+  `sNew` became `sNew := "Größe" + sNsNew`. Two places matched a
+  lower-cased copy of a line and then sliced the original. Case mapping
+  that changes byte length (`İ`, `ẞ`) could misplace that slice or panic,
+  and both now search the original line (#255, #258).
+- **A script that names a missing procedure no longer resolves to another
+  script.** When `Cat.Script.Proc` found the script but the script lacked
+  `Proc`, the workspace-unique fallback still ran and landed in an
+  unrelated script that happened to define `Proc`. Go-to-definition jumped
+  there, and rename treated the call site as an unambiguous caller. A
+  found script that lacks the procedure now resolves to nothing, as the
+  catalog always said (#255).
+- **Go-to-definition fixes.**
+  - A 1-part `DoProc(` whose string sits on the next line now resolves.
+  - `DoProc("Helper")` written inside a comment no longer navigates.
+  - A word inside an ordinary string or a comment returns nothing instead
+    of jumping to its declaration.
+  - Procedure locations now cover the name itself, not a guessed span
+    from column 0.
+  - The member of a built-in class instance (`oMail := Email{}` followed
+    by `oMail:Subject := …`) is no longer treated as a UDObject property
+    (#255, #258).
+- **Document symbols fixes.**
+  - Nested comment regions nest. A procedure inside an inner region used
+    to be listed twice, once under each region.
+  - Parameter children appear when a bare `:PARAMETERS` lists its names
+    on the following lines, and each child now points at its own name
+    instead of column 0.
+  - A region's selection range now covers its name (#255).
+- **Inlay hints skip member calls.** `sName:Replace("a", "b")` is a .NET
+  method and `Me:Left(...)` is a class method. Both were labelled with
+  the parameter names of the SSL built-in that shares their name (#255).
+- **`--format` no longer leaves a marker-free script unformatted.** The
+  CLI ran the data-source SQL-mode classifier on every input. That
+  classifier treats content with no colon keyword and no `:=` as SQL, so
+  a small script such as `usrmes( "hi" ) ;` came back untouched. The
+  passthrough now applies only to data sources (#255).
+- **Variable completion lists only variables in scope.** It offered every
+  declaration from every procedure, duplicates included. It now offers
+  the cursor's procedure's locals and parameters, script-level
+  declarations, and publics, one item per name (#258).
+- **The workspace index skips dot-directories.** Copies of scripts under
+  `.git`, `.history`, or `.claude/worktrees` were indexed, so workspace
+  symbols listed every procedure twice and cross-file resolution saw
+  phantom duplicates. The background walk and watcher events now ignore
+  them (#255).
 
 ## [0.24.0] - 2026-09-21
 

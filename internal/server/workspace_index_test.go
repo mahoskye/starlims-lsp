@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 const testSSLContent = `:DECLARE sName;
@@ -426,6 +428,7 @@ func TestIsSSLFile(t *testing.T) {
 	}
 }
 
+// [spec feature.cross_file_resolution/A20]
 func TestWorkspaceIndex_DispatchResolvesToClassOnly(t *testing.T) {
 	// diag.execfunction_class_target (issue #143): true only when the
 	// target has candidates and every candidate is a class file.
@@ -460,5 +463,55 @@ func TestWorkspaceIndex_DispatchResolvesToClassOnly(t *testing.T) {
 		if got := wi.DispatchResolvesToClassOnly(tc.target); got != tc.want {
 			t.Errorf("DispatchResolvesToClassOnly(%q) = %v, want %v", tc.target, got, tc.want)
 		}
+	}
+}
+
+// [spec feature.workspace_symbols/A8] — copies of scripts under
+// dot-directories below a root (.git, .history, .claude worktrees) are
+// neither walked nor indexed from watcher events, so a procedure is never
+// listed twice (issue #255).
+func TestWorkspaceIndex_SkipsHiddenDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "Main.ssl", ":PROCEDURE RunMain;\n:ENDPROC;\n")
+	for _, hidden := range []string{".history", ".claude/worktrees/copy", ".git"} {
+		sub := filepath.Join(dir, filepath.FromSlash(hidden))
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeTestFile(t, sub, "Main.ssl", ":PROCEDURE RunMain;\n:ENDPROC;\n")
+	}
+
+	wi := NewWorkspaceIndex([]string{pathToURI(dir)})
+	wi.StartBackgroundIndex()
+	select {
+	case <-wi.doneCh:
+	case <-time.After(10 * time.Second):
+		t.Fatal("background indexing timed out")
+	}
+
+	if got := wi.FileCount(); got != 1 {
+		t.Fatalf("expected only the root file to be indexed, got %d files", got)
+	}
+	if got := len(wi.SearchSymbols("RunMain", nil)); got != 1 {
+		t.Fatalf("expected RunMain exactly once, got %d", got)
+	}
+
+	// Watcher events for a hidden copy are ignored.
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+	hiddenURI := pathToURI(filepath.Join(dir, ".history", "Main.ssl"))
+	if !wi.InHiddenDir(hiddenURI) {
+		t.Fatal("expected the .history copy to be recognized as hidden")
+	}
+	if wi.InHiddenDir(pathToURI(filepath.Join(dir, "Main.ssl"))) {
+		t.Fatal("a root-level file is not hidden")
+	}
+	if err := s.handleDidChangeWatchedFiles(nil, &protocol.DidChangeWatchedFilesParams{
+		Changes: []protocol.FileEvent{{URI: hiddenURI, Type: protocol.FileChangeTypeCreated}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := wi.FileCount(); got != 1 {
+		t.Fatalf("watcher event for a hidden copy must not index it, got %d files", got)
 	}
 }

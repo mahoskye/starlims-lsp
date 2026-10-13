@@ -800,12 +800,10 @@ func GetWordAtPosition(text string, line, column int) string {
 		return ""
 	}
 
-	lineText := lines[line-1]
-	if column < 1 || column > len(lineText)+1 {
+	runes := []rune(lines[line-1])
+	if column < 1 || column > len(runes)+1 {
 		return ""
 	}
-
-	runes := []rune(lineText)
 
 	// Find word boundaries
 	start := column - 1

@@ -776,18 +776,22 @@ func FindProcedureAtLine(procedures []ProcedureInfo, line int) *ProcedureInfo {
 
 // ControlFlowBlock represents a control flow block (IF, WHILE, FOR, etc.).
 type ControlFlowBlock struct {
-	Kind      string // "IF", "WHILE", "FOR", "BEGINCASE", "TRY"
+	Kind      string // "IF", "WHILE", "FOR", "BEGINCASE", "TRY", "REGION", "BEGININLINECODE"
 	StartLine int
 	EndLine   int
 }
 
 // controlFlowPairs maps block start keywords to their corresponding end keywords.
+// :REGION and :BEGININLINECODE are named text/code blocks with multi-line
+// bodies; they fold like control flow (issue #255).
 var controlFlowPairs = map[string]string{
-	"IF":        "ENDIF",
-	"WHILE":     "ENDWHILE",
-	"FOR":       "NEXT",
-	"BEGINCASE": "ENDCASE",
-	"TRY":       "ENDTRY",
+	"IF":              "ENDIF",
+	"WHILE":           "ENDWHILE",
+	"FOR":             "NEXT",
+	"BEGINCASE":       "ENDCASE",
+	"TRY":             "ENDTRY",
+	"REGION":          "ENDREGION",
+	"BEGININLINECODE": "ENDINLINECODE",
 }
 
 // ExtractControlFlowBlocks extracts all control flow blocks from tokens.

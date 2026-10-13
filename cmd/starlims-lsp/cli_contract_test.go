@@ -409,7 +409,7 @@ func TestCLIContract_ProfileTable(t *testing.T) {
 func TestCLIContract_Format(t *testing.T) {
 	dir := t.TempDir()
 	raw := ":procedure Demo;\n:declare sName;\nsName:=\"x\";\n:endproc;\n"
-	formatted := formatContent(raw, providers.DefaultFormattingOptions())
+	formatted := formatContent(raw, providers.DefaultFormattingOptions(), false)
 	if formatted == raw {
 		t.Fatal("fixture must need formatting")
 	}

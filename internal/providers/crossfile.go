@@ -319,7 +319,7 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 	if dt := DispatchTargetAt(tokens, line, column); dt != nil {
 		if len(dt.Parts) == 1 {
 			// Same-script semantics, unchanged (feature.definition A6/A7).
-			if loc := findDoProcDefinition(text, line, column, uri, procedures); loc != nil {
+			if loc := procedureLocation(tokens, dt.Parts[0], uri, procedures); loc != nil {
 				return []Location{*loc}
 			}
 			return nil
@@ -350,7 +350,11 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 	// property's definition (feature.definition A14); a shaped receiver
 	// whose shape lacks the member is null, never a fallback to an
 	// unrelated same-named symbol (A15). Unshaped receivers fall through.
-	if recv, member, ok := MemberAccessAt(tokens, line, column); ok {
+	// A receiver holding a built-in class instance (`oMail := Email{}`) is
+	// never a UDObject, even when `oMail:Subject := …` would give it an
+	// augmentation shape: its members are the class's, not definitions in
+	// this file (D10, issue #255).
+	if recv, member, ok := MemberAccessAt(tokens, line, column); ok && !isBuiltinInstance(tokens, recv) {
 		shapes := BuildUDObjectShapesWithProcedures(tokens, procedures)
 		if shape, shaped := shapes[strings.ToLower(recv)]; shaped {
 			if prop := FindShapeProperty(shape, member); prop != nil && prop.Line > 0 {
@@ -370,6 +374,13 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 		return []Location{*loc}
 	}
 	return nil
+}
+
+// isBuiltinInstance reports whether recv was assigned a built-in class
+// instance or a returns-category object (typed-receiver inference).
+func isBuiltinInstance(tokens []lexer.Token, recv string) bool {
+	_, typed := BuildTypedReceivers(tokens, false)[strings.ToLower(recv)]
+	return typed
 }
 
 func resolvedToLocations(targets []ResolvedTarget) []Location {

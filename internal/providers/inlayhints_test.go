@@ -320,7 +320,7 @@ func TestFindFunctionCalls(t *testing.T) {
 	code := `x := Substr(s, 1, 5);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 1 {
 		t.Errorf("Expected 1 function call, got %d", len(calls))
@@ -340,7 +340,7 @@ func TestFindFunctionCalls_NestedParens(t *testing.T) {
 	code := `x := Outer(Inner(a, b), c);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 2 {
 		t.Errorf("Expected 2 function calls, got %d", len(calls))
@@ -492,5 +492,22 @@ func TestGetInlayHints_CallFormsHintOnlyWhenUnambiguous(t *testing.T) {
 	one := GetInlayHints(lexer.NewLexer(`o := CreateUdObject(vDefs);`).Tokenize(), nil, 1, 1, InlayHintOptions{Enabled: true, MinParameterCount: 1})
 	if len(one) != 0 {
 		t.Errorf("a one-argument CreateUdObject call is ambiguous and must not be hinted, got %+v", one)
+	}
+}
+
+// [spec feature.inlay_hints/A10] — a member call is not the like-named
+// built-in: `sName:Replace(...)` (a .NET passthrough) and `Me:Left(...)`
+// (a class method) get no built-in parameter-name hints (issue #255).
+func TestGetInlayHints_MemberCallsGetNoBuiltinHints(t *testing.T) {
+	text := "sOut := sName:Replace(\"a\", \"b\");\nx := Me:Left(\"abc\", 2);\ny := Left(\"abc\", 2);"
+	tokens := lexer.NewLexer(text).Tokenize()
+	hints := GetInlayHints(tokens, nil, 1, 3, DefaultInlayHintOptions())
+	for _, h := range hints {
+		if h.Line != 3 {
+			t.Errorf("member calls must get no hints, got %q on line %d", h.Label, h.Line)
+		}
+	}
+	if len(hints) != 2 {
+		t.Errorf("expected the plain Left(...) call on line 3 to keep its two hints, got %+v", hints)
 	}
 }

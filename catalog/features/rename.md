@@ -47,6 +47,18 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issues #255, #258"
+    note: >-
+      Role-aware end to end. The server's procedure-subject choice now
+      consults the identifier role, so a member access or a variable
+      spelled like a procedure no longer renames the procedure workspace-
+      wide (A19); member names are never renameable (A20); a dispatch
+      string counts as a procedure occurrence, so a variable rename leaves
+      `DoProc("Calc")` alone (A18). Also: rune columns after non-ASCII
+      text (A21), file-wide subjects skip procedures that shadow them with
+      a local (A22), Rename repeats prepare's string/comment guard (A23),
+      and NIL / built-in class names are rejected as new names (A5).
 issues: ["#43", "#125"]
 ---
 
@@ -66,14 +78,32 @@ issues: ["#43", "#125"]
   rejects: script rename is a file rename, out of scope. 1-part dispatch
   strings also still reject — a same-file rename starts from the
   identifier, not the string.
+- Prepare-rename MUST also reject the member name of a `:` access
+  (`oRec:Name`): the receiver's type is not resolved, so a rename would
+  edit every like-spelled member in the file, built-in .NET properties
+  included (D10). `Rename` itself repeats these guards — a request from a
+  comment, a string, or a member name produces no edits even when the
+  client skipped prepare.
 - The new name MUST be validated: a legal SSL identifier (letter or `_`
   first, then alphanumerics/`_`), not a keyword, not a built-in function
-  name, and not `Me`/`Base`/`Constructor`; otherwise the rename MUST be
-  rejected with no edits.
+  name, not a built-in class name, not `NIL`, and not
+  `Me`/`Base`/`Constructor`; otherwise the rename MUST be rejected with no
+  edits.
 - Edits MUST be scope-aware: renaming a local variable or parameter changes
   occurrences only within its declaring procedure; a same-named local in
-  another procedure MUST NOT be touched. `:PUBLIC` variables and procedure
-  names rename file-wide.
+  another procedure MUST NOT be touched. `:PUBLIC` variables, script-level
+  variables, and procedure names rename file-wide — except inside a
+  procedure that declares its own local or parameter of that name, whose
+  occurrences belong to that local (definition's precedence, A4).
+- Occurrences are classified by identifier role (shared with
+  feature.references): a variable and its declarations are one symbol, a
+  procedure with its call sites and `DoProc`/`ExecFunction` dispatch
+  strings another, and a member name or class name neither. A rename
+  edits only occurrences of the subject's own role family. The server's
+  cross-file procedure path is taken only when the cursor's role is a
+  procedure header, a call callee, or unclassified (a dispatch string).
+- Edit ranges are character columns: a non-ASCII character earlier on the
+  line never shifts an edit.
 - Matching MUST be case-insensitive; every case variant of the old name is
   replaced with the exact casing the user supplied.
 - Renaming a procedure MUST also update its `DoProc("Name")` /
@@ -111,7 +141,7 @@ issues: ["#43", "#125"]
 - A2: Given two procedures each declaring a local `sValue`, when the user renames `sValue` inside the first procedure, then no occurrence in the second procedure is modified — matches outside the declaring procedure's scope must not be touched.
 - A3: Given the cursor on a keyword, built-in function, or `Me`/`Base`/`Constructor`, when prepare-rename is invoked, then the rename is rejected before a new name can be entered.
 - A4: Given the cursor inside a comment or a non-dispatch string literal (including a 1-part dispatch string), when prepare-rename is invoked, then the rename is rejected.
-- A5: Given a valid rename target, when the user supplies `IF`, `Len`, or `my-var` as the new name, then the rename is rejected and no edits are produced.
+- A5: Given a valid rename target, when the user supplies `IF`, `Len`, `my-var`, `NIL`, or a built-in class name such as `Email` as the new name, then the rename is rejected and no edits are produced.
 - A6: Given `:PROCEDURE CalcTotal;` or a `:PUBLIC` variable referenced across the file, when the user renames it, then all file-wide identifier occurrences are updated.
 - A7: Given a procedure rename with a `DoProc("CalcTotal")` call present, when the rename executes, then the name inside the dispatch string is updated too (exactly the name, quotes untouched), keeping the call working.
 - A8: Given an unrelated string such as `"sName is a variable"` or a comment mentioning the old name, when a rename of `sName` executes, then that string/comment content is NOT edited.
@@ -124,7 +154,12 @@ issues: ["#43", "#125"]
 - A15: Given the cursor on a category or script segment of a dotted dispatch string, when prepare-rename is invoked, then the rename is rejected.
 - A16: Given a caller file rewritten on disk after indexing (site moved, no re-index), when the rename executes, then the edit is computed at the site's fresh position from current disk content.
 - A17: Given a variable `sName` and a member access `oRec:sName` in the same file, when the variable is renamed, then the member access is NOT edited — a property belongs to the receiver's type, not to the file's variable of that spelling.
-- A18: Given a variable `sName` and a `:PROCEDURE sName;` in the same file, when the variable is renamed then the procedure header and its call sites are NOT edited, and when the procedure is renamed then the variable's declaration and uses are NOT edited.
+- A18: Given a variable `sName` and a `:PROCEDURE sName;` in the same file, when the variable is renamed then the procedure header and its call sites (including a `DoProc("sName")` dispatch string) are NOT edited, and when the procedure is renamed then the variable's declaration and uses are NOT edited.
+- A19: Given a workspace index and the cursor on a member access (`oRec:CalcTotal`) or a variable spelled like a procedure of the file, when the rename executes, then neither the procedure header nor any dispatch site in any file is edited — only the subject's own symbol is.
+- A20: Given `oA := Email{};` and `oA:Subject := "x";`, when prepare-rename or rename is invoked on the member name `Subject`, then it is rejected and no edits are produced — member names are never renamed.
+- A21: Given `sName := "Größe" + sName;`, when `sName` is renamed to `sNew`, then the result is `sNew := "Größe" + sNew;` — edit ranges are character columns, never byte offsets.
+- A22: Given `:PUBLIC gCount;` used at file level and a procedure that declares its own `:DECLARE gCount;`, when the public is renamed, then that procedure's local declaration and uses are NOT edited.
+- A23: Given a rename request positioned inside a comment or a non-dispatch string (prepare skipped by the client), when the rename executes, then no edits are produced.
 
 ## Rationale
 
@@ -145,10 +180,9 @@ renamed).
 
 Cross-file rename (issue #125) inverts references' liberality: a missed
 reference costs a click, a wrong edit corrupts a call site, so only
-unambiguous resolutions are written (plan D1) and class-file procedures refuse
-the cross-file path outright (plan D8; "plan" is
-`docs/plans/2026-07-24-cross-file-references-rename.md` §7, not
-DECISIONS.md) — an honest refusal beats a rename that
+unambiguous resolutions are written (the issue #125 unambiguous-write
+rule) and class-file procedures refuse the cross-file path outright (the
+issue #125 class-file gate) — an honest refusal beats a rename that
 silently breaks every `obj:Method()` caller it cannot see. Edits are always
 recomputed from current content because the index may be stale against
 unsaved or external changes; emitting edits from indexed positions could
@@ -157,15 +191,16 @@ splice the new name into the wrong bytes.
 ## Known gaps
 
 - **Class-method channel.** `obj:Method()` / `Base:Method()` calls into
-  class scripts via bare identifiers are invisible; the plan-D8 gate refuses
-  cross-file rename for class-file procedures rather than break those
-  callers. Relaxable if class-method resolution is ever modeled.
+  class scripts via bare identifiers are invisible; the issue #125
+  class-file gate refuses cross-file rename for class-file procedures
+  rather than break those callers. Relaxable if class-method resolution is ever modeled.
 - **Include-spliced 1-part calls.** A 1-part `DoProc("Foo")` in an includer
   of the definition file is a genuine runtime call but is out of rename's
   sight (1-part scoping rule) — renaming the procedure breaks it silently.
 - **Concatenated dispatch strings.** `DoProc("CAT." + sName)` is never
   edited.
 - **Position encoding.** The server does not negotiate `positionEncoding`
-  and computes byte columns; non-ASCII characters before a site on the same
-  line can skew edit columns under UTF-16 clients. Pre-existing; multi-file
-  edits widen the blast radius.
+  and computes character (rune) columns (A21). These equal UTF-16 columns
+  for every character in the Basic Multilingual Plane; a character outside
+  it (an emoji) before a site on the same line still counts as one column
+  where a UTF-16 client counts two.

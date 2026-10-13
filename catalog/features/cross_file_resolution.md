@@ -9,6 +9,7 @@ config: []
 tests:
   - internal/server/script_identity_test.go
   - internal/server/cross_file_test.go
+  - internal/server/workspace_index_test.go
 history:
   - date: 2026-07-02
     ref: "cross-file milestone plan"
@@ -52,6 +53,14 @@ history:
       annotation detached by a blank line or another comment used to mark
       the procedure private (and hide it from completion) although the
       runtime leaves it public.
+  - date: 2026-10-13
+    ref: "issue #255 (features audit)"
+    note: >-
+      Truthful null enforced: when a rule finds the named script but the
+      script lacks the procedure, neither the basename degradation nor the
+      workspace-unique fallback runs (they used to land in an unrelated
+      script, which rename then treated as an unambiguous caller). A7
+      strengthened; class-only classification gets its criterion (A20).
 issues: []
 ---
 
@@ -85,14 +94,20 @@ Windows-style `/C:/...` paths):
   procedure (the flat-layout form). When both rules hit, both candidate
   sets are returned.
 - 3+-part `…Cat.Script.Proc`: category chain first (all leading segments
-  joined form the category); when it yields nothing, degrade to
+  joined form the category); when the chain finds no script, degrade to
   script-basename match on the second-to-last segment.
 - Final fallback for either shape: the last segment as a
-  **workspace-unique** procedure name — applied only when no other rule
-  hit and exactly one candidate exists. Two or more candidates yield
-  nothing (the uniqueness gate keeps flat-layout guessing quiet).
+  **workspace-unique** procedure name — applied only when no rule found
+  the named script and exactly one candidate exists. Two or more
+  candidates yield nothing (the uniqueness gate keeps flat-layout guessing
+  quiet).
 - **Truthful null**: a resolved script that lacks the named procedure
-  contributes nothing — resolution never lands "near" a target.
+  contributes nothing, and its presence stops the later rules — neither
+  the degradation nor the fallback runs — so resolution never lands
+  "near" a target in some other script.
+- **Class-only classification** (for `diag.execfunction_class_target`):
+  a dotted target is class-only when it has at least one candidate and
+  every candidate is a `:CLASS` file.
 
 **Include resolution** (`:INCLUDE` targets, already unquoted): dotted
 `Category.Script` uses the category chain, degrading to a basename match;
@@ -145,7 +160,7 @@ buffer drops that candidate entirely.
 - A4: Given an indexed script with a file-level `:PARAMETERS`, when a 2-part `Category.Script` target resolves, then the result is that script's entry point at the `:PARAMETERS` line (line 0 when the script has none).
 - A5: Given a flat-layout file `Helpers.ssl` containing `:PROCEDURE CalculateTotal`, when `Helpers.CalculateTotal` resolves, then the result is that procedure's line in that file.
 - A6: Given `Cat.Script.Proc` where the category is unknown to the workspace, when it resolves, then the script-basename degradation finds `Script` and returns procedure `Proc`.
-- A7: Given a target whose script resolves but whose procedure does not exist in it, when it resolves, then NO result is returned.
+- A7: Given a target whose script resolves but whose procedure does not exist in it, when it resolves, then NO result is returned — even when another script defines a workspace-unique procedure of that name.
 - A8: Given targets differing from the indexed names only by case, when they resolve, then they resolve identically to the exact-case forms.
 - A9: Given two files matching the same target (one anchored, one flat), when it resolves, then both candidates are returned with the anchored match first.
 - A10: Given a target matching no category or script rule whose last segment names a procedure found in exactly one workspace file, when it resolves, then that procedure is returned; given the same shape with the procedure in two files, then nothing is returned.
@@ -158,6 +173,7 @@ buffer drops that candidate entirely.
 - A17: Given a script and a data source sharing a name, when a dispatch or include target names it, then only the script is returned; when a data-source target names it, then only the data source is returned.
 - A18: Given file A with `:INCLUDE B;` where B declares `:PUBLIC gShared;` and B itself includes C declaring `:PUBLIC gDeep;`, when A's include declaration closure is computed, then it contains both `gShared` and `gDeep`; a cyclic include chain (C including A) terminates without error.
 - A19: Given an include target resolving to two candidate files with different declarations, when the closure is computed, then it contains the union of both candidates' declared names; an unresolvable include target contributes nothing.
+- A20: Given a dotted dispatch target whose every candidate is a `:CLASS` file, when class-only classification runs, then it is true; when any candidate is an ordinary script, or there is no candidate, then it is false.
 
 ## Rationale
 

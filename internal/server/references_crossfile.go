@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -145,7 +146,15 @@ func (s *SSLServer) definitionFileSymbols(defURI string) (string, []parser.Proce
 // procedure (v0.14.0 review F3: a shadowed cursor must keep the scope-aware
 // single-file path, or a local-variable rename silently mutates other
 // files). The declaration line itself is always the procedure.
-func procedureSubjectAt(cache *DocumentCache, word string, line int) (string, bool) {
+//
+// The identifier's role decides first (issue #255): a member access
+// (`oRec:CalcTotal`) or a variable spelled like a procedure is a different
+// symbol, so it never takes the procedure's cross-file path. Only a
+// procedure header, a call callee, or an unclassified position qualifies.
+func procedureSubjectAt(cache *DocumentCache, content, word string, line, column int) (string, bool) {
+	if !providers.CursorMayNameProcedure(content, line, column) {
+		return "", false
+	}
 	var subject string
 	declLine := 0
 	for _, proc := range cache.Procedures {
@@ -173,6 +182,9 @@ func procedureSubjectAt(cache *DocumentCache, word string, line int) (string, bo
 	return subject, true
 }
 
+// procedureKeywordPattern matches the :PROCEDURE keyword in any casing.
+var procedureKeywordPattern = regexp.MustCompile(`(?i):procedure\b`)
+
 // procedureNamePosition locates the (1-based) line and column of the
 // procedure's name on its :PROCEDURE line; (0, 0) when not found. The name
 // is matched as a whole word AFTER the :PROCEDURE keyword — a plain
@@ -189,13 +201,17 @@ func procedureNamePosition(content string, procs []parser.ProcedureInfo, procNam
 			return 0, 0
 		}
 		lineText := lines[proc.StartLine-1]
+		// Search the ORIGINAL line case-insensitively: offsets found in a
+		// lower-cased copy can differ in byte length on non-ASCII text
+		// (`İ`, `ẞ`) and slice out of range (issue #255). The returned
+		// column is in characters, like every other server position.
 		searchFrom := 0
-		if kw := strings.Index(strings.ToLower(lineText), ":procedure"); kw >= 0 {
-			searchFrom = kw + len(":procedure")
+		if kw := procedureKeywordPattern.FindStringIndex(lineText); kw != nil {
+			searchFrom = kw[1]
 		}
 		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(proc.Name) + `\b`)
 		if m := re.FindStringIndex(lineText[searchFrom:]); m != nil {
-			return proc.StartLine, searchFrom + m[0] + 1
+			return proc.StartLine, utf8.RuneCountInString(lineText[:searchFrom+m[0]]) + 1
 		}
 		return proc.StartLine, 1
 	}

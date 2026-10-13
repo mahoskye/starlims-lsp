@@ -1,6 +1,8 @@
 package providers
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"starlims-lsp/internal/lexer"
@@ -155,5 +157,75 @@ func TestIdentifierRolesClassification(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("sName occurrence %d: expected %v, got %v", i, want[i], got[i])
 		}
+	}
+}
+
+// [spec feature.rename/A20] — a member name is never renameable: its
+// receiver's type is unresolved, and a rename would edit every
+// like-spelled member in the file, built-in .NET properties included.
+func TestRenameRejectsMemberNames(t *testing.T) {
+	text := `:PROCEDURE Main;
+:DECLARE oA, oB;
+oA := Email{};
+oB := CreateUdObject();
+oA:Subject := "x";
+oB:Subject := "y";
+:ENDPROC;`
+	procs, vars := symbolInfo(t, text)
+
+	// Cursor on `Subject` in `oA:Subject` (line 5, column 5).
+	if res := PrepareRename(text, 5, 5, "file:///t.ssl", procs, vars); res != nil {
+		t.Errorf("prepare-rename must reject a member name, got %+v", res)
+	}
+	if res := Rename(text, 5, 5, "Topic", "file:///t.ssl", procs, vars); res != nil {
+		t.Errorf("rename must produce no edits for a member name, got %+v", res)
+	}
+	// The receiver variable itself stays renameable.
+	if res := PrepareRename(text, 5, 1, "file:///t.ssl", procs, vars); res == nil {
+		t.Error("the receiver variable must stay renameable")
+	}
+}
+
+// [spec feature.references/A18] — a file-wide variable's references skip a
+// procedure that declares its own local or parameter of the same name, and
+// report character (rune) columns after non-ASCII text (issue #258).
+func TestReferencesFileWideSkipsShadowingProcedure(t *testing.T) {
+	text := `:DECLARE sX;
+sX := "é" + sX;
+:PROCEDURE Shadows;
+:PARAMETERS sX;
+:RETURN sX;
+:ENDPROC;`
+	procs, vars := symbolInfo(t, text)
+
+	locs := FindReferencesWithScope(text, 1, 10, "file:///t.ssl", true, procs, vars)
+	var got []string
+	for _, l := range locs {
+		got = append(got, fmt.Sprintf("%d:%d", l.Range.Start.Line, l.Range.Start.Character))
+	}
+	want := []string{"0:9", "1:0", "1:12"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("expected references %v, got %v", want, got)
+	}
+}
+
+// [spec feature.definition/A19] — a word inside a non-dispatch string or a
+// comment is prose: definition returns null even when a declaration of that
+// name exists (issue #258).
+func TestDefinitionFromStringOrCommentReturnsNothing(t *testing.T) {
+	text := `:PROCEDURE Main;
+:DECLARE sName;
+sName := "sName is bad";
+/* sName;
+:ENDPROC;`
+	procs, vars := symbolInfo(t, text)
+	if loc := FindDefinition(text, 3, 12, "file:///t.ssl", procs, vars); loc != nil {
+		t.Errorf("definition from inside a string must be null, got %+v", loc)
+	}
+	if loc := FindDefinition(text, 4, 5, "file:///t.ssl", procs, vars); loc != nil {
+		t.Errorf("definition from inside a comment must be null, got %+v", loc)
+	}
+	if loc := FindDefinition(text, 3, 2, "file:///t.ssl", procs, vars); loc == nil {
+		t.Error("the code occurrence must still resolve")
 	}
 }

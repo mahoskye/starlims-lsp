@@ -34,6 +34,14 @@ history:
       `aParameters:`), now that the signature database is generated from
       the reference. A function with alternative call forms is hinted
       only when the argument count selects one form (A9).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Member calls get no built-in hints (A10): `sName:Replace(...)` is a
+      .NET passthrough and `Me:Left(...)` a class method, yet both were
+      labelled with the like-named SSL built-in's parameters (D10). Stale
+      "inner-array hints not implemented" text removed; minParameterCount
+      wording now matches what it gates.
 issues: ["#46"]
 ---
 
@@ -46,6 +54,9 @@ Serves `textDocument/inlayHint` with parameter-name hints:
   applied by the server handler).
 - Built-in function calls get hints from the canonical signature database.
   Functions not in that database get no hints — the server MUST NOT guess.
+  The member name of a `:` access (`sName:Replace(...)`, `Me:Left(...)`)
+  is never a built-in call: it belongs to the receiver, so it gets no
+  hints even when it shares a built-in's name (D10).
 - `DoProc(...)` and `ExecFunction(...)` calls (case-insensitive) get
   hints on their own two arguments from their reference signatures:
   `sProcedureName:` / `aArguments:` and `sName:` / `aParameters:`.
@@ -56,14 +67,16 @@ Serves `textDocument/inlayHint` with parameter-name hints:
   `:PROCEDURE` in the current document and the second is an array literal
   `{...}`, the procedure's own parameter names are additionally hinted
   inside the array; when the name is a variable, only the outer hints are
-  shown. (Inner-array hints are not implemented yet — see Known gaps / A4.)
+  shown.
 - Hints are emitted only for arguments that are actually present, and for
   every call in nested expressions independently.
 - No hints may be produced for function-like text inside string literals
   (including SQL strings) or comments.
 - `ssl.inlayHints.enabled: false` disables the feature entirely;
-  `ssl.inlayHints.minParameterCount` (default 2) suppresses hints for
-  functions whose signature has fewer parameters than the threshold.
+  `ssl.inlayHints.minParameterCount` (default 2) suppresses built-in hints
+  for signatures with fewer parameters than the threshold, and inner
+  DoProc/ExecFunction array hints for target procedures with fewer
+  parameters. The `sProcName:`/`aParams:` outer hints are always shown.
 - Only calls within the client-requested line range are processed.
 
 ## Acceptance
@@ -77,6 +90,7 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
 - A9: Given `o := CreateUdObject("Cat.Cls", {1});`, when hints are requested, then `sClassName:` and `aArgs:` are hinted; given the one-argument `CreateUdObject(vDefs)` (property-definition or class-name form), then no hint is produced.
+- A10: Given `sOut := sName:Replace("a", "b");` or `x := Me:Left("abc", 2);`, when hints are requested, then no hints are produced for the member call, while a plain `Left("abc", 2)` call keeps its hints.
 
 ## Rationale
 

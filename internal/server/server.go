@@ -391,6 +391,10 @@ func (s *SSLServer) handleDidChangeWatchedFiles(context *glsp.Context, params *p
 		uri := event.URI
 		switch event.Type {
 		case protocol.FileChangeTypeCreated, protocol.FileChangeTypeChanged:
+			// Copies under dot-directories are never indexed (issue #255).
+			if s.workspaceIndex.InHiddenDir(uri) {
+				continue
+			}
 			// Skip if file is currently open (open document is more up-to-date)
 			if _, open := s.documents.GetDocument(uri); !open {
 				s.workspaceIndex.IndexFile(uri)

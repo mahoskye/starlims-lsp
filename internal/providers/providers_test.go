@@ -801,53 +801,64 @@ DoProc("TargetProc");
 
 // ==================== Document Symbols Tests ====================
 
-// [spec feature.document_symbols/A1]
+// [spec feature.document_symbols/A1] — a Function symbol per procedure,
+// with exactly its parameters as Variable children ranged over their own
+// names, including when a bare :PARAMETERS puts the names on following
+// lines (issue #255).
 func TestGetDocumentSymbols_Procedures(t *testing.T) {
 	text := `:PROCEDURE Test1;
 :ENDPROC;
 
 :PROCEDURE Test2;
-:PARAMETERS param1;
+:PARAMETERS sA, nB;
+:ENDPROC;
+
+:PROCEDURE Test3;
+:PARAMETERS
+    sC,
+    nD;
 :ENDPROC;`
 
 	symbols := GetDocumentSymbols(text)
 
-	if len(symbols) < 2 {
-		t.Fatalf("expected at least 2 symbols, got %d", len(symbols))
+	type child struct {
+		name      string
+		line, col int
 	}
-
-	// Check that we found both procedures
-	foundTest1 := false
-	foundTest2 := false
+	want := map[string][]child{
+		"Test1": nil,
+		"Test2": {{"sA", 4, 12}, {"nB", 4, 16}},
+		"Test3": {{"sC", 9, 4}, {"nD", 10, 4}},
+	}
+	found := map[string]bool{}
 	for _, sym := range symbols {
-		if sym.Name == "Test1" {
-			foundTest1 = true
-			if sym.Kind != SymbolKindFunction {
-				t.Errorf("expected Test1 to be a function symbol")
-			}
+		expected, ok := want[sym.Name]
+		if !ok {
+			continue
 		}
-		if sym.Name == "Test2" {
-			foundTest2 = true
-			if sym.Kind != SymbolKindFunction {
-				t.Errorf("expected Test2 to be a function symbol")
+		found[sym.Name] = true
+		if sym.Kind != SymbolKindFunction {
+			t.Errorf("%s: expected kind Function, got %v", sym.Name, sym.Kind)
+		}
+		if len(sym.Children) != len(expected) {
+			t.Errorf("%s: expected %d parameter children, got %+v", sym.Name, len(expected), sym.Children)
+			continue
+		}
+		for k, c := range sym.Children {
+			e := expected[k]
+			if c.Name != e.name || c.Kind != SymbolKindVariable {
+				t.Errorf("%s child %d: expected Variable %q, got %q kind %v", sym.Name, k, e.name, c.Name, c.Kind)
 			}
-			// Note: Parameter extraction from :PARAMETERS depends on parser implementation
-			// If children are found, verify they're valid
-			if len(sym.Children) > 0 {
-				for _, child := range sym.Children {
-					if child.Kind != SymbolKindVariable {
-						t.Errorf("expected parameter child to be variable symbol")
-					}
-				}
+			sel := c.SelectionRange
+			if sel.Start.Line != e.line || sel.Start.Character != e.col || sel.End.Character != e.col+len(e.name) {
+				t.Errorf("%s child %q: expected selection %d:%d-%d, got %+v", sym.Name, e.name, e.line, e.col, e.col+len(e.name), sel)
 			}
 		}
 	}
-
-	if !foundTest1 {
-		t.Error("expected to find Test1 symbol")
-	}
-	if !foundTest2 {
-		t.Error("expected to find Test2 symbol")
+	for name := range want {
+		if !found[name] {
+			t.Errorf("expected a symbol for %s", name)
+		}
 	}
 }
 
@@ -936,6 +947,54 @@ func TestGetDocumentSymbols_FileOrder(t *testing.T) {
 	}
 	if len(procNames) != 2 || procNames[0] != "Zebra" || procNames[1] != "Alpha" {
 		t.Errorf("expected file order [Zebra Alpha], got %v", procNames)
+	}
+}
+
+// [spec feature.document_symbols/A8] — nested regions nest: Inner is a child
+// of Outer, a procedure inside Inner appears exactly once (under Inner),
+// and each region's selectionRange covers exactly its name (issue #255).
+func TestGetDocumentSymbols_NestedRegions(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:PROCEDURE Deep;
+:ENDPROC;
+/* endregion;
+:PROCEDURE Shallow;
+:ENDPROC;
+/* endregion;`
+
+	symbols := GetDocumentSymbols(text)
+	if len(symbols) != 1 || symbols[0].Name != "Outer" {
+		t.Fatalf("expected Outer as the only top-level symbol, got %+v", symbols)
+	}
+	outer := symbols[0]
+	if sel := outer.SelectionRange; sel.Start.Line != 0 || sel.Start.Character != 10 || sel.End.Character != 15 {
+		t.Errorf("Outer selectionRange must cover exactly the name (0:10-15), got %+v", sel)
+	}
+
+	var inner *DocumentSymbol
+	shallowCount := 0
+	for i := range outer.Children {
+		switch outer.Children[i].Name {
+		case "Inner":
+			inner = &outer.Children[i]
+		case "Shallow":
+			shallowCount++
+		case "Deep":
+			t.Error("Deep belongs to Inner, not directly to Outer")
+		}
+	}
+	if inner == nil || inner.Kind != SymbolKindNamespace {
+		t.Fatalf("expected Inner as a Namespace child of Outer, got %+v", outer.Children)
+	}
+	if shallowCount != 1 {
+		t.Errorf("expected Shallow exactly once under Outer, got %d", shallowCount)
+	}
+	if len(inner.Children) != 1 || inner.Children[0].Name != "Deep" {
+		t.Errorf("expected Deep as Inner's only child, got %+v", inner.Children)
+	}
+	if sel := inner.SelectionRange; sel.Start.Line != 1 || sel.Start.Character != 10 || sel.End.Character != 15 {
+		t.Errorf("Inner selectionRange must cover exactly the name (1:10-15), got %+v", sel)
 	}
 }
 
@@ -3516,6 +3575,37 @@ func TestGetFoldingRanges_OrphanEndregion_ClosesNothing(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected region A range 1-3 despite orphan endregion, got: %+v", ranges)
+	}
+}
+
+// [spec feature.folding/A9] — :REGION/:ENDREGION and
+// :BEGININLINECODE/:ENDINLINECODE keyword blocks fold with kind region
+// (issue #255).
+func TestGetFoldingRanges_RegionAndInlineCodeKeywords(t *testing.T) {
+	text := `:REGION Template;
+Dear $Name$,
+thank you.
+:ENDREGION;
+:BEGININLINECODE Snippet;
+nCount := 1;
+nCount += 1;
+:ENDINLINECODE;`
+
+	ranges := GetFoldingRanges(text)
+	foundRegion, foundInline := false, false
+	for _, r := range ranges {
+		if r.Kind != "region" {
+			continue
+		}
+		if r.StartLine == 0 && r.EndLine == 3 {
+			foundRegion = true
+		}
+		if r.StartLine == 4 && r.EndLine == 7 {
+			foundInline = true
+		}
+	}
+	if !foundRegion || !foundInline {
+		t.Errorf("expected region folds 0-3 (:REGION) and 4-7 (:BEGININLINECODE), got: %+v", ranges)
 	}
 }
 

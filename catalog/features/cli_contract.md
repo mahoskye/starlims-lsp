@@ -39,6 +39,12 @@ history:
       the tool `version`; and the --strict false-positive budget was
       measured and set (see False-positive budget). The versioning policy
       is DECISIONS.md D16.
+  - date: 2026-10-13
+    ref: "issue #255 (features audit, PR #299)"
+    note: >-
+      --format gained --ds, and its SQL-mode passthrough applies only to
+      data sources (.ds/.ds.txt or --ds), as --validate's does; content
+      alone no longer decides it.
 issues: []
 ---
 
@@ -185,8 +191,11 @@ nothing to stdout and names each file that would change on stderr.
 `--stdin` cannot be combined with file arguments or `--write`, and
 `--write` cannot be combined with `--check`. Its flags are `--stdin`,
 `--write`/`-w`, `--check`, `--indent-style <tab|space>`,
-`--indent-size <n>`, `--max-line-length <n>`, `--no-sql`, `--help`/`-h`,
-and `--`. A consumer that needs the tool version calls `--version`.
+`--indent-size <n>`, `--max-line-length <n>`, `--no-sql`, `--ds`,
+`--help`/`-h`, and `--`. A data source (a `.ds`/`.ds.txt` path, or any
+input under `--ds`) whose content is SQL-mode passes through unchanged;
+every other input is formatted as SSL (feature.formatting). A consumer
+that needs the tool version calls `--version`.
 
 ### Versioning policy
 
