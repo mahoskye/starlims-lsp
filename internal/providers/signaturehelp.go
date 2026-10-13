@@ -6,6 +6,7 @@ import (
 
 	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 )
 
 // SignatureHelp represents signature help information.
@@ -95,12 +96,17 @@ func buildConstructorSignatureHelp(className string, activeParam int) *Signature
 	}
 }
 
-// GetSignatureHelpFromTokens returns signature help for built-in SSL
-// functions and built-in class constructors. User-defined procedures are
-// intentionally excluded because SSL runtime dispatch uses
-// DoProc/ExecFunction rather than direct custom procedure calls
-// (feature.signature_help A4), so the function takes no procedure list.
 func GetSignatureHelpFromTokens(tokens []lexer.Token, line, column int) *SignatureHelp {
+	return GetSignatureHelpWithProcedures(tokens, nil, line, column)
+}
+
+// GetSignatureHelpWithProcedures returns signature help for built-in SSL functions.
+// The procedures parameter is accepted for API compatibility, but user-defined
+// procedures are intentionally excluded because SSL runtime dispatch uses
+// DoProc/ExecFunction rather than direct custom procedure calls.
+func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.ProcedureInfo, line, column int) *SignatureHelp {
+	_ = procedures
+
 	// Find the call context from tokens: a function call `Foo(...)` or a
 	// built-in class instantiation `Email{...}` (issue #40).
 	funcName, activeParam, isConstructor := findFunctionContextFromTokens(tokens, line, column)

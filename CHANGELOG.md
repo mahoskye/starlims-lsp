@@ -14,12 +14,12 @@ consumers, and given a decision. The full record is in
 code, or output format changes for either distribution.
 
 ### Fixed
-- **Hover and completion no longer call `:REGION` and `:BEGININLINECODE`
-  "legacy".** Both are current, supported SSL (bodies stored for
-  `GetRegion()` / `GetInlineCode()`). #28 settled that when it removed
-  `region_legacy`, but four keyword descriptions still said otherwise.
-  So did several docs, including one that still claimed the LSP emits an
-  info diagnostic for `:REGION`.
+- **Docs no longer call `:REGION` and `:BEGININLINECODE` "legacy".** Both
+  are current, supported SSL (bodies stored for `GetRegion()` /
+  `GetInlineCode()`). #28 settled that when it removed `region_legacy`,
+  but several docs still said otherwise, including one that claimed the
+  LSP emits an info diagnostic for `:REGION`. The keyword hover text is
+  replaced by the reference's own in #287.
 - **CONFIGURATION.md matches the server.** `builtinFunctionCase` defaults
   to `"PascalCase"`, not `"preserve"`. `endpointPatterns` are
   case-insensitive substrings, not globs (the old example could never
@@ -34,16 +34,11 @@ code, or output format changes for either distribution.
 
 ### Removed
 - **Dead internals, no behavior change.** Removed: the unread `root`
-  argument of `Parser.ExtractVariables`; the unread `procedures` argument
-  of `GetSignatureHelpWithProcedures`, which is folded into
-  `GetSignatureHelpFromTokens`; and `style != "compact"` guards that
-  could no longer be false after `compact` became an alias.
-- **43 unreachable curated function signatures** (TraceOn, In64BitMode,
-  UndeclaredVars, …) for names absent from the published inventory. The
-  overlay is read only for published names, so they never reached hover,
-  signature help, or `--export-signatures`, whose output is
-  byte-identical. The map is renamed `curatedFunctionSignatures`, and a
-  test now rejects unreachable entries.
+  argument of `Parser.ExtractVariables`, and `style != "compact"` guards
+  that could no longer be false after `compact` became an alias. (The
+  unread `procedures` argument of `GetSignatureHelpWithProcedures` and the
+  unreachable curated signatures are left to #287, which replaces the
+  curated signature data with the reference's.)
 
 ### Deprecated
 - **`ssl.format.sql.style: "compact"`** was already a deprecated alias

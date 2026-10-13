@@ -89,18 +89,6 @@ func TestFunctionSignatureMappings(t *testing.T) {
 	}
 }
 
-// TestCuratedSignaturesAreReachable: the curated signature map is an
-// overlay read only for names in the published inventory, so a curated
-// entry for an unpublished name is dead data that never reaches hover,
-// signature help, or --export-signatures (issue #257 pruned 43 of them).
-func TestCuratedSignaturesAreReachable(t *testing.T) {
-	for lower := range curatedFunctionSignatures {
-		if !IsSSLFunction(lower) {
-			t.Errorf("curated signature %q is not in the published function inventory and can never be served", lower)
-		}
-	}
-}
-
 func TestCanonicalInventories(t *testing.T) {
 	// Counts match the published ssl-element-reference.json:
 	// 330 functions and 29 classes.

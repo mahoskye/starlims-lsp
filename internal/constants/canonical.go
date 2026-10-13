@@ -108,8 +108,8 @@ func buildCanonicalFunctionSignatures() map[string]FunctionSignature {
 			sig := supplementalFunctionSignatures[lower]
 			sig.Name = name
 			signatures[lower] = sig
-		case curatedFunctionSignatures[lower].Name != "":
-			sig := curatedFunctionSignatures[lower]
+		case legacySSLFunctionSignatures[lower].Name != "":
+			sig := legacySSLFunctionSignatures[lower]
 			sig.Name = name
 			signatures[lower] = sig
 		default:
