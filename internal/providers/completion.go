@@ -316,7 +316,7 @@ func GetPredefinedGlobalCompletions() []CompletionItem {
 			Label:            g,
 			Kind:             CompletionKindVariable,
 			Detail:           "Predefined Global",
-			Documentation:    "Runtime-provided read-only global variable.",
+			Documentation:    "Declared by a base STARLIMS installation; an installation may declare more or fewer. A local with the same name hides it.",
 			InsertText:       g,
 			InsertTextFormat: InsertTextFormatPlainText,
 		})

@@ -13,6 +13,7 @@ config:
 spec_options:
   check_unused_vars: true
 tests:
+  - internal/providers/predefined_globals_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-02-02
@@ -38,6 +39,11 @@ history:
       previously produced no names at all, so every name it declared was
       invisible to this behavior. No change on the production corpus's
       default-on output; the names it recovers were simply missing before.
+  - date: 2026-10-13
+    ref: "issue #270"
+    note: >-
+      A ?name? marker in a string literal counts as a use: a parameter
+      read only through SQLExecute substitution was reported unused.
 issues: ["#48"]
 ---
 
@@ -60,7 +66,12 @@ finding:
   other object (`oOrder:nValue` counts as a use of a declared `nValue`) —
   a documented simplification in `countVariableUsages`, trading false
   negatives for zero false positives;
-- any read, argument use, or placeholder-free mention inside the scope.
+- any read, argument use, or placeholder-free mention inside the scope;
+- a named `?name?` marker inside a string literal in the scope
+  (issue #270): `SQLExecute` substitutes the variable at run time. The
+  marker is read the same way `invalid_sql_param` reads it, so a
+  property or array marker (`?oUser:ID?`, `?aIds[1]?`) uses its base
+  variable.
 
 ## Examples
 
@@ -110,6 +121,17 @@ finding:
 	:DECLARE nValue;
 	:DECLARE nTotal, oOrder;
 	nTotal := oOrder:nValue;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS sId;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT * FROM Orders WHERE Id = ?sId?");
+	:RETURN aRows;
 :ENDPROC;
 ```
 

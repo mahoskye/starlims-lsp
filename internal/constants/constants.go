@@ -95,12 +95,8 @@ var SSLMultiCharOperators = []string{
 	"&&", "||",
 }
 
-// SSLPredefinedGlobals contains runtime-provided read-only global variables.
-// These are always recognized as pre-declared identifiers and must never be assigned to.
-// Source: ssl_agent_instructions.md — "Predefined Global Variables" section.
-var SSLPredefinedGlobals = []string{
-	"MYUSERNAME", // The currently logged-in user's login name. Read-only.
-}
+// SSLPredefinedGlobals is loaded from the vendored reference guide; see
+// predefined_globals.go.
 
 // SSLStatusKeywords are predefined global constants provided by the STARLIMS runtime.
 // Each keyword is a read-only identifier whose value equals its own name as a string

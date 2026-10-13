@@ -48,3 +48,21 @@ The LSP must build offline. Vendoring the JSON makes the build
 hermetic — `go generate` reads only from this file, never from the
 sibling repo. Refresh is a deliberate human step that lines up with
 ssl-style-guide releases.
+
+## Predefined globals
+
+`predefined-globals.md` is a verbatim copy of the reference guide
+`content/guides/predefined-globals.md` from
+[`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference)
+(CC BY 4.0). `predefined_globals.go` parses its tables at init: the names
+a base installation declares, and the names it does not declare together
+with their replacements (issue #270). Refresh with a plain copy:
+
+```bash
+cp ../ssl-docs/content/guides/predefined-globals.md internal/constants/data/
+go test ./internal/constants/ ./internal/providers/
+```
+
+`TestPredefinedGlobalsMatchesReference` compares the copy with a sibling
+`ssl-docs` checkout when one is present (override with
+`SSL_REFERENCE_DIR`).

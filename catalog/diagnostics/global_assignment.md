@@ -13,6 +13,7 @@ config:
 spec_options:
   global_variables: ["gAppContext"]
 tests:
+  - internal/providers/predefined_globals_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-01-14
@@ -38,6 +39,16 @@ history:
       vs IS) flagged, and a system-init script assigning the :PUBLIC
       global it just created flagged — the read-only premise holds for
       consumers, not the declarer.
+  - date: 2026-10-13
+    ref: "issue #270"
+    note: >-
+      The predefined-globals list grew to the reference's
+      base-installation set for undeclared_variable, but the always-checked
+      set here stays MYUSERNAME. Nothing makes a predefined global
+      read-only, and the application's own login and session-start
+      scripts assign the user and site globals; widening this error to
+      the whole list added 57 errors on the corpus, mostly in that
+      shipped code.
 issues: []
 ---
 
@@ -48,7 +59,10 @@ immediately followed (across whitespace only) by the `:=` assignment
 operator. Globals are pre-declared by the runtime and must not be written.
 The checked set is the case-insensitive union of:
 
-- built-in predefined globals (`MYUSERNAME`);
+- the built-in predefined global `MYUSERNAME` (only that one: the other
+  base-installation globals, such as `STARLIMSDEPT` or `CRLF`, are
+  written by the application's own session-start code, so they are not
+  checked unless listed in `ssl.diagnostics.globals`);
 - STARLIMS status keywords (`Pending`, `Approved`, `Rejected`, ... — each a
   read-only constant whose value is its own name);
 - names configured in `ssl.diagnostics.globals` (surfaced to the spec runner
@@ -109,6 +123,15 @@ aSeg := {1,2};
 ```ssl
 :PUBLIC MYUSERNAME;
 MYUSERNAME := "system";
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE SetSite;
+	:PARAMETERS sDept;
+	STARLIMSDEPT := sDept;
+:ENDPROC;
 ```
 
 ## Rationale

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`undeclared_variable` skips label and block names.** The name after
+  `:LABEL`, `:REGION` and `:BEGININLINECODE` is not a variable reference,
+  but `--strict` reported it as undeclared (#272).
+- **The predefined globals a base installation declares are recognized.**
+  `undeclared_variable` knew only `MYUSERNAME`, so reading `CRLF`,
+  `UserLang`, `sCC`, `Session` or `PublicConsts` warned under `--strict`.
+  The list is now read from a vendored copy of the reference's
+  predefined-globals guide. A name the guide says a base installation
+  does *not* declare (`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`,
+  `MYUSERID`, ...) still warns, and the message names the replacement,
+  such as `Chr(13)`. `Request` and `Response` stay scoped to endpoint
+  scripts, and `global_assignment` still checks only `MYUSERNAME` among
+  them, because the application's own session code assigns the others
+  (#270).
+- **`unused_variable` counts `?name?` markers.** A parameter read only
+  through `SQLExecute` substitution was reported as never used (#270).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an
