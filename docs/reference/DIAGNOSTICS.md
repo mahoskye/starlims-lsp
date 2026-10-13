@@ -37,6 +37,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
 | `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
 | `datasource_default_required` | Data source parameter missing its inline default (removed — premise was wrong) | error | authoritative | removed | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
+| `datasource_sql_question_placeholder` | ?name? marker in a SQL data source | error | authoritative | active | [diag.datasource_sql_question_placeholder](../../catalog/diagnostics/datasource_sql_question_placeholder.md) |
 | `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | error | authoritative | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
 | `datasource_undeclared_placeholder` | Undeclared @name placeholder in a SQL data-source body | warning | authoritative | active | [diag.datasource_undeclared_placeholder](../../catalog/diagnostics/datasource_undeclared_placeholder.md) |
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
@@ -48,6 +49,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `doproc_in_class` | DoProc call inside a class method | error | authoritative | active | [diag.doproc_in_class](../../catalog/diagnostics/doproc_in_class.md) |
 | `dot_property_access` | Dot notation used for property access | error | tool | active | [diag.dot_property_access](../../catalog/diagnostics/dot_property_access.md) |
 | `empty_optional_param_array` | Trailing empty array passed for an optional parameter | info | tool | active | [diag.empty_optional_param_array](../../catalog/diagnostics/empty_optional_param_array.md) |
+| `empty_parameters` | :PARAMETERS with no names | error | authoritative | active | [diag.empty_parameters](../../catalog/diagnostics/empty_parameters.md) |
 | `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | tool | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
 | `equals_vs_strict_equals` | String comparison with = is prefix matching | info | advisory | active | [diag.equals_vs_strict_equals](../../catalog/diagnostics/equals_vs_strict_equals.md) |
 | `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
@@ -73,6 +75,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
+| `invariant_date_columns_quoted` | Quoted :INVARIANTDATECOLUMNS column name | warning | authoritative | active | [diag.invariant_date_columns_quoted](../../catalog/diagnostics/invariant_date_columns_quoted.md) |
 | `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
 | `label_keyword_form` | Label keyword written in the wrong case | error | tool | active | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
 | `limit_public_vars` | PUBLIC variables discouraged | info | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
@@ -94,6 +97,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `nil_not_empty_string` | NIL compared against a default-value literal | info | advisory | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
 | `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
 | `not_preferred_operator` | Discouraged inequality operator form | info | advisory | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
+| `nullasblank_value` | :NULLASBLANK value other than true or false | warning | authoritative | active | [diag.nullasblank_value](../../catalog/diagnostics/nullasblank_value.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
