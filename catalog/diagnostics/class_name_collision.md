@@ -3,7 +3,7 @@ id: diag.class_name_collision
 title: User-defined :CLASS shadows a built-in SSL class
 kind: diagnostic
 status: active
-authority: tool
+authority: advisory
 schema_ref: null
 default_severity: warning
 severity_overridable: true
@@ -19,6 +19,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to advisory: the style-guide record
+      class_name_not_builtin (level advisory) names this rule in
+      enforced_by, so the guide is not silent. The rationale's 'style
+      guide is silent' clause is removed.
 issues: []
 ---
 
@@ -70,5 +77,6 @@ It must NOT flag:
 A user-defined class that reuses a built-in name shadows the built-in only in
 the file's local scope, so `Name{}` instantiation may still resolve to the
 built-in elsewhere — a confusing trap for readers reaching for the built-in.
-The style guide is silent (`authority: tool`); warning rather than error
-because the declaration is legal SSL, but new code should pick another name.
+The style-guide record class_name_not_builtin (advisory, warning) asks for
+another name; warning rather than error because the declaration is legal
+SSL, but new code should pick another name.

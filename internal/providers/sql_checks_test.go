@@ -9,16 +9,6 @@ import (
 // in multi-line strings, the case-mapping slice panic, the expression-tree
 // sql_injection rule, and the lexer-based SQL advisories.
 
-func diagsWithCode(diags []Diagnostic, code string) []Diagnostic {
-	var out []Diagnostic
-	for _, d := range diags {
-		if d.Code == code {
-			out = append(out, d)
-		}
-	}
-	return out
-}
-
 // [spec diag.udobject_array_in_clause] A placeholder on a later line of a
 // multi-line SQL string is ranged on that line, not on the string's first
 // line past its end. The same helper serves complex_sql_placeholder and

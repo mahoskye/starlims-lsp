@@ -3,7 +3,7 @@ id: diag.finally_empty
 title: Empty :FINALLY block
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -32,6 +32,13 @@ history:
       An empty first :FINALLY followed by a duplicate :FINALLY now flags:
       the duplicate's statements were counted as the first clause's body,
       hiding this finding behind diag.single_finally.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      try_and_finally_bodies_not_empty (level authoritative) names this
+      rule in enforced_by, so the guide is not silent. Rationale cites
+      the compile-time rejection (reference keywords/TRY, FINALLY).
 issues: []
 ---
 
@@ -119,8 +126,11 @@ It must NOT flag when:
 
 ## Rationale
 
-An empty `:FINALLY` is always a leftover — either cleanup code was removed
-without removing the clause, or the author stubbed it and forgot. Introduced
+The reference (keywords/TRY, FINALLY) requires a `:FINALLY` body to hold
+at least one statement, and the language rejects an empty one
+(style-guide record try_and_finally_bodies_not_empty). In practice it is
+always a leftover — either cleanup code was removed without removing the
+clause, or the author stubbed it and forgot. Introduced
 with the TRY-structure family (commit cdbfee6) at error severity to match
 the sibling structural rules (`try_structure`, `single_finally`), which
 treat a malformed handler skeleton as a real defect rather than style.

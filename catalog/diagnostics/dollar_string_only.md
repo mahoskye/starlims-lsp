@@ -3,13 +3,14 @@ id: diag.dollar_string_only
 title: "$ containment operator with non-string operands"
 kind: diagnostic
 status: active
-authority: style_only
+authority: authoritative
 schema_ref: lints.type_safety.dollar_string_only
 default_severity: warning
 severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/expr_operator_checks_test.go
 history:
   - date: 2026-03-21
     ref: "commit cdbfee6"
@@ -23,25 +24,42 @@ history:
       False-positive guard: operands that are indexed access (arr[i]) or
       member access (obj:prop) are never classified — element and member
       types are unknowable from names alone.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Ported to the expression AST. The legacy heuristic typed loop-
+      counter names and UPPER_SNAKE constants as numbers (`"A" $
+      ALLOWED_CODES` flagged), and tracked assignments read the last
+      token of an expression. Operands are now whole subtrees, so
+      precedence is real: `.NOT. "a" $ s` is `(.NOT. "a") $ s` and
+      flags. authority corrected to authoritative: the style-guide
+      record dollar_string_only (level authoritative) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 
 ## Behavior
 
-Fires a warning on the `$` containment operator when either operand's
-conservatively inferred type is known and is not `string`. Inference draws
-from literals, tracked local `:=` assignments, strict Hungarian name
-prefixes (`s`, `n`, `b`, `a`, `o`, `d`, `fn`), and built-in function
-return types.
+Fires a warning on a binary `$` (containment) when either operand's type
+is known and is not string. Operands are whole subtrees of the
+expression AST, typed by the tree inference in `expr_types.go`:
+literals, operator results, builtin return types, and Hungarian
+prefixes on bare identifiers in their documented shape (`sName`,
+`nCount`). The range covers the `$` token.
+
+Precedence is the grammar's: unary operators bind tighter than `$`, so
+`.NOT. "a" $ sList` is `(.NOT. "a") $ sList` — a boolean on the left —
+and flags. The intended test is `.NOT. ("a" $ sList)`.
 
 It must NOT flag:
 
 - `$` between two string operands;
-- operands whose type is unknown (bare names with no inferable prefix or
-  tracked assignment stay silent);
-- indexed-access (`arr[i]`) or member-access (`obj:prop`) operands, even
-  when the element/member name carries a non-string Hungarian prefix —
-  their runtime types are unknowable (commit d134334).
+- an operand whose type is unknown — a name without a typed prefix,
+  loop-counter names (`i`, `j`, `k`, `x`, `y`, `z`), UPPER_SNAKE
+  constants, user-procedure returns, array elements (`arr[i]`);
+- an operand that reads a `:` member (`obj:nCode`), even when the member
+  name carries a non-string prefix — its runtime type is unknowable
+  (commit d134334).
 
 ## Examples
 
@@ -54,6 +72,19 @@ sText := "abcdef";
 :IF nCount $ sText;
 	nCount := 1;
 :ENDIF;
+```
+
+### Flags
+
+`.NOT.` binds tighter than `$`, so the left operand is a boolean.
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS sList;
+:IF .NOT. "a" $ sList;
+	sList := "a" + sList;
+:ENDIF;
+:ENDPROC;
 ```
 
 ### Does not flag
@@ -77,12 +108,26 @@ sHay := "abc";
 :ENDIF;
 ```
 
+### Does not flag
+
+Loop-counter names and constants make no type claim.
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS ALLOWED_CODES;
+:DECLARE x, bHit;
+x := DoProc("NextCode");
+bHit := "A" $ ALLOWED_CODES .OR. "B" $ x;
+:ENDPROC;
+```
+
 ## Rationale
 
-The schema rule (`lints.type_safety.dollar_string_only`, severity
-`warning`) records that `$` only works on strings and non-string operands
-cause a runtime error; the catalog maps schema warnings to `style_only`
-authority and the emit site uses warning severity to match. The
-member-access Does-not-flag fence pins the d134334 false-positive guard: a
-member named `nCode` must not be presumed numeric just because of its
-prefix.
+The reference (operators/dollar) documents `$` for two strings only; any
+other operand raises a runtime error. Warning rather than error because
+type evidence includes Hungarian prefixes, a naming convention. The
+original token scan typed loop-counter names and UPPER_SNAKE constants
+as numbers and so reported valid containment tests; issue #255 moved the
+rule onto the expression AST, where unknown operands make no claim. The
+member-access Does-not-flag fence pins the d134334 guard: a member named
+`nCode` must not be presumed numeric just because of its prefix.

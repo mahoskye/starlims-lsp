@@ -3,7 +3,7 @@ id: diag.hungarian_notation
 title: Missing Hungarian notation prefix
 kind: diagnostic
 status: active
-authority: advisory
+authority: style_only
 schema_ref: lints.hungarian_notation
 default_severity: warning
 severity_overridable: true
@@ -48,6 +48,21 @@ history:
       sharing a switch with the type cross-check simply forced consumers
       to take a whole-codebase convention audit to get a correctness
       signal.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority set to style_only, the level of the records
+      hungarian_variable_names and documented_hungarian_prefixes.
+      Severity question recorded on issue #300.
+  - date: 2026-10-13
+    ref: "issue #300"
+    note: >-
+      Severity question settled: stays warning, a recorded exception to
+      the "style finding = hint/info" convention. The rule is opt-in, so
+      its gate already decides volume; warning is the deliberate nudge
+      toward the convention for users who enable it (decided 2026-08-29
+      with the hungarian_types gate split). Hint renders as a faint
+      underline that is easy to ignore; info would be double-gated.
 issues: []
 ---
 
@@ -102,6 +117,12 @@ It must NOT flag:
 ```
 
 ## Rationale
+
+Severity is warning by deliberate exception (issue #300): naming is a
+style finding, which would ordinarily be hint or info, but the rule is
+opt-in, so the gate rather than the severity controls volume, and a
+warning is the intended nudge for users who turn it on. Info would hide
+it a second time behind the info gate, and a hint is easy to miss.
 
 The style guide requires Hungarian prefixes (schema:
 `lints.hungarian_notation`, `naming_conventions.variables`), but existing

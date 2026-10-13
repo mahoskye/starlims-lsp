@@ -18,6 +18,12 @@ history:
       (:DECLARE x := 1;) were silently accepted as valid. Authoritative SSL
       permits only a comma-separated identifier list; class-level fields
       "initialized" this way are silently never assigned at runtime.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Rationale no longer says both 'syntax error' and 'silently never
+      assigned'; the generated code passed this tool's validation while
+      the language rejects it.
 issues: []
 ---
 
@@ -103,8 +109,8 @@ It must NOT flag:
 Authoritative language behavior (issue #138): the runtime accepts only an
 identifier list after `:DECLARE`, so an inline initializer is a syntax error
 — hence error severity. The missing diagnostic was actively dangerous:
-generated code containing `:DECLARE CONST_X := ...;` lines passed validation
-cleanly while the class-level "constants" were silently never assigned at
-runtime. The tree-sitter-ssl grammar (`declaration_statement_declare` =
+generated code containing `:DECLARE CONST_X := ...;` lines passed this
+tool's validation cleanly, so the invalid declarations surfaced only when
+the code met STARLIMS. The tree-sitter-ssl grammar (`declaration_statement_declare` =
 identifier list only) already agreed with this rule; the LSP was the
 outlier.

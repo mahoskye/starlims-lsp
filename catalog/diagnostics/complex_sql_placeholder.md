@@ -3,7 +3,7 @@ id: diag.complex_sql_placeholder
 title: Complex expression inside a SQLExecute named placeholder
 kind: diagnostic
 status: active
-authority: tool
+authority: advisory
 schema_ref: null
 default_severity: info
 config:
@@ -30,6 +30,12 @@ history:
     note: >-
       Range fixed for multi-line SQL strings: it stayed on the string's
       first line, past its end. Shared helper with udobject_array_in_clause.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to advisory: the style-guide record
+      complex_sql_placeholder (level advisory) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

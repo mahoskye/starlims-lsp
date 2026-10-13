@@ -3,7 +3,7 @@ id: diag.format_arg_not_array
 title: sFmt:Format called with a scalar instead of the values array
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: warning
 severity_overridable: true
@@ -37,6 +37,12 @@ history:
       second-letter test. Corpus differential over 6,228 production
       files: identical output to the token implementation (0 hits both
       before and after).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      format_arg_not_array (level authoritative) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

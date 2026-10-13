@@ -3,8 +3,8 @@ id: diag.begincase_requires_case
 title: BEGINCASE block with no CASE clause
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: blocks.case.constraint
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -19,6 +19,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      begincase_requires_case (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. Rationale corrected: an
+      empty :BEGINCASE is rejected at compile time. schema_ref set to
+      blocks.case.constraint.
 issues: []
 ---
 
@@ -73,11 +81,10 @@ nOut := 0;
 
 ## Rationale
 
-A `:BEGINCASE` exists to select among `:CASE` branches; with none, the
-construct either does nothing or unconditionally runs its `:OTHERWISE`,
-which is always clearer written as plain statements. The style guide's
-structural rules treat this as malformed, so it reports as an error.
-Emitting on the closing `:ENDCASE` keeps the rule from piling onto blocks
-that are already broken for a different reason (unclosed). Introduced in
-the style-guide alignment pass (commit cdbfee6); the code slug was
-stabilized in PR #3 (v0.4.0).
+The reference (keywords/BEGINCASE) requires at least one `:CASE` block,
+and an empty `:BEGINCASE; :ENDCASE;` is rejected when the script
+compiles (style-guide record begincase_requires_case), so this is an
+error. Emitting on the closing `:ENDCASE` keeps the rule from piling onto
+blocks that are already broken for a different reason (unclosed).
+Introduced in the style-guide alignment pass (commit cdbfee6); the code
+slug was stabilized in PR #3 (v0.4.0).

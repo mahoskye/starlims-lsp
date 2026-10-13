@@ -3,7 +3,7 @@ id: diag.base_requires_inherit
 title: Base member access in a class without :INHERIT
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,6 +19,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      base_member_access (level authoritative) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

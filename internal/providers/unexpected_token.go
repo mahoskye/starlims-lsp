@@ -182,6 +182,15 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		return true
 	}
 
+	// bare_logical_operator, prefix form: in `:IF Not bA;` the parser reads
+	// `Not` as an operand and stops on `bA`, but the cause is the bare
+	// `Not` that rule already reports (issue #255).
+	if prev := previousSignificantTokenIndex(tokens, idx-1); prev >= 0 &&
+		tokens[prev].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[prev].Text, "NOT") &&
+		bareLogicalOperatorPosition(tokens, prev) {
+		return true
+	}
+
 	// unclosed_delimiter: an opener never closed swallows the rest of the
 	// file into this statement, so whatever the parser stopped on is a
 	// symptom of that.

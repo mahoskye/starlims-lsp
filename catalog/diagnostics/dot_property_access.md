@@ -3,7 +3,7 @@ id: diag.dot_property_access
 title: Dot notation used for property access
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -45,6 +45,17 @@ history:
       templates retrieved via GetRegion()) is captured as one raw token at
       the lexer, suppression shared by every check
       (feature.diagnostics_pipeline A23).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      A call or subscript result also counts as a receiver
+      (`GetObj().Name`, `aRows[1].Name` were only unknown_token
+      warnings), and an unquoted ExecFunction/DoProc path is left to
+      execfunction_missing_quotes so one defect reports once. The
+      :INHERIT rationale is corrected: the qualified form is required.
+      authority corrected to authoritative: the style-guide record
+      dot_property_access (level authoritative) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 
@@ -54,7 +65,9 @@ Flags `identifier.identifier` patterns — property access using dot notation,
 familiar from other languages but wrong in SSL, which uses colon notation
 (`object:property`). Concretely: a `.name` fragment (lexed as an unknown
 token starting with `.` followed by identifier characters) whose preceding
-significant token is an identifier. The range covers the `.name` fragment
+significant token can end a receiver: an identifier, or the `)` / `]`
+closing a call or subscript (`GetObj().Name`, `aRows[1].Name`, issue
+#255). The range covers the `.name` fragment
 and the message names the property and the colon replacement.
 
 It must NOT flag:
@@ -63,9 +76,13 @@ It must NOT flag:
 - dots inside `:INCLUDE` module paths, however deep (`:INCLUDE A.B.C.D;`) —
   the whole statement through its terminating `;` is exempt (issue #56);
 - dots inside `:INHERIT` qualified base names
-  (`:INHERIT Category.ScriptName;`) — the schema documents both bare and
-  qualified forms as accepted (classes.signature.inherit), so the whole
-  statement through its terminating `;` is exempt (issue #149);
+  (`:INHERIT Category.ScriptName;`) — the qualified form is the required
+  one (reference keywords/INHERIT), so the whole statement through its
+  terminating `;` is exempt (issue #149);
+- the first `.Name` of an unquoted dispatch path
+  (`ExecFunction(Module.Proc, ...)`, `DoProc(...)`) —
+  `diag.execfunction_missing_quotes` reports that defect with the quoting
+  fix, so it is reported once (issue #255);
 - dotted logical operators and boolean literals (`.AND.`, `.OR.`, `.T.`,
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
@@ -90,6 +107,18 @@ names there never reach this check.
 :ENDPROC;
 ```
 
+### Flags
+
+A call or subscript result is a receiver too.
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE x, aRows;
+	x := aRows[1].Name;
+	x := Today().Year;
+:ENDPROC;
+```
+
 ### Does not flag
 
 ```ssl
@@ -97,6 +126,17 @@ names there never reach this check.
 	:DECLARE x, oEmail;
 	oEmail := Email{};
 	x := oEmail:Subject;
+:ENDPROC;
+```
+
+### Does not flag
+
+The unquoted path is `execfunction_missing_quotes`' finding.
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE n;
+	n := ExecFunction(Utils.Helper, {1});
 :ENDPROC;
 ```
 

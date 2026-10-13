@@ -31,7 +31,6 @@ history:
       raising, so a guard such as `nValue == NIL` is safe. Behavior
       already matches; a fence pins NIL comparisons against numbers and
       dates.
-issues: []
   - date: 2026-10-13
     ref: "issue #255"
     note: >-

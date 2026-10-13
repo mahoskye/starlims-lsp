@@ -3,7 +3,7 @@ id: diag.deprecated_keyword
 title: Legacy keyword discouraged in new code
 kind: diagnostic
 status: active
-authority: style_only
+authority: advisory
 schema_ref: lints.deprecated_keywords
 default_severity: warning
 severity_overridable: true
@@ -27,6 +27,12 @@ history:
       owns this rule (lints.deprecated_keywords, via
       prefer_try_over_error_resume and label_is_legacy, both at warning),
       so authority moves from tool to style_only and schema_ref is set.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority set to advisory: the records label_is_legacy (advisory)
+      and prefer_try_over_error_resume (style_only) enforce this rule. A
+      :LABEL fence pins the label branch.
 issues: []
 ---
 
@@ -62,6 +68,19 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Flags
+
+Both label forms, spaced and compact.
+
+```ssl
+:PROCEDURE Demo;
+	Branch("LABEL DONE");
+	:LABEL DONE;
+	Branch("LABELAGAIN");
+	:LABELAGAIN;
+:ENDPROC;
+```
+
 ### Does not flag
 
 ```ssl
@@ -78,8 +97,8 @@ It must NOT flag:
 ## Rationale
 
 These keywords still execute, so error severity would be wrong — but the
-style guide alignment (cdbfee6) treats them as legacy constructs that new
-code should not add, and the style guide's `lints.deprecated_keywords`
-entries set warning for all three. Warning is the standard severity for
+style guide treats them as legacy constructs that new code should not add
+(records label_is_legacy and prefer_try_over_error_resume, both warning;
+alignment commit cdbfee6). Warning is the standard severity for
 "valid-but-discouraged" in this catalog. Structural problems *inside* a
 legacy handler are a separate concern owned by `error_handler_structure`.

@@ -513,6 +513,92 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   `max_block_depth`, `mixed_error_handling_families`, `negative_logic`,
   and `nested_iif` style_only, and `nil_in_operations` and
   `nil_not_empty_string` authoritative. No severity changed (#255).
+### Breaking
+- **`code_block_structure` is an error, and `:INHERIT` placement is a new
+  error code.** `{|| expr}` (a code block with no bound variable) is a
+  compile-time error according to the reference, but it shipped at
+  warning. A `:INHERIT` that does not directly follow `:CLASS` is also a
+  compile error, and it reported only as an info-tier `class_member_order`
+  note, hidden by default. That case now reports as `inherit_position`, at
+  error. Neither appears anywhere in the 6,228-file private corpus, so no
+  document that validated before fails now (#255).
+
+### Added
+- **`equals_empty_string` reports `x = ""`, a comparison that is always
+  true.** For strings, `=` is a prefix match that is true whenever the
+  right operand is empty, so `:IF sStatus = "";` takes its branch for every
+  string value. It was reported only by `equals_vs_strict_equals` at info,
+  which is hidden by default. It is now a warning. `"" = x` is a correct
+  emptiness test and stays silent, and so does a bare `x = "";` statement,
+  which is a mistyped assignment. There are two findings in the private
+  corpus, both in conditions (#255).
+
+### Changed
+- **The operator type checks run on the expression tree.**
+  `arithmetic_type_mismatch`, `dollar_string_only`,
+  `code_block_comparison` and `for_numeric_values` used to compare adjacent
+  tokens. Their type heuristic read loop-counter names (`i`, `x`, ...) and
+  UPPER_SNAKE constants as numbers, so `"A" $ ALLOWED_CODES` flagged. It
+  also missed date arithmetic, so `dDue - 1` and `dEnd - dStart` flagged as
+  well. Each operand is now a whole subtree, and the pair is judged against
+  the reference's operator type tables. The rules newly cover `%`, `^`,
+  `**`, same-type pairs the operator rejects (`.T. - .F.`), and the
+  `!=` / `<>` / `#` comparisons of a code block, which raise at runtime
+  like `==`. Real precedence also surfaces a real bug: `.NOT. "a" $ sList`
+  is `(.NOT. "a") $ sList`. In the private corpus, `arithmetic_type_mismatch`
+  goes from 26 findings to 10 and `dollar_string_only` from 4 to 5. The `+`
+  path (`mixed_type_operator`) is unchanged (#255).
+- **`default_on_declare_line` flags a `:DEFAULT` on a name that is not a
+  parameter, on any line.** It used to flag only a `:DECLARE` and a
+  `:DEFAULT` sharing one line. That always co-fired with
+  `default_after_parameters`, misreported a default on a real parameter
+  that merely shared the line, and missed the defect everywhere else. The
+  slug is unchanged. Corpus: 35 findings, all in one script that already
+  fails `default_after_parameters` (#255).
+- **`branch_target_label` checks a literal target against the labels in its
+  procedure.** A typo such as `Branch("LABEL SKP")` now flags, and so does a
+  lowercase `"labelskip"`, because the keyword is uppercase and the match is
+  exact. A scope that uses `:INCLUDE` is not judged (#255).
+- **`error_handler_structure` checks handler placement.** It now reports an
+  `:ERROR;` with nothing before it to protect, a `:RESUME;` with no
+  `:ERROR;` in its procedure (which does not compile), and an `:ERROR`
+  followed directly by any block boundary. None of these appear in the
+  corpus (#255).
+- **`invalid_limstypeex_comparison` follows the documented comparison
+  semantics.** String comparison is case-sensitive and `=` is a prefix
+  match, so `== "numeric"` and `= "String"` now flag, while `= "NUM"` and
+  `"STRINGS" = LimsTypeEx(x)` no longer do. `<>` and `#` are checked, and
+  inequality findings say "always true". One corpus document gains a
+  finding and stops validating: its guard compares against `"String"` and
+  can never pass (#255).
+- **`base_outside_class` warns rather than errors in a procedure-only
+  file**, the include-library tier `me_outside_class` has had since #171
+  (#255).
+
+### Fixed
+- **Member access no longer trips `base_standalone` or
+  `createudobject_builtin_misuse`.** `oUri:Base` and
+  `oFactory:CreateUdObject("Email")` are members of some other object and
+  never warn (D10) (#258).
+- **One typo, one finding.** `bA AND (bB)` and `NOT (bA)` no longer also
+  report as `direct_procedure_call`. The operand after a prefix bare `Not`
+  no longer also reports as `unexpected_token`. An `:ENDFOR` that closes a
+  `:FOR` no longer leaves `unclosed_block` on the loop. An unquoted
+  `ExecFunction(Module.Proc)` path no longer also reports
+  `dot_property_access`. `:CATCH` with a missing `;` says so, instead of
+  calling the next statement an exception variable (#255).
+- **`assignment_in_condition` ignores bracketed assignments.**
+  `:IF (oRow := Fetch()) != NIL;` is the deliberate assign-and-test form
+  and no longer warns (#255).
+- **`dot_property_access` covers call and subscript receivers.**
+  `GetObj().Name` and `aRows[1].Name` were only an `unknown_token` warning
+  (#255).
+- **Catalog audit of the a–l diagnostic entries.** `authority` is
+  corrected on 36 entries to match the style-guide record that enforces
+  each one, 10 resolving `schema_ref`s are filled in, and stale rationale is
+  rewritten. That includes `datasource_sql_semicolon`'s, which argued for a
+  warning the rule does not report. Data-source fences now carry the inline
+  `:PARAMETERS` defaults a data source requires (#255).
 
 ## [0.24.0] - 2026-09-21
 

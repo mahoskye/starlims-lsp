@@ -3,13 +3,14 @@ id: diag.for_numeric_values
 title: ":FOR loop parts must be numeric"
 kind: diagnostic
 status: active
-authority: style_only
+authority: authoritative
 schema_ref: lints.type_safety.for_numeric_values
 default_severity: warning
 severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/expr_operator_checks_test.go
 history:
   - date: 2026-03-21
     ref: "commit cdbfee6"
@@ -23,22 +24,31 @@ history:
       Expression inference made paren-aware: operators inside nested call
       arguments / index lookups no longer misclassify the outer expression
       (fixed false positives on values like Len(s) - 1 chains).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Ported to the expression AST: the :FOR header's own trees (target,
+      start, limit, step), so values are whole expressions. authority
+      corrected to authoritative: the style-guide record
+      for_numeric_values (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. The stale 'schema
+      warnings map to style_only' sentence is removed.
 issues: []
 ---
 
 ## Behavior
 
-For each complete `:FOR ... ;` statement, fires a warning on every part
-whose type local inference can prove non-numeric: the loop variable (the
-identifier after `:FOR`), the start expression (after `:=`), the limit
-(after `:TO`), and the step (after `:STEP`) — one diagnostic per offending
-part. Inference draws from literals, tracked local `:=` assignments,
-strict Hungarian name prefixes, and built-in return types; compound
-expressions are classified conservatively (paren-aware since 2a74704).
-Tracked assignments take precedence over name prefixes, and the loop's own
-start assignment counts: a string-prefixed variable initialized from a
-numeric start value is treated as numeric and does not flag as loop
-variable.
+For each `:FOR` header the expression AST parses, fires a warning on
+every part whose type the tree inference can prove non-numeric: the
+start expression (after `:=`), the limit (after `:TO`), and the step
+(after `:STEP`) — each a whole expression — and the loop variable when
+its Hungarian prefix promises a non-number and the start value is not a
+number. One diagnostic per offending part, ranged over that part. Types
+come from `expr_types.go`: literals, operator results, builtin return
+types, and Hungarian prefixes on bare identifiers in their documented
+shape; an operand that reads a `:` member makes no claim. A
+string-prefixed loop variable started from a number is treated as
+numeric and does not flag.
 
 It must NOT flag:
 
@@ -46,7 +56,9 @@ It must NOT flag:
   silent — the rule prefers false negatives);
 - fully numeric loops, including numeric variables and expressions in any
   of the four positions;
-- `:FOR` statements without a terminating `;` (the malformed-statement
+- loop-counter names (`i`, `j`, `k`, `x`, `y`, `z`) and UPPER_SNAKE
+  constants, which carry no type claim;
+- `:FOR` headers the expression parser cannot read (the malformed-statement
   case is left to the block/delimiter rules).
 
 ## Examples
@@ -94,11 +106,11 @@ It must NOT flag:
 
 ## Rationale
 
-The schema rule (`lints.type_safety.for_numeric_values`, severity
-`warning`) records that non-numeric `:FOR` values cause a runtime error;
-the catalog maps schema warnings to `style_only` authority and the emit
-site uses warning severity to match. Because detection rests on
-name-and-assignment inference, the unknown-type Does-not-flag fence pins
-the conservatism that keeps this rule quiet on untyped variables, and
-2a74704 (history) is the false-positive class — operators inside nested
-sub-expressions — that must never return.
+The reference (keywords/FOR) requires the start, limit, and step to be
+numeric at runtime, and the style-guide record for_numeric_values
+records a non-numeric value as a runtime error. Because the evidence
+includes Hungarian prefixes, the rule warns rather than errors, and the
+unknown-type Does-not-flag fence pins the conservatism that keeps it
+quiet on untyped variables. 2a74704 (history) fixed a false-positive
+class — operators inside nested sub-expressions — that the AST port
+(issue #255) removes by construction: each part is a parsed expression.

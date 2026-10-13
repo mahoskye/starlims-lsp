@@ -3,7 +3,7 @@ id: diag.hungarian_type_mismatch
 title: Hungarian prefix disagrees with the assigned expression's type
 kind: diagnostic
 status: active
-authority: advisory
+authority: style_only
 schema_ref: lints.hungarian_notation
 default_severity: warning
 severity_overridable: true
@@ -45,6 +45,12 @@ history:
       independent in logic (this one only ever inspects names that carry a
       prefix, so it is silent on exactly the code the other floods); only
       the switch was shared.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to style_only: the style-guide record
+      prefix_matches_type (level style_only) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

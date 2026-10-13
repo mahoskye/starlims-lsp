@@ -1,9 +1,9 @@
 ---
 id: diag.default_on_declare_line
-title: ":DEFAULT on the same line as :DECLARE"
+title: ":DEFAULT on a name that is not a parameter"
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,23 +19,48 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Re-scoped. The rule now flags a :DEFAULT whose target is not a
+      :PARAMETERS name of the enclosing procedure (or of the script),
+      ranged on the target, on any line (reference keywords/DEFAULT: the
+      name must already be in the :PARAMETERS list). The old same-line
+      heuristic always co-fired with default_after_parameters,
+      misreported a :DEFAULT on a parameter that merely shared a line
+      with :DECLARE, and missed the defect on any other line. The slug
+      is kept for client compatibility. authority corrected to
+      authoritative: the style-guide record no_default_on_declare_line
+      (level authoritative) names this rule in enforced_by, so the guide
+      is not silent.
 issues: []
 ---
 
 ## Behavior
 
-Flags a `:DECLARE` statement when a `:DEFAULT` keyword appears later on the
-same source line (in non-data-source files; data source files route to their
-own `:DEFAULT` rules instead). `:DEFAULT` provides defaults for
-`:PARAMETERS` variables — combining it with `:DECLARE` on one line is the
-signature of trying to default a declared local. The range covers the
-`:DECLARE` keyword.
+Flags a `:DEFAULT` whose target is not a `:PARAMETERS` name of its scope:
+the enclosing `:PROCEDURE`, or — outside every procedure — the
+script-level `:PARAMETERS`. `:DEFAULT` only supplies a fallback for a
+parameter (reference keywords/DEFAULT: the name must already be in the
+current `:PARAMETERS` list), so defaulting a `:DECLARE`d local, a
+misspelled parameter, or a name from another procedure is a defect. The
+range covers the target name; names compare case-insensitively. The
+check runs in non-data-source files; data source files route to their
+own `:DEFAULT` rules.
+
+The slug predates the re-scope. The rule used to flag only a `:DECLARE`
+and a `:DEFAULT` sharing one line, which co-fired with
+`default_after_parameters`, misreported a `:DEFAULT` on a real parameter
+that happened to share a line with a `:DECLARE`, and missed the defect on
+any other line (issue #255). Placement — `:DEFAULT` not directly after
+`:PARAMETERS` — remains `default_after_parameters`' finding; the two
+report different defects and can both fire on one statement.
 
 It must NOT flag:
 
-- `:DECLARE` and `:DEFAULT` on separate lines;
-- `:DEFAULT` used with `:PARAMETERS` (the correct pairing), with or without
-  a `:DECLARE` elsewhere in the file;
+- a `:DEFAULT` on a name in the scope's `:PARAMETERS` list, whatever else
+  shares its line;
+- a script-level `:DEFAULT` on a script-level parameter;
 - data source files, where this check does not run.
 
 ## Examples
@@ -45,6 +70,19 @@ It must NOT flag:
 ```ssl
 :PROCEDURE Demo;
 	:DECLARE sName; :DEFAULT sName, "";
+:ENDPROC;
+```
+
+### Flags
+
+A `:DECLARE`d local on its own line, after the parameter defaults.
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS sIn;
+	:DEFAULT sIn, "";
+	:DECLARE nCount;
+	:DEFAULT nCount, 0;
 :ENDPROC;
 ```
 
@@ -58,12 +96,25 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Does not flag
+
+The target is a parameter, so sharing a line with `:DECLARE` is not this
+rule's concern.
+
+```ssl
+:PARAMETERS sTop;
+:DEFAULT sTop, "";
+:PROCEDURE Demo;
+	:PARAMETERS sName; :DEFAULT sName, ""; :DECLARE sLocal;
+:ENDPROC;
+```
+
 ## Rationale
 
-Defaulting a `:DECLARE`d local is a language constraint violation, not a
-style preference, so this is an error (567b287). The rule is line-based by
-design and owns only the one-liner shape: a `:DEFAULT` targeting a declared
-variable on a *different* line is instead caught by the placement rule
-`default_after_parameters` (a `:DEFAULT` not immediately following
-`:PARAMETERS`), so between the two rules no misuse escapes while neither
-needs cross-line data-flow guessing.
+Defaulting a name that is not a parameter is a language constraint
+violation, not a style preference, so this is an error (567b287; reference
+keywords/DEFAULT). The re-scope keys the rule on the defect — the target —
+rather than on a line layout, so it needs no data flow: the parameter
+list of the enclosing scope is all it reads. On the private corpus it
+found 35 such defaults in one script, which `default_after_parameters`
+already rejected for placement.
