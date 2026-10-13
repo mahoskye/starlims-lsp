@@ -5174,9 +5174,9 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 
 		if j < len(tokens) && tokens[j].Type == lexer.TokenOperator && tokens[j].Text == ":=" {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
+				Severity: SeverityWarning,
 				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Cannot assign to global variable '%s'", token.Text),
+				Message:  fmt.Sprintf("Assignment to global variable '%s' changes it for every routine that reads it", token.Text),
 				Source:   "ssl-lsp",
 				Code:     CodeGlobalAssignment,
 			})

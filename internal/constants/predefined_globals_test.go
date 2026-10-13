@@ -8,11 +8,11 @@ import (
 )
 
 // The vendored guide must yield the base-installation names the reference
-// documents, and must not leak the non-base names or the endpoint
-// ambients into the declared set (issue #270).
+// documents (the four platform objects included), and must not leak the
+// non-base names into the declared set (issue #270).
 func TestPredefinedGlobalsParsed(t *testing.T) {
 	for _, want := range []string{
-		"Session", "PublicConsts", "MYUSERNAME", "UserLang", "STARLIMSDEPT",
+		"Request", "Response", "Session", "PublicConsts", "MYUSERNAME", "UserLang", "STARLIMSDEPT",
 		"STARLIMSSITECODE", "METHODDEVELOPER", "CRLF", "sCC", "sSC", "sTK",
 		"sPK", "DQ", "PLATFORMA", "StationName", "TRANSACTION_ID",
 		"glb_In_Batch", "CALDATEFORMAT", "GlbDefaultWorkPath",
@@ -25,7 +25,7 @@ func TestPredefinedGlobalsParsed(t *testing.T) {
 	if !IsPredefinedGlobal("myusername") {
 		t.Error("lookup must ignore case")
 	}
-	for _, not := range []string{"Request", "Response", "CR", "LF", "TAB", "sTab", "sDQ", "sSQ", "MYUSERID", "MYLANGID", "MYDEPT", "MYSITE", "NIL", "Done"} {
+	for _, not := range []string{"CR", "LF", "TAB", "sTab", "sDQ", "sSQ", "MYUSERID", "MYLANGID", "MYDEPT", "MYSITE", "NIL", "Done"} {
 		if IsPredefinedGlobal(not) {
 			t.Errorf("%s: must not be a declared predefined global", not)
 		}

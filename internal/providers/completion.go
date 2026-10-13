@@ -312,6 +312,11 @@ func GetStatusKeywordCompletions() []CompletionItem {
 func GetPredefinedGlobalCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, g := range constants.SSLPredefinedGlobals {
+		// Request and Response are offered with their own documentation
+		// in endpoint scripts only (GetEndpointAmbientCompletions).
+		if strings.EqualFold(g, "Request") || strings.EqualFold(g, "Response") {
+			continue
+		}
 		items = append(items, CompletionItem{
 			Label:            g,
 			Kind:             CompletionKindVariable,

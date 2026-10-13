@@ -61,7 +61,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `finally_empty` | Empty :FINALLY block | error | tool | active | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
 | `for_numeric_values` | :FOR loop parts must be numeric | warning | style_only | active | [diag.for_numeric_values](../../catalog/diagnostics/for_numeric_values.md) |
 | `format_arg_not_array` | sFmt:Format called with a scalar instead of the values array | warning | tool | active | [diag.format_arg_not_array](../../catalog/diagnostics/format_arg_not_array.md) |
-| `global_assignment` | Assignment to a global variable | error | tool | active | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
+| `global_assignment` | Assignment to a global variable | warning | tool | active | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
 | `hungarian_notation` | Missing Hungarian notation prefix | warning | advisory | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
 | `hungarian_type_mismatch` | Hungarian prefix disagrees with the assigned expression's type | warning | advisory | active | [diag.hungarian_type_mismatch](../../catalog/diagnostics/hungarian_type_mismatch.md) |
 | `identifier_too_long` | Identifier exceeds style-guide length limit | info | tool | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |

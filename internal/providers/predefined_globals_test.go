@@ -57,15 +57,16 @@ sOut += TAB + MYUSERID;
 	}
 }
 
-// Issue #270: Request and Response keep DECISIONS.md D4 — declared only
-// in endpoint scripts.
-func TestUndeclaredEndpointAmbientsStayScoped(t *testing.T) {
+// Request and Response are platform objects readable in any script: the
+// reference says referencing them outside an endpoint does not raise, so
+// they are never undeclared (DECISIONS.md D4, amended).
+func TestUndeclaredPlatformObjectsEverywhere(t *testing.T) {
 	script := `:PROCEDURE Demo;
-UsrMes(Request:Form("a"));
+UsrMes(Request:UserAgent);
+Response:Write("x");
 :ENDPROC;`
-	got := undeclaredNames(t, script)
-	if len(got) != 1 || !strings.Contains(got[0], "'Request'") {
-		t.Fatalf("Request outside an endpoint must flag, got %v", got)
+	if got := undeclaredNames(t, script); len(got) != 0 {
+		t.Fatalf("platform objects must not be undeclared outside an endpoint, got %v", got)
 	}
 }
 

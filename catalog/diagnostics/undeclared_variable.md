@@ -84,7 +84,9 @@ history:
       was before. A name the guide lists as not declared on a base
       installation (CR, LF, TAB, sTab, sSQ, sDQ, MYUSERID, ...) still
       flags, and its message names the replacement (#270). Request and
-      Response keep the D4 endpoint scoping. Corpus under --strict:
+      Response are declared in every script too: the reference says
+      reading them outside an endpoint does not raise, so D4's
+      endpoint-only scoping was amended. Corpus under --strict:
       1,811 -> 829 findings.
 issues: []
 ---
@@ -115,10 +117,10 @@ installation declares (issue #270; the platform's `Session` and
 `ssl.diagnostics.globals`, names declared by the file's resolved
 `:INCLUDE` targets (the include declaration closure,
 `feature.cross_file_resolution` A18-A19 — `:INCLUDE` splices the included
-script's text, so its declarations are in scope), and — in endpoint
-scripts only — the runtime ambients `Request` and `Response`. In
-non-endpoint files `Request` and `Response` flag like any other
-undeclared name.
+script's text, so its declarations are in scope), and the platform objects
+`Request`, `Response`, `Session` and `PublicConsts` in every script: the
+reference says referencing `Request` or `Response` outside an endpoint
+does not raise (DECISIONS.md D4, amended 2026-10-13).
 
 A name the reference lists as **not** declared on a base installation
 (`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`, `MYUSERID`, `MYLANGID`,
@@ -239,9 +241,10 @@ Undeclared-variable detection is the highest-value and highest-noise check
 in the pipeline — its history is a list of contexts that had to be exempted
 one false positive at a time. Each Does-not-flag fence pins one of those
 exemptions permanently. The endpoint-ambient fence runs with
-`is_endpoint_file: true` (spec_options); the inverse case — `Request`
-flagging in a non-endpoint file — is covered by PR #23's tests in
-providers_test.go, since spec fences share one option set per entry.
+`is_endpoint_file: true` (spec_options); that `Request` is also declared
+outside an endpoint is pinned in providers_test.go
+(TestEndpointAmbients_RequestNotUndeclaredOutsideEndpoint), since spec
+fences share one option set per entry.
 The member-access fence pins DECISIONS.md D10 (issue #22): the member of
 a `:` access is never a variable reference, and built-in value types
 forward unmatched members to .NET at runtime, so flagging them would

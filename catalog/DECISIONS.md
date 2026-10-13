@@ -159,6 +159,13 @@ Files matching `ssl.diagnostics.endpointPatterns` or carrying an
 never flagged undeclared, not assignable. Pattern for any future
 runtime-injected globals.
 
+**Amended 2026-10-13 (issue #260).** The reference now says `Request` and
+`Response` can be read in any script — outside an endpoint they do not
+raise, though their values do not come from an HTTP caller. They are
+therefore never flagged undeclared, in any file. Endpoint classification
+(the patterns and the `Endpoint:` marker) still selects the endpoint-only
+typed receivers, hover and completion for `Request`/`Response`.
+
 ## D3 — Suppression comment grammar (2026-05-01, PR #4, v0.5.0)
 
 `/* @ssl-disable <slug>; */` suppresses a rule for the file;

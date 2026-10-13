@@ -2735,7 +2735,7 @@ func TestGetDiagnostics_DefaultOnDeclareLine_ValidSyntax(t *testing.T) {
 
 // ==================== Global Variable Assignment Tests ====================
 
-func TestGetDiagnostics_GlobalAssignment_Error(t *testing.T) {
+func TestGetDiagnostics_GlobalAssignment_Warning(t *testing.T) {
 	text := `:PROCEDURE Test;
 gCurrentUser := "admin";
 x := gCurrentUser;
@@ -2748,10 +2748,10 @@ x := gCurrentUser;
 	// Should find error for assigning to gCurrentUser
 	foundGlobalError := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") && strings.Contains(d.Message, "gCurrentUser") {
+		if strings.Contains(d.Message, "Assignment to global variable") && strings.Contains(d.Message, "gCurrentUser") {
 			foundGlobalError = true
-			if d.Severity != SeverityError {
-				t.Errorf("expected error severity for global assignment, got %v", d.Severity)
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for global assignment, got %v", d.Severity)
 			}
 		}
 	}
@@ -2774,7 +2774,7 @@ Len(gCurrentUser);
 
 	// Should NOT find any global assignment errors - just reading the global, not assigning
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") {
+		if strings.Contains(d.Message, "Assignment to global variable") {
 			t.Errorf("unexpected global assignment error when only reading: %s", d.Message)
 		}
 	}
@@ -2792,7 +2792,7 @@ GCURRENTUSER := "admin";
 	// Should find error even with different casing
 	foundGlobalError := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") {
+		if strings.Contains(d.Message, "Assignment to global variable") {
 			foundGlobalError = true
 		}
 	}
@@ -8962,7 +8962,10 @@ func TestEndpointAmbients_RequestAndResponseAcceptedInEndpoint(t *testing.T) {
 	}
 }
 
-func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
+func TestEndpointAmbients_RequestNotUndeclaredOutsideEndpoint(t *testing.T) {
+	// DECISIONS.md D4 (amended): Request and Response are platform objects
+	// readable in any script — referencing one outside an endpoint does
+	// not raise — so they are never undeclared.
 	text := `:DECLARE sUrl;
 	sUrl := Request:Url;`
 
@@ -8970,15 +8973,10 @@ func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
 	opts.CheckUndeclaredVars = true
 	opts.IsEndpointFile = false
 
-	diags := GetDiagnostics(text, opts)
-	found := false
-	for _, d := range diags {
-		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "Request") {
-			found = true
+	for _, d := range GetDiagnostics(text, opts) {
+		if d.Code == CodeUndeclaredVariable {
+			t.Fatalf("Request must not be undeclared outside an endpoint: %+v", d)
 		}
-	}
-	if !found {
-		t.Fatalf("expected Request to be flagged as undeclared in non-endpoint file, got %+v", diags)
 	}
 }
 

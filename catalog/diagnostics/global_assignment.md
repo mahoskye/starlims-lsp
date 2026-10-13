@@ -5,7 +5,7 @@ kind: diagnostic
 status: active
 authority: tool
 schema_ref: null
-default_severity: error
+default_severity: warning
 severity_overridable: true
 suppressible: true
 config:
@@ -49,6 +49,13 @@ history:
       scripts assign the user and site globals; widening this error to
       the whole list added 57 errors on the corpus, mostly in that
       shipped code.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Severity error -> warning. The reference says nothing makes a
+      predefined global read-only: the assignment succeeds and changes
+      the value for every routine that reads it. A likely bug, not a
+      failure; severity encodes the kind of finding.
 issues: []
 ---
 
@@ -56,7 +63,9 @@ issues: []
 
 Always-on check: flags an identifier that names a global variable when it is
 immediately followed (across whitespace only) by the `:=` assignment
-operator. Globals are pre-declared by the runtime and must not be written.
+operator. Nothing makes a predefined global read-only: the assignment
+succeeds and every routine that reads the global afterwards sees the new
+value, which is almost never intended.
 The checked set is the case-insensitive union of:
 
 - the built-in predefined global `MYUSERNAME` (only that one: the other
@@ -136,8 +145,12 @@ MYUSERNAME := "system";
 
 ## Rationale
 
-Writing to a pre-declared global either fails at runtime or silently
-corrupts shared state; both are real defects, hence error severity. The rule
+Writing to a pre-declared global succeeds and silently changes shared
+state for every routine that reads it afterwards (reference
+guides/predefined-globals.md). That is a likely bug, not a compile or
+run-time failure, so the severity is warning (it was error until
+2026-10-13, when the "fails at runtime" premise was checked against the
+reference). The rule
 started as an opt-in for user-configured globals (commit 567b287) but the
 built-in sets were promoted to always-on (be7a174, d23fca8) because
 assigning to `MYUSERNAME` or a status keyword is never intentional. The

@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`unused_variable` counts `?name?` markers.** A parameter read only
   through `SQLExecute` substitution was reported as never used (#270).
 
+### Changed
+- **`global_assignment` is a warning** (was an error), and its message no
+  longer says the assignment is impossible. The reference says nothing
+  makes a predefined global read-only: the assignment succeeds and changes
+  the value for every routine that reads it. That is a likely bug, not a
+  failure.
+- **`Request` and `Response` are never undeclared.** The reference says
+  they can be read in any script, so `undeclared_variable` no longer flags
+  them outside endpoint scripts (DECISIONS.md D4, amended). Completion
+  still offers them only in endpoint scripts.
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

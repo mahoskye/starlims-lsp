@@ -24,10 +24,9 @@ import (
 var predefinedGlobalsDoc string
 
 // SSLPredefinedGlobals contains the globals a base STARLIMS installation
-// declares for every server script: the platform objects (except the
-// endpoint ambients Request and Response, which DECISIONS.md D4 scopes to
-// endpoint scripts) and the publics the application's server-start scripts
-// create. Names are recognized case-insensitively as pre-declared. Status
+// declares for every server script: the platform objects (Request,
+// Response, Session, PublicConsts — readable in any script, DECISIONS.md
+// D4) and the publics the application's server-start scripts create. Names are recognized case-insensitively as pre-declared. Status
 // names are installation data and live in SSLStatusKeywords.
 var SSLPredefinedGlobals []string
 
@@ -45,10 +44,6 @@ var SSLWriteCheckedGlobals = []string{"MYUSERNAME"}
 // upper-case.
 var SSLNonBaseGlobals map[string]string
 
-// SSLEndpointAmbients are the platform objects that are meaningful only in
-// an endpoint script (DECISIONS.md D4).
-var SSLEndpointAmbients = []string{"Request", "Response"}
-
 var backtickName = regexp.MustCompile("`([^`]+)`")
 
 func init() {
@@ -64,10 +59,6 @@ func parsePredefinedGlobals(doc string) ([]string, map[string]string) {
 	var declared []string
 	seen := map[string]bool{}
 	nonBase := map[string]string{}
-	ambient := map[string]bool{}
-	for _, a := range SSLEndpointAmbients {
-		ambient[strings.ToUpper(a)] = true
-	}
 
 	section := ""
 	for _, line := range strings.Split(doc, "\n") {
@@ -84,7 +75,7 @@ func parsePredefinedGlobals(doc string) ([]string, map[string]string) {
 		case "Provided by the platform", "Declared by the application", "In batch jobs":
 			for _, n := range names {
 				up := strings.ToUpper(n)
-				if seen[up] || ambient[up] {
+				if seen[up] {
 					continue
 				}
 				seen[up] = true
