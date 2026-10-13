@@ -313,6 +313,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
 	diagnostics = append(diagnostics, checkIncludeQuotedTarget(tokens)...)
 	diagnostics = append(diagnostics, checkInlineCodeNaming(tokens)...)
+	diagnostics = append(diagnostics, checkInheritQualifiedName(tokens)...)
 	diagnostics = append(diagnostics, checkBeginCaseHasCase(tokens)...)
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
 	diagnostics = append(diagnostics, checkErrorHandlerStructure(tokens)...)
@@ -550,6 +551,33 @@ func parseRuleList(s string) []string {
 	return out
 }
 
+// knownInvalidKeyword reports colon forms that are not SSL keywords but are
+// known, so they are definite compile errors rather than possible gaps in
+// the keyword list (issue #269): :ENDCLASS (a class runs to the end of its
+// file and has no closer), and a data-source builder directive outside a
+// data source file.
+func knownInvalidKeyword(token lexer.Token, normalized string, isDataSource bool) (Diagnostic, bool) {
+	switch {
+	case normalized == "ENDCLASS":
+		return Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  "':ENDCLASS' is not valid — a class extends to the end of its file and has no closing keyword",
+			Source:   "ssl-lsp",
+			Code:     CodeEndClassInvalid,
+		}, true
+	case !isDataSource && constants.IsBuilderDirective(normalized):
+		return Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(token),
+			Message:  fmt.Sprintf("'%s' is a data source builder directive and is valid only in a data source file", token.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeBuilderDirectiveOutsideDatasource,
+		}, true
+	}
+	return Diagnostic{}, false
+}
+
 // checkKeywordForms enforces colon-prefixed uppercase keywords and flags unknown colon forms.
 func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
@@ -586,6 +614,8 @@ func checkKeywordForms(tokens []lexer.Token) []Diagnostic {
 						Source:   "ssl-lsp",
 						Code:     CodeEndForInvalid,
 					})
+				} else if d, ok := knownInvalidKeyword(token, normalized, false); ok {
+					diagnostics = append(diagnostics, d)
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityWarning,
@@ -1223,6 +1253,12 @@ func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
 		if !parameterizedFuncs[strings.ToUpper(token.Text)] {
 			continue
 		}
+		// A member call (oDb:RunSQL(...)) is the object's own method, not
+		// the built-in (DECISIONS.md D10).
+		if prev := prevSignificantTokenIndex(tokens, i-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+			continue
+		}
 
 		funcName := token.Text
 
@@ -1263,7 +1299,7 @@ func checkNamedSQLParamsWithWrongFunction(tokens []lexer.Token) []Diagnostic {
 				for _, ph := range placeholders {
 					if ph.IsNamed {
 						diagnostics = append(diagnostics, Diagnostic{
-							Severity: SeverityWarning,
+							Severity: SeverityError,
 							Range:    tokenToRange(t),
 							Message:  fmt.Sprintf("Named SQL parameter '?%s?' not supported by '%s'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.", ph.Name, funcName),
 							Source:   "ssl-lsp",
@@ -3436,6 +3472,68 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	return diagnostics
+}
+
+// checkInheritQualifiedName reports an :INHERIT whose parent is a plain
+// class name (issue #269). The parent must be written as the full
+// Category.ClassName; a plain name fails when the class compiles with
+// "Specify the full name of the class in :INHERIT". A quoted parent is not
+// checked: its compile behavior is not documented (DECISIONS.md D10).
+func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword ||
+			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INHERIT") {
+			continue
+		}
+		var first, last *lexer.Token
+		qualified, colonForm := false, false
+		var written strings.Builder
+		for j := i + 1; j < len(tokens); j++ {
+			t := &tokens[j]
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+			if first == nil && t.Type != lexer.TokenIdentifier {
+				break
+			}
+			// The lexer reads `.ClassName` after the category as one token,
+			// so look for the dot in the text, not as punctuation.
+			if strings.Contains(t.Text, ".") {
+				qualified = true
+			}
+			// `Category:ClassName` lexes the colon as member access or as a
+			// fused `:ClassName` keyword token.
+			if strings.Contains(t.Text, ":") {
+				colonForm = true
+			}
+			written.WriteString(t.Text)
+			if first == nil {
+				first = t
+			}
+			last = t
+		}
+		if first == nil || qualified {
+			continue
+		}
+		r := tokenToRange(*first)
+		r.End = tokenToRange(*last).End
+		message := fmt.Sprintf("':INHERIT' needs the parent's full 'Category.ClassName'; the plain name '%s' does not compile (Specify the full name of the class in :INHERIT)", first.Text)
+		if colonForm {
+			message = fmt.Sprintf("':INHERIT' separates category and class with '.', not ':'; write ':INHERIT %s;'", strings.ReplaceAll(written.String(), ":", "."))
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    r,
+			Message:  message,
+			Source:   "ssl-lsp",
+			Code:     CodeInheritQualifiedName,
+		})
+	}
 	return diagnostics
 }
 
@@ -6110,6 +6208,8 @@ func checkKeywordFormsDataSource(tokens []lexer.Token) []Diagnostic {
 						Source:   "ssl-lsp",
 						Code:     CodeEndForInvalid,
 					})
+				} else if d, ok := knownInvalidKeyword(token, normalized, true); ok {
+					diagnostics = append(diagnostics, d)
 				} else {
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: SeverityWarning,

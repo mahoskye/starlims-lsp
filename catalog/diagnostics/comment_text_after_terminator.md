@@ -38,6 +38,16 @@ history:
       comments AND to a comment whose ';' lands on its first line (the
       issue's original shape). Paragraph-break suppression (issue #6)
       still applies unchanged.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      Severity re-checked against the style guide, which maps
+      no_semicolon_in_comment_text and banner_has_no_semicolon (both
+      error) to this rule. Kept at warning: when the stranded text does
+      not parse, unexpected_token already reports the compile error at
+      error severity, and this rule explains its cause. When the text
+      happens to parse, it is a detection heuristic, so error would
+      overstate certainty about intent.
 issues: ["#25"]
 ---
 

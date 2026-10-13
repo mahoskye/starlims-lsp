@@ -4,7 +4,7 @@ title: DoProc call inside a class method
 kind: diagnostic
 status: active
 authority: authoritative
-schema_ref: lints.compile_errors.doproc_in_class
+schema_ref: lints.compile_errors.rules.doproc_in_class
 default_severity: error
 severity_overridable: true
 suppressible: true

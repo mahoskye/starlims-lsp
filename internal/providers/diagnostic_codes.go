@@ -154,3 +154,11 @@ const (
 	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
 	CodeHungarianTypeMismatch       = "hungarian_type_mismatch"
 )
+
+// Known-invalid forms reported as compile errors (issue #269). A separate
+// block so adding them does not realign the stable-code table above.
+const (
+	CodeInheritQualifiedName              = "inherit_qualified_name"
+	CodeEndClassInvalid                   = "endclass_invalid"
+	CodeBuilderDirectiveOutsideDatasource = "builder_directive_outside_datasource"
+)
