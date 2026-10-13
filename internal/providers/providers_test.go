@@ -4588,8 +4588,11 @@ func TestGetDiagnostics_ZeroBasedArrayIndex(t *testing.T) {
 
 func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 	// [0] on a value reached through colon member access may be a 0-based
-	// .NET collection: warning, not error (issue #152). Chained access
-	// behaves the same.
+	// .NET collection — `dataSet:Tables[0]` is the prescribed form there —
+	// so it is an info-tier advisory, not an error (issues #152/#255).
+	// Chained access behaves the same, and the default surface drops it.
+	infoOpts := DefaultDiagnosticOptions()
+	infoOpts.IncludeInfoDiagnostics = true
 	cases := []struct {
 		name string
 		code string
@@ -4600,12 +4603,17 @@ func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			found := false
 			for _, d := range GetDiagnostics(tc.code, DefaultDiagnosticOptions()) {
 				if d.Code == CodeZeroBasedArrayIndex {
+					t.Errorf("info-tier advisory must be gated off by default: %s", d.Message)
+				}
+			}
+			found := false
+			for _, d := range GetDiagnostics(tc.code, infoOpts) {
+				if d.Code == CodeZeroBasedArrayIndex {
 					found = true
-					if d.Severity != SeverityWarning {
-						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					if d.Severity != SeverityInfo {
+						t.Errorf("expected SeverityInfo, got %d", d.Severity)
 					}
 					if !strings.Contains(d.Message, ".NET") {
 						t.Errorf("message should mention .NET collections: %s", d.Message)
@@ -4613,7 +4621,7 @@ func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Error("expected zero-index warning on member-access subscript")
+				t.Error("expected zero-index advisory on member-access subscript")
 			}
 		})
 	}
@@ -5513,17 +5521,19 @@ oInt := LimsNetConnect("System", "System.Numerics.BigInteger");
 aBytes := oInt:ToByteArray();
 bZero := aBytes[0] == 0;`
 
+	infoOpts := DefaultDiagnosticOptions()
+	infoOpts.IncludeInfoDiagnostics = true
 	found := false
-	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+	for _, d := range GetDiagnostics(code, infoOpts) {
 		if d.Code == CodeZeroBasedArrayIndex {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity on .NET-derived [0], got %v", d.Severity)
+			if d.Severity != SeverityInfo {
+				t.Errorf("expected info severity on .NET-derived [0], got %v", d.Severity)
 			}
 		}
 	}
 	if !found {
-		t.Error("expected zero_based_array_index warning on .NET-derived [0]")
+		t.Error("expected zero_based_array_index advisory on .NET-derived [0]")
 	}
 
 	reassigned := `:DECLARE oInt, aBytes, bZero;
@@ -6367,7 +6377,7 @@ bFlag := .T.;
 // --- Scientific notation diagnostic ---
 
 func TestGetDiagnostics_ScientificNotationWithoutDecimal(t *testing.T) {
-	// 7e2 should trigger a warning about missing decimal point
+	// 7e2 does not compile: an error about the missing decimal point (#291)
 	text := `:DECLARE nVal;
 nVal := 7e2;`
 	diagnostics := GetDiagnostics(text, DiagnosticOptions{})
@@ -6376,8 +6386,8 @@ nVal := 7e2;`
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "scientific notation") && strings.Contains(d.Message, "decimal") {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected SeverityWarning, got %d", d.Severity)
+			if d.Severity != SeverityError {
+				t.Errorf("expected SeverityError, got %d", d.Severity)
 			}
 		}
 	}

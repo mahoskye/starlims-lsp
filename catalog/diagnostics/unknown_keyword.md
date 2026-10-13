@@ -37,6 +37,16 @@ history:
       `:REPLACE` and inserting a `;` that split the chain. The
       continuation reading yields to a real keyword, so a lost `;` before
       a line-leading `:IF` still lexes the keyword.
+  - date: 2026-10-13
+    ref: "issue #291"
+    note: >-
+      Kept at warning when unknown_token and scientific_notation were
+      raised to error: a gap in the keyword list must not fail validation.
+      unexpected_token no longer defers to this rule, so an unknown colon
+      form in a position the statement grammar cannot accept is also
+      reported there, as the parse failure it is (0 such sites in 6,228
+      production files). A statement that is only an unknown keyword
+      (`:FOOBAR;`) is not a parse failure and stays this rule's alone.
 issues: []
 ---
 
@@ -119,4 +129,12 @@ identifier/`)`/`]`) and on dedicated rules for every recognized-but-wrong
 shape (`keyword_uppercase`, `endfor_invalid`, `label_keyword_form`).
 Warning rather than error because the validator's keyword list, not the
 runtime, is the authority here — an unknown name may be a gap in the list
-(as the builder directives were until commit f6e78ef).
+(as the builder directives were until commit f6e78ef), and a gap in the
+list must not fail `--validate`. That is the one deliberate exception
+among the rules `unexpected_token` used to defer to (issue #291): where
+the unknown colon form also stands where the statement grammar cannot
+place any token, `unexpected_token` reports the parse failure as an error
+alongside this warning, so the warning never stands in for a failure the
+parser can prove. A statement consisting of the unknown keyword alone is
+the residual case — the statement grammar does not model unknown keyword
+statements, so it is reported here only, and validation passes.

@@ -19,6 +19,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
 issues: []
 ---
 
@@ -38,8 +44,8 @@ It must NOT flag:
 
 - the correct order `:TRY ... :CATCH ... :FINALLY ... :ENDTRY`;
 - `:TRY`/`:CATCH` without any `:FINALLY`;
-- a `:CATCH` outside any `:TRY` block — that placement is owned by the
-  block-structure checks, not this ordering rule.
+- a `:CATCH` outside any `:TRY` block — that placement is
+  `stray_block_keyword`'s, not this ordering rule's.
 
 ## Examples
 

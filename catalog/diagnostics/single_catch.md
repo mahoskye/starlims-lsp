@@ -19,6 +19,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
 issues: []
 ---
 
@@ -38,8 +44,8 @@ It must NOT flag:
 - a `:CATCH` that appears after a `:FINALLY` — that clause is reported as
   `diag.catch_order_before_finally` instead, and is deliberately not
   double-counted here;
-- a stray `:CATCH` outside any `:TRY` block (owned by the block-structure
-  checks).
+- a stray `:CATCH` outside any `:TRY` block — that is
+  `stray_block_keyword`.
 
 ## Examples
 

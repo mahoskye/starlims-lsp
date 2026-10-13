@@ -29,6 +29,15 @@ history:
       (categories-only level 0 per the noise policy); the pre-existing
       vs-code-ssl-formatter#74 same-file exception is now documented
       here and A5 narrowed to non-dispatch strings.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      ProcedureInfo.IsPrivate now requires an annotation in force — the
+      exact lowercase form on the line immediately before :PROCEDURE —
+      matching diag.visibility_annotation. A near-miss spelling or an
+      annotation detached by a blank line or another comment used to mark
+      the procedure private (and hide it from completion) although the
+      runtime leaves it public.
 issues: []
 ---
 
@@ -65,7 +74,10 @@ trigger policy:
   (feature.cross_file_resolution): before any dot, same-file procedures
   plus workspace category names only; after `Category.`, that category's
   scripts; after `Category.Script.` or flat `Script.`, that script's
-  procedures with `/*@private;`/`/*@protected;` ones excluded. All items
+  procedures with `/*@private;`/`/*@protected;` ones excluded — an
+  annotation counts only when it is in force (exact form, on the line
+  immediately before `:PROCEDURE`; diag.visibility_annotation reports the
+  inert ones, and an inert annotation never hides a procedure). All items
   insert plain text. `.` remains a non-trigger character (the trigger
   policy above is unchanged): segment completions appear on explicit
   invocation or while the popup is already open — do not "fix" this by

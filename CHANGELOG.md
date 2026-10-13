@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- **`unknown_token` and `scientific_notation` are errors, so code that
+  cannot compile no longer validates as `valid: true`.** When a statement
+  does not parse, `unexpected_token` defers to a more specific rule that
+  already names the token, and these two were warnings. A backtick, a
+  `?`, or a glued `7e2` therefore produced only a warning, and
+  `--validate` returned `valid: true` and exit 0. Both are now errors. A
+  `--validate` consumer that gates on `valid` or the exit code sees
+  failures where it saw passes before.
+
+  Cost on a 6,228-file production corpus: `unknown_token` fires 70 times
+  in 7 files, all genuinely broken code; two more files now fail
+  validation. `scientific_notation` fires nowhere. `unknown_keyword` stays
+  a warning, because a gap in the keyword list must not fail validation.
+  `unexpected_token` no longer defers to it, so an unknown colon form in a
+  position the grammar cannot accept is also reported as the parse
+  failure it is (#291).
+
+### Added
+- **`stray_block_keyword` reports a middle clause keyword outside its
+  block.** `:ELSE` outside an `:IF`, `:CATCH` or `:FINALLY` outside a
+  `:TRY`, and `:CASE` or `:OTHERWISE` outside a `:BEGINCASE` validated
+  clean. Three catalog entries said the placement was "owned by the
+  block-structure checks", but no such check existed. It is an error, and
+  the owner search stops at the enclosing procedure (#292).
+- **`unqualified_field_read` reports a bare read of a class field inside
+  a method.** A bare name in a method never reaches the field: it raises
+  `Variable [name] is undefined!` or silently reads a caller's or a
+  public variable. The existing assignment rule claimed the opposite for
+  reads. This is a warning and skips a read that the assignment rule
+  already covers. On the production corpus: 26 findings in 5 files, each
+  a field read with no local of that name (#260).
+
+### Changed
+- **`zero_based_array_index` on a .NET collection is an info-tier
+  advisory, not a warning.** The style guide prescribes
+  `dataSet:Tables[0]`, and every one of the 245 production findings was
+  that path, so the default surface was warning on the prescribed form.
+  A bare SSL array indexed with `[0]` is still an error. Detection now
+  reads the expression tree and checks every dimension: `aRows[1][0]` and
+  `aRows[0, 1]` used to be missed (#255).
+- **Visibility annotations are judged the way the runtime reads them.**
+  Only the exact lowercase `/*@private;` or `/*@protected;` on the line
+  immediately before `:PROCEDURE` takes effect. A near-miss spelling, a
+  blank line, or another comment in between leaves the procedure public.
+  These cases are now `visibility_annotation` warnings, where before they
+  got the info-tier "annotation in use" note. `ProcedureInfo.IsPrivate`,
+  which hides private procedures from cross-file completion, uses the
+  same verdict (#255).
+- **`unqualified_field_assignment` sees every write form.** It now reads
+  the expression tree instead of scanning for `name :=`. That adds
+  `nTotal++`, element writes (`aItems[1] := x`) and the inner targets of
+  a chained assignment. A method-local `:PUBLIC` now shadows the field.
+  Production: 14 to 15 findings (#255).
+
+### Fixed
+- **One mistake, one finding, across the structural rules (#255).**
+  - An empty `:TRY` body is reported once, not twice.
+  - `:ENDFOR` no longer also reports its `:FOR` as unclosed.
+  - A stray `:ENDIF` inside a procedure is `unmatched_block_end`, as it is
+    at top level, instead of "does not match ':PROCEDURE'".
+  - A missing inner closer (`Len(aV[1);`) is one unclosed `[`.
+  - An extra closer (`{a, b}});`) is one unmatched `}`; each of these
+    last two used to produce two errors.
+  - An unterminated string after an operand is reported only by
+    `unterminated_string`.
+- **A leading UTF-8 byte-order mark is no longer an unknown token.**
+  Files read from disk by `--validate` reported it, and the formatter
+  writes it back unchanged (#255).
+- **Dot-style access after a call or a subscript is named as such.**
+  `oObj:Get().Value` and `aRows[1].Value` are `dot_property_access` with
+  its colon fix-it, not a generic `unknown_token` (#255).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

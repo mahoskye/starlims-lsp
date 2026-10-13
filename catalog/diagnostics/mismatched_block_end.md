@@ -22,6 +22,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Catalog audit: a stray end keyword inside a procedure with no block
+      open in it (`:PROCEDURE; :ENDIF; :ENDPROC;`) is unmatched_block_end
+      now, not a crossed pair with the :PROCEDURE; and `:ENDFOR` pairs with
+      its `:FOR` silently, endfor_invalid owning the token.
 issues: []
 ---
 
@@ -38,8 +45,8 @@ typically also reported as `unclosed_block` at end of file).
 This code is reserved for the truly-crossed case. It must NOT fire when:
 
 - blocks are properly paired and nested;
-- a block-end appears with no open block at all — that is
-  `unmatched_block_end`;
+- a block-end appears with no open block at all, or with nothing open
+  inside the enclosing `:PROCEDURE` — that is `unmatched_block_end`;
 - the end keyword mismatches the innermost block but a matching opener sits
   deeper in the stack (e.g. `:WHILE` containing an unclosed `:IF` followed
   by `:ENDWHILE`) — the scanner recovers by reporting the intervening
@@ -78,6 +85,15 @@ nCount := 1;
 	:IF nCount > 0;
 		nCount := nCount - 1;
 :ENDWHILE;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	nCount := 1;
+:ENDIF;
+:ENDPROC;
 ```
 
 ## Rationale

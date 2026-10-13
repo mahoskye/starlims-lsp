@@ -24,6 +24,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      The block scanner now pairs `:ENDFOR` with its `:FOR` silently, so
+      the loop is no longer also reported as unclosed_block — one typo,
+      one finding.
 issues: []
 ---
 
@@ -74,6 +80,6 @@ It must NOT flag:
 is a high-frequency guess that SSL rejects — the loop terminator is `:NEXT`.
 Rather than the generic "Unknown SSL keyword" warning, this earns a
 dedicated error with the exact replacement (be7a174), and the data source
-variant (f6e78ef) keeps the message consistent everywhere. Note the
-unterminated `:FOR` will typically also raise an unclosed-block diagnostic;
-that is a separate rule.
+variant (f6e78ef) keeps the message consistent everywhere. The block
+scanner treats `:ENDFOR` as closing its `:FOR`, so the loop is not also
+reported as `unclosed_block` (issue #255): this rule is the one finding.

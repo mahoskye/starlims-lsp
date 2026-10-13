@@ -43,6 +43,15 @@ history:
       within the language, not a namespace collision, and is unaffected.)
       Class-only dispatch classification (DispatchResolvesToClassOnly)
       added for diag.execfunction_class_target.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      ProcedureInfo.IsPrivate now requires an annotation in force — the
+      exact lowercase form on the line immediately before :PROCEDURE —
+      matching diag.visibility_annotation. A near-miss spelling or an
+      annotation detached by a blank line or another comment used to mark
+      the procedure private (and hide it from completion) although the
+      runtime leaves it public.
 issues: []
 ---
 
@@ -118,7 +127,10 @@ before flat matches, path-lexicographic within each group, capped at 10.
 
 **Visibility**: `/*@private;` and `/*@protected;` procedures resolve for
 navigation (following author intent); completion surfaces filter them out
-separately (feature.completion, when cross-file completion lands).
+separately (feature.completion, when cross-file completion lands). A
+procedure counts as annotated only when the annotation is in force — the
+exact form on the line immediately before `:PROCEDURE` — the same verdict
+diag.visibility_annotation reports (issue #255).
 
 **Open-document overlay**: resolutions into currently-open documents
 re-derive their target line from the live document cache, so unsaved

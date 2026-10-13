@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
@@ -175,6 +174,13 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		return true
 	}
 
+	// unterminated_string: a string with no closer runs to end of file, so
+	// whatever stands around it is a symptom; that rule names the opener
+	// (issue #255).
+	if tok.Type == lexer.TokenString && tok.Unterminated {
+		return true
+	}
+
 	// unclosed_delimiter: an opener never closed swallows the rest of the
 	// file into this statement, so whatever the parser stopped on is a
 	// symptom of that.
@@ -198,11 +204,14 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		}
 	}
 
-	// unknown_keyword (and endfor_invalid) own a colon form that is not an
-	// SSL keyword — including the lexer's reading of a line-leading member
-	// call (`:Replace(...)` continuing a chain) as one.
-	if tok.Type == lexer.TokenKeyword && strings.HasPrefix(tok.Text, ":") && !isLegacyLabelKeywordForm(tok.Text) &&
-		!constants.IsKeyword(strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))) {
+	// An unknown colon form is not deferred to unknown_keyword: that rule
+	// stays a warning, because a gap in the keyword list must not fail
+	// validation, while a token the statement grammar cannot place is a
+	// parse failure whatever its spelling (issue #291). A statement that
+	// is only an unknown keyword (`:FOOBAR;`) is not a parse failure here
+	// and stays unknown_keyword's alone. endfor_invalid is already an
+	// error and owns `:ENDFOR`.
+	if tok.Type == lexer.TokenKeyword && strings.EqualFold(tok.Text, ":ENDFOR") {
 		return true
 	}
 

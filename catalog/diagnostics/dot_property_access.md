@@ -45,6 +45,13 @@ history:
       templates retrieved via GetRegion()) is captured as one raw token at
       the lexer, suppression shared by every check
       (feature.diagnostics_pipeline A23).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Receiver widened: a `.name` after a call's `)` or a subscript's `]`
+      (`oObj:Get().Value`, `aRows[1].Value`) is the same mistake and is
+      reported here; it used to fall through to unknown_token with a
+      generic message.
 issues: []
 ---
 
@@ -54,7 +61,8 @@ Flags `identifier.identifier` patterns — property access using dot notation,
 familiar from other languages but wrong in SSL, which uses colon notation
 (`object:property`). Concretely: a `.name` fragment (lexed as an unknown
 token starting with `.` followed by identifier characters) whose preceding
-significant token is an identifier. The range covers the `.name` fragment
+significant token ends a receiver: an identifier, a call's `)`, or a
+subscript's `]` (`oObj.Value`, `oObj:Get().Value`, `aRows[1].Value`). The range covers the `.name` fragment
 and the message names the property and the colon replacement.
 
 It must NOT flag:
@@ -69,7 +77,8 @@ It must NOT flag:
 - dotted logical operators and boolean literals (`.AND.`, `.OR.`, `.T.`,
   `.F.`), which lex as operators, not unknown fragments;
 - numeric literals with decimal points;
-- a leading `.name` with no preceding identifier;
+- a leading `.name` with no preceding receiver (`n := .foo;` — that is
+  `unknown_token`);
 - anything inside a `:REGION` body — region payload is opaque text, never
   lexed as SSL (issue #164, feature.diagnostics_pipeline).
 
@@ -88,6 +97,14 @@ names there never reach this check.
 	oEmail := Email{};
 	x := oEmail.Subject;
 :ENDPROC;
+```
+
+### Flags
+
+```ssl
+:DECLARE oObj, aRows, nTotal;
+nTotal := oObj:Get().Value;
+nTotal := aRows[1].Value;
 ```
 
 ### Does not flag

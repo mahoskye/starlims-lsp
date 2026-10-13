@@ -3,7 +3,7 @@ id: diag.try_structure
 title: TRY body with no statements before its handler
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,23 +19,27 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Catalog audit: one report per empty body. The emit at :ENDTRY could
+      never be the only report (the body flag only ever turns true, so the
+      handler-clause emit had already fired for the same :TRY) and it fired
+      inconsistently — twice for `:TRY; :CATCH; :ENDTRY;` and for an empty
+      body before a non-empty :FINALLY, once when the :CATCH held a
+      statement. Removed. Authority corrected to authoritative to mirror
+      the style-guide rule try_and_finally_bodies_not_empty.
 issues: []
 ---
 
 ## Behavior
 
 Flags a `:TRY` block whose body contains no statements before its first
-handler clause — the schema requires the protected body to hold at least
-one statement. Three emit sites share the same message (`':TRY' requires
-at least one statement before ':CATCH' or ':FINALLY'`), error severity,
-and range (the opening `:TRY` token):
-
-- when a `:CATCH` is reached with an empty body;
-- when a `:FINALLY` is reached with an empty body;
-- at `:ENDTRY`, if the block has a handler and no body statement ever
-  appeared (so `:TRY; :CATCH; :ENDTRY;` is reported twice — once at the
-  empty-body `:CATCH`, once at close; consumers should de-duplicate by
-  range if needed).
+handler clause — the protected body must hold at least one statement.
+Exactly one diagnostic per empty body, emitted when the first `:CATCH` or
+`:FINALLY` is reached, with the message `':TRY' requires at least one
+statement before ':CATCH' or ':FINALLY'`, error severity, and the opening
+`:TRY` token as its range.
 
 Semicolons, whitespace, and comments do not count as statements; any other
 token does, including a nested `:TRY` keyword. Nested blocks are tracked
@@ -101,13 +105,36 @@ nCount := 1;
 :ENDPROC;
 ```
 
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE nCount;
+:TRY;
+:FINALLY;
+nCount := 2;
+:ENDTRY;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:TRY;
+:ENDTRY;
+:ENDPROC;
+```
+
 ## Rationale
 
-The schema's error-handling structure marks the `:TRY` body as "requires
-at least one statement" (authoritative section, but no lints slug — hence
-`authority: tool`, like the sibling TRY rules). An empty protected body
-means the handler guards nothing, which is almost always a refactoring
-leftover; error severity matches the schema's structural framing. The
-empty-`:CATCH` fence pins the asymmetry that matters most in practice:
-the body must not be empty, the catch may be. The bare-`:TRY;:ENDTRY;`
-fence pins the single-report contract with `diag.try_requires_handler`.
+The style-guide rule `try_and_finally_bodies_not_empty` (authoritative,
+error) requires a non-empty `:TRY` body, and its notes name this code as
+the LSP's report of it, so the authority mirrors it. An empty protected
+body means the handler guards nothing, which is almost always a
+refactoring leftover. The empty-`:CATCH` fence pins the asymmetry that
+matters most in practice: the body must not be empty, the catch may be.
+One report per empty body (issue #255): the second Flags fence, an empty
+body before a non-empty `:FINALLY`, used to be reported twice. The
+bare-`:TRY;:ENDTRY;` fence pins the single-report contract with
+`diag.try_requires_handler`.
