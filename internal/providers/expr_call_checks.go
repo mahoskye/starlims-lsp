@@ -126,9 +126,9 @@ func receiverDisplayName(e *parser.Expr) string {
 // builtinMaxArity maps lowercase builtin names to the maximum argument
 // count their published signature accepts. Functions whose signature is
 // variadic ("..."), unparseable, or absent are NOT in the map — unknown
-// arity must never flag. Built once from both signature sources: the
-// generated signature string (counts optional [x] parameters) and the
-// curated parameter list, taking the larger of the two.
+// arity must never flag. Built once from both signature fields: the
+// published signature string (counts optional [x] parameters) and the
+// parameter rows (or the longest call form), taking the larger of the two.
 var builtinMaxArity = buildBuiltinMaxArity()
 
 func buildBuiltinMaxArity() map[string]int {
@@ -161,8 +161,17 @@ func buildBuiltinMaxArity() map[string]int {
 				}
 			}
 		}
-		if curated, ok := constants.SSLFunctionSignatures[lower]; ok && len(curated.Parameters) > count {
-			count = len(curated.Parameters)
+		if sig, ok := constants.SSLFunctionSignatures[lower]; ok {
+			// A function with alternative call forms accepts at most its
+			// longest form, not the union of every form's parameters.
+			n := len(sig.Parameters)
+			if len(sig.Forms) > 0 {
+				n = 0
+				for _, f := range sig.Forms {
+					n = max(n, len(f.Parameters))
+				}
+			}
+			count = max(count, n)
 		}
 		arity[lower] = count
 	}

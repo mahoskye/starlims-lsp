@@ -258,21 +258,22 @@ func generateHintsForCall(tokens []lexer.Token, call FunctionCall, procedures []
 		return nil
 	}
 
+	names := hintParameterNames(sig, len(call.Arguments))
+
 	// Check minimum parameter threshold
-	if len(sig.Parameters) < opts.MinParameterCount {
+	if len(names) < opts.MinParameterCount {
 		return nil
 	}
 
 	// Generate hints for each argument
 	for i, arg := range call.Arguments {
-		if i >= len(sig.Parameters) {
+		if i >= len(names) {
 			break
 		}
-		param := sig.Parameters[i]
 		hints = append(hints, InlayHint{
 			Line:      arg.Line,
 			Character: arg.Column,
-			Label:     param.Name,
+			Label:     names[i],
 			Kind:      InlayHintKindParameter,
 		})
 	}
@@ -280,13 +281,45 @@ func generateHintsForCall(tokens []lexer.Token, call FunctionCall, procedures []
 	return hints
 }
 
+// hintParameterNames returns the positional parameter names to hint for a
+// call with argCount arguments. A function with alternative call forms
+// (CreateUdObject) is hinted only when exactly one form can take that many
+// arguments; otherwise the form is ambiguous and no hint is better than a
+// wrong one.
+func hintParameterNames(sig constants.FunctionSignature, argCount int) []string {
+	if len(sig.Forms) == 0 {
+		names := make([]string, 0, len(sig.Parameters))
+		for _, p := range sig.Parameters {
+			names = append(names, p.Name)
+		}
+		return names
+	}
+	var match []string
+	matches := 0
+	for _, f := range sig.Forms {
+		if argCount <= len(f.Parameters) && argCount > 0 {
+			match = f.Parameters
+			matches++
+		}
+	}
+	if matches != 1 {
+		return nil
+	}
+	return match
+}
+
 // generateDoProcHints creates hints for DoProc/ExecFunction calls.
 func generateDoProcHints(tokens []lexer.Token, call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
 	var hints []InlayHint
 
-	// DoProc always has at least sProcName parameter hint
-	// DoProc(sProcName, aParams)
-	doProcParams := []string{"sProcName", "aParams"}
+	// The outer hints are the dispatcher's own published parameter names:
+	// DoProc(sProcedureName, [aArguments]), ExecFunction(sName, [aParameters]).
+	var doProcParams []string
+	if sig, ok := constants.GetFunctionSignature(call.Name); ok {
+		for _, p := range sig.Parameters {
+			doProcParams = append(doProcParams, p.Name)
+		}
+	}
 
 	// Add hints for DoProc's own parameters
 	for i, arg := range call.Arguments {

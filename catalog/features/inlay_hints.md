@@ -25,6 +25,15 @@ history:
       string-literal first argument resolves to a same-file procedure and
       the array elements are hinted with its parameter names. Dynamic
       targets stay unhinted.
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Hint labels are the reference parameter names (`SubStr` hints
+      `sSource:`, `nStartPos:`, `nLength:`; `DoProc` hints
+      `sProcedureName:`/`aArguments:`, `ExecFunction` `sName:`/
+      `aParameters:`), now that the signature database is generated from
+      the reference. A function with alternative call forms is hinted
+      only when the argument count selects one form (A9).
 issues: ["#46"]
 ---
 
@@ -38,7 +47,11 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - Built-in function calls get hints from the canonical signature database.
   Functions not in that database get no hints — the server MUST NOT guess.
 - `DoProc(...)` and `ExecFunction(...)` calls (case-insensitive) get
-  `sProcName:` / `aParams:` hints on their own two arguments.
+  hints on their own two arguments from their reference signatures:
+  `sProcedureName:` / `aArguments:` and `sName:` / `aParameters:`.
+- A function with alternative call forms (`CreateUdObject`) is hinted only
+  when exactly one form can take the call's argument count; otherwise the
+  form is ambiguous and the call gets no hints.
 - When the first DoProc/ExecFunction argument is a string literal naming a
   `:PROCEDURE` in the current document and the second is an array literal
   `{...}`, the procedure's own parameter names are additionally hinted
@@ -56,13 +69,14 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 ## Acceptance
 
 - A1: Given `x := Substr("Hello", 1, 5);`, when hints are requested, then parameter-name hints of kind Parameter appear before each of the three arguments.
-- A2: Given `x := Len(sValue);` with `minParameterCount` at its default of 2, when hints are requested, then no hint is produced for the call; with `minParameterCount: 1` the `source` hint appears.
-- A3: Given `DoProc("MyProc", {100, 200});` or `ExecFunction(...)` in any casing, when hints are requested, then `sProcName:` and `aParams:` hints are produced for the two outer arguments.
+- A2: Given `x := Len(sValue);` with `minParameterCount` at its default of 2, when hints are requested, then no hint is produced for the call; with `minParameterCount: 1` the `vSource` hint appears.
+- A3: Given `DoProc("MyProc", {100, 200});` or `ExecFunction(...)` in any casing, when hints are requested, then the dispatcher's own reference parameter names are hinted on the two outer arguments (`sProcedureName:`/`aArguments:` for DoProc, `sName:`/`aParameters:` for ExecFunction).
 - A4: Given a document defining `:PROCEDURE Calc;` with `:PARAMETERS nQty, nPrice;` and a call `DoProc("Calc", {100, 25.50});`, when hints are requested, then `nQty:` and `nPrice:` hints are additionally produced inside the array literal.
 - A5: Given `s := "Substr(a, 1, 2)";` or the same text inside a comment, when hints are requested, then no hint is produced for the call-shaped text in string or comment context.
 - A6: Given `ssl.inlayHints.enabled: false`, when hints are requested, then the result is empty.
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
+- A9: Given `o := CreateUdObject("Cat.Cls", {1});`, when hints are requested, then `sClassName:` and `aArgs:` are hinted; given the one-argument `CreateUdObject(vDefs)` (property-definition or class-name form), then no hint is produced.
 
 ## Rationale
 

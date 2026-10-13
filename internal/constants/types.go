@@ -1,11 +1,45 @@
 package constants
 
-// Types modeling the structured fields of ssl-element-reference.json that the
-// hand-maintained constants did not previously expose: class constructors and
-// methods, operator type-behavior tables, type members, and special-form
-// syntax. The existing FunctionSignature/FunctionParameter shapes (defined in
-// signatures.go) remain the source of truth for function parameter detail and
-// are unchanged.
+// Types modeling the structured fields of ssl-element-reference.json:
+// function signatures, class constructors and methods, operator type-behavior
+// tables, type members, and special-form syntax.
+
+// FunctionParameter is one parameter of a built-in function or constructor.
+type FunctionParameter struct {
+	Name     string
+	Type     string
+	Required bool
+	// Conditional marks a parameter the reference lists as required only
+	// in the call form that uses it (Required is false).
+	Conditional bool
+	// Default is the published default for an optional parameter, as
+	// prose (".T.", "current default connection"); empty when none is
+	// documented.
+	Default     string
+	Description string
+}
+
+// FunctionSignature is a built-in function's published signature.
+type FunctionSignature struct {
+	Name              string
+	Description       string
+	ReturnType        string
+	ReturnDescription string
+	Parameters        []FunctionParameter
+	// Variadic marks a function that accepts further arguments after its
+	// last listed parameter (Eval).
+	Variadic bool
+	// Forms lists alternative call forms when one flat parameter list
+	// would misdescribe the function (CreateUdObject). Empty for nearly
+	// every function; renderers then build one form from Parameters.
+	Forms []FunctionForm
+}
+
+// FunctionForm is one call form of a function with several, naming the
+// parameters (from FunctionSignature.Parameters) that form takes, in order.
+type FunctionForm struct {
+	Parameters []string
+}
 
 // ConstructorSignature describes one constructor form for a built-in class.
 type ConstructorSignature struct {
@@ -124,10 +158,8 @@ type LiteralDetails struct {
 	Syntax  string
 }
 
-// KeywordDetails holds the structured detail for one keyword. Hand-maintained
-// rich descriptions still live in SSLKeywordDescriptions (constants.go) and
-// take precedence; this carries the published syntax block for hover and
-// completion.
+// KeywordDetails holds the structured detail for one keyword: the published
+// summary (also exposed as SSLKeywordDescriptions) and syntax block.
 type KeywordDetails struct {
 	Title   string
 	Summary string

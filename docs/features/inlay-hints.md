@@ -32,7 +32,7 @@ result := SubStr("Hello World", 1, 5);
 | Type | Hints Shown | Notes |
 |------|-------------|-------|
 | Built-in functions | Yes | 330 canonical functions with parameter names |
-| DoProc calls | Yes | Shows `sProcName:` and `aParams:` |
+| DoProc calls | Yes | Shows `sProcedureName:` and `aArguments:` |
 | ExecFunction calls | Yes | Same as DoProc |
 | DoProc with known procedure | Yes | Also shows inner parameter names |
 | User procedure direct calls | No | SSL procedures can't be called directly |
@@ -54,7 +54,7 @@ For the 330 canonical built-in SSL functions, parameter names come from the sign
 /* Actual code;
 x := SQLExecute(query, "DSN1");
 
-/* Editor displays with hints: SQLExecute(commandString: query, friendlyName: "DSN1");
+/* Editor displays with hints: SQLExecute(sCommandString: query, sConnectionName: "DSN1");
 ```
 
 ### 2.4 DoProc/ExecFunction Hints
@@ -66,7 +66,7 @@ SSL procedures must be called via `DoProc` or `ExecFunction`. The server provide
 /* Actual code;
 DoProc("Calculate", {100, 25.50});
 
-/* Editor displays: DoProc(sProcName: "Calculate", aParams: {100, 25.50});
+/* Editor displays: DoProc(sProcedureName: "Calculate", aArguments: {100, 25.50});
 ```
 
 **Level 2: Inner array parameters (when procedure is known)**
@@ -81,7 +81,7 @@ If the procedure name matches a `:PROCEDURE` in the current document:
 /* Actual code;
 DoProc("Calculate", {100, 25.50});
 
-/* Editor displays: DoProc(sProcName: "Calculate", aParams: {nQty: 100, nPrice: 25.50});
+/* Editor displays: DoProc(sProcedureName: "Calculate", aArguments: {nQty: 100, nPrice: 25.50});
 ```
 
 ---
@@ -170,7 +170,7 @@ When the procedure name is a variable (not a string literal), only DoProc parame
 
 ```ssl
 /* Only DoProc hints shown - procedure unknown;
-DoProc(sProcName, aParams);
+DoProc(sProcedureName, aArguments);
 ```
 
 ---
@@ -218,8 +218,8 @@ x := Len(sValue);
 
 DoProc("Calculate", {100, 25.50});
 /* Expected hints:
-   - Position before "Calculate": sProcName:
-   - Position before {: aParams:
+   - Position before "Calculate": sProcedureName:
+   - Position before {: aArguments:
    - Position before 100: nQty:
    - Position before 25.50: nPrice:;
 ```
@@ -230,8 +230,8 @@ DoProc("Calculate", {100, 25.50});
 /* Test: DoProc with unknown procedure;
 DoProc("UnknownProc", {x, y, z});
 /* Expected hints:
-   - Position before "UnknownProc": sProcName:
-   - Position before {: aParams:
+   - Position before "UnknownProc": sProcedureName:
+   - Position before {: aArguments:
    - No hints for x, y, z (procedure unknown);
 ```
 
@@ -241,8 +241,8 @@ DoProc("UnknownProc", {x, y, z});
 /* Test: ExecFunction behavior;
 ExecFunction("MyProc", {arg1});
 /* Expected hints:
-   - Position before "MyProc": sProcName:
-   - Position before {: aParams:;
+   - Position before "MyProc": sProcedureName:
+   - Position before {: aArguments:;
 ```
 
 ### 6.6 Nested Function Calls

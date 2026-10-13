@@ -2,7 +2,7 @@
 
 This document lists all **330 developer-facing built-in functions** exposed by the LSP. Signatures are sourced from `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative).
 
-**Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/signatures.go`
+**Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/function_overrides.go`
 
 Function names are case-insensitive at runtime, but the LSP presents the canonical casing documented in the style-guide materials. Parameter prefixes: `s` = string, `n` = number, `b` = boolean, `d` = date, `a` = array, `o` = object, `v` = any/variant, `fn` = code block.
 
@@ -624,4 +624,4 @@ Str(nValue, 6, 2);   /* Numeric formatting with width/decimals;
 
 For the full list of 330 canonical built-in functions with detailed signatures, see:
 
-**LSP Sources:** `internal/constants/canonical.go`, `internal/constants/signatures.go`
+**LSP Sources:** `internal/constants/canonical.go`, `internal/constants/function_overrides.go`

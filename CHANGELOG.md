@@ -16,6 +16,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behind until someone noticed wrong hover text (#254).
 
 ### Changed
+- **Function hover, signature help, and completion now come from the SSL
+  reference instead of a hand-maintained copy.** The roughly 2,700 lines
+  of curated signatures in `signatures.go` had drifted from the
+  reference. The `SQLExecute` hover called its second parameter a
+  "friendly name for logging", while the exceptions listed directly
+  beneath named the same argument `sConnectionName`. Every type was
+  `variant`, and descriptions repeated parameter names back. Signatures
+  are now generated from the vendored reference: its parameter names,
+  real types (`string`, `boolean or string`, ...), optional or required
+  status, documented defaults, and return descriptions. The hover reads
+  top to bottom as the call form, what the function does, each
+  parameter, what it returns, and then the documented exceptions.
+  Signature-help labels, completion snippet placeholders, and inlay hints
+  use the same names, so `SubStr` now hints `sSource:` instead of
+  `source:`. A test checks every function's names, types, and defaults
+  against the vendored JSON. The only hand-written content left is five
+  documented overrides, each filling a gap in the extracted data.
+  Examples: `CreateUdObject` is shown as its three call forms rather
+  than one flat parameter list, and `SortArray` gets back a parameter row
+  the extraction dropped. The maximum argument count for every function
+  is unchanged, so no diagnostic changes (#252).
+- **Keyword, operator, literal, and `Me`/`Base`/`Constructor` hovers
+  render the reference.** Each shows the published summary, its syntax
+  block, and the reference's caveats and Don't list, replacing one-line
+  descriptions that had gone stale. For example, `:PUBLIC` was described
+  as call-stack scoped and the `Constructor` hover stated a member order
+  that is only a convention. The `=` / `==` / `!=` string semantics now
+  come from the reference too: `=` prefix-matches, and `!=` negates
+  exact equality, not `=` (#252).
+- **Endpoint, SQL-placeholder, and data-source directive hovers were
+  corrected against the reference.** `Request`/`Response` no longer claim
+  to exist only in endpoint scripts (they do not raise elsewhere), and
+  show one merged list of caveats. A `?name?` hover says `SQLExecute`
+  binds the variable's value instead of splicing it into the SQL, that an
+  array expands to one `?` per element, and that no other SQL function
+  substitutes named placeholders. The `:NULLASBLANK` hover warns that
+  `.T.`/`.F.` are silently ignored, so write `true`/`false` (#252).
 - **The bundled SSL reference data is current again.** Both vendored
   files were re-synced from `starlims-ssl-reference`, which had gathered
   two months of corrections since the last sync (2026-08-07). No element

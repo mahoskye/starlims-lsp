@@ -297,7 +297,7 @@ starlims-lsp/
 │   ├── constants/
 │   │   ├── constants.go      # Keywords, literals, operators, legacy inventories
 │   │   ├── canonical.go      # Canonical public function/class inventories
-│   │   └── signatures.go     # Legacy signature corpus
+│   │   └── function_overrides.go # Documented overrides of generated signatures
 │   ├── providers/
 │   │   ├── completion.go     # Auto-completion
 │   │   ├── hover.go          # Hover information

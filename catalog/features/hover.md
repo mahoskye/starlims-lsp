@@ -10,6 +10,7 @@ config:
 tests:
   - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
+  - internal/providers/hover_reference_test.go
   - internal/providers/element_reference_test.go
   - internal/server/handler_test.go
 history:
@@ -82,7 +83,23 @@ history:
       longer lists members those types do not have, and names the
       functions to use instead (A20). The object type keeps its member
       table.
-issues: []
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Every hover source reviewed against the reference. Function hover
+      now renders the reference-generated signature (names, types,
+      optional/default, return description) instead of curated
+      signatures.go entries that had drifted from it (SQLExecute param 2
+      was a "friendly name" over exceptions naming sConnectionName); the
+      only hand-written content left is a small documented override set
+      (A21-A23). Keyword, operator, literal, and Me/Base/Constructor
+      hovers now render the reference summary, syntax, caveats, and
+      don't-list in place of hand-written one-liners (A24-A25). The
+      endpoint-ambient hover no longer claims Request/Response exist only
+      in endpoint scripts (the reference says they do not raise
+      elsewhere), and SQL-placeholder hover says values are bound, not
+      spliced, and that only SQLExecute substitutes `?name?`.
+issues: ["#252"]
 ---
 
 ## Behavior
@@ -91,9 +108,23 @@ issues: []
   keywords, built-in functions, built-in classes, core SSL value types,
   special forms (`Me`, `Base`, `Constructor`, ...), literals (`.T.`, `.F.`,
   `NIL`), operators, user-defined procedures, and declared variables.
-- Built-in function hover MUST show the canonical signature, parameter list,
-  return type, and description; documented exceptions/caveats from the
-  element metadata MUST be included when present.
+- Built-in function hover MUST show, in this order: the call form(s) as an
+  SSL code block, the description, each parameter with its type,
+  optional/required status, and documented default, the return type with
+  its description, then the documented exceptions, caveats, and don't-list
+  from the element metadata when present. Parameter names, types,
+  required-ness, and defaults MUST be the vendored reference's; the only
+  permitted departures are the documented overrides in
+  `internal/constants/function_overrides.go`, which may fill a gap in the
+  extracted data (a dropped parameter row the published signature names,
+  a truncated return description, alternative call forms) but never rename
+  or invent a parameter.
+- A function the reference documents with alternative call forms
+  (`CreateUdObject`) MUST show each form, not one flat parameter list.
+- Keyword, operator, literal, and class-context (`Me`, `Base`,
+  `Constructor`) hover MUST render the reference summary, its syntax block
+  when one is published, and the reference caveats and don't-list.
+  Operator hover additionally carries the type-behavior table.
 - Built-in class hover MUST enumerate published constructors, properties,
   and methods; binary-operator hover MUST include the type-behavior table.
 - Core-type hover MUST list only the `:` members the reference publishes
@@ -163,6 +194,11 @@ issues: []
 - A18: Given `DoProc("NoSuchProc", {})` naming no procedure in the current file, when the user hovers inside the string, then the response is null — 1-part targets never resolve cross-file, and the string suppression (A7) holds.
 - A19: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when hover is requested, then the local variable's hover is NOT shown.
 - A20: Given a hover on the core type name `array`, when hover is requested, then the hover states that the type has no SSL-defined `:` members and lists the functions to use instead (such as `ALen`), and does NOT list `Append` or any other member as callable; a hover on `object` still lists its member table.
+- A21: Given any built-in function, when hover is requested, then every parameter is listed under its reference name, in reference order — enforced for all 330 functions, alongside a data-level check that names, types, required-ness, and defaults equal the vendored JSON.
+- A22: Given `aRows := SQLExecute(sSQL);`, when the user hovers `SQLExecute`, then the hover reads top to bottom as the call form `SQLExecute(sCommandString, [sConnectionName], ...)`, the description, the parameters (e.g. `sConnectionName` *(string, optional, default: current default connection)*), the return line, then the documented exceptions; it does NOT contain `friendlyName` or `variant` types.
+- A23: Given a hover on `CreateUdObject`, when hover is requested, then the call forms `CreateUdObject()`, `CreateUdObject(aPropertyDefs)`, and `CreateUdObject(sClassName, [aArgs])` are shown, and the parameters are NOT presented as one positional list.
+- A24: Given a hover on a keyword or operator (e.g. `:EXITCASE`, `=`, `!=`), when hover is requested, then the reference summary, syntax, caveats, and don't-list are shown: `:EXITCASE` warns that without it later `:CASE` expressions are still evaluated, `=` states prefix matching for strings, and `!=` states it negates strict (exact) equality, not `=`; `!=` is never described as prefix matching.
+- A25: Given a hover on `Me`, `Base`, or `Constructor`, when hover is requested, then the reference special-form summary, syntax, caveats, and don't-list are shown (e.g. `Me` names `Me:MethodName(args)` and that use outside a class method is a compile-time error).
 
 ## Rationale
 

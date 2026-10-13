@@ -29,23 +29,46 @@ type ParameterInformation struct {
 	Documentation string
 }
 
-func buildSignatureHelp(funcName string, activeParam int) *SignatureHelp {
-	sig, ok := constants.GetFunctionSignature(funcName)
-	if !ok {
-		return nil
-	}
-
+// functionSignatureHelp renders signature help for a built-in function from
+// its reference-generated signature. A function with several call forms
+// (CreateUdObject) gets one signature per form; the active one is the first
+// form with a parameter at the active index.
+func functionSignatureHelp(sig constants.FunctionSignature, activeParam int) *SignatureHelp {
 	docInfo := buildFunctionDoc(sig)
 
-	return &SignatureHelp{
-		Signatures: []SignatureInformation{
-			{
-				Label:         docInfo.Label,
-				Documentation: docInfo.Documentation,
-				Parameters:    docInfo.Parameters,
+	if len(docInfo.Forms) <= 1 {
+		return &SignatureHelp{
+			Signatures: []SignatureInformation{
+				{
+					Label:         docInfo.Label,
+					Documentation: docInfo.Documentation,
+					Parameters:    docInfo.Parameters,
+				},
 			},
-		},
-		ActiveSignature: 0,
+			ActiveSignature: 0,
+			ActiveParameter: activeParam,
+		}
+	}
+
+	infos := make([]SignatureInformation, 0, len(docInfo.Forms))
+	active := len(docInfo.Forms) - 1
+	for i, f := range docInfo.Forms {
+		label := f.Label
+		if sig.ReturnType != "" {
+			label += " → " + sig.ReturnType
+		}
+		infos = append(infos, SignatureInformation{
+			Label:         label,
+			Documentation: docInfo.Documentation,
+			Parameters:    f.Parameters,
+		})
+		if active == len(docInfo.Forms)-1 && activeParam < len(f.Parameters) {
+			active = i
+		}
+	}
+	return &SignatureHelp{
+		Signatures:      infos,
+		ActiveSignature: active,
 		ActiveParameter: activeParam,
 	}
 }
@@ -120,18 +143,7 @@ func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.Pr
 
 	// First, try to find in built-in functions
 	if sig, ok := constants.GetFunctionSignature(funcName); ok {
-		docInfo := buildFunctionDoc(sig)
-		return &SignatureHelp{
-			Signatures: []SignatureInformation{
-				{
-					Label:         docInfo.Label,
-					Documentation: docInfo.Documentation,
-					Parameters:    docInfo.Parameters,
-				},
-			},
-			ActiveSignature: 0,
-			ActiveParameter: activeParam,
-		}
+		return functionSignatureHelp(sig, activeParam)
 	}
 
 	return nil

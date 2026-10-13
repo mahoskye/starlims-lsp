@@ -128,8 +128,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Provides access to the column definitions of a CDataTable.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "CDataColumns{oDataTable}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `oDataTable` | object | yes | The `CDataTable` whose columns are exposed by the collection. In most scripts, use `oTable:Columns` instead of constructing the collection directly. |",
+				Signature: "CDataColumns{oDataTable}",
 				Parameters: []FunctionParameter{
 					{Name: "oDataTable", Type: "object", Required: true, Description: "The CDataTable whose columns are exposed by the collection. In most scripts, use oTable:Columns instead of constructing the collection directly."},
 				},
@@ -222,8 +221,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 				Description: "Creates an `Email` object with exception suppression enabled by default. Operations return `.T.` or `.F.`, and failures are exposed through the `Exception` property.",
 			},
 			{
-				Signature:   "Email{bIgnoreExceptions}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `bIgnoreExceptions` | boolean | yes | When `.T.`, methods suppress exceptions and return `.F.` on failure. When `.F.`, failures raise exceptions. |",
+				Signature: "Email{bIgnoreExceptions}",
 				Parameters: []FunctionParameter{
 					{Name: "bIgnoreExceptions", Type: "boolean", Required: true, Description: "When .T., methods suppress exceptions and return .F. on failure. When .F., failures raise exceptions."},
 				},
@@ -264,8 +262,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Exports tables into a destination folder.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "EnterpriseExporter{aTables, bSysTables, sPath}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `aTables` | array | yes | Table list. Use a simple array of table names in default mode, or an array of table entries in `IsEnterpriseOnly` and `FromSQL` modes. In entry-based modes, each entry starts with the output table name and can include a second string value used as the source string for that table. | | `bSysTables` | boolean | yes | When `.T.`, exports system-table content instead of regular table content. | | `sPath` | string | yes | Destination folder for the export output. The exporter writes one subfolder and one `.txt` file per table. |",
+				Signature: "EnterpriseExporter{aTables, bSysTables, sPath}",
 				Parameters: []FunctionParameter{
 					{Name: "aTables", Type: "array", Required: true, Description: "Table list. Use a simple array of table names in default mode, or an array of table entries in IsEnterpriseOnly and FromSQL modes. In entry-based modes, each entry starts with the output table name and can include a second string value used as the source string for that table."},
 					{Name: "bSysTables", Type: "boolean", Required: true, Description: "When .T., exports system-table content instead of regular table content."},
@@ -634,15 +631,13 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Matches SSL strings against a stored regular expression pattern.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "SSLRegex{sPattern}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store |",
+				Signature: "SSLRegex{sPattern}",
 				Parameters: []FunctionParameter{
 					{Name: "sPattern", Type: "string", Required: true, Description: "Regular expression pattern to store"},
 				},
 			},
 			{
-				Signature:   "SSLRegex{sPattern, bCaseSensitive}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching. Omitting this parameter gives case-sensitive matching. |",
+				Signature: "SSLRegex{sPattern, bCaseSensitive}",
 				Parameters: []FunctionParameter{
 					{Name: "sPattern", Type: "string", Required: true, Description: "Regular expression pattern to store"},
 					{Name: "bCaseSensitive", Type: "boolean", Required: false, Description: ".T. for case-sensitive matching, .F. for case-insensitive matching. Omitting this parameter gives case-sensitive matching."},
