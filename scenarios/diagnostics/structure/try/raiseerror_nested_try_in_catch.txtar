@@ -1,0 +1,44 @@
+Near miss for raiseerror_in_catch: RaiseError inside the :TRY body of a
+nested :TRY within the outer :CATCH (the nested handler catches it), in
+:FINALLY, and as a member call `oLog:RaiseError(...)`. None may flag
+(diag.raiseerror_in_catch fourth and sixth bullets, D10).
+-- input.ssl --
+:PROCEDURE PostEntry;
+	:PARAMETERS oLog, nAmount;
+	:DECLARE oErr;
+	:TRY;
+		nAmount := nAmount * 1;
+	:CATCH;
+		:TRY;
+			RaiseError("rethrown for the inner handler");
+		:CATCH;
+			oErr := GetLastSSLError();
+			oLog:RaiseError(oErr:Description);
+		:ENDTRY;
+	:FINALLY;
+		:IF nAmount < 0;
+			RaiseError("negative amount after posting");
+		:ENDIF;
+	:ENDTRY;
+:ENDPROC;
+-- format --
+:PROCEDURE PostEntry;
+	:PARAMETERS oLog, nAmount;
+	:DECLARE oErr;
+	:TRY;
+		nAmount := nAmount * 1;
+	:CATCH;
+		:TRY;
+			RaiseError("rethrown for the inner handler");
+		:CATCH;
+			oErr := GetLastSSLError();
+			oLog:RaiseError(oErr:Description);
+		:ENDTRY;
+	:FINALLY;
+		:IF nAmount < 0;
+			RaiseError("negative amount after posting");
+		:ENDIF;
+	:ENDTRY;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

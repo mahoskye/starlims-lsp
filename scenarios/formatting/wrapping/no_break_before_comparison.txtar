@@ -1,0 +1,23 @@
+Comparison operators bind to their operands: an over-long condition made
+of one comparison between two atomic operands has no legal break point
+and stays over-long rather than breaking before `>=` or `==`
+(fmt.max_line_length "Wrapping never happens ... before comparison
+operators").
+-- input.ssl --
+:PROCEDURE Compare;
+:PARAMETERS oSettings;
+:IF oSettings:primaryConfiguration:maximumAllowedRetryCount >= oSettings:fallbackConfiguration:limit;
+:RETURN .T.;
+:ENDIF;
+:RETURN .F.;
+:ENDPROC;
+-- format --
+:PROCEDURE Compare;
+	:PARAMETERS oSettings;
+	:IF oSettings:primaryConfiguration:maximumAllowedRetryCount >= oSettings:fallbackConfiguration:limit;
+		:RETURN .T.;
+	:ENDIF;
+	:RETURN .F.;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

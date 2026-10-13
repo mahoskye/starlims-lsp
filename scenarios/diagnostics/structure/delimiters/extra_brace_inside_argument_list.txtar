@@ -1,0 +1,32 @@
+An extra `}` inside a DoProc argument list: the second `}` is stray, the
+`)` still closes the call. Reported once as unmatched_delimiter, not
+mismatched_delimiter (diag.unmatched_delimiter second Flags fence).
+-- input.ssl --
+:PROCEDURE QueueLabel;
+	:PARAMETERS sSampleId, nCopies;
+	:DECLARE vResult;
+	vResult := DoProc("PrintLabelCopies", {sSampleId, nCopies}});
+	:RETURN vResult;
+:ENDPROC;
+
+:PROCEDURE PrintLabelCopies;
+	:PARAMETERS sSampleId, nCopies;
+	:RETURN nCopies;
+:ENDPROC;
+-- format --
+:PROCEDURE QueueLabel;
+	:PARAMETERS sSampleId, nCopies;
+	:DECLARE vResult;
+	vResult := DoProc("PrintLabelCopies", {sSampleId, nCopies}});
+	:RETURN vResult;
+:ENDPROC;
+
+:PROCEDURE PrintLabelCopies;
+	:PARAMETERS sSampleId, nCopies;
+	:RETURN nCopies;
+:ENDPROC;
+-- diagnostics --
+4:60-4:61 error unmatched_delimiter: Unmatched '}'
+-- diagnostics [--strict --info] --
+4:60-4:61 error unmatched_delimiter: Unmatched '}'
+9:14-9:23 hint unused_variable: Variable 'sSampleId' is declared but never used

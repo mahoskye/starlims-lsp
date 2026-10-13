@@ -1,0 +1,31 @@
+Property placeholders udobject_array_in_clause must accept
+(diag.udobject_array_in_clause Does not flag): a scalar property outside
+an IN clause, a local array copied from the property (the prescribed
+fix), and IN as the tail of a longer word (JOIN (...)).
+-- input.ssl --
+:PROCEDURE ByFilter;
+	:PARAMETERS oFilter;
+	:DECLARE aIds, aRows;
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE site = ?oFilter:sName?");
+	aIds := oFilter:aIds;
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE sampleid IN (?aIds?)");
+	aRows := SQLExecute("SELECT s.sampleid FROM samples s JOIN (?oFilter:sView?) v ON v.sampleid = s.sampleid");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE ByFilter;
+	:PARAMETERS oFilter;
+	:DECLARE aIds, aRows;
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE site = ?oFilter:sName?");
+	aIds := oFilter:aIds;
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE sampleid IN (?aIds?)");
+	aRows := SQLExecute("
+	    SELECT s.sampleid
+	    FROM samples s
+	    JOIN (?oFilter:sView?) v
+	      ON v.sampleid = s.sampleid
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,26 @@
+Near-miss for diag.default_on_declare_line: the :DEFAULT target is a
+parameter, so sharing its line with :PARAMETERS and :DECLARE is not this
+rule's concern. A script-level :DEFAULT on a script-level parameter is
+fine too.
+-- input.ssl --
+:PARAMETERS sTopMode;
+:DEFAULT sTopMode, "run";
+:PROCEDURE Helper;
+	:PARAMETERS sName; :DEFAULT sName, ""; :DECLARE sLocal;
+	sLocal := sName + sTopMode;
+	:RETURN sLocal;
+:ENDPROC;
+:RETURN sTopMode;
+-- format --
+:PARAMETERS sTopMode;
+:DEFAULT sTopMode, "run";
+:PROCEDURE Helper;
+	:PARAMETERS sName;
+	:DEFAULT sName, "";
+	:DECLARE sLocal;
+	sLocal := sName + sTopMode;
+	:RETURN sLocal;
+:ENDPROC;
+:RETURN sTopMode;
+-- diagnostics --
+-- diagnostics [--strict --info] --

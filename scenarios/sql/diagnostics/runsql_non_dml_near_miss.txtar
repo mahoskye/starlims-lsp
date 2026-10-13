@@ -1,0 +1,58 @@
+RunSQL calls runsql_non_dml must accept (diag.runsql_non_dml Does not
+flag): UPDATE/DELETE/INSERT, SELECT ... INTO, a WITH-wrapped UPDATE, an
+INSERT whose SELECT only continues a concatenation, a variable-built
+query, a member call oSql:RunSql(...) (D10), and a SELECT routed to
+LSelect instead.
+-- input.ssl --
+:PROCEDURE Archive;
+	:PARAMETERS sOrdNo, oSql;
+	:DECLARE bOk, sSQL, aRows;
+	bOk := RunSQL("UPDATE orders SET status = 'X' WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("DELETE FROM ordtask WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("SELECT ordno, status INTO orders_archive FROM orders WHERE status = 'X'");
+	bOk := RunSQL("WITH done AS (SELECT ordno FROM orders WHERE status = 'X') UPDATE orders SET archived = 1 WHERE ordno IN (SELECT ordno FROM done)");
+	bOk := RunSQL("INSERT INTO orders_archive (ordno) " + "SELECT ordno FROM orders WHERE status = 'X'");
+	sSQL := "SELECT ordno FROM orders";
+	bOk := RunSQL(sSQL);
+	bOk := oSql:RunSql("SELECT ordno FROM orders");
+	aRows := LSelect("SELECT status FROM orders WHERE ordno = ?",,, {sOrdNo});
+	:RETURN {bOk, aRows};
+:ENDPROC;
+-- format --
+:PROCEDURE Archive;
+	:PARAMETERS sOrdNo, oSql;
+	:DECLARE bOk, sSQL, aRows;
+	bOk := RunSQL("UPDATE orders SET status = 'X' WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("DELETE FROM ordtask WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("
+	    SELECT ordno, status
+	    INTO orders_archive
+	    FROM orders
+	    WHERE status = 'X'
+	");
+	bOk := RunSQL("
+	    WITH done AS (
+	        SELECT ordno
+	        FROM orders
+	        WHERE status = 'X'
+	    )
+	    UPDATE orders SET
+	        archived = 1
+	    WHERE ordno IN (
+	        SELECT ordno
+	        FROM done
+	    )
+	");
+	bOk := RunSQL("INSERT INTO orders_archive (ordno) " + "
+	    SELECT ordno
+	    FROM orders
+	    WHERE status = 'X'
+	");
+	sSQL := "SELECT ordno FROM orders";
+	bOk := RunSQL(sSQL);
+	bOk := oSql:RunSql("SELECT ordno FROM orders");
+	aRows := LSelect("SELECT status FROM orders WHERE ordno = ?",,, {sOrdNo});
+	:RETURN {bOk, aRows};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

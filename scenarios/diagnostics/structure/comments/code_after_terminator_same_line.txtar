@@ -1,0 +1,23 @@
+Code following a comment's `;` on the same line is executable and easy
+to misread as part of the comment: comment_text_after_terminator,
+same-line continuation path, warning (diag.comment_text_after_terminator
+first Flags fence).
+-- input.ssl --
+:PROCEDURE ResetFlags;
+	:DECLARE bDirty, bLocked;
+	/* clear both flags; bDirty := .F.;
+	bLocked := .F.;
+	:RETURN bLocked;
+:ENDPROC;
+-- format --
+:PROCEDURE ResetFlags;
+	:DECLARE bDirty, bLocked;
+	/* clear both flags;
+	bDirty := .F.;
+	bLocked := .F.;
+	:RETURN bLocked;
+:ENDPROC;
+-- diagnostics --
+3:2-3:22 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
+-- diagnostics [--strict --info] --
+3:2-3:22 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden

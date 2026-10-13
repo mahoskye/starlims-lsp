@@ -1,0 +1,53 @@
+An :IF whose whole condition is a negation and that has its own :ELSE
+fires diag.negative_logic (info, on the negation token): .NOT. x, !x and
+.NOT. (a .AND. b) all qualify. The :ELSE of the nested :IF inside the
+first block belongs to the inner block, not the outer one.
+-- input.ssl --
+:PROCEDURE Route;
+	:PARAMETERS bReady, bUrgent, bLocal;
+	:DECLARE sQueue;
+	:IF .NOT. bReady;
+		sQueue := "hold";
+	:ELSE;
+		sQueue := "run";
+	:ENDIF;
+	:IF !bUrgent;
+		sQueue := sQueue + "-normal";
+	:ELSE;
+		sQueue := sQueue + "-urgent";
+	:ENDIF;
+	:IF .NOT. (bUrgent .AND. bLocal);
+		sQueue := sQueue + "-remote";
+	:ELSE;
+		sQueue := sQueue + "-local";
+	:ENDIF;
+	:RETURN sQueue;
+:ENDPROC;
+-- format --
+:PROCEDURE Route;
+	:PARAMETERS bReady, bUrgent, bLocal;
+	:DECLARE sQueue;
+	:IF .NOT. bReady;
+		sQueue := "hold";
+	:ELSE;
+		sQueue := "run";
+	:ENDIF;
+
+	:IF !bUrgent;
+		sQueue := sQueue + "-normal";
+	:ELSE;
+		sQueue := sQueue + "-urgent";
+	:ENDIF;
+
+	:IF .NOT. (bUrgent .AND. bLocal);
+		sQueue := sQueue + "-remote";
+	:ELSE;
+		sQueue := sQueue + "-local";
+	:ENDIF;
+	:RETURN sQueue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:6-4:11 info negative_logic: Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.
+9:6-9:7 info negative_logic: Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.
+14:6-14:11 info negative_logic: Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.

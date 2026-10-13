@@ -1,0 +1,45 @@
+Near-misses for diag.for_numeric_values: fully numeric loops (variables,
+expressions, a builtin returning a number), unknown v-prefixed bounds, a
+loop counter, an UPPER_SNAKE constant, a member read, and a
+string-prefixed loop variable started from a number (treated as
+numeric).
+-- input.ssl --
+:PROCEDURE Walk;
+	:PARAMETERS vStart, vEnd, aRows, oCfg, MAX_PASSES;
+	:DECLARE nIdx, nMax, i, sPos;
+	nMax := 10;
+	:FOR nIdx := 1 :TO nMax :STEP 2;
+	:NEXT;
+	:FOR i := vStart :TO vEnd;
+	:NEXT;
+	:FOR i := 1 :TO Len(aRows) - 1;
+	:NEXT;
+	:FOR i := 1 :TO MAX_PASSES :STEP oCfg:nStride;
+	:NEXT;
+	:FOR sPos := 1 :TO nMax;
+	:NEXT;
+	:RETURN nIdx;
+:ENDPROC;
+-- format --
+:PROCEDURE Walk;
+	:PARAMETERS vStart, vEnd, aRows, oCfg, MAX_PASSES;
+	:DECLARE nIdx, nMax, i, sPos;
+	nMax := 10;
+	:FOR nIdx := 1 :TO nMax :STEP 2;
+	:NEXT;
+
+	:FOR i := vStart :TO vEnd;
+	:NEXT;
+
+	:FOR i := 1 :TO Len(aRows) - 1;
+	:NEXT;
+
+	:FOR i := 1 :TO MAX_PASSES :STEP oCfg:nStride;
+	:NEXT;
+
+	:FOR sPos := 1 :TO nMax;
+	:NEXT;
+	:RETURN nIdx;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

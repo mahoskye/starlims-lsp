@@ -1,0 +1,15 @@
+Identifiers far longer than any line limit (over 120 characters). A single
+identifier cannot be wrapped, so the formatter must leave the line long
+rather than split the name; diagnostics treat it like any other name.
+-- input.ssl --
+:DECLARE sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
+sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar := "x";
+:RETURN sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
+-- format --
+:DECLARE sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
+sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar :=
+	"x";
+:RETURN sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:10-1:130 info identifier_too_long: Variable name 'sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar' exceeds 20-character limit (effective length 119 excluding prefix)

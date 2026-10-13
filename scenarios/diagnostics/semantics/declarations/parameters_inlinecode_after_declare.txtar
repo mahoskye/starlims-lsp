@@ -1,0 +1,21 @@
+A :BEGININLINECODE block is a :PARAMETERS scope of its own: a :DECLARE
+before the block's :PARAMETERS fires diag.parameters_first with the
+:BEGININLINECODE message (issue #168).
+-- input.ssl --
+:BEGININLINECODE Scale;
+:DECLARE nFactor;
+:PARAMETERS nAmount;
+nFactor := 3;
+:RETURN nAmount * nFactor;
+:ENDINLINECODE;
+-- format --
+:BEGININLINECODE Scale;
+	:DECLARE nFactor;
+	:PARAMETERS nAmount;
+	nFactor := 3;
+	:RETURN nAmount * nFactor;
+:ENDINLINECODE;
+-- diagnostics --
+3:1-3:12 error parameters_first: ':PARAMETERS' must appear immediately after ':BEGININLINECODE'
+-- diagnostics [--strict --info] --
+3:1-3:12 error parameters_first: ':PARAMETERS' must appear immediately after ':BEGININLINECODE'

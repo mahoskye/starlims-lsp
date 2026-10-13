@@ -1,0 +1,43 @@
+Arithmetic operand pairs the reference's type tables do not accept
+(diag.arithmetic_type_mismatch, warning, on the operator): string minus
+number, boolean times number, % with a string, .T. - .F. (a same-type
+pair - still rejects), and a call operand typed by its documented return
+(Len(...) * "2"). The string-operand and other-pair messages differ.
+-- input.ssl --
+:PROCEDURE Crunch;
+	:PARAMETERS sText, bDone;
+	:DECLARE nOut, bFlag;
+	nOut := "abc" - 1;
+	nOut := bDone * 2;
+	nOut := 10 % "3";
+	bFlag := .T. - .F.;
+	nOut := Len(sText) * "2";
+	nOut := 2 ^ "3";
+	:RETURN nOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Crunch;
+	:PARAMETERS sText, bDone;
+	:DECLARE nOut, bFlag;
+	nOut := "abc" - 1;
+	nOut := bDone * 2;
+	nOut := 10 % "3";
+	bFlag := .T. - .F.;
+	nOut := Len(sText) * "2";
+	nOut := 2 ^ "3";
+	:RETURN nOut;
+:ENDPROC;
+-- diagnostics --
+4:16-4:17 warning arithmetic_type_mismatch: String in arithmetic operation '-': string - number. Arithmetic operators require numeric operands
+5:16-5:17 warning arithmetic_type_mismatch: Non-numeric type in arithmetic operation '*': boolean * number. The operator does not accept this operand pair and raises a runtime error
+6:13-6:14 warning arithmetic_type_mismatch: String in arithmetic operation '%': number % string. Arithmetic operators require numeric operands
+7:15-7:16 warning arithmetic_type_mismatch: Non-numeric type in arithmetic operation '-': boolean - boolean. The operator does not accept this operand pair and raises a runtime error
+8:21-8:22 warning arithmetic_type_mismatch: String in arithmetic operation '*': number * string. Arithmetic operators require numeric operands
+9:12-9:13 warning arithmetic_type_mismatch: String in arithmetic operation '^': number ^ string. Arithmetic operators require numeric operands
+-- diagnostics [--strict --info] --
+4:16-4:17 warning arithmetic_type_mismatch: String in arithmetic operation '-': string - number. Arithmetic operators require numeric operands
+5:16-5:17 warning arithmetic_type_mismatch: Non-numeric type in arithmetic operation '*': boolean * number. The operator does not accept this operand pair and raises a runtime error
+6:13-6:14 warning arithmetic_type_mismatch: String in arithmetic operation '%': number % string. Arithmetic operators require numeric operands
+7:15-7:16 warning arithmetic_type_mismatch: Non-numeric type in arithmetic operation '-': boolean - boolean. The operator does not accept this operand pair and raises a runtime error
+8:21-8:22 warning arithmetic_type_mismatch: String in arithmetic operation '*': number * string. Arithmetic operators require numeric operands
+9:12-9:13 warning arithmetic_type_mismatch: String in arithmetic operation '^': number ^ string. Arithmetic operators require numeric operands

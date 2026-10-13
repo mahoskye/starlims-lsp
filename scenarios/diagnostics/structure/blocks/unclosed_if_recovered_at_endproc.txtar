@@ -1,0 +1,43 @@
+An :IF missing its :ENDIF inside the first of two procedures. The
+recovery path of unclosed_block reports the :IF when the :ENDPROC is
+reached, and the :ENDPROC still closes the procedure, so the second
+procedure is judged on its own and nothing cascades into it
+(diag.unclosed_block recovery; diag.mismatched_block_end must not fire).
+-- input.ssl --
+:PROCEDURE ApplyDiscount;
+	:PARAMETERS nAmount;
+	:DECLARE nResult;
+	nResult := nAmount;
+	:IF nAmount > 100;
+		nResult := nAmount * 0.9;
+	:RETURN nResult;
+:ENDPROC;
+
+:PROCEDURE RoundAmount;
+	:PARAMETERS nAmount;
+	:IF nAmount < 0;
+		:RETURN 0;
+	:ENDIF;
+	:RETURN Round(nAmount, 2);
+:ENDPROC;
+-- format --
+:PROCEDURE ApplyDiscount;
+	:PARAMETERS nAmount;
+	:DECLARE nResult;
+	nResult := nAmount;
+	:IF nAmount > 100;
+		nResult := nAmount * 0.9;
+		:RETURN nResult;
+	:ENDPROC;
+
+	:PROCEDURE RoundAmount;
+		:PARAMETERS nAmount;
+		:IF nAmount < 0;
+			:RETURN 0;
+		:ENDIF;
+		:RETURN Round(nAmount, 2);
+	:ENDPROC;
+-- diagnostics --
+5:2-5:5 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+-- diagnostics [--strict --info] --
+5:2-5:5 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'

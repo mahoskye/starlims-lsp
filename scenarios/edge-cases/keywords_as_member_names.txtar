@@ -1,0 +1,35 @@
+Members whose names are SSL keywords: oCursor:Next(), oFlow:Return,
+oTask:Case, oRange:To, oList:EndIf(). The lexer forms no keyword token
+after a ':' receiver, so these are member accesses: the formatter must not
+uppercase or re-indent them as keywords, and no keyword diagnostics may
+fire.
+-- input.ssl --
+:PROCEDURE Walk;
+	:PARAMETERS oCursor, oFlow, oTask, oRange, oList;
+	:DECLARE vNext, vRet, vCase, nTo;
+	:WHILE oCursor:Next();
+		vNext := oCursor:Current;
+	:ENDWHILE;
+	vRet := oFlow:Return;
+	vCase := oTask:Case;
+	nTo := oRange:To;
+	oList:EndIf();
+	oFlow:Return := vNext;
+	:RETURN {vRet, vCase, nTo};
+:ENDPROC;
+-- format --
+:PROCEDURE Walk;
+	:PARAMETERS oCursor, oFlow, oTask, oRange, oList;
+	:DECLARE vNext, vRet, vCase, nTo;
+	:WHILE oCursor:Next();
+		vNext := oCursor:Current;
+	:ENDWHILE;
+	vRet := oFlow:Return;
+	vCase := oTask:Case;
+	nTo := oRange:To;
+	oList:EndIf();
+	oFlow:Return := vNext;
+	:RETURN {vRet, vCase, nTo};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

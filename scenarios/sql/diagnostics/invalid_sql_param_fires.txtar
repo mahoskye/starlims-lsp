@@ -1,0 +1,25 @@
+A ?name? placeholder whose base variable is never declared, assigned or
+predefined (diag.invalid_sql_param). The check is opt-in and runs under
+--strict, so only the [--strict --info] profile reports it. The scan is
+lexical over every string literal: the standalone sSQL assignment fires
+as well as the SQLExecute argument, and ?oFilter:sName? is checked as
+oFilter. --strict also reports oFilter as undeclared? No: it only
+appears inside a string.
+-- input.ssl --
+:PROCEDURE FindSample;
+	:DECLARE sSQL, aRows;
+	sSQL := "SELECT sampleid FROM samples WHERE sampleid = ?nSampleId?";
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE site = ?oFilter:sName?");
+	:RETURN {sSQL, aRows};
+:ENDPROC;
+-- format --
+:PROCEDURE FindSample;
+	:DECLARE sSQL, aRows;
+	sSQL := "SELECT sampleid FROM samples WHERE sampleid = ?nSampleId?";
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE site = ?oFilter:sName?");
+	:RETURN {sSQL, aRows};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:57-3:68 warning invalid_sql_param: SQL parameter 'nSampleId' does not match any declared variable
+4:65-4:80 warning invalid_sql_param: SQL parameter 'oFilter:sName' does not match any declared variable

@@ -1,0 +1,30 @@
+A :BEGINCASE holding only an :OTHERWISE clause, which the compiler
+rejects: begincase_requires_case fires on the :BEGINCASE token when the
+:ENDCASE closes it (diag.begincase_requires_case). missing_otherwise must
+not fire, since an :OTHERWISE is present.
+-- input.ssl --
+:PROCEDURE PickShelf;
+	:PARAMETERS sZone;
+	:DECLARE sShelf;
+	:BEGINCASE;
+	:OTHERWISE;
+		sShelf := "A-" + sZone;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sShelf;
+:ENDPROC;
+-- format --
+:PROCEDURE PickShelf;
+	:PARAMETERS sZone;
+	:DECLARE sShelf;
+	:BEGINCASE;
+	:OTHERWISE;
+		sShelf := "A-" + sZone;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sShelf;
+:ENDPROC;
+-- diagnostics --
+4:2-4:12 error begincase_requires_case: ':BEGINCASE' requires at least one ':CASE' block
+-- diagnostics [--strict --info] --
+4:2-4:12 error begincase_requires_case: ':BEGINCASE' requires at least one ':CASE' block

@@ -1,0 +1,28 @@
+A trailing empty {} as the second argument of DoProc, ExecFunction or
+GetDataSet should be omitted (diag.empty_optional_param_array, info tier,
+on the {}). Whitespace or a comment inside the braces still counts as
+empty (an SSL comment runs to its `;`, so the closing brace goes on the
+next line); case does not matter.
+-- input.ssl --
+:PROCEDURE Fetch;
+	:DECLARE vOut, sXml;
+	vOut := DoProc("Refresh", {});
+	vOut := EXECFUNCTION("Stock.Count", { });
+	sXml := GetDataSet("SELECT id FROM lots", {/* none;
+	});
+	:RETURN sXml;
+:ENDPROC;
+-- format --
+:PROCEDURE Fetch;
+	:DECLARE vOut, sXml;
+	vOut := DoProc("Refresh", {});
+	vOut := ExecFunction("Stock.Count", {});
+	sXml := GetDataSet("SELECT id FROM lots", {  /* none;
+	});
+	:RETURN sXml;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:28-3:30 info empty_optional_param_array: Omit the trailing empty array for 'DoProc' instead of passing '{}'
+4:38-4:41 info empty_optional_param_array: Omit the trailing empty array for 'EXECFUNCTION' instead of passing '{}'
+5:44-6:3 info empty_optional_param_array: Omit the trailing empty array for 'GetDataSet' instead of passing '{}'

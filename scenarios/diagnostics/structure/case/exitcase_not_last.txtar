@@ -1,0 +1,46 @@
+A statement follows a direct :EXITCASE in the same branch, and a second
+:EXITCASE follows another. exitcase_last_in_branch reports the first
+statement after the :EXITCASE, once per branch, ranged on that
+statement's first token (diag.exitcase_last_in_branch "Not last" case).
+-- input.ssl --
+:PROCEDURE NormalizeFlag;
+	:PARAMETERS sFlag;
+	:DECLARE nOut;
+	:BEGINCASE;
+	:CASE sFlag == "Y";
+		:EXITCASE;
+		nOut := 1;
+	:CASE sFlag == "N";
+		nOut := 0;
+		:EXITCASE;
+		:EXITCASE;
+	:OTHERWISE;
+		nOut := -1;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nOut;
+:ENDPROC;
+-- format --
+:PROCEDURE NormalizeFlag;
+	:PARAMETERS sFlag;
+	:DECLARE nOut;
+	:BEGINCASE;
+	:CASE sFlag == "Y";
+		:EXITCASE;
+		nOut := 1;
+	:CASE sFlag == "N";
+		nOut := 0;
+		:EXITCASE;
+		:EXITCASE;
+	:OTHERWISE;
+		nOut := -1;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nOut;
+:ENDPROC;
+-- diagnostics --
+7:3-7:7 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch
+11:3-11:12 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch
+-- diagnostics [--strict --info] --
+7:3-7:7 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch
+11:3-11:12 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch

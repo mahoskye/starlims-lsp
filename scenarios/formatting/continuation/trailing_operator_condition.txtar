@@ -1,0 +1,34 @@
+An :IF condition the author split after a trailing `.AND.` (the legacy
+shape the style guide's continuation_line_breaks calls Bad): no `;` is
+forced after the operator and the continuation takes one level past the
+:IF line. The wrapper never moves a source break, so the operator stays
+trailing (fmt.max_line_length: "an operator the author left trailing at a
+line end stays trailing"). The leading-operator form is left out: range
+formatting an operator-led line re-indents it and appends `;` to the line
+before it, an A2 invariant failure reported separately.
+-- input.ssl --
+:PROCEDURE CheckLimits;
+:PARAMETERS nLow, nHigh, sMode;
+:DECLARE bOk;
+bOk := .F.;
+:IF nLow > 1 .AND.
+nHigh < 50 .AND.
+          sMode == "STRICT";
+bOk := .T.;
+:ENDIF;
+:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckLimits;
+	:PARAMETERS nLow, nHigh, sMode;
+	:DECLARE bOk;
+	bOk := .F.;
+	:IF nLow > 1 .AND.
+		nHigh < 50 .AND.
+		sMode == "STRICT";
+		bOk := .T.;
+	:ENDIF;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

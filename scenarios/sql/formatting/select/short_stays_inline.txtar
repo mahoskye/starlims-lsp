@@ -1,0 +1,23 @@
+Single-line SQL that fits its line is left exactly as written, keyword
+casing and spacing included (fmt.sql_in_strings, vs-code-ssl-formatter
+#64): lowercase keywords, double spaces and a short join all survive.
+-- input.ssl --
+:PROCEDURE Small;
+	:PARAMETERS nId;
+	:DECLARE aRows, nCount;
+	aRows := SQLExecute("select ordno,status  from orders where ordno = ?nId?");
+	nCount := LSearch("Select Count(*) From ordtask Where ordno = ?", 0,, {nId});
+	aRows := SQLExecute("select o.ordno from orders o join ordtask t on t.ordno=o.ordno");
+	:RETURN {aRows, nCount};
+:ENDPROC;
+-- format --
+:PROCEDURE Small;
+	:PARAMETERS nId;
+	:DECLARE aRows, nCount;
+	aRows := SQLExecute("select ordno,status  from orders where ordno = ?nId?");
+	nCount := LSearch("Select Count(*) From ordtask Where ordno = ?", 0,, {nId});
+	aRows := SQLExecute("select o.ordno from orders o join ordtask t on t.ordno=o.ordno");
+	:RETURN {aRows, nCount};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

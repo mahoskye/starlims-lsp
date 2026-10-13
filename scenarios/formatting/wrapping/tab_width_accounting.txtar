@@ -1,0 +1,53 @@
+For line-length accounting a tab counts as `indentSize` columns
+(fmt.indent_style, fmt.max_line_length): a line three blocks deep fits at
+the default width 4 but wraps under `--indent-size 8` with tabs, and the
+same layout under `--indent-style space --indent-size 8` wraps at the same
+point.
+-- input.ssl --
+:PROCEDURE Deep;
+:PARAMETERS aRows;
+:DECLARE i, vResult;
+:FOR i := 1 :TO Len(aRows);
+:IF .NOT. Empty(aRows[i]);
+vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
+:ENDIF;
+:NEXT;
+:RETURN vResult;
+:ENDPROC;
+-- format [--indent-size 8] --
+:PROCEDURE Deep;
+	:PARAMETERS aRows;
+	:DECLARE i, vResult;
+	:FOR i := 1 :TO Len(aRows);
+		:IF .NOT. Empty(aRows[i]);
+			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
+				"FINAL", i});
+		:ENDIF;
+	:NEXT;
+	:RETURN vResult;
+:ENDPROC;
+-- format [--indent-style space --indent-size 8] --
+:PROCEDURE Deep;
+        :PARAMETERS aRows;
+        :DECLARE i, vResult;
+        :FOR i := 1 :TO Len(aRows);
+                :IF .NOT. Empty(aRows[i]);
+                        vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
+                                "FINAL", i});
+                :ENDIF;
+        :NEXT;
+        :RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Deep;
+	:PARAMETERS aRows;
+	:DECLARE i, vResult;
+	:FOR i := 1 :TO Len(aRows);
+		:IF .NOT. Empty(aRows[i]);
+			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
+		:ENDIF;
+	:NEXT;
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

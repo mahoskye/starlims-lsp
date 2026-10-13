@@ -1,0 +1,39 @@
+A :CASE clause and the :OTHERWISE clause each lack :EXITCASE. prefer_exitcase
+fires once per unterminated clause on the clause keyword; :OTHERWISE is
+held to the same rule even though nothing follows it (diag.prefer_exitcase).
+-- input.ssl --
+:PROCEDURE UnitFactor;
+	:PARAMETERS sUnit;
+	:DECLARE nFactor;
+	:BEGINCASE;
+	:CASE sUnit == "mg";
+		nFactor := 0.001;
+	:CASE sUnit == "g";
+		nFactor := 1;
+		:EXITCASE;
+	:OTHERWISE;
+		nFactor := 0;
+	:ENDCASE;
+	:RETURN nFactor;
+:ENDPROC;
+-- format --
+:PROCEDURE UnitFactor;
+	:PARAMETERS sUnit;
+	:DECLARE nFactor;
+	:BEGINCASE;
+	:CASE sUnit == "mg";
+		nFactor := 0.001;
+	:CASE sUnit == "g";
+		nFactor := 1;
+		:EXITCASE;
+	:OTHERWISE;
+		nFactor := 0;
+	:ENDCASE;
+	:RETURN nFactor;
+:ENDPROC;
+-- diagnostics --
+5:2-5:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+10:2-10:12 warning prefer_exitcase: ':OTHERWISE' block should end with ':EXITCASE;'
+-- diagnostics [--strict --info] --
+5:2-5:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+10:2-10:12 warning prefer_exitcase: ':OTHERWISE' block should end with ':EXITCASE;'

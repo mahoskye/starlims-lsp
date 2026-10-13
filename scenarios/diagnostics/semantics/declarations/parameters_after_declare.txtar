@@ -1,0 +1,21 @@
+Inside a procedure, :PARAMETERS must be the first statement after
+:PROCEDURE; one after a :DECLARE fires diag.parameters_first (error, on
+the keyword).
+-- input.ssl --
+:PROCEDURE Weigh;
+	:DECLARE nTare;
+	:PARAMETERS nGross;
+	nTare := 5;
+	:RETURN nGross - nTare;
+:ENDPROC;
+-- format --
+:PROCEDURE Weigh;
+	:DECLARE nTare;
+	:PARAMETERS nGross;
+	nTare := 5;
+	:RETURN nGross - nTare;
+:ENDPROC;
+-- diagnostics --
+3:2-3:13 error parameters_first: ':PARAMETERS' must appear immediately after ':PROCEDURE'
+-- diagnostics [--strict --info] --
+3:2-3:13 error parameters_first: ':PARAMETERS' must appear immediately after ':PROCEDURE'

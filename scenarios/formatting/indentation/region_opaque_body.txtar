@@ -1,0 +1,40 @@
+A top-level :REGION body is opaque payload and passes through
+byte-for-byte (fmt.indent_style, issue #164). The body has keyword-shaped
+lines, missing semicolons, odd spacing and blank lines; none of it may be
+indented, recased, spaced or terminated, and the :region / :endregion
+lines themselves are recased. (A region nested inside a procedure is left
+out: range-formatting its body re-indents the body lines, an A2/A13
+invariant failure reported separately.)
+-- input.ssl --
+:region TopLevelText;
+select   a , b
+  from   sample_table
+
+:if lowercase stays
+    indented line:=1
+:endregion;
+:PROCEDURE ReadRegion;
+:DECLARE sText;
+sText := GetRegion("TopLevelText");
+:RETURN sText;
+:ENDPROC;
+-- format --
+:REGION TopLevelText;
+select   a , b
+  from   sample_table
+
+:if lowercase stays
+    indented line:=1
+:ENDREGION;
+
+:PROCEDURE ReadRegion;
+	:DECLARE sText;
+	sText := GetRegion("TopLevelText");
+	:RETURN sText;
+:ENDPROC;
+-- diagnostics --
+1:1-1:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':REGION'
+7:1-7:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDREGION'
+-- diagnostics [--strict --info] --
+1:1-1:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':REGION'
+7:1-7:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDREGION'

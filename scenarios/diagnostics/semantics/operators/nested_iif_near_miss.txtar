@@ -1,0 +1,23 @@
+Near-misses for diag.nested_iif: sibling IIF calls in one statement,
+other functions nested inside an IIF, and an IIF inside a code block
+inside an IIF (the code block is one opaque token).
+-- input.ssl --
+:PROCEDURE Describe;
+	:PARAMETERS bShort, bUpper, sName;
+	:DECLARE sOut, fnPick;
+	sOut := IIF(bShort, "S", "L") + IIF(bUpper, "U", "l");
+	sOut := IIF(bShort, Left(AllTrim(sName), 3), Upper(sName));
+	fnPick := IIF(bShort, {|s| IIF(Empty(s), "-", s)}, {|s| s});
+	:RETURN sOut + Eval(fnPick, sName);
+:ENDPROC;
+-- format --
+:PROCEDURE Describe;
+	:PARAMETERS bShort, bUpper, sName;
+	:DECLARE sOut, fnPick;
+	sOut := IIf(bShort, "S", "L") + IIf(bUpper, "U", "l");
+	sOut := IIf(bShort, Left(AllTrim(sName), 3), Upper(sName));
+	fnPick := IIf(bShort, {|s| IIf(Empty(s), "-", s)}, {|s| s});
+	:RETURN sOut + Eval(fnPick, sName);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

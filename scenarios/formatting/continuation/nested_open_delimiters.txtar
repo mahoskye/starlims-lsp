@@ -1,0 +1,26 @@
+Continuation indent is fixed at one level, never proportional to nesting
+depth: several unclosed delimiters open on one line still put the next
+line only one level past the statement line (fmt.indent_style "The extra
+level is fixed, never proportional to nesting depth").
+-- input.ssl --
+:PROCEDURE Nested;
+:PARAMETERS sKey;
+:DECLARE vResult;
+vResult := DoProc("Outer", {DoProc("Inner", {Upper(AllTrim(
+sKey)),
+"second"}),
+"third"});
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Nested;
+	:PARAMETERS sKey;
+	:DECLARE vResult;
+	vResult := DoProc("Outer", {DoProc("Inner", {Upper(AllTrim(
+		sKey)),
+		"second"}),
+		"third"});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

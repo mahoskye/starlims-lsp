@@ -1,0 +1,21 @@
+A :PROCEDURE defined inside an SSL data source: its :PARAMETERS is an
+ordinary procedure signature, not the data source's interface, so its
+defaultless names must not report datasource_default_required (catalog
+diag.datasource_default_required: must NOT flag). The script-level
+parameter has its inline default. The procedure is called with DoProc.
+-- input.ds --
+:PARAMETERS sPrefix := "LOT";
+:PROCEDURE BuildCode;
+:PARAMETERS sHead, nSeq;
+:RETURN sHead + "-" + LimsString(nSeq);
+:ENDPROC;
+:RETURN DoProc("BuildCode", {sPrefix, 1});
+-- format --
+:PARAMETERS sPrefix := "LOT";
+:PROCEDURE BuildCode;
+	:PARAMETERS sHead, nSeq;
+	:RETURN sHead + "-" + LimsString(nSeq);
+:ENDPROC;
+:RETURN DoProc("BuildCode", {sPrefix, 1});
+-- diagnostics --
+-- diagnostics [--strict --info] --

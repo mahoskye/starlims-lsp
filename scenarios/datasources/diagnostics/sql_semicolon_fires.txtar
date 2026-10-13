@@ -1,0 +1,23 @@
+datasource_sql_semicolon: two statements separated by `;` in a SQL-mode
+body (and a trailing `;`). The body runs as one SQL command and STARLIMS
+rejects the document ("Invalid SQL statement: remove any misplaced
+semicolons(;)"), so each separator reports an error. The header's own
+terminators never flag.
+-- input.ds --
+:DSN := DATABASE;
+:PARAMETERS nKeep := 30;
+
+delete from scan_log where age_days > @nKeep;
+update scan_counter set last_purge = CURRENT_TIMESTAMP;
+-- format --
+:DSN := DATABASE;
+:PARAMETERS nKeep := 30;
+
+delete from scan_log where age_days > @nKeep;
+update scan_counter set last_purge = CURRENT_TIMESTAMP;
+-- diagnostics --
+4:45-4:46 error datasource_sql_semicolon: Misplaced semicolon in a SQL data-source body. The body runs as a single SQL command, so ';' statement separators are not part of the format - STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it.
+5:55-5:56 error datasource_sql_semicolon: Misplaced semicolon in a SQL data-source body. The body runs as a single SQL command, so ';' statement separators are not part of the format - STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it.
+-- diagnostics [--strict --info] --
+4:45-4:46 error datasource_sql_semicolon: Misplaced semicolon in a SQL data-source body. The body runs as a single SQL command, so ';' statement separators are not part of the format - STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it.
+5:55-5:56 error datasource_sql_semicolon: Misplaced semicolon in a SQL data-source body. The body runs as a single SQL command, so ';' statement separators are not part of the format - STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it.

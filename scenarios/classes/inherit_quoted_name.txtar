@@ -1,0 +1,21 @@
+A quoted :INHERIT parent. Its compile behavior is undocumented, so
+diag.inherit_qualified_name stays silent (DECISIONS.md D10). Records
+whatever else the tool says about the string in that position.
+-- input.ssl --
+:CLASS Counter;
+:INHERIT "Samples.BaseCounter";
+:DECLARE nCount;
+
+:PROCEDURE Reset;
+	Me:nCount := 0;
+:ENDPROC;
+-- format --
+:CLASS Counter;
+:INHERIT "Samples.BaseCounter";
+:DECLARE nCount;
+
+:PROCEDURE Reset;
+	Me:nCount := 0;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

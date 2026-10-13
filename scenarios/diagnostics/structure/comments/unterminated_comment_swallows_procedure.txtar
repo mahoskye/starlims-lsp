@@ -1,0 +1,21 @@
+A comment opened above a procedure whose first `;` is inside the
+procedure's code. The comment ends there (no comment_termination), and
+the code that remains reads as fragments. Records the downstream damage:
+the :PROCEDURE line is swallowed, so its :ENDPROC is unmatched
+(diag.comment_termination "Note", diag.unmatched_block_end).
+-- input.ssl --
+/* Helper: trims and upper-cases a code
+:PROCEDURE CleanCode;
+	:PARAMETERS sCode;
+	:RETURN Upper(AllTrim(sCode));
+:ENDPROC;
+-- format --
+/* Helper: trims and upper-cases a code
+:PROCEDURE CleanCode;
+:PARAMETERS sCode;
+:RETURN Upper(AllTrim(sCode));
+:ENDPROC;
+-- diagnostics --
+5:1-5:9 error unmatched_block_end: Unexpected ':ENDPROC' without matching block start
+-- diagnostics [--strict --info] --
+5:1-5:9 error unmatched_block_end: Unexpected ':ENDPROC' without matching block start

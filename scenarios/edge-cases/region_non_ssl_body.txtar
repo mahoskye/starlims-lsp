@@ -1,0 +1,37 @@
+A :REGION whose body is not SSL: JSON with braces and colons, an HTML
+fragment with quotes, and lines that look like SSL keywords and comments
+but have no semicolons. The region body is stored text read by
+GetRegion(), a multi-line token the formatter preserves byte for byte
+(feature.formatting A11); no diagnostics may come from inside it.
+-- input.ssl --
+:PROCEDURE Template;
+	:RETURN GetRegion("Payload");
+:ENDPROC;
+
+:REGION Payload;
+{
+  "sample": {"id": 42, "status": "P"},
+  "tags": ["a", "b"]
+}
+<div class="note">Don't :IF this "works"</div>
+:IF looks like code
+/* not a comment
+    deeply   indented    text
+:ENDREGION;
+-- format --
+:PROCEDURE Template;
+	:RETURN GetRegion("Payload");
+:ENDPROC;
+
+:REGION Payload;
+{
+  "sample": {"id": 42, "status": "P"},
+  "tags": ["a", "b"]
+}
+<div class="note">Don't :IF this "works"</div>
+:IF looks like code
+/* not a comment
+    deeply   indented    text
+:ENDREGION;
+-- diagnostics --
+-- diagnostics [--strict --info] --

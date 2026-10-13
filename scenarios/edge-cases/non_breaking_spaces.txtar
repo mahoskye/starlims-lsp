@@ -1,0 +1,10 @@
+Non-breaking spaces (U+00A0) between tokens, as pasted from a web page
+or document: the formatter normalizes them to ordinary spacing.
+-- input.ssl --
+:DECLARE nCount;
+nCount := 1;
+-- format --
+:DECLARE nCount;
+nCount := 1;
+-- diagnostics --
+-- diagnostics [--strict --info] --

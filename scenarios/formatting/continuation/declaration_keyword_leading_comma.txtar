@@ -1,0 +1,35 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+A declaration keyword alone on its line (:PARAMETERS, :DECLARE) takes its
+operand list from the following lines: no `;` is forced after the bare
+keyword (fmt.semicolon_enforcement issue #216), including a list with a
+leading-comma line from legacy code.
+-- input.ssl --
+:PROCEDURE ChartStats;
+:PARAMETERS
+sChartId, aRules, nMean
+, nDeviation, nLimit;
+:DEFAULT sChartId, "";
+:DECLARE
+nIndex, nCount;
+nIndex := 0;
+nCount := 0;
+:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE ChartStats;
+	:PARAMETERS
+	sChartId, aRules, nMean
+	, nDeviation, nLimit;
+	:DEFAULT sChartId, "";
+	:DECLARE
+	nIndex, nCount;
+	nIndex := 0;
+	nCount := 0;
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:11-3:17 hint unused_variable: Variable 'aRules' is declared but never used
+3:19-3:24 hint unused_variable: Variable 'nMean' is declared but never used
+4:3-4:13 hint unused_variable: Variable 'nDeviation' is declared but never used
+4:15-4:21 hint unused_variable: Variable 'nLimit' is declared but never used

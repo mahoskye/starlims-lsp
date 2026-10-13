@@ -1,0 +1,16 @@
+A SELECT list with implicit column aliases (`col alias`) fails strict SQL
+statement validation but carries no SSL marker, so it still classifies as
+SQL (feature.diagnostics_pipeline A22, issue #153). The lowercase `and`
+must not report bare_logical_operator and `t.col` must not report
+dot_property_access. The input uses the .ds.txt extension, which the CLI
+classifies exactly like .ds (feature.cli_contract, feature.formatting A11).
+-- input.ds.txt --
+select t.batch_no batchNo, t.qty_on_hand onHand, t.lot_code lot
+from stock_batch t
+where t.qty_on_hand > 0 and t.lot_code is not null
+-- format --
+select t.batch_no batchNo, t.qty_on_hand onHand, t.lot_code lot
+from stock_batch t
+where t.qty_on_hand > 0 and t.lot_code is not null
+-- diagnostics --
+-- diagnostics [--strict --info] --

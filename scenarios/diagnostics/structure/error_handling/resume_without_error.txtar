@@ -1,0 +1,21 @@
+A :RESUME in a procedure with no :ERROR does not compile:
+error_handler_structure on the :RESUME, plus its deprecated_keyword
+warning (diag.error_handler_structure fourth Flags fence).
+-- input.ssl --
+:PROCEDURE StoreAudit;
+	:PARAMETERS sAction;
+	RunSQL("INSERT INTO AUDITLOG(ACTION) VALUES(?)",, {sAction});
+	:RESUME;
+:ENDPROC;
+-- format --
+:PROCEDURE StoreAudit;
+	:PARAMETERS sAction;
+	RunSQL("INSERT INTO AUDITLOG(ACTION) VALUES(?)",, {sAction});
+	:RESUME;
+	:ENDPROC;
+-- diagnostics --
+4:2-4:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+4:2-4:9 error error_handler_structure: ':RESUME' without an ':ERROR' handler in the same procedure does not compile
+-- diagnostics [--strict --info] --
+4:2-4:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+4:2-4:9 error error_handler_structure: ':RESUME' without an ':ERROR' handler in the same procedure does not compile

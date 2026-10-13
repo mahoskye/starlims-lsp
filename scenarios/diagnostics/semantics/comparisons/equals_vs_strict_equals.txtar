@@ -1,0 +1,31 @@
+= with a string literal operand does prefix matching
+(diag.equals_vs_strict_equals, info tier, suggests ==), on either side.
+"Logged" = "Log" is .T. while "Logged" != "Log" is also .T. (AGENTS.md
+string equality gotcha).
+-- input.ssl --
+:PROCEDURE StatusIs;
+	:PARAMETERS sStatus;
+	:IF sStatus = "Log";
+		:RETURN 1;
+	:ENDIF;
+	:IF "Done" = sStatus;
+		:RETURN 2;
+	:ENDIF;
+	:RETURN 0;
+:ENDPROC;
+-- format --
+:PROCEDURE StatusIs;
+	:PARAMETERS sStatus;
+	:IF sStatus = "Log";
+		:RETURN 1;
+	:ENDIF;
+
+	:IF "Done" = sStatus;
+		:RETURN 2;
+	:ENDIF;
+	:RETURN 0;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:14-3:15 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+6:13-6:14 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

@@ -1,0 +1,22 @@
+A name directly followed by { is a class instantiation, not a variable
+read, even when the class is not in the published inventory
+(diag.undeclared_variable near-miss, issue #304). Built-in function names
+(Len, Today) are never undeclared either.
+-- input.ssl --
+:PROCEDURE OpenPanel;
+	:DECLARE oPanel, nWidth, dOpened;
+	oPanel := PanelLayout{"pnlMain", 0, 0, 320, 240};
+	nWidth := Len("pnlMain") * 10;
+	dOpened := Today();
+	:RETURN oPanel;
+:ENDPROC;
+-- format --
+:PROCEDURE OpenPanel;
+	:DECLARE oPanel, nWidth, dOpened;
+	oPanel := PanelLayout{"pnlMain", 0, 0, 320, 240};
+	nWidth := Len("pnlMain") * 10;
+	dOpened := Today();
+	:RETURN oPanel;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

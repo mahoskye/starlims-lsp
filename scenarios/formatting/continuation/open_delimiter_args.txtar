@@ -1,0 +1,33 @@
+A call whose argument list spans lines inside an unclosed `(` and `{`,
+every line ending in a comma: each continuation line sits exactly one
+level past the statement line regardless of paren depth, and no `;` is
+forced inside the open delimiters (fmt.indent_style,
+fmt.semicolon_enforcement). The closer-leads-its-line shape is left out:
+range-formatting the element line before a leading `}` appends a `;`, an
+A2 invariant failure reported separately.
+-- input.ssl --
+:PROCEDURE SaveResult;
+:PARAMETERS sSampleId, nValue;
+:DECLARE vResult;
+:IF nValue > 0;
+vResult := ExecFunction("Results.Store",
+{sSampleId,
+           nValue,
+Now()});
+:ENDIF;
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE SaveResult;
+	:PARAMETERS sSampleId, nValue;
+	:DECLARE vResult;
+	:IF nValue > 0;
+		vResult := ExecFunction("Results.Store",
+			{sSampleId,
+			nValue,
+			Now()});
+	:ENDIF;
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

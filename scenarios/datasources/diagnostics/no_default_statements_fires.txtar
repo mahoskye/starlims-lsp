@@ -1,0 +1,28 @@
+no_default_statements_in_datasource: a hand-written :DEFAULT in a data
+source is always wrong (the builder generates :DEFAULT itself), in any
+casing. Both lines report on the keyword; the lowercase one also reports
+keyword_uppercase. The script layout here is the style guide's
+datasource_not_script_layout Bad example in shape, so the defaultless
+names also report datasource_default_required.
+-- input.ds --
+:PARAMETERS sAisle, nLevel;
+:DEFAULT sAisle, "A";
+:default nLevel, 1;
+:RETURN sAisle + LimsString(nLevel);
+-- format --
+:PARAMETERS sAisle, nLevel;
+:DEFAULT sAisle, "A";
+:DEFAULT nLevel, 1;
+:RETURN sAisle + LimsString(nLevel);
+-- diagnostics --
+1:13-1:19 error datasource_default_required: Data source parameter 'sAisle' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+1:21-1:27 error datasource_default_required: Data source parameter 'nLevel' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+2:1-2:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+3:1-3:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements
+-- diagnostics [--strict --info] --
+1:13-1:19 error datasource_default_required: Data source parameter 'sAisle' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+1:21-1:27 error datasource_default_required: Data source parameter 'nLevel' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+2:1-2:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+3:1-3:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements

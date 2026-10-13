@@ -1,0 +1,47 @@
+A legacy-style routine combining :ERROR/:RESUME with :LABEL/Branch()
+retry flow, in the shape older scripts take. Every legacy keyword is a
+deprecated_keyword warning; the handler is placed last with a body, the
+Branch target resolves, so error_handler_structure and
+branch_target_label stay silent.
+-- input.ssl --
+:PROCEDURE ImportWithRetry;
+	:PARAMETERS sFile;
+	:DECLARE nTries, bOk;
+	nTries := 0;
+	bOk := .F.;
+	:LABEL ATTEMPT;
+	nTries := nTries + 1;
+	bOk := .NOT. Empty(sFile);
+	:IF .NOT. bOk .AND. nTries < 3;
+		Branch("LABEL ATTEMPT");
+	:ENDIF;
+	:RETURN bOk;
+	:ERROR;
+	bOk := .F.;
+	:RESUME;
+:ENDPROC;
+-- format --
+:PROCEDURE ImportWithRetry;
+	:PARAMETERS sFile;
+	:DECLARE nTries, bOk;
+	nTries := 0;
+	bOk := .F.;
+	:LABEL ATTEMPT;
+	nTries := nTries + 1;
+	bOk := .NOT. Empty(sFile);
+	:IF .NOT. bOk .AND. nTries < 3;
+		Branch("LABEL ATTEMPT");
+	:ENDIF;
+	:RETURN bOk;
+	:ERROR;
+		bOk := .F.;
+	:RESUME;
+:ENDPROC;
+-- diagnostics --
+6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+13:2-13:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:2-15:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+-- diagnostics [--strict --info] --
+6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+13:2-13:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:2-15:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

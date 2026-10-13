@@ -1,0 +1,34 @@
+Within a known SQL call only argument 0 is a SQL candidate (issue #82):
+an over-long SQL-looking default value and a SQL-looking friendly name
+are byte-preserved (the SSL statement may wrap at a comma, but the
+string bytes never change), while short SQL in argument 0 stays inline.
+A member call is not a known SQL function, but detectSQLStrings is on
+by default, so its overflowing SQL argument is detected and reflowed
+like any other SQL string literal.
+-- input.ssl --
+:PROCEDURE Lookups;
+	:PARAMETERS sOrdNo, oDb;
+	:DECLARE sName, bOk;
+	sName := LSearch("select custname from orders where ordno = ?", "select nothing from nowhere where nothing = 1 order by nothing", , {sOrdNo});
+	bOk := RunSQL("delete from ordtask where ordno = ?", "select connection", {sOrdNo});
+	bOk := oDb:Execute("select ordno, status, logdate, custid, site from orders where status = 'A' order by logdate");
+	:RETURN {sName, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Lookups;
+	:PARAMETERS sOrdNo, oDb;
+	:DECLARE sName, bOk;
+	sName := LSearch("select custname from orders where ordno = ?",
+		"select nothing from nowhere where nothing = 1 order by nothing",, {sOrdNo});
+	bOk := RunSQL("delete from ordtask where ordno = ?", "select connection", {sOrdNo});
+	bOk := oDb:Execute("
+	    SELECT ordno, status, logdate, custid, site
+	    FROM orders
+	    WHERE status = 'A'
+	    ORDER BY logdate
+	");
+	:RETURN {sName, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:130-4:133 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate

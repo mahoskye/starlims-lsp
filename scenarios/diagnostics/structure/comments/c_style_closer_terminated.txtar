@@ -1,0 +1,27 @@
+Near miss for comment_swallows_code: banners closed with `*/;` really end
+at the `;`, so nothing is hidden. The inert-but-stylistic `*/` tail is
+c_style_comment_closer, info tier only, so it appears only under --info
+(diag.comment_swallows_code first bullet, diag.c_style_comment_closer).
+Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+-- input.ssl --
+/*******************************************
+ Module: shipment label printing
+ *******************************************/;
+:PROCEDURE PrintLabel;
+	:PARAMETERS sShipment;
+	/* short note */;
+	:RETURN "LBL-" + sShipment;
+:ENDPROC;
+-- format --
+/*******************************************
+ Module: shipment label printing
+ *******************************************/;
+:PROCEDURE PrintLabel;
+	:PARAMETERS sShipment;
+	/* short note */;
+	:RETURN "LBL-" + sShipment;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:125 info c_style_comment_closer: SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)
+6:2-6:19 info c_style_comment_closer: SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)

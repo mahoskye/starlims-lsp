@@ -1,0 +1,26 @@
+Only LSearch's first argument is a SQL candidate (issue #82): the
+SQL-looking default value is byte-preserved while the overflowing query
+reflows, and the skipped connection argument keeps its adjacent commas.
+-- input.ssl --
+:PROCEDURE CustomerName;
+	:PARAMETERS sOrdNo;
+	:DECLARE sName;
+	sName := LSearch("select c.custname from customers c inner join orders o on o.custid = c.custid where o.ordno = ?", "select a fallback name from the list", , {sOrdNo});
+	:RETURN sName;
+:ENDPROC;
+-- format --
+:PROCEDURE CustomerName;
+	:PARAMETERS sOrdNo;
+	:DECLARE sName;
+	sName := LSearch("
+	    SELECT c.custname
+	    FROM customers c
+	    INNER JOIN orders o
+	      ON o.custid = c.custid
+	    WHERE o.ordno = ?
+	", "select a fallback name from the list",, {sOrdNo});
+	:RETURN sName;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:156-4:159 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate

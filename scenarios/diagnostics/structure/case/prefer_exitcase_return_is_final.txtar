@@ -1,0 +1,32 @@
+Near miss for prefer_exitcase and exitcase_after_return: every branch ends
+with :RETURN as its final statement (a trailing comment is transparent),
+so no :EXITCASE is needed and none is unreachable (issue #139;
+diag.prefer_exitcase, diag.exitcase_after_return "Does not flag").
+-- input.ssl --
+:PROCEDURE GradeFor;
+	:PARAMETERS nScore;
+	:BEGINCASE;
+	:CASE nScore >= 90;
+		:RETURN "A";
+	:CASE nScore >= 75;
+		:RETURN "B";
+	:OTHERWISE;
+		:RETURN "C";
+		/* scores below 75 all share one grade;
+	:ENDCASE;
+:ENDPROC;
+-- format --
+:PROCEDURE GradeFor;
+	:PARAMETERS nScore;
+	:BEGINCASE;
+	:CASE nScore >= 90;
+		:RETURN "A";
+	:CASE nScore >= 75;
+		:RETURN "B";
+	:OTHERWISE;
+		:RETURN "C";
+		/* scores below 75 all share one grade;
+	:ENDCASE;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

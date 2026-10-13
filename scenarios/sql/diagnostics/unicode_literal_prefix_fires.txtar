@@ -1,0 +1,22 @@
+N'…' Unicode literals in embedded SQL (diag.unicode_literal_prefix, info
+tier), upper- and lowercase prefix, via SQLExecute and RunSQL.
+-- input.ssl --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("UPDATE samples SET note = N'checked' WHERE sampleid = ?nId?");
+	bOk := RunSQL("UPDATE samples SET note = n'rechecked' WHERE sampleid = ?",, {nId});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("UPDATE samples SET note = N'checked' WHERE sampleid = ?nId?");
+	bOk := RunSQL("UPDATE samples SET note = n'rechecked' WHERE sampleid = ?",, {nId});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:83 info unicode_literal_prefix: Unicode literal prefix N'...' in embedded SQL - drop the prefix unless the target column genuinely requires it
+5:16-5:75 info unicode_literal_prefix: Unicode literal prefix N'...' in embedded SQL - drop the prefix unless the target column genuinely requires it

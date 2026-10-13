@@ -1,0 +1,33 @@
+A procedure written with mixed-case keywords (`:Declare`, `:EndIf`,
+`:Return`) among correct ones. Keywords are case-sensitive, so each
+miscased token is keyword_uppercase (error) with the canonical spelling;
+correctly cased keywords and keyword names used as plain words
+(`Return` inside a string) do not flag (diag.keyword_uppercase).
+-- input.ssl --
+:PROCEDURE CheckStock;
+	:PARAMETERS nOnHand;
+	:Declare sMessage;
+	sMessage := "Return to supplier";
+	:IF nOnHand > 0;
+		sMessage := "In stock";
+	:EndIf;
+	:Return sMessage;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckStock;
+	:PARAMETERS nOnHand;
+	:DECLARE sMessage;
+	sMessage := "Return to supplier";
+	:IF nOnHand > 0;
+		sMessage := "In stock";
+	:ENDIF;
+	:RETURN sMessage;
+:ENDPROC;
+-- diagnostics --
+3:2-3:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+7:2-7:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+8:2-8:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+-- diagnostics [--strict --info] --
+3:2-3:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+7:2-7:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+8:2-8:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'

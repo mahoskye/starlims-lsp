@@ -1,0 +1,27 @@
+Non-ASCII text in strings and comments: accented Latin, CJK, emoji (an
+astral-plane character, two UTF-16 code units) and a combining accent.
+Diagnostic columns after non-ASCII text on the same line must stay
+correct: the undeclared sMissing after an emoji on line 7 sits at column
+17, counted in code points as the CLI contract specifies (A2), the emoji
+being one character, and formatting must not mangle bytes.
+-- input.ssl --
+/* Résumé des échantillons — 样品摘要 🧪;
+:DECLARE sGreeting, sLabel, sUnused;
+sGreeting := "Grüße aus Zürich 👋";
+sLabel := "試料番号: " + sGreeting + " café";
+/* naïve — combining: é → é;
+sLabel := sLabel + "🧪🧫";   :RETURN sLabel;
+sLabel := "🧪" + sMissing;
+-- format --
+/* Résumé des échantillons — 样品摘要 🧪;
+:DECLARE sGreeting, sLabel, sUnused;
+sGreeting := "Grüße aus Zürich 👋";
+sLabel := "試料番号: " + sGreeting + " café";
+/* naïve — combining: é → é;
+sLabel := sLabel + "🧪🧫";
+:RETURN sLabel;
+sLabel := "🧪" + sMissing;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+2:29-2:36 hint unused_variable: Variable 'sUnused' is declared but never used
+7:17-7:25 warning undeclared_variable: Variable 'sMissing' is not declared

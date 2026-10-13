@@ -1,0 +1,40 @@
+The CLI runs with the blank-line cap disabled (maxConsecutiveBlankLines
+default 0), so source runs of blank lines inside a procedure pass through
+unchanged; only the procedure boundary is normalized
+(fmt.max_consecutive_blank_lines issue #37, fmt.blank_lines_between_procs).
+Whitespace-only lines become empty (fmt.trim_trailing_whitespace).
+Note: the style guide's no_excess_blank_lines asks for 3+ blank lines to
+become one; the catalog keeps the cap opt-in, so this records the default.
+-- input.ssl --
+:PROCEDURE Spaced;
+:DECLARE nFirst, nSecond;
+nFirst := 1;
+
+
+
+nSecond := 2;
+  
+:RETURN nFirst + nSecond;
+:ENDPROC;
+
+
+:PROCEDURE Next;
+:RETURN 0;
+:ENDPROC;
+-- format --
+:PROCEDURE Spaced;
+	:DECLARE nFirst, nSecond;
+	nFirst := 1;
+
+
+
+	nSecond := 2;
+
+	:RETURN nFirst + nSecond;
+:ENDPROC;
+
+:PROCEDURE Next;
+	:RETURN 0;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

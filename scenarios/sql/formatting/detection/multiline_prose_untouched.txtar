@@ -1,0 +1,14 @@
+A multi-line English string with SQL trigger words keeps its line
+breaks byte for byte (issue #82). Kept at column 0: a non-SQL multi-line
+string inside an indented block trips a range-formatting bug (see the
+suite report), so this input stays top-level.
+-- input.ssl --
+:DECLARE sMsg;
+sMsg := "Select the samples from the rack
+and update the status column";
+-- format --
+:DECLARE sMsg;
+sMsg := "Select the samples from the rack
+and update the status column";
+-- diagnostics --
+-- diagnostics [--strict --info] --

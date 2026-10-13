@@ -1,0 +1,34 @@
+Near miss for begincase_requires_case: a :BEGINCASE with no :CASE that
+never reaches :ENDCASE. The rule is emitted at close, so only
+unclosed_block reports the opener; begincase_requires_case must NOT fire
+(catalog "must NOT flag" second bullet). Because the block stays open,
+the :RETURN after the :OTHERWISE branch's :EXITCASE is read as part of
+that branch and exitcase_last_in_branch also fires on it: a consequence
+of the same missing :ENDCASE.
+-- input.ssl --
+:PROCEDURE PickBin;
+	:PARAMETERS nSize;
+	:DECLARE sBin;
+	:BEGINCASE;
+	:OTHERWISE;
+		sBin := "default";
+		:EXITCASE;
+	:RETURN sBin;
+:ENDPROC;
+-- format --
+:PROCEDURE PickBin;
+	:PARAMETERS nSize;
+	:DECLARE sBin;
+	:BEGINCASE;
+	:OTHERWISE;
+		sBin := "default";
+		:EXITCASE;
+		:RETURN sBin;
+	:ENDPROC;
+-- diagnostics --
+4:2-4:12 error unclosed_block: Unclosed ':BEGINCASE' - expected ':ENDCASE'
+8:2-8:9 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch
+-- diagnostics [--strict --info] --
+2:14-2:19 hint unused_variable: Variable 'nSize' is declared but never used
+4:2-4:12 error unclosed_block: Unclosed ':BEGINCASE' - expected ':ENDCASE'
+8:2-8:9 error exitcase_last_in_branch: Statement after ':EXITCASE' does not compile: ':EXITCASE' must be the last statement of its ':CASE' or ':OTHERWISE' branch

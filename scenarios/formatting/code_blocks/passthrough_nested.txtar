@@ -1,0 +1,21 @@
+Normalization is conservative: a code block containing a nested code
+block passes through byte-for-byte, while the surrounding statement is
+still spaced (fmt.code_block_literals bail-outs). (The multi-line-body
+bail-out is left out: inside a procedure, range-formatting its second
+line re-indents it, an invariant failure reported separately.)
+-- input.ssl --
+:PROCEDURE Nested;
+:DECLARE fnOuter, vResult;
+fnOuter:={|x|Eval({|y|y+1}, x)};
+vResult:=Eval(fnOuter,1);
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Nested;
+	:DECLARE fnOuter, vResult;
+	fnOuter := {|x|Eval({|y|y+1}, x)};
+	vResult := Eval(fnOuter, 1);
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

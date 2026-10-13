@@ -1,0 +1,36 @@
+Near-misses for diag.zero_based_array_index: other literal and variable
+indexes, an expression that evaluates to 0 or 1, a call result
+subscript, a bracket string [0], and DataSet :Tables chains, which are
+.NET and 0-based at every tier (issue #304).
+-- input.ssl --
+:PROCEDURE Cells;
+	:PARAMETERS aItems, nIndex;
+	:DECLARE oData, vOut, sName;
+	vOut := aItems[1];
+	vOut := aItems[nIndex];
+	vOut := aItems[0 + 1];
+	vOut := DoProc("GetRows")[0];
+	sName := [0];
+	oData := LimsNetConnect("System.Data", "System.Data.DataSet");
+	vOut := oData:Tables[0];
+	sName := oData:Tables[0]:Columns[0]:ColumnName;
+	vOut := oData:Tables[0]:Rows[0]:ItemArray[0];
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Cells;
+	:PARAMETERS aItems, nIndex;
+	:DECLARE oData, vOut, sName;
+	vOut := aItems[1];
+	vOut := aItems[nIndex];
+	vOut := aItems[0 + 1];
+	vOut := DoProc("GetRows")[0];
+	sName := [0];
+	oData := LimsNETConnect("System.Data", "System.Data.DataSet");
+	vOut := oData:Tables[0];
+	sName := oData:Tables[0]:Columns[0]:ColumnName;
+	vOut := oData:Tables[0]:Rows[0]:ItemArray[0];
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

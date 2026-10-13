@@ -1,0 +1,53 @@
+The sanctioned way for methods to call each other inside a class: Me: for
+own methods, Base: for parent methods, a fully qualified DoProc for an
+external script procedure (issue #151), and CreateUdObject with a
+category-qualified class name. No doproc_in_class, base_* or
+createudobject findings expected.
+-- input.ssl --
+:CLASS Pipeline;
+:INHERIT Lab.Stage;
+:DECLARE oNext;
+
+:PROCEDURE Constructor;
+	Base:Constructor();
+	Me:oNext := CreateUdObject("Lab.Sink");
+:ENDPROC;
+
+:PROCEDURE Run;
+	:PARAMETERS aRows;
+	:DECLARE aClean;
+	aClean := Me:Clean(aRows);
+	aClean := DoProc("Lab.RowRules.Normalize", {aClean});
+	Base:Run(aClean);
+	:RETURN Me:oNext:Accept(aClean);
+:ENDPROC;
+
+:PROCEDURE Clean;
+	:PARAMETERS aRows;
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:CLASS Pipeline;
+:INHERIT Lab.Stage;
+:DECLARE oNext;
+
+:PROCEDURE Constructor;
+	Base:Constructor();
+	Me:oNext := CreateUdObject("Lab.Sink");
+:ENDPROC;
+
+:PROCEDURE Run;
+	:PARAMETERS aRows;
+	:DECLARE aClean;
+	aClean := Me:Clean(aRows);
+	aClean := DoProc("Lab.RowRules.Normalize", {aClean});
+	Base:Run(aClean);
+	:RETURN Me:oNext:Accept(aClean);
+:ENDPROC;
+
+:PROCEDURE Clean;
+	:PARAMETERS aRows;
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

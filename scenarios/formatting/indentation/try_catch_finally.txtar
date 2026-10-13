@@ -1,0 +1,52 @@
+:TRY / :CATCH / :FINALLY / :ENDTRY nested inside a :WHILE inside a
+procedure. :CATCH and :FINALLY dedent themselves to the :TRY column and
+indent their bodies one level (fmt.indent_style). Input is flush-left with
+lowercase keywords, the usual shape of hand-edited legacy code.
+-- input.ssl --
+:PROCEDURE ProcessQueue;
+:PARAMETERS aQueue;
+:DECLARE nIndex, oErr, sMessage;
+nIndex := 0;
+:WHILE nIndex < Len(aQueue);
+nIndex += 1;
+:try;
+DoProc("ProcessItem", {aQueue[nIndex]});
+:catch;
+oErr := GetLastSSLError();
+sMessage := "Failed item " + LimsString(nIndex) + ": " + oErr:Description;
+ErrorMes("ProcessQueue", sMessage);
+:finally;
+nIndex := nIndex;
+:endtry;
+:ENDWHILE;
+:RETURN nIndex;
+:ENDPROC;
+-- format --
+:PROCEDURE ProcessQueue;
+	:PARAMETERS aQueue;
+	:DECLARE nIndex, oErr, sMessage;
+	nIndex := 0;
+	:WHILE nIndex < Len(aQueue);
+		nIndex += 1;
+		:TRY;
+			DoProc("ProcessItem", {aQueue[nIndex]});
+		:CATCH;
+			oErr := GetLastSSLError();
+			sMessage := "Failed item " + LimsString(nIndex) + ": " + oErr:Description;
+			ErrorMes("ProcessQueue", sMessage);
+		:FINALLY;
+			nIndex := nIndex;
+		:ENDTRY;
+	:ENDWHILE;
+	:RETURN nIndex;
+:ENDPROC;
+-- diagnostics --
+7:1-7:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+13:1-13:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FINALLY'
+15:1-15:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
+-- diagnostics [--strict --info] --
+7:1-7:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+13:1-13:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FINALLY'
+15:1-15:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'

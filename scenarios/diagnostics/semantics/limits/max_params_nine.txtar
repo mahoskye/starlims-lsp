@@ -1,0 +1,27 @@
+A procedure with 9 parameters exceeds the style guide's 8
+(diag.max_params_warning, info tier, on the procedure name), so it shows
+only under --info. A procedure with exactly 8 does not fire.
+-- input.ssl --
+:PROCEDURE RegisterSample;
+	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer, sRemarks;
+	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer, sRemarks};
+:ENDPROC;
+:PROCEDURE RegisterBlank;
+	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer;
+	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer};
+:ENDPROC;
+-- format --
+:PROCEDURE RegisterSample;
+	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
+	            sRemarks;
+	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
+		sRemarks};
+:ENDPROC;
+
+:PROCEDURE RegisterBlank;
+	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer;
+	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:12-1:26 info max_params_warning: Procedure 'RegisterSample' has 9 parameters; style guide recommends at most 8 per procedure

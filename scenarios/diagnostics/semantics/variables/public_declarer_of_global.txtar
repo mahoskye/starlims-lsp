@@ -1,0 +1,20 @@
+A file that declares :PUBLIC MYUSERNAME is the initializer that creates
+the global, so its assignment is not diag.global_assignment (issue #169);
+each :PUBLIC statement still fires diag.limit_public_vars (info tier) on its keyword,
+one per statement however many names it lists.
+-- input.ssl --
+:PUBLIC MYUSERNAME;
+:PUBLIC gSiteCode, gShiftNo;
+MYUSERNAME := "system";
+gSiteCode := "S01";
+gShiftNo := 1;
+-- format --
+:PUBLIC MYUSERNAME;
+:PUBLIC gSiteCode, gShiftNo;
+MYUSERNAME := "system";
+gSiteCode := "S01";
+gShiftNo := 1;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+2:1-2:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing

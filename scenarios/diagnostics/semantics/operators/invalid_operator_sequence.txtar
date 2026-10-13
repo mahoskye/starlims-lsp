@@ -1,0 +1,35 @@
+C-family operators (diag.invalid_operator_sequence, error): && and || get
+the .AND./.OR. replacement, and a bare & or | is simply invalid. The
+glued === / !== forms are left out of this input: the formatter rewrites
+`1 === 1` to `1 == = 1`, which introduces unexpected_token errors (an
+invariant failure, reported separately).
+-- input.ssl --
+:PROCEDURE CheckPair;
+	:PARAMETERS bA, bB;
+	:DECLARE bOk;
+	bOk := bA && bB;
+	bOk := bA || bB;
+	bOk := bA & bB;
+	bOk := bA | bB;
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckPair;
+	:PARAMETERS bA, bB;
+	:DECLARE bOk;
+	bOk := bA && bB;
+	bOk := bA || bB;
+	bOk := bA & bB;
+	bOk := bA | bB;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+4:12-4:14 error invalid_operator_sequence: SSL uses '.AND.' instead of '&&'
+5:12-5:14 error invalid_operator_sequence: SSL uses '.OR.' instead of '||'
+6:12-6:13 error invalid_operator_sequence: '&' is not a valid SSL operator
+7:12-7:13 error invalid_operator_sequence: '|' is not a valid SSL operator
+-- diagnostics [--strict --info] --
+4:12-4:14 error invalid_operator_sequence: SSL uses '.AND.' instead of '&&'
+5:12-5:14 error invalid_operator_sequence: SSL uses '.OR.' instead of '||'
+6:12-6:13 error invalid_operator_sequence: '&' is not a valid SSL operator
+7:12-7:13 error invalid_operator_sequence: '|' is not a valid SSL operator

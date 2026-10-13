@@ -1,0 +1,33 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+A call chain continued with the member-access `:` leading the next line
+is one statement: no `;` after the receiver line, the member names keep
+their case (`:Replace` is not the keyword `:REPLACE`), and each chain line
+takes one continuation level (fmt.indent_style and
+fmt.semicolon_enforcement, issue #240 follow-up). Nested inside an :IF to
+show the extra level is relative to the statement line.
+-- input.ssl --
+:PROCEDURE FillTemplate;
+:PARAMETERS oTemplate, sTitle, sUser;
+:DECLARE sOut;
+:IF .NOT. Empty(sTitle);
+sOut := oTemplate:ToString()
+:Replace("##TITLE##", sTitle)
+        :Replace("##USER##", sUser)
+:Trim();
+:ENDIF;
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE FillTemplate;
+	:PARAMETERS oTemplate, sTitle, sUser;
+	:DECLARE sOut;
+	:IF .NOT. Empty(sTitle);
+		sOut := oTemplate:ToString()
+			:Replace("##TITLE##", sTitle)
+			:Replace("##USER##", sUser)
+			:Trim();
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

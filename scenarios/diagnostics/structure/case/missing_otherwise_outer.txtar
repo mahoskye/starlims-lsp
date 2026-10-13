@@ -1,0 +1,38 @@
+An outermost :BEGINCASE whose :CASE clauses all end with :EXITCASE but
+which has no :OTHERWISE. missing_otherwise is a hint on the :BEGINCASE
+token; legal and often intentional, so nothing stronger may appear
+(diag.missing_otherwise).
+-- input.ssl --
+:PROCEDURE StatusLabel;
+	:PARAMETERS sCode;
+	:DECLARE sLabel;
+	sLabel := "Unknown";
+	:BEGINCASE;
+	:CASE sCode == "A";
+		sLabel := "Active";
+		:EXITCASE;
+	:CASE sCode == "I";
+		sLabel := "Inactive";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE StatusLabel;
+	:PARAMETERS sCode;
+	:DECLARE sLabel;
+	sLabel := "Unknown";
+	:BEGINCASE;
+	:CASE sCode == "A";
+		sLabel := "Active";
+		:EXITCASE;
+	:CASE sCode == "I";
+		sLabel := "Inactive";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+5:2-5:12 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling
+-- diagnostics [--strict --info] --
+5:2-5:12 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling

@@ -1,0 +1,224 @@
+A legacy notification script: a built-in class created with call
+parentheses (Email()) and through CreateUdObject("Email"), properties set
+with dots, nested :IF blocks with no indentation at all, tabs and spaces
+mixed, a :LABEL / Branch() retry loop, a code block built and evaluated,
+and lowercase .t. / .and. / nil literals. Formatting and diagnostics
+together on an old mail sender.
+The second half adds a recipient-list helper with crammed lines, a
+:BEGINCASE without :OTHERWISE or :EXITCASE, a :WHILE whose body mixes
+tabs and spaces, and an :ERROR handler placed first so it protects
+nothing (error_handler_structure).
+Suspected issue: inside BuildList the formatter indents everything after the first-placed :ERROR as handler body, then ':ENDCASE' and ':ENDWHILE' each dedent one level too far (see edge-cases/error_handler_nested_block), contradicting fmt.indent_style's one level per enclosing block.
+-- input.ssl --
+:PARAMETERS recipients, subj, body;
+:DECLARE mail, tries, sent, r, fmtfn, alt;
+:DEFAULT subj, "LIMS notice";
+tries := 0; sent := .f.;
+fmtfn := {|x| "To: " + x};
+:LABEL SendAgain;
+tries := tries + 1;
+mail := Email();
+mail.Subject := subj;
+mail:Body := body;
+:for r := 1 :to len(recipients);
+:if .not. empty(recipients[r]) .and. recipients[r] != nil;
+mail:To := recipients[r];
+:if tries > 1;
+	UsrMes(eval(fmtfn, recipients[r]));
+:endif;
+:endif;
+:next;
+sent := mail:Send();
+:if .not. sent .and. tries < 3;
+    Branch("LABEL SendAgain");
+:endif;
+:if .not. sent;
+	alt := CreateUdObject("Email");
+	alt:To := "lims-admin@example.com";
+		alt:Subject := "notify failed: " + subj;
+  alt:Send();
+:endif;
+:return sent;
+
+:procedure BuildList;
+:parameters dept;
+:declare lst, q, row, idx;
+:error;
+ErrorMes("BuildList", "lookup failed");
+lst := {}; idx := 1;
+q := LSelect1("select Email, Active from LabContacts where Dept = ?",, {dept});
+:while idx <= len(q);
+	row := q[idx];
+        :begincase;
+        :case row[2] = "Y";
+	AAdd(lst, row[1]);
+        :case row[2] = "";
+  	UsrMes("no status for " + row[1]);
+        :endcase;
+    idx := idx + 1;
+:endwhile;
+:if len(lst) = 0; lst := {"lims-admin@example.com"}; :endif;
+:return lst;
+:endproc;
+
+:procedure Retire;
+:parameters addr;
+:declare ok;
+ok := RunSQL("update LabContacts set Active = 'N' where Email = '" + addr + "'");
+:return ok;
+:endproc;
+-- format --
+:PARAMETERS recipients, subj, body;
+:DECLARE mail, tries, sent, r, fmtfn, alt;
+:DEFAULT subj, "LIMS notice";
+tries := 0;
+sent := .F.;
+fmtfn := {|x| "To: " + x};
+:LABEL SendAgain;
+tries := tries + 1;
+mail := Email();
+mail.Subject := subj;
+mail:Body := body;
+:FOR r := 1 :TO Len(recipients);
+	:IF .NOT. Empty(recipients[r]) .AND. recipients[r] != NIL;
+		mail:To := recipients[r];
+		:IF tries > 1;
+			UsrMes(Eval(fmtfn, recipients[r]));
+		:ENDIF;
+	:ENDIF;
+:NEXT;
+sent := mail:Send();
+:IF .NOT. sent .AND. tries < 3;
+	Branch("LABEL SendAgain");
+:ENDIF;
+
+:IF .NOT. sent;
+	alt := CreateUdObject("Email");
+	alt:To := "lims-admin@example.com";
+	alt:Subject := "notify failed: " + subj;
+	alt:Send();
+:ENDIF;
+:RETURN sent;
+
+:PROCEDURE BuildList;
+	:PARAMETERS dept;
+	:DECLARE lst, q, row, idx;
+	:ERROR;
+		ErrorMes("BuildList", "lookup failed");
+		lst := {};
+		idx := 1;
+		q := LSelect1("select Email, Active from LabContacts where Dept = ?",, {dept});
+		:WHILE idx <= Len(q);
+			row := q[idx];
+			:BEGINCASE;
+			:CASE row[2] = "Y";
+				AAdd(lst, row[1]);
+			:CASE row[2] = "";
+				UsrMes("no status for " + row[1]);
+		:ENDCASE;
+		idx := idx + 1;
+	:ENDWHILE;
+
+	:IF Len(lst) = 0;
+		lst := {"lims-admin@example.com"};
+	:ENDIF;
+	:RETURN lst;
+:ENDPROC;
+
+:PROCEDURE Retire;
+	:PARAMETERS addr;
+	:DECLARE ok;
+	ok := RunSQL("update LabContacts set Active = 'N' where Email = '" + addr + "'");
+	:RETURN ok;
+:ENDPROC;
+-- diagnostics --
+3:1-3:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+6:1-6:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:9-8:14 error class_instantiation_curly: SSL built-in class 'Email' uses curly braces for instantiation: 'Email{}' not 'Email()'
+9:5-9:13 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Subject' instead of 'object.Subject'
+11:1-11:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+11:13-11:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+12:1-12:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+14:1-14:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+16:1-16:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+17:1-17:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+18:1-18:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+20:1-20:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+22:1-22:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+23:1-23:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+24:24-24:31 error createudobject_builtin_misuse: Built-in SSL class 'Email' must use curly-brace construction ('Email{}'), not CreateUdObject("Email")
+28:1-28:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+29:1-29:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+31:1-31:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+32:1-32:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+33:1-33:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+34:1-34:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+34:1-34:7 error error_handler_structure: ':ERROR' protects only the statements before it in the procedure; placed first it protects nothing. Move it to the end of the procedure
+34:1-34:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+38:1-38:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':WHILE'
+40:9-40:19 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+40:9-40:19 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling
+41:9-41:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+41:9-41:14 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+43:9-43:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+43:9-43:14 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+43:15-43:26 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+45:9-45:17 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+47:1-47:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDWHILE'
+48:1-48:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+48:54-48:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+49:1-49:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+50:1-50:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+52:1-52:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+53:1-53:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+54:1-54:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+55:68-55:69 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+56:1-56:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+57:1-57:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- diagnostics [--strict --info] --
+3:1-3:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+6:1-6:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:9-8:14 error class_instantiation_curly: SSL built-in class 'Email' uses curly braces for instantiation: 'Email{}' not 'Email()'
+9:5-9:13 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Subject' instead of 'object.Subject'
+11:1-11:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+11:13-11:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+12:1-12:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+14:1-14:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+16:1-16:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+17:1-17:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+18:1-18:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+20:1-20:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+22:1-22:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+23:1-23:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+24:24-24:31 error createudobject_builtin_misuse: Built-in SSL class 'Email' must use curly-brace construction ('Email{}'), not CreateUdObject("Email")
+28:1-28:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+29:1-29:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+31:1-31:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+32:1-32:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+33:1-33:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+34:1-34:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+34:1-34:7 error error_handler_structure: ':ERROR' protects only the statements before it in the procedure; placed first it protects nothing. Move it to the end of the procedure
+34:1-34:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+38:1-38:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':WHILE'
+40:9-40:19 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+40:9-40:19 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling
+41:9-41:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+41:9-41:14 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+41:22-41:23 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+43:9-43:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+43:9-43:14 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+43:15-43:26 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+43:22-43:23 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+45:9-45:17 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+47:1-47:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDWHILE'
+48:1-48:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+48:54-48:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+49:1-49:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+50:1-50:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+52:1-52:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+53:1-53:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+54:1-54:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+55:14-55:67 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+55:68-55:69 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+56:1-56:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+57:1-57:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

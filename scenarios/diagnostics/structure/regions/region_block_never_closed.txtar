@@ -1,0 +1,21 @@
+A :REGION opened and never closed runs to the end of the file; its body is
+opaque payload that formatting passes through verbatim.
+-- input.ssl --
+:PROCEDURE Demo;
+:RETURN 1;
+:ENDPROC;
+:REGION HelpText;
+Free text that is never closed
+  with its own indentation
+-- format --
+:PROCEDURE Demo;
+	:RETURN 1;
+:ENDPROC;
+
+:REGION HelpText;
+Free text that is never closed
+  with its own indentation
+-- diagnostics --
+4:1-4:8 error unclosed_block: Unclosed ':REGION' - expected ':ENDREGION'
+-- diagnostics [--strict --info] --
+4:1-4:8 error unclosed_block: Unclosed ':REGION' - expected ':ENDREGION'

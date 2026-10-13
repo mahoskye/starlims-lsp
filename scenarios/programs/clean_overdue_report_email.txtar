@@ -1,0 +1,218 @@
+A complete reporting script written to AGENTS.md conventions: LSelect1
+with positional placeholders, FOR loops over result rows, string
+building with sFmt:Format, an Email{.F.} built-in sent inside TRY/CATCH,
+a BEGINCASE recipient choice and ExecFunction for an external lookup.
+Expected nearly clean under every profile.
+-- input.ssl --
+/*
+ * Script: OverdueReportEmail
+ * Description: Mails each lab group the list of its overdue tests
+ * Parameters:
+ *   nGraceDays - days past due before a test counts as overdue
+ * Returns: the number of messages sent
+;
+:PARAMETERS nGraceDays;
+:DEFAULT nGraceDays, 2;
+:DECLARE aGroups, nSent, i, sGroup, aOverdue, sBody, bSent;
+
+nSent := 0;
+aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",, {"PENDING"});
+
+:FOR i := 1 :TO Len(aGroups);
+	sGroup := aGroups[i][1];
+	aOverdue := DoProc("FindOverdue", {sGroup, nGraceDays});
+	:IF Len(aOverdue) > 0;
+		sBody := DoProc("BuildBody", {sGroup, aOverdue});
+		bSent := DoProc("SendReport", {sGroup, sBody});
+		:IF bSent;
+			nSent += 1;
+		:ENDIF;
+	:ENDIF;
+:NEXT;
+
+:RETURN nSent;
+
+/*
+ * Procedure: FindOverdue
+ * Parameters:
+ *   sGroup - the lab group to check
+ *   nGraceDays - days past due before a test counts as overdue
+ * Returns: rows of {TestId, SampleId, DueDate}
+;
+:PROCEDURE FindOverdue;
+	:PARAMETERS sGroup, nGraceDays;
+	:DECLARE dCutoff, sSQL;
+	dCutoff := DateAdd(Today(), -nGraceDays, "dd");
+	sSQL := "SELECT TestId, SampleId, DueDate FROM LabTests WHERE LabGroup = ? AND Status = ? AND DueDate < ?";
+	:RETURN LSelect1(sSQL,, {sGroup, "PENDING", dCutoff});
+:ENDPROC;
+
+/*
+ * Procedure: BuildBody
+ * Parameters:
+ *   sGroup - the lab group the message is for
+ *   aOverdue - rows of {TestId, SampleId, DueDate}
+ * Returns: the message body text
+;
+:PROCEDURE BuildBody;
+	:PARAMETERS sGroup, aOverdue;
+	:DECLARE sFmt, sBody, j, aRow;
+	sFmt := "Test {0} on sample {1} was due {2}";
+	sBody := "Overdue tests for " + sGroup + Chr(13) + Chr(10);
+	:FOR j := 1 :TO Len(aOverdue);
+		aRow := aOverdue[j];
+		sBody += sFmt:Format({aRow[1], aRow[2], DateToString(aRow[3], "yyyy-MM-dd")});
+		sBody += Chr(13) + Chr(10);
+	:NEXT;
+	:RETURN sBody;
+:ENDPROC;
+
+/*
+ * Procedure: SendReport
+ * Parameters:
+ *   sGroup - the lab group to notify
+ *   sBody - the message body
+ * Returns: .T. when the message was handed to SMTP
+;
+:PROCEDURE SendReport;
+	:PARAMETERS sGroup, sBody;
+	:DECLARE oEmail, sRecipient, bOk;
+	:BEGINCASE;
+	:CASE sGroup == "CHEM";
+		sRecipient := "chem-leads@example.com";
+		:EXITCASE;
+	:CASE sGroup == "MICRO";
+		sRecipient := "micro-leads@example.com";
+		:EXITCASE;
+	:OTHERWISE;
+		sRecipient := ExecFunction("Lab.GroupDirectory.LeadAddress", {sGroup});
+		:EXITCASE;
+	:ENDCASE;
+
+	:IF Empty(sRecipient);
+		:RETURN .F.;
+	:ENDIF;
+
+	:TRY;
+		oEmail := Email{.F.};
+		oEmail:To := sRecipient;
+		oEmail:Subject := "Overdue tests: " + sGroup;
+		oEmail:Body := sBody;
+		bOk := oEmail:Send();
+	:CATCH;
+		ErrorMes("OverdueReportEmail", GetLastSSLError():Description);
+		bOk := .F.;
+	:ENDTRY;
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+/*
+ * Script: OverdueReportEmail
+ * Description: Mails each lab group the list of its overdue tests
+ * Parameters:
+ *   nGraceDays - days past due before a test counts as overdue
+ * Returns: the number of messages sent
+;
+:PARAMETERS nGraceDays;
+:DEFAULT nGraceDays, 2;
+:DECLARE aGroups, nSent, i, sGroup, aOverdue, sBody, bSent;
+
+nSent := 0;
+aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
+	{"PENDING"});
+
+:FOR i := 1 :TO Len(aGroups);
+	sGroup := aGroups[i][1];
+	aOverdue := DoProc("FindOverdue", {sGroup, nGraceDays});
+	:IF Len(aOverdue) > 0;
+		sBody := DoProc("BuildBody", {sGroup, aOverdue});
+		bSent := DoProc("SendReport", {sGroup, sBody});
+		:IF bSent;
+			nSent += 1;
+		:ENDIF;
+	:ENDIF;
+:NEXT;
+
+:RETURN nSent;
+
+/*
+ * Procedure: FindOverdue
+ * Parameters:
+ *   sGroup - the lab group to check
+ *   nGraceDays - days past due before a test counts as overdue
+ * Returns: rows of {TestId, SampleId, DueDate}
+;
+:PROCEDURE FindOverdue;
+	:PARAMETERS sGroup, nGraceDays;
+	:DECLARE dCutoff, sSQL;
+	dCutoff := DateAdd(Today(), -nGraceDays, "dd");
+	sSQL := "
+	    SELECT TestId, SampleId, DueDate
+	    FROM LabTests
+	    WHERE LabGroup = ?
+	      AND Status = ?
+	      AND DueDate < ?
+	";
+	:RETURN LSelect1(sSQL,, {sGroup, "PENDING", dCutoff});
+:ENDPROC;
+
+/*
+ * Procedure: BuildBody
+ * Parameters:
+ *   sGroup - the lab group the message is for
+ *   aOverdue - rows of {TestId, SampleId, DueDate}
+ * Returns: the message body text
+;
+:PROCEDURE BuildBody;
+	:PARAMETERS sGroup, aOverdue;
+	:DECLARE sFmt, sBody, j, aRow;
+	sFmt := "Test {0} on sample {1} was due {2}";
+	sBody := "Overdue tests for " + sGroup + Chr(13) + Chr(10);
+	:FOR j := 1 :TO Len(aOverdue);
+		aRow := aOverdue[j];
+		sBody += sFmt:Format({aRow[1], aRow[2], DateToString(aRow[3], "yyyy-MM-dd")});
+		sBody += Chr(13) + Chr(10);
+	:NEXT;
+	:RETURN sBody;
+:ENDPROC;
+
+/*
+ * Procedure: SendReport
+ * Parameters:
+ *   sGroup - the lab group to notify
+ *   sBody - the message body
+ * Returns: .T. when the message was handed to SMTP
+;
+:PROCEDURE SendReport;
+	:PARAMETERS sGroup, sBody;
+	:DECLARE oEmail, sRecipient, bOk;
+	:BEGINCASE;
+	:CASE sGroup == "CHEM";
+		sRecipient := "chem-leads@example.com";
+		:EXITCASE;
+	:CASE sGroup == "MICRO";
+		sRecipient := "micro-leads@example.com";
+		:EXITCASE;
+	:OTHERWISE;
+		sRecipient := ExecFunction("Lab.GroupDirectory.LeadAddress", {sGroup});
+		:EXITCASE;
+	:ENDCASE;
+
+	:IF Empty(sRecipient);
+		:RETURN .F.;
+	:ENDIF;
+
+	:TRY;
+		oEmail := Email{.F.};
+		oEmail:To := sRecipient;
+		oEmail:Subject := "Overdue tests: " + sGroup;
+		oEmail:Body := sBody;
+		bOk := oEmail:Send();
+	:CATCH;
+		ErrorMes("OverdueReportEmail", GetLastSSLError():Description);
+		bOk := .F.;
+	:ENDTRY;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,69 @@
+A realistic open/use/close routine where NIL rules meet: a guarded
+release (quiet), a use after the release (nil_method_call), a NIL
+compared against "" (info), and a NIL in a string concatenation. The
+:FINALLY body has statements and no :RETURN.
+-- input.ssl --
+:PROCEDURE SyncLabels;
+	:PARAMETERS sHost;
+	:DECLARE oConn, sLog, bOk;
+	bOk := .F.;
+	sLog := "";
+	:TRY;
+		oConn := LimsNetConnect("LabelBridge", "LabelBridge.Client");
+		oConn:Open(sHost);
+		bOk := oConn:Push();
+	:CATCH;
+		sLog := "sync failed: " + GetLastSSLError():Description;
+	:FINALLY;
+		:IF !Empty(oConn);
+			oConn:Close();
+			oConn := NIL;
+		:ENDIF;
+	:ENDTRY;
+	:IF oConn == "";
+		sLog := sLog + " (no connection)";
+	:ENDIF;
+	:IF NIL = "";
+		sLog := sLog + NIL;
+	:ENDIF;
+	oConn := NIL;
+	oConn:Dispose();
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE SyncLabels;
+	:PARAMETERS sHost;
+	:DECLARE oConn, sLog, bOk;
+	bOk := .F.;
+	sLog := "";
+	:TRY;
+		oConn := LimsNETConnect("LabelBridge", "LabelBridge.Client");
+		oConn:Open(sHost);
+		bOk := oConn:Push();
+	:CATCH;
+		sLog := "sync failed: " + GetLastSSLError():Description;
+	:FINALLY;
+		:IF !Empty(oConn);
+			oConn:Close();
+			oConn := NIL;
+		:ENDIF;
+	:ENDTRY;
+
+	:IF oConn == "";
+		sLog := sLog + " (no connection)";
+	:ENDIF;
+
+	:IF NIL = "";
+		sLog := sLog + NIL;
+	:ENDIF;
+	oConn := NIL;
+	oConn:Dispose();
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+22:16-22:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+25:2-25:7 warning nil_method_call: Variable 'oConn' may be NIL at this point. Calling methods on NIL raises an error.
+-- diagnostics [--strict --info] --
+21:10-21:11 info nil_not_empty_string: NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL
+22:16-22:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+25:2-25:7 warning nil_method_call: Variable 'oConn' may be NIL at this point. Calling methods on NIL raises an error.

@@ -1,0 +1,29 @@
+A SQL character literal left open across SSL concatenation
+(diag.sql_literal_splice, info tier): reported once per call on the
+opening piece, beside sql_injection on the same call (deliberate double
+emission). The second call opens the literal inside an IN list whose
+closing piece also carries a balanced 'Z' literal.
+-- input.ssl --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, sCode;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
+	aRows := SQLExecute("SELECT id FROM c WHERE code IN ('" + sCode + "', 'Z')");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, sCode;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
+	aRows := SQLExecute("SELECT id FROM c WHERE code IN ('" + sCode + "', 'Z')");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+4:72-4:73 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+5:58-5:59 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+-- diagnostics [--strict --info] --
+4:22-4:71 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+4:72-4:73 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+5:22-5:57 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+5:58-5:59 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.

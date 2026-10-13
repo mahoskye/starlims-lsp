@@ -1,0 +1,47 @@
+Field names shadowed by method-local :DECLARE, :PARAMETERS and :PUBLIC
+entries: the local is evidently intended, so neither
+unqualified_field_assignment nor unqualified_field_read may fire. Qualified
+Me: access elsewhere. Should be free of field findings.
+-- input.ssl --
+:CLASS Totaler;
+:DECLARE nTotal, sLabel, aRows;
+
+:PROCEDURE Compute;
+	:DECLARE nTotal;
+	nTotal := 5;
+	:RETURN nTotal;
+:ENDPROC;
+
+:PROCEDURE Rename;
+	:PARAMETERS sLabel;
+	Me:sLabel := sLabel;
+:ENDPROC;
+
+:PROCEDURE Share;
+	:PUBLIC aRows;
+	aRows := {};
+	:RETURN Len(Me:aRows);
+:ENDPROC;
+-- format --
+:CLASS Totaler;
+:DECLARE nTotal, sLabel, aRows;
+
+:PROCEDURE Compute;
+	:DECLARE nTotal;
+	nTotal := 5;
+	:RETURN nTotal;
+:ENDPROC;
+
+:PROCEDURE Rename;
+	:PARAMETERS sLabel;
+	Me:sLabel := sLabel;
+:ENDPROC;
+
+:PROCEDURE Share;
+	:PUBLIC aRows;
+	aRows := {};
+	:RETURN Len(Me:aRows);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+16:2-16:9 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing

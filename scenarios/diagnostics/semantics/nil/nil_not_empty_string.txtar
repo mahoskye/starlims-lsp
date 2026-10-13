@@ -1,0 +1,29 @@
+NIL compared with = or == against a default-value literal ("", '', [],
+0, .F.) is always .F. — declared variables start as "", not NIL
+(diag.nil_not_empty_string, info tier, on the operator), with NIL on
+either side. NIL is not a string, so equals_vs_strict_equals and
+equals_empty_string stay quiet on NIL = "".
+-- input.ssl --
+:PROCEDURE Probe;
+	:DECLARE bA;
+	bA := NIL = "";
+	bA := NIL == 0;
+	bA := .F. == NIL;
+	bA := NIL = '';
+	:RETURN bA;
+:ENDPROC;
+-- format --
+:PROCEDURE Probe;
+	:DECLARE bA;
+	bA := NIL = "";
+	bA := NIL == 0;
+	bA := .F. == NIL;
+	bA := NIL = '';
+	:RETURN bA;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:12-3:13 info nil_not_empty_string: NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL
+4:12-4:14 info nil_not_empty_string: NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL
+5:12-5:14 info nil_not_empty_string: NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL
+6:12-6:13 info nil_not_empty_string: NIL is not the same as empty string, zero, or .F. Declared variables initialize to empty string, not NIL

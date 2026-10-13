@@ -1,0 +1,18 @@
+`/* Regional settings follow;` contains "region" only as part of a longer
+word, so it opens nothing and cannot hide the orphan `/* endregion;`
+below it: region_end_mismatch fires (diag.region_end_mismatch second
+Flags fence).
+-- input.ssl --
+/* Regional settings follow;
+:DECLARE sLocale;
+sLocale := "en-US";
+/* endregion;
+-- format --
+/* Regional settings follow;
+:DECLARE sLocale;
+sLocale := "en-US";
+/* endregion;
+-- diagnostics --
+4:1-4:14 hint region_end_mismatch: 'endregion' has no open '/* region' to close
+-- diagnostics [--strict --info] --
+4:1-4:14 hint region_end_mismatch: 'endregion' has no open '/* region' to close

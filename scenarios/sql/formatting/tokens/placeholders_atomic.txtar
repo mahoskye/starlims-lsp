@@ -1,0 +1,39 @@
+Placeholders are atomic spans preserved verbatim (fmt.sql_in_strings):
+?name?, ?oObj:Prop?, ?aArr[1]?, ?Today()?, the quoted-literal idiom
+?'Y'? and a ?'<<name>>'? template span (byte-preserved, not
+legitimized), plus bare positional ? markers in a RunSQL call.
+-- input.ssl --
+:PROCEDURE Placeholders;
+	:PARAMETERS sStatus, oUser, aIds, sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("select ordno from orders where status = ?sStatus? and owner = ?oUser:ID? and ordno = ?aIds[1]? and logdate < ?Today()? and active = ?'Y'? and loggedby = ?'<<username>>'?");
+	bOk := RunSQL("update orders set status = ?, modified_by = ?, modified_date = sysdate where ordno = ? and status <> ?",, {"C", oUser:ID, sOrdNo, "X"});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Placeholders;
+	:PARAMETERS sStatus, oUser, aIds, sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE status = ?sStatus?
+	      AND owner = ?oUser:ID?
+	      AND ordno = ?aIds[1]?
+	      AND logdate < ?Today()?
+	      AND active = ?'Y'?
+	      AND loggedby = ?'<<username>>'?
+	");
+	bOk := RunSQL("
+	    UPDATE orders SET
+	        status = ?,
+	        modified_by = ?,
+	        modified_date = SYSDATE
+	    WHERE ordno = ?
+	      AND status <> ?
+	",, {"C", oUser:ID, sOrdNo, "X"});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:193 info sql_suspect_placeholder: Placeholder ?'<<username>>'? stacks a <<...>> template substitution inside ?...? - verify both layers actually resolve; a plain ?name? placeholder avoids the ambiguity

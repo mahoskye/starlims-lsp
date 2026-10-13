@@ -1,0 +1,33 @@
+Near-misses for diag.equals_empty_string: Empty(), == "" and != "",
+"" = x (true only when x is empty — a correct emptiness test), a
+non-string left operand, a bare x = ""; statement (a mistyped
+assignment, not a test), and "" inside SQL text.
+-- input.ssl --
+:PROCEDURE Blank;
+	:PARAMETERS sStatus, nCount;
+	:DECLARE bBlank, sSql;
+	bBlank := Empty(sStatus);
+	bBlank := sStatus == "" .OR. sStatus != "";
+	bBlank := "" = sStatus;
+	bBlank := nCount = "";
+	sSql := "UPDATE lots SET note = '' WHERE id = ?";
+	sStatus = "";
+	:RETURN bBlank;
+:ENDPROC;
+-- format --
+:PROCEDURE Blank;
+	:PARAMETERS sStatus, nCount;
+	:DECLARE bBlank, sSql;
+	bBlank := Empty(sStatus);
+	bBlank := sStatus == "" .OR. sStatus != "";
+	bBlank := "" = sStatus;
+	bBlank := nCount = "";
+	sSql := "UPDATE lots SET note = '' WHERE id = ?";
+	sStatus = "";
+	:RETURN bBlank;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+6:15-6:16 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+7:19-7:20 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+9:10-9:11 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

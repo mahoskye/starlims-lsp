@@ -1,0 +1,19 @@
+:DECLARE nCount :DEFAULT 0; writes the default inline on the :DECLARE
+statement. v0.24.0 reported diag.default_on_declare_line here; the
+re-scoped rule only inspects statement-initial :DEFAULT targets, and the
+statement now validates clean under every profile.
+Known issue: #323 (regression: this input should not validate clean).
+-- input.ssl --
+:PROCEDURE StartCount;
+	:DECLARE nCount :DEFAULT 0;
+	nCount := nCount + 1;
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE StartCount;
+	:DECLARE nCount :DEFAULT 0;
+	nCount := nCount + 1;
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

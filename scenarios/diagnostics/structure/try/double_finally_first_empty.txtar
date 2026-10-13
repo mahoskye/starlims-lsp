@@ -1,0 +1,35 @@
+Two :FINALLY clauses where the first is empty. single_finally fires on the
+second :FINALLY; the statement after it belongs to no clause, so the first
+:FINALLY is still reported as finally_empty (diag.single_finally,
+diag.finally_empty fourth Flags fence).
+-- input.ssl --
+:PROCEDURE ReleaseLock;
+	:PARAMETERS sLockName;
+	:DECLARE bReleased;
+	:TRY;
+		bReleased := .T.;
+	:FINALLY;
+	:FINALLY;
+		bReleased := .F.;
+	:ENDTRY;
+	:RETURN bReleased;
+:ENDPROC;
+-- format --
+:PROCEDURE ReleaseLock;
+	:PARAMETERS sLockName;
+	:DECLARE bReleased;
+	:TRY;
+		bReleased := .T.;
+	:FINALLY;
+	:FINALLY;
+		bReleased := .F.;
+	:ENDTRY;
+	:RETURN bReleased;
+:ENDPROC;
+-- diagnostics --
+6:2-6:10 error finally_empty: ':FINALLY' must contain at least one statement
+7:2-7:10 error single_finally: Only one ':FINALLY' block is allowed per ':TRY'
+-- diagnostics [--strict --info] --
+2:14-2:23 hint unused_variable: Variable 'sLockName' is declared but never used
+6:2-6:10 error finally_empty: ':FINALLY' must contain at least one statement
+7:2-7:10 error single_finally: Only one ':FINALLY' block is allowed per ':TRY'

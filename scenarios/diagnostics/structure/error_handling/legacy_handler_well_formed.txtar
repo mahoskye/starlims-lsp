@@ -1,0 +1,31 @@
+A legacy :ERROR handler at the end of its procedure, after the statements
+it protects, with a handler statement and :RESUME. error_handler_structure
+must NOT fire; deprecated_keyword (warning) fires on :ERROR and :RESUME
+naming the :TRY/:CATCH replacement (diag.error_handler_structure "Does not
+flag", diag.deprecated_keyword).
+-- input.ssl --
+:PROCEDURE LoadPrices;
+	:DECLARE aPrices, nStatus;
+	nStatus := 0;
+	aPrices := SQLExecute("SELECT PRICE FROM PRICELIST");
+	:RETURN aPrices;
+	:ERROR;
+	nStatus := -1;
+	:RESUME;
+:ENDPROC;
+-- format --
+:PROCEDURE LoadPrices;
+	:DECLARE aPrices, nStatus;
+	nStatus := 0;
+	aPrices := SQLExecute("SELECT PRICE FROM PRICELIST");
+	:RETURN aPrices;
+	:ERROR;
+		nStatus := -1;
+	:RESUME;
+:ENDPROC;
+-- diagnostics --
+6:2-6:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+8:2-8:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+-- diagnostics [--strict --info] --
+6:2-6:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+8:2-8:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

@@ -1,0 +1,37 @@
+A standalone comment block directly above :PROCEDURE (no blank line
+between) is attached: the separating blank line goes above the comment
+block, not between it and the keyword. A comment already separated from
+its :PROCEDURE by a blank line is not attached, and normalization applies
+between that comment and the :PROCEDURE (fmt.blank_lines_between_procs).
+-- input.ssl --
+:PROCEDURE First;
+:RETURN 1;
+:ENDPROC;
+/* Second: returns two;
+/* used by the report header;
+:PROCEDURE Second;
+:RETURN 2;
+:ENDPROC;
+/* Loose note about Third;
+
+
+:PROCEDURE Third;
+:RETURN 3;
+:ENDPROC;
+-- format --
+:PROCEDURE First;
+	:RETURN 1;
+:ENDPROC;
+
+/* Second: returns two;
+/* used by the report header;
+:PROCEDURE Second;
+	:RETURN 2;
+:ENDPROC;
+/* Loose note about Third;
+
+:PROCEDURE Third;
+	:RETURN 3;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

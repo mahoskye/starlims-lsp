@@ -1,0 +1,20 @@
+Near miss for inline_default_outside_datasource: the script layout a .ssl
+file should use (`:PARAMETERS` names only, then `:DEFAULT` lines) is
+silent, as is a `:=` outside :PARAMETERS. The same inline form in a data
+source is covered by ssl_mode/formatted_as_ssl.
+-- input.ssl --
+:PARAMETERS sFleet, nLimit;
+:DEFAULT sFleet, "F1";
+:DEFAULT nLimit, 5;
+:DECLARE nTotal;
+nTotal := Len(sFleet) + nLimit;
+:RETURN nTotal;
+-- format --
+:PARAMETERS sFleet, nLimit;
+:DEFAULT sFleet, "F1";
+:DEFAULT nLimit, 5;
+:DECLARE nTotal;
+nTotal := Len(sFleet) + nLimit;
+:RETURN nTotal;
+-- diagnostics --
+-- diagnostics [--strict --info] --

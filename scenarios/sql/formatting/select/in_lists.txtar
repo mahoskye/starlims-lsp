@@ -1,0 +1,25 @@
+IN lists stay inline when they fit: a literal list, a ?aCodes? array
+placeholder that SQLExecute expands, and a NOT IN list (reference §2.3,
+sql_in_clause_array_expansion).
+-- input.ssl --
+:PROCEDURE Filter;
+	:DECLARE aCodes, aRows;
+	aCodes := {"pH", "TOC", "COND"};
+	aRows := SQLExecute("select ordno, testcode, status from ordtask where status in ('Logged', 'Pending', 'Active') and testcode in (?aCodes?) and site not in ('LAB2', 'LAB3')");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Filter;
+	:DECLARE aCodes, aRows;
+	aCodes := {"pH", "TOC", "COND"};
+	aRows := SQLExecute("
+	    SELECT ordno, testcode, status
+	    FROM ordtask
+	    WHERE status IN ('Logged', 'Pending', 'Active')
+	      AND testcode IN (?aCodes?)
+	      AND site NOT IN ('LAB2', 'LAB3')
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

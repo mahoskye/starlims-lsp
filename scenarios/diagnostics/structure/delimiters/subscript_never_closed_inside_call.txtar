@@ -1,0 +1,22 @@
+`Len(aRows[1);`: the `)` matches the `(` deeper in the stack, so the `[`
+above it is reported once as unclosed_delimiter and matching resumes;
+mismatched_delimiter must NOT fire (diag.unclosed_delimiter recovery,
+diag.mismatched_delimiter "Does not flag").
+-- input.ssl --
+:PROCEDURE FirstRowWidth;
+	:PARAMETERS aRows;
+	:DECLARE nWidth;
+	nWidth := Len(aRows[1);
+	:RETURN nWidth;
+:ENDPROC;
+-- format --
+:PROCEDURE FirstRowWidth;
+	:PARAMETERS aRows;
+	:DECLARE nWidth;
+	nWidth := Len(aRows[1);
+		:RETURN nWidth;
+		:ENDPROC;
+-- diagnostics --
+4:21-4:22 error unclosed_delimiter: Unclosed '['
+-- diagnostics [--strict --info] --
+4:21-4:22 error unclosed_delimiter: Unclosed '['

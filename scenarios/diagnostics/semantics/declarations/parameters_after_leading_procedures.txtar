@@ -1,0 +1,24 @@
+Leading :PROCEDURE blocks do not count as top-level statements, so the
+script-level :PARAMETERS after them does not fire diag.parameters_first.
+The LSP tolerates this layout; the style guide treats it as wrong
+(AGENTS.md section 5), which this scenario pins as current behavior.
+-- input.ssl --
+:PROCEDURE Square;
+	:PARAMETERS nSide;
+	:RETURN nSide * nSide;
+:ENDPROC;
+:PARAMETERS nInput;
+:DECLARE nArea;
+nArea := DoProc("Square", {nInput});
+:RETURN nArea;
+-- format --
+:PROCEDURE Square;
+	:PARAMETERS nSide;
+	:RETURN nSide * nSide;
+:ENDPROC;
+:PARAMETERS nInput;
+:DECLARE nArea;
+nArea := DoProc("Square", {nInput});
+:RETURN nArea;
+-- diagnostics --
+-- diagnostics [--strict --info] --

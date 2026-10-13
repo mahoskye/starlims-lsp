@@ -62,6 +62,8 @@ contracts that need no expected text:
 - nothing panics (a recovered panic surfaces as `internal_error`);
 - formatting is idempotent (feature.formatting A6);
 - formatting changes only whitespace, letter case and semicolons;
+- every named SQL placeholder (`?sName?`, `?oRow:Id?`) survives byte for
+  byte, since its interior reaches parameter binding;
 - the formatted output has no error the input did not already have, under
   the default and `--strict --info` profiles;
 - range-formatting any line of the formatted output leaves it unchanged
@@ -69,6 +71,19 @@ contracts that need no expected text:
 
 A scenario with an unremarkable outcome still earns its place by putting
 its input through all of these.
+
+Their names, for known failures: `no-panic`, `idempotent`,
+`whitespace-only`, `placeholders-verbatim`, `no-gained-errors`,
+`range-stable`. A scenario that
+reproduces an open bug in one of them keeps its place with a header line
+
+```text
+Known failure: range-stable — #NNN range formatting adds ';' mid-statement
+```
+
+The runner tolerates that invariant's failure for the scenario and fails
+the build once it passes, so the line must go when the fix lands (the same
+ratchet as the catalog's `expect=fail` fences).
 
 ## Workflow
 

@@ -1,0 +1,26 @@
+inline_default_outside_datasource: in an ordinary .ssl script the inline
+`:PARAMETERS p := v` form does not compile. Each inline default reports
+an error from the name through `:=`, at script level and in a procedure
+signature.
+-- input.ssl --
+:PARAMETERS sFleet := "F1", nLimit := 5;
+:PROCEDURE CountTrucks;
+	:PARAMETERS sCode, nMax := 10;
+	:RETURN Len(sCode) + nMax;
+:ENDPROC;
+:RETURN DoProc("CountTrucks", {sFleet, nLimit});
+-- format --
+:PARAMETERS sFleet := "F1", nLimit := 5;
+:PROCEDURE CountTrucks;
+	:PARAMETERS sCode, nMax := 10;
+	:RETURN Len(sCode) + nMax;
+:ENDPROC;
+:RETURN DoProc("CountTrucks", {sFleet, nLimit});
+-- diagnostics --
+1:13-1:22 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'sFleet' to a ':DEFAULT' line after ':PARAMETERS'
+1:29-1:38 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'nLimit' to a ':DEFAULT' line after ':PARAMETERS'
+3:21-3:28 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'nMax' to a ':DEFAULT' line after ':PARAMETERS'
+-- diagnostics [--strict --info] --
+1:13-1:22 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'sFleet' to a ':DEFAULT' line after ':PARAMETERS'
+1:29-1:38 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'nLimit' to a ':DEFAULT' line after ':PARAMETERS'
+3:21-3:28 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'nMax' to a ':DEFAULT' line after ':PARAMETERS'

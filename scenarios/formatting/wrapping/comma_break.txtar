@@ -1,0 +1,30 @@
+A call whose array literal overflows the 90-column default wraps after
+the last comma that still fits; the comma trails its line and the
+continuation sits one level past the statement line, not under the open
+brace (fmt.max_line_length greedy latest-fitting packing). Nested inside
+a :FOR so the tab counts as indentSize columns.
+-- input.ssl --
+:PROCEDURE Totals;
+:PARAMETERS aQuarters;
+:DECLARE vResult, i;
+:FOR i := 1 :TO Len(aQuarters);
+vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarterRevenue, aQuarters[i]});
+:NEXT;
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Totals;
+	:PARAMETERS aQuarters;
+	:DECLARE vResult, i;
+	:FOR i := 1 :TO Len(aQuarters);
+		vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
+			nThirdQuarterRevenue, nFourthQuarterRevenue, aQuarters[i]});
+	:NEXT;
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+5:39-5:59 warning undeclared_variable: Variable 'nFirstQuarterRevenue' is not declared
+5:61-5:82 warning undeclared_variable: Variable 'nSecondQuarterRevenue' is not declared
+5:84-5:104 warning undeclared_variable: Variable 'nThirdQuarterRevenue' is not declared
+5:106-5:127 warning undeclared_variable: Variable 'nFourthQuarterRevenue' is not declared

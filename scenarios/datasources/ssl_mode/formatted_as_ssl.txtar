@@ -1,0 +1,50 @@
+An SSL-mode data source (body carries :DECLARE, :IF, :RETURN and `:=`) is
+formatted and diagnosed as SSL (feature.formatting A9, D15): lowercase
+keywords are re-cased and report keyword_uppercase (not
+builder_directive_case, which owns only the four directives), the body
+indents, and the bare `or` still reports bare_logical_operator because a
+marker-carrying data source keeps the full SSL set
+(feature.diagnostics_pipeline A22, issue #153). The script-level
+`:PARAMETERS p := default` inline defaults are legal here, so neither
+inline_default_outside_datasource nor datasource_default_required fires,
+and ?name? markers inside SQLExecute are SSL's substitution, not
+datasource_sql_question_placeholder's concern.
+-- input.ds --
+:PARAMETERS sRoute := "R1", nMaxStops := 20;
+:declare aStops, sSQL;
+sSQL := "SELECT stop_id, stop_seq FROM route_stop WHERE route_code = ?sRoute? AND stop_seq <= ?nMaxStops?";
+:if Empty(sRoute) or nMaxStops < 1;
+aStops := {};
+:else;
+aStops := SQLExecute(sSQL);
+:endif;
+:return aStops;
+-- format --
+:PARAMETERS sRoute := "R1", nMaxStops := 20;
+:DECLARE aStops, sSQL;
+sSQL := "
+    SELECT stop_id, stop_seq
+    FROM route_stop
+    WHERE route_code = ?sRoute?
+      AND stop_seq <= ?nMaxStops?
+";
+:IF Empty(sRoute) or nMaxStops < 1;
+	aStops := {};
+:ELSE;
+	aStops := SQLExecute(sSQL);
+:ENDIF;
+:RETURN aStops;
+-- diagnostics --
+2:1-2:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:1-4:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+4:19-4:21 error bare_logical_operator: Use '.OR.' instead of 'or' for logical operations in SSL
+6:1-6:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+8:1-8:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+9:1-9:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+-- diagnostics [--strict --info] --
+2:1-2:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:1-4:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+4:19-4:21 error bare_logical_operator: Use '.OR.' instead of 'or' for logical operations in SSL
+6:1-6:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+8:1-8:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+9:1-9:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'

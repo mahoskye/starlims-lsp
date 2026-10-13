@@ -1,0 +1,51 @@
+A realistic routine mixing a .NET DataSet with native arrays: the
+oData:Tables[0] chain never flags (issue #304); once the table is held in
+oTable, oTable:Rows[...]:ItemArray[0] no longer passes through :Tables
+textually, so it is the member-reached info tier; the native result
+array read at [0] is an error, a .NET list read at [0] is info, and
+:Count on an array built from {} raises. AAdd and Len are the native
+forms.
+-- input.ssl --
+:PROCEDURE CollectNames;
+	:PARAMETERS sXml;
+	:DECLARE oData, oTable, aNames, oList, i, sFirst, nCount;
+	oData := LimsNetConnect("System.Data", "System.Data.DataSet");
+	oData:ReadXml(sXml);
+	oTable := oData:Tables[0];
+	aNames := {};
+	:FOR i := 1 :TO oTable:Rows:Count;
+		AAdd(aNames, oTable:Rows[i - 1]:ItemArray[0]);
+	:NEXT;
+	sFirst := aNames[0];
+	oList := LimsNetConnect("mscorlib", "System.Collections.ArrayList");
+	sFirst := oList:Items[0];
+	nCount := aNames:Count;
+	nCount := Len(aNames);
+	:RETURN sFirst;
+:ENDPROC;
+-- format --
+:PROCEDURE CollectNames;
+	:PARAMETERS sXml;
+	:DECLARE oData, oTable, aNames, oList, i, sFirst, nCount;
+	oData := LimsNETConnect("System.Data", "System.Data.DataSet");
+	oData:ReadXml(sXml);
+	oTable := oData:Tables[0];
+	aNames := {};
+	:FOR i := 1 :TO oTable:Rows:Count;
+		AAdd(aNames, oTable:Rows[i - 1]:ItemArray[0]);
+	:NEXT;
+	sFirst := aNames[0];
+	oList := LimsNETConnect("mscorlib", "System.Collections.ArrayList");
+	sFirst := oList:Items[0];
+	nCount := aNames:Count;
+	nCount := Len(aNames);
+	:RETURN sFirst;
+:ENDPROC;
+-- diagnostics --
+11:19-11:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+14:19-14:24 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length
+-- diagnostics [--strict --info] --
+9:45-9:46 info zero_based_array_index: Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is.
+11:19-11:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+13:24-13:25 info zero_based_array_index: Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is.
+14:19-14:24 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length

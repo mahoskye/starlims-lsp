@@ -1,0 +1,15 @@
+Openers still open at end of file: an array literal whose last line ends
+in ',' and never closes. unclosed_delimiter reports the opener itself,
+not end of file; the formatter must not invent a closer.
+-- input.ssl --
+:DECLARE aItems, nFirst;
+nFirst := 1;
+aItems := {4, 5,
+-- format --
+:DECLARE aItems, nFirst;
+nFirst := 1;
+aItems := {4, 5,
+-- diagnostics --
+3:11-3:12 error unclosed_delimiter: Unclosed '{'
+-- diagnostics [--strict --info] --
+3:11-3:12 error unclosed_delimiter: Unclosed '{'

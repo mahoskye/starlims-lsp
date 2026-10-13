@@ -1,0 +1,22 @@
+A :PARAMETERS keyword with no names fires diag.empty_parameters (error, on
+the keyword), at script level and inside a procedure.
+-- input.ssl --
+:PARAMETERS;
+:PROCEDURE Ping;
+	:PARAMETERS;
+	:RETURN .T.;
+:ENDPROC;
+:RETURN DoProc("Ping");
+-- format --
+:PARAMETERS;
+:PROCEDURE Ping;
+	:PARAMETERS;
+	:RETURN .T.;
+:ENDPROC;
+:RETURN DoProc("Ping");
+-- diagnostics --
+1:1-1:12 error empty_parameters: ':PARAMETERS' must name at least one parameter; leave the line out when there are none
+3:2-3:13 error empty_parameters: ':PARAMETERS' must name at least one parameter; leave the line out when there are none
+-- diagnostics [--strict --info] --
+1:1-1:12 error empty_parameters: ':PARAMETERS' must name at least one parameter; leave the line out when there are none
+3:2-3:13 error empty_parameters: ':PARAMETERS' must name at least one parameter; leave the line out when there are none

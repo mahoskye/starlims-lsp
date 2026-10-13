@@ -1,0 +1,29 @@
+ODBC escapes are atomic spans (issue #217, reference §4A): the marker
+lowercase, the {fn name and SQL_* tokens uppercase, interior identifiers
+keep their casing, a space separates '}' from a following alias, and a
+{d '…'} / {ts '…'} literal interior is never respaced.
+-- input.ssl --
+:PROCEDURE Escapes;
+	:PARAMETERS sUser;
+	:DECLARE aRows;
+	aRows := SQLExecute("select {FN concat(o.OrdNo, t.TestCode)}orderkey, {fn convert(t.dispstatus, sql_varchar)} as status from orders o inner join ordtask t on t.ordno = o.ordno where t.datestarted >= {d '2024-01-15'} and t.modified < {ts '2024-06-30 23:59:59'} and o.owner = ?sUser?");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Escapes;
+	:PARAMETERS sUser;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT {fn CONCAT(o.OrdNo, t.TestCode)} orderkey,
+	           {fn CONVERT(t.dispstatus, SQL_VARCHAR)} AS status
+	    FROM orders o
+	    INNER JOIN ordtask t
+	      ON t.ordno = o.ordno
+	    WHERE t.datestarted >= {d '2024-01-15'}
+	      AND t.modified < {ts '2024-06-30 23:59:59'}
+	      AND o.owner = ?sUser?
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,22 @@
+Near misses for datasource_default_required: defaults containing commas
+inside braces and a function call are read through the next top-level
+comma, so `aCodes := {"A", "B"}` and `sMode := Upper("x,y")` are each one
+entry and no identifier inside them is mistaken for a parameter name.
+-- input.ds --
+:PARAMETERS sStatus := "A", aCodes := {"A", "B"}, sMode := Upper("x,y");
+:DECLARE aRows;
+aRows := SQLExecute("SELECT crate_id FROM crate WHERE crate_status IN (?aCodes?) AND mode_code = ?sMode? AND status = ?sStatus?");
+:RETURN aRows;
+-- format --
+:PARAMETERS sStatus := "A", aCodes := {"A", "B"}, sMode := Upper("x,y");
+:DECLARE aRows;
+aRows := SQLExecute("
+    SELECT crate_id
+    FROM crate
+    WHERE crate_status IN (?aCodes?)
+      AND mode_code = ?sMode?
+      AND status = ?sStatus?
+");
+:RETURN aRows;
+-- diagnostics --
+-- diagnostics [--strict --info] --

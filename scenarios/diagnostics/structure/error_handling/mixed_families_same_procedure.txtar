@@ -1,0 +1,41 @@
+A procedure that already uses :TRY/:CATCH and also ends with a legacy
+:ERROR handler. mixed_error_handling_families (warning) fires once,
+ranged on the :ERROR that introduced the mix; deprecated_keyword fires on
+each legacy keyword separately (diag.mixed_error_handling_families
+first Flags fence).
+-- input.ssl --
+:PROCEDURE CountRows;
+	:PARAMETERS sRegion;
+	:DECLARE nCount;
+	:TRY;
+		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
+	:CATCH;
+		nCount := 0;
+	:ENDTRY;
+	:RETURN nCount;
+	:ERROR;
+	nCount := -1;
+	:RESUME;
+:ENDPROC;
+-- format --
+:PROCEDURE CountRows;
+	:PARAMETERS sRegion;
+	:DECLARE nCount;
+	:TRY;
+		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
+	:CATCH;
+		nCount := 0;
+	:ENDTRY;
+	:RETURN nCount;
+	:ERROR;
+		nCount := -1;
+	:RESUME;
+:ENDPROC;
+-- diagnostics --
+10:2-10:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+10:2-10:8 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+12:2-12:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+-- diagnostics [--strict --info] --
+10:2-10:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+10:2-10:8 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+12:2-12:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

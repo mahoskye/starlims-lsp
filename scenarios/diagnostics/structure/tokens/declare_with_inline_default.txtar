@@ -1,0 +1,18 @@
+`:DECLARE nCount :DEFAULT 0;` packs two statements into one: :DEFAULT
+only follows :PARAMETERS, and a declaration takes no initializer. The
+second keyword in the :DECLARE list should be reported as a parse
+failure. Known issue: #323 (validates clean, a regression).
+-- input.ssl --
+:PROCEDURE StartCounter;
+	:DECLARE nCount :DEFAULT 0;
+	nCount := nCount + 1;
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE StartCounter;
+	:DECLARE nCount :DEFAULT 0;
+	nCount := nCount + 1;
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

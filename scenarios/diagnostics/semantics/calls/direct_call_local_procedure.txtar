@@ -1,0 +1,32 @@
+Calling a procedure declared in this file C-style is provably a dispatch
+bypass (diag.direct_procedure_call, error, on the name). DoProc is the
+correct form and does not fire.
+-- input.ssl --
+:PROCEDURE AddTax;
+	:PARAMETERS nAmount;
+	:RETURN nAmount * 1.2;
+:ENDPROC;
+:PROCEDURE Checkout;
+	:PARAMETERS nNet;
+	:DECLARE nGross;
+	nGross := AddTax(nNet);
+	nGross := DoProc("AddTax", {nNet});
+	:RETURN nGross;
+:ENDPROC;
+-- format --
+:PROCEDURE AddTax;
+	:PARAMETERS nAmount;
+	:RETURN nAmount * 1.2;
+:ENDPROC;
+
+:PROCEDURE Checkout;
+	:PARAMETERS nNet;
+	:DECLARE nGross;
+	nGross := AddTax(nNet);
+	nGross := DoProc("AddTax", {nNet});
+	:RETURN nGross;
+:ENDPROC;
+-- diagnostics --
+8:12-8:18 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("AddTax", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
+-- diagnostics [--strict --info] --
+8:12-8:18 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("AddTax", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.

@@ -1,0 +1,29 @@
+Quote shapes sql_literal_splice must not flag (diag.sql_literal_splice
+Does not flag): a balanced literal, a named placeholder, an apostrophe
+inside a -- comment (issue #255), an unbalanced quote in a string that is
+not concatenated, and a spliced non-SQL message string.
+-- input.ssl --
+:PROCEDURE Lookup;
+	:PARAMETERS sName;
+	:DECLARE aRows, sMsg;
+	aRows := SQLExecute("SELECT custid FROM customers WHERE kind = 'A'");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE kind = 'A' -- it's the default");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = 'O''Brien");
+	sMsg := "Customer '" + sName + "' was not found";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- format --
+:PROCEDURE Lookup;
+	:PARAMETERS sName;
+	:DECLARE aRows, sMsg;
+	aRows := SQLExecute("SELECT custid FROM customers WHERE kind = 'A'");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
+	aRows :=
+		SQLExecute("SELECT custid FROM customers WHERE kind = 'A' -- it's the default");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = 'O''Brien");
+	sMsg := "Customer '" + sName + "' was not found";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

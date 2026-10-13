@@ -1,0 +1,44 @@
+Near miss for unexpected_token: assignment is an expression wherever an
+operand can stand (chains, inside array literals and arguments), `++` and
+`--` take variables, elements and properties in either position, and a
+bare `:RETURN;` is complete (issue #240). Clean.
+-- input.ssl --
+:PROCEDURE CounterDemo;
+	:DECLARE nA, nB, nC, aCounts, oStats;
+	nA := nB := nC := 0;
+	aCounts := {nA += 1, 0};
+	oStats := CreateUdObject();
+	oStats:hits := 0;
+	nA++;
+	--nB;
+	aCounts[1]++;
+	++oStats:hits;
+	DoProc("NoteCounts", {nC := 5});
+	:RETURN;
+:ENDPROC;
+
+:PROCEDURE NoteCounts;
+	:PARAMETERS nValue;
+	:RETURN nValue;
+:ENDPROC;
+-- format --
+:PROCEDURE CounterDemo;
+	:DECLARE nA, nB, nC, aCounts, oStats;
+	nA := nB := nC := 0;
+	aCounts := {nA += 1, 0};
+	oStats := CreateUdObject();
+	oStats:hits := 0;
+	nA++;
+	--nB;
+	aCounts[1]++;
+	++oStats:hits;
+	DoProc("NoteCounts", {nC := 5});
+	:RETURN;
+:ENDPROC;
+
+:PROCEDURE NoteCounts;
+	:PARAMETERS nValue;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

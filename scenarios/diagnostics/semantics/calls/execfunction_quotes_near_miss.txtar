@@ -1,0 +1,27 @@
+Near-misses for diag.execfunction_missing_quotes: a quoted path, a
+variable holding the path, and a dotted fragment in a later argument
+(that one is dot_property_access's finding, not this rule's).
+-- input.ssl --
+:PROCEDURE Dispatch;
+	:PARAMETERS oCfg;
+	:DECLARE nOut, sPath;
+	sPath := "Billing.ComputeFees";
+	nOut := ExecFunction("Billing.ComputeFees", {1});
+	nOut := ExecFunction(sPath, {nOut});
+	nOut := ExecFunction(sPath, {oCfg.Rate});
+	:RETURN nOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Dispatch;
+	:PARAMETERS oCfg;
+	:DECLARE nOut, sPath;
+	sPath := "Billing.ComputeFees";
+	nOut := ExecFunction("Billing.ComputeFees", {1});
+	nOut := ExecFunction(sPath, {nOut});
+	nOut := ExecFunction(sPath, {oCfg.Rate});
+	:RETURN nOut;
+:ENDPROC;
+-- diagnostics --
+7:35-7:40 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Rate' instead of 'object.Rate'
+-- diagnostics [--strict --info] --
+7:35-7:40 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Rate' instead of 'object.Rate'

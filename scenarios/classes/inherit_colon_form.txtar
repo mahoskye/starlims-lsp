@@ -1,0 +1,22 @@
+The colon form :INHERIT Samples:BaseCounter is a syntax error too; the
+message gives the dotted form (diag.inherit_qualified_name).
+-- input.ssl --
+:CLASS Counter;
+:INHERIT Samples:BaseCounter;
+:DECLARE nCount;
+
+:PROCEDURE Reset;
+	Me:nCount := 0;
+:ENDPROC;
+-- format --
+:CLASS Counter;
+:INHERIT Samples:BaseCounter;
+:DECLARE nCount;
+
+:PROCEDURE Reset;
+	Me:nCount := 0;
+:ENDPROC;
+-- diagnostics --
+2:10-2:29 error inherit_qualified_name: ':INHERIT' separates category and class with '.', not ':'; write ':INHERIT Samples.BaseCounter;'
+-- diagnostics [--strict --info] --
+2:10-2:29 error inherit_qualified_name: ':INHERIT' separates category and class with '.', not ':'; write ':INHERIT Samples.BaseCounter;'

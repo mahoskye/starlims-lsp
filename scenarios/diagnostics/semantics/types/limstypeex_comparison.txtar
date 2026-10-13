@@ -1,0 +1,48 @@
+LimsTypeEx returns one of nine uppercase names and string comparison is
+case-sensitive (diag.invalid_limstypeex_comparison, error, on the
+literal): == "NUMBER" is never true, <> "NUMBER" always true, = "String"
+(wrong case, no result starts with it), and "INTEGER" = LimsTypeEx(...)
+(literal on the left starts with no result).
+-- input.ssl --
+:PROCEDURE Classify;
+	:PARAMETERS vValue;
+	:IF LimsTypeEx(vValue) == "NUMBER";
+		:RETURN 1;
+	:ENDIF;
+	:IF LimsTypeEx(vValue) = "String";
+		:RETURN 2;
+	:ENDIF;
+	:IF "INTEGER" = LimsTypeEx(vValue);
+		:RETURN 3;
+	:ENDIF;
+	:RETURN LimsTypeEx(vValue) <> "NUMBER";
+:ENDPROC;
+-- format --
+:PROCEDURE Classify;
+	:PARAMETERS vValue;
+	:IF LimsTypeEx(vValue) == "NUMBER";
+		:RETURN 1;
+	:ENDIF;
+
+	:IF LimsTypeEx(vValue) = "String";
+		:RETURN 2;
+	:ENDIF;
+
+	:IF "INTEGER" = LimsTypeEx(vValue);
+		:RETURN 3;
+	:ENDIF;
+	:RETURN LimsTypeEx(vValue) <> "NUMBER";
+:ENDPROC;
+-- diagnostics --
+3:28-3:36 error invalid_limstypeex_comparison: LimsTypeEx never returns "NUMBER" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+6:27-6:35 error invalid_limstypeex_comparison: LimsTypeEx never returns "String" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+9:6-9:15 error invalid_limstypeex_comparison: LimsTypeEx never returns "INTEGER" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+12:32-12:40 error invalid_limstypeex_comparison: LimsTypeEx never returns "NUMBER" - this comparison is always true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+-- diagnostics [--strict --info] --
+3:28-3:36 error invalid_limstypeex_comparison: LimsTypeEx never returns "NUMBER" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+6:25-6:26 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+6:27-6:35 error invalid_limstypeex_comparison: LimsTypeEx never returns "String" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+9:6-9:15 error invalid_limstypeex_comparison: LimsTypeEx never returns "INTEGER" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+9:16-9:17 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+12:29-12:31 info not_preferred_operator: Use '!=' instead of '<>' for inequality
+12:32-12:40 error invalid_limstypeex_comparison: LimsTypeEx never returns "NUMBER" - this comparison is always true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE

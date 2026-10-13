@@ -1,0 +1,26 @@
+Near-misses for diag.scientific_notation: valid forms with either
+exponent sign (issue #246), a number separated from an e-named
+identifier by whitespace or an operator, and identifiers that merely
+start with e.
+-- input.ssl --
+:PROCEDURE Scale;
+	:DECLARE nA, nB, nC, nD, eFactor;
+	eFactor := 2;
+	nA := 7.0e2;
+	nB := 1.2e-3;
+	nC := 9.0E+1 * eFactor;
+	nD := 1.5e+3 - 2 * eFactor;
+	:RETURN nA + nB + nC + nD;
+:ENDPROC;
+-- format --
+:PROCEDURE Scale;
+	:DECLARE nA, nB, nC, nD, eFactor;
+	eFactor := 2;
+	nA := 7.0e2;
+	nB := 1.2e-3;
+	nC := 9.0E+1 * eFactor;
+	nD := 1.5e+3 - 2 * eFactor;
+	:RETURN nA + nB + nC + nD;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

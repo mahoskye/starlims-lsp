@@ -1,0 +1,29 @@
+A CTE (WITH name AS (…)) and a window function: the CTE body indents one
+level and the main SELECT returns to the clause column (reference §2.7,
+§7.3); ROW_NUMBER() OVER (…) is kept as an expression (reference §7.6).
+-- input.ssl --
+:PROCEDURE Ranking;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("with task_summary as (select ordno, count(*) as total_tasks from ordtask where ordno = ?sOrdNo? group by ordno) select ts.ordno, ts.total_tasks, row_number() over (partition by ts.ordno order by ts.total_tasks desc) as rn from task_summary ts");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Ranking;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    WITH task_summary AS (
+	        SELECT ordno, COUNT(*) AS total_tasks
+	        FROM ordtask
+	        WHERE ordno = ?sOrdNo?
+	        GROUP BY ordno
+	    )
+	    SELECT ts.ordno, ts.total_tasks,
+	           ROW_NUMBER() OVER (PARTITION BY ts.ordno ORDER BY ts.total_tasks DESC) AS rn
+	    FROM task_summary ts
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

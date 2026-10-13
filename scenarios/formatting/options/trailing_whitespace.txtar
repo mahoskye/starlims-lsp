@@ -1,0 +1,22 @@
+Trailing spaces and tabs are removed from code lines, whitespace-only
+lines become empty, and interior lines of a top-level multi-line comment
+are trimmed too, while a line end inside a top-level multi-line string
+keeps its trailing spaces (fmt.trim_trailing_whitespace, issue #216).
+-- input.ssl --
+:DECLARE sName, sTxt;	
+   
+sName := "x";   
+/* first line   
+second line	;
+sTxt := "first   
+second";
+-- format --
+:DECLARE sName, sTxt;
+
+sName := "x";
+/* first line
+second line	;
+sTxt := "first   
+second";
+-- diagnostics --
+-- diagnostics [--strict --info] --

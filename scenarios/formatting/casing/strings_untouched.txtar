@@ -1,0 +1,18 @@
+String content is never recased or respaced: keyword, literal and
+operator text inside all three quote styles stays as written, while the
+code around it is canonicalized (fmt.keyword_case D7,
+fmt.operator_spacing).
+-- input.ssl --
+:declare sNote, sSql, sAlt;
+sNote:=":if nil .t. .and. x:=1";
+sSql:=[it's "quoted" .or. a=1 nil];
+sAlt:='len( a ) , :endif';
+-- format --
+:DECLARE sNote, sSql, sAlt;
+sNote := ":if nil .t. .and. x:=1";
+sSql := [it's "quoted" .or. a=1 nil];
+sAlt := 'len( a ) , :endif';
+-- diagnostics --
+1:1-1:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+-- diagnostics [--strict --info] --
+1:1-1:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'

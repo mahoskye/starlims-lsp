@@ -1,0 +1,21 @@
+Exactly one space after each comma in argument lists, array literals and
+declaration lists, and any space before a comma removed (fmt.comma_spacing
+issue #35). Commas inside strings are untouched.
+-- input.ssl --
+:PROCEDURE Commas;
+:PARAMETERS sA ,sB,   sC;
+:DECLARE aValues,vResult;
+aValues := {sA ,sB,sC , "a,b,c"};
+vResult := DoProc("Join",{aValues,", "});
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Commas;
+	:PARAMETERS sA, sB, sC;
+	:DECLARE aValues, vResult;
+	aValues := {sA, sB, sC, "a,b,c"};
+	vResult := DoProc("Join", {aValues, ", "});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,38 @@
+Near miss for deprecated_keyword: identifiers and text that merely
+contain the legacy words (`nErrorCount`, a procedure named ResumeJob,
+`:LABEL` in a comment, "resume" in a string) are not keyword tokens.
+Clean (diag.deprecated_keyword "must NOT flag").
+-- input.ssl --
+:PROCEDURE ResumeJob;
+	:PARAMETERS nJobId;
+	:DECLARE nErrorCount, sNote, oErr;
+	nErrorCount := 0;
+	/* the old version used :ERROR and :LABEL here;
+	sNote := "resume after :ERROR";
+	:TRY;
+		RunSQL("UPDATE JOBS SET STATE = 'RUNNING' WHERE JOBID = ?",, {nJobId});
+	:CATCH;
+		oErr := GetLastSSLError();
+		nErrorCount := nErrorCount + 1;
+		sNote := oErr:Description;
+	:ENDTRY;
+	:RETURN nErrorCount;
+:ENDPROC;
+-- format --
+:PROCEDURE ResumeJob;
+	:PARAMETERS nJobId;
+	:DECLARE nErrorCount, sNote, oErr;
+	nErrorCount := 0;
+	/* the old version used :ERROR and :LABEL here;
+	sNote := "resume after :ERROR";
+	:TRY;
+		RunSQL("UPDATE JOBS SET STATE = 'RUNNING' WHERE JOBID = ?",, {nJobId});
+	:CATCH;
+		oErr := GetLastSSLError();
+		nErrorCount := nErrorCount + 1;
+		sNote := oErr:Description;
+	:ENDTRY;
+	:RETURN nErrorCount;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

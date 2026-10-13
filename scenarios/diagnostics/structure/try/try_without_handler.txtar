@@ -1,0 +1,25 @@
+A :TRY whose :CATCH was removed, leaving bare :TRY ... :ENDTRY, which SSL
+rejects. try_requires_handler fires on the :TRY when :ENDTRY is seen
+(diag.try_requires_handler).
+-- input.ssl --
+:PROCEDURE TouchRecord;
+	:PARAMETERS nRecordId;
+	:DECLARE bOk;
+	:TRY;
+		bOk := RunSQL("UPDATE RECORDS SET TOUCHED = 1 WHERE RECORDID = ?",, {nRecordId});
+	:ENDTRY;
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE TouchRecord;
+	:PARAMETERS nRecordId;
+	:DECLARE bOk;
+	:TRY;
+		bOk := RunSQL("UPDATE RECORDS SET TOUCHED = 1 WHERE RECORDID = ?",, {nRecordId});
+	:ENDTRY;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+4:2-4:6 error try_requires_handler: ':TRY' requires at least one ':CATCH' or ':FINALLY' block
+-- diagnostics [--strict --info] --
+4:2-4:6 error try_requires_handler: ':TRY' requires at least one ':CATCH' or ':FINALLY' block

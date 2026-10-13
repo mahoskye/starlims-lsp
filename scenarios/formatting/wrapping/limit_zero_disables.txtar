@@ -1,0 +1,27 @@
+`--max-line-length 0` disables wrapping: a 130-column call stays on one
+line, while the default 90 wraps it (fmt.max_line_length "0 disables").
+-- input.ssl --
+:PROCEDURE NoWrap;
+:DECLARE vResult;
+vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarter});
+:RETURN vResult;
+:ENDPROC;
+-- format [--max-line-length 0] --
+:PROCEDURE NoWrap;
+	:DECLARE vResult;
+	vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarter});
+	:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE NoWrap;
+	:DECLARE vResult;
+	vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
+		nThirdQuarterRevenue, nFourthQuarter});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:39-3:59 warning undeclared_variable: Variable 'nFirstQuarterRevenue' is not declared
+3:61-3:82 warning undeclared_variable: Variable 'nSecondQuarterRevenue' is not declared
+3:84-3:104 warning undeclared_variable: Variable 'nThirdQuarterRevenue' is not declared
+3:106-3:120 warning undeclared_variable: Variable 'nFourthQuarter' is not declared

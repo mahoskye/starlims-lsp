@@ -1,0 +1,13 @@
+A top-level :INCLUDE placed after a :DECLARE. include_early is info tier,
+so it appears only under --info (diag.include_early first Flags fence).
+-- input.ssl --
+:DECLARE nCount;
+:INCLUDE Common.StringHelpers;
+nCount := 0;
+-- format --
+:DECLARE nCount;
+:INCLUDE Common.StringHelpers;
+nCount := 0;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+2:1-2:9 info include_early: ':INCLUDE' should appear early in the file. Recommended order: :PARAMETERS, :DEFAULT, :INCLUDE, :PUBLIC, :DECLARE

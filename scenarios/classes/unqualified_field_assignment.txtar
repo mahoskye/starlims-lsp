@@ -1,0 +1,51 @@
+Bare writes to class fields inside methods (diag.unqualified_field_assignment,
+warning): plain :=, compound +=, ++, an element write and a :FOR loop
+variable. A bare name never reaches the field. The read in
+nTotal := nTotal + 1 is reported once, by the assignment rule, and later
+reads in that method are not reported.
+-- input.ssl --
+:CLASS Ledger;
+:DECLARE nTotal, aItems, nIndex;
+
+:PROCEDURE Post;
+	:PARAMETERS nDelta;
+	nTotal := nTotal + 1;
+	nTotal += nDelta;
+	:RETURN nTotal;
+:ENDPROC;
+
+:PROCEDURE Bump;
+	nTotal++;
+	aItems[1] := 5;
+	:FOR nIndex := 1 :TO 3;
+		Me:nTotal += nIndex;
+	:NEXT;
+:ENDPROC;
+-- format --
+:CLASS Ledger;
+:DECLARE nTotal, aItems, nIndex;
+
+:PROCEDURE Post;
+	:PARAMETERS nDelta;
+	nTotal := nTotal + 1;
+	nTotal += nDelta;
+	:RETURN nTotal;
+:ENDPROC;
+
+:PROCEDURE Bump;
+	nTotal++;
+	aItems[1] := 5;
+	:FOR nIndex := 1 :TO 3;
+		Me:nTotal += nIndex;
+	:NEXT;
+:ENDPROC;
+-- diagnostics --
+6:2-6:8 warning unqualified_field_assignment: Bare assignment to 'nTotal' inside a class method creates a local — use 'Me:nTotal' to assign the class field
+12:2-12:8 warning unqualified_field_assignment: Bare 'nTotal' inside a class method does not reach the class field, so this increment misses it — use 'Me:nTotal'
+13:2-13:8 warning unqualified_field_assignment: Bare 'aItems' inside a class method does not reach the class field, so this element write misses it — use 'Me:aItems'
+14:7-14:13 warning unqualified_field_assignment: Bare assignment to 'nIndex' inside a class method creates a local — use 'Me:nIndex' to assign the class field
+-- diagnostics [--strict --info] --
+6:2-6:8 warning unqualified_field_assignment: Bare assignment to 'nTotal' inside a class method creates a local — use 'Me:nTotal' to assign the class field
+12:2-12:8 warning unqualified_field_assignment: Bare 'nTotal' inside a class method does not reach the class field, so this increment misses it — use 'Me:nTotal'
+13:2-13:8 warning unqualified_field_assignment: Bare 'aItems' inside a class method does not reach the class field, so this element write misses it — use 'Me:aItems'
+14:7-14:13 warning unqualified_field_assignment: Bare assignment to 'nIndex' inside a class method creates a local — use 'Me:nIndex' to assign the class field

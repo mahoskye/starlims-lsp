@@ -1,0 +1,26 @@
+Keywords are uppercased on reflow while identifiers keep the author's
+casing (identifierCase preserve default, issue #219): uppercase table
+names, mixed-case columns and lowercase aliases all survive.
+-- input.ssl --
+:PROCEDURE Casing;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("select O.ORDNO, o.CustId, t.TestCode from ORDERS o inner join OrdTask t on t.OrdNo = o.ORDNO where o.ORDNO = ?sOrdNo? order by t.TestCode");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Casing;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT O.ORDNO, o.CustId, t.TestCode
+	    FROM ORDERS o
+	    INNER JOIN OrdTask t
+	      ON t.OrdNo = o.ORDNO
+	    WHERE o.ORDNO = ?sOrdNo?
+	    ORDER BY t.TestCode
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,24 @@
+A banner written in SSL comment style (`/*` closed by `;`, not `*/`) above
+a SQL-mode header. The header split masks it like a terminated banner, so
+the body classifies on its own content and stays SQL
+(feature.diagnostics_pipeline A31). The style guide's
+datasource_sql_comment_syntax rule calls this form wrong in a SQL data
+source but is reviewer-enforced, so no diagnostic is expected for it.
+-- input.ds --
+/* Data source: pallet movements by dock;
+:DSN := DATABASE;
+:PARAMETERS nDock := 1;
+
+select m.move_id, m.pallet_no
+from pallet_move m
+where m.dock_no = @nDock
+-- format --
+/* Data source: pallet movements by dock;
+:DSN := DATABASE;
+:PARAMETERS nDock := 1;
+
+select m.move_id, m.pallet_no
+from pallet_move m
+where m.dock_no = @nDock
+-- diagnostics --
+-- diagnostics [--strict --info] --

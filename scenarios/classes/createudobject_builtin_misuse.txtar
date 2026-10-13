@@ -1,0 +1,42 @@
+CreateUdObject used to build built-in classes (diag.createudobject_builtin_misuse,
+error): "Email" and " SSLDataset " (trimmed match) flag. Near misses: a
+category-qualified user class, a variable target, an anonymous object, a
+seeded anonymous object, and a member method named CreateUdObject (D10).
+-- input.ssl --
+:CLASS Dispatcher;
+:DECLARE oFactory;
+
+:PROCEDURE Build;
+	:PARAMETERS sKind;
+	:DECLARE oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory;
+	oMail := CreateUdObject("Email");
+	oData := CreateUdObject(" SSLDataset ");
+	oHelper := CreateUdObject("Lab.OrderHelper");
+	oDyn := CreateUdObject(sKind);
+	oAnon := CreateUdObject();
+	oSeeded := CreateUdObject({{"kind", sKind}});
+	oViaFactory := Me:oFactory:CreateUdObject("Email");
+	:RETURN {oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory};
+:ENDPROC;
+-- format --
+:CLASS Dispatcher;
+:DECLARE oFactory;
+
+:PROCEDURE Build;
+	:PARAMETERS sKind;
+	:DECLARE oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory;
+	oMail := CreateUdObject("Email");
+	oData := CreateUdObject(" SSLDataset ");
+	oHelper := CreateUdObject("Lab.OrderHelper");
+	oDyn := CreateUdObject(sKind);
+	oAnon := CreateUdObject();
+	oSeeded := CreateUdObject({{"kind", sKind}});
+	oViaFactory := Me:oFactory:CreateUdObject("Email");
+	:RETURN {oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory};
+:ENDPROC;
+-- diagnostics --
+7:26-7:33 error createudobject_builtin_misuse: Built-in SSL class 'Email' must use curly-brace construction ('Email{}'), not CreateUdObject("Email")
+8:26-8:40 error createudobject_builtin_misuse: Built-in SSL class 'SSLDataset' must use curly-brace construction ('SSLDataset{}'), not CreateUdObject("SSLDataset")
+-- diagnostics [--strict --info] --
+7:26-7:33 error createudobject_builtin_misuse: Built-in SSL class 'Email' must use curly-brace construction ('Email{}'), not CreateUdObject("Email")
+8:26-8:40 error createudobject_builtin_misuse: Built-in SSL class 'SSLDataset' must use curly-brace construction ('SSLDataset{}'), not CreateUdObject("SSLDataset")

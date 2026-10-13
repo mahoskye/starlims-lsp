@@ -1,0 +1,17 @@
+COLLATE with no comment justifying it (diag.unjustified_collate, info
+tier): the statement before the call is reached before any /* comment.
+-- input.ssl --
+:PROCEDURE Names;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT custname FROM customers ORDER BY custname COLLATE Latin1_General_CI_AS");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Names;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT custname FROM customers ORDER BY custname COLLATE Latin1_General_CI_AS");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:22-3:101 info unjustified_collate: COLLATE in embedded SQL without a justification comment - document why the forced collation is needed in a comment directly above this statement

@@ -1,0 +1,27 @@
+:BEGININLINECODE / :ENDINLINECODE indent their body one level like any
+other block (fmt.indent_style lists :BEGININLINECODE as a block opener;
+style guide indent_block_bodies agrees).
+-- input.ssl --
+:PROCEDURE BuildScript;
+:DECLARE sCode;
+:BEGININLINECODE HelperBody;
+:DECLARE nTotal;
+nTotal := 1 + 2;
+:RETURN nTotal;
+:ENDINLINECODE;
+sCode := GetInlineCode("HelperBody");
+:RETURN sCode;
+:ENDPROC;
+-- format --
+:PROCEDURE BuildScript;
+	:DECLARE sCode;
+	:BEGININLINECODE HelperBody;
+		:DECLARE nTotal;
+		nTotal := 1 + 2;
+		:RETURN nTotal;
+	:ENDINLINECODE;
+	sCode := GetInlineCode("HelperBody");
+	:RETURN sCode;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

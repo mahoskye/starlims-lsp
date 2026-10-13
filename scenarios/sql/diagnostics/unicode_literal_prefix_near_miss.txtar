@@ -1,0 +1,34 @@
+N-and-quote sequences unicode_literal_prefix must not flag
+(diag.unicode_literal_prefix Does not flag): an 'N' literal, a ?'N'?
+placeholder, N'x' inside a SQL comment, a word ending in N before a
+quote, and an N'…' run in a non-SQL message string.
+-- input.ssl --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows, sMsg;
+	aRows := SQLExecute("UPDATE samples SET flag = 'N' WHERE active = ?'N'? -- no N'x' needed
+");
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE COLUMN'x' = 1 AND sampleid = ?nId?");
+	sMsg := "PLAN'N'GO";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- format --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows, sMsg;
+	aRows := SQLExecute("
+	    UPDATE samples SET
+	        flag = 'N'
+	    WHERE active = ?'N'? -- no N'x' needed
+	");
+	aRows := SQLExecute("
+	    SELECT sampleid
+	    FROM samples
+	    WHERE COLUMN 'x' = 1
+	      AND sampleid = ?nId?
+	");
+	sMsg := "PLAN'N'GO";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

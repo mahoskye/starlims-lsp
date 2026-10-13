@@ -1,0 +1,22 @@
+A file with an :INCLUDE whose closure cannot be resolved (no workspace
+index under --validate) is not checked for undeclared names: the unread
+script may declare them (diag.undeclared_variable, D10, issue #304).
+aShelfCodes would otherwise flag.
+-- input.ssl --
+:INCLUDE Inventory.ShelfCodes;
+:PROCEDURE ShelfLabel;
+	:PARAMETERS nSlot;
+	:DECLARE sLabel;
+	sLabel := aShelfCodes[nSlot];
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:INCLUDE Inventory.ShelfCodes;
+:PROCEDURE ShelfLabel;
+	:PARAMETERS nSlot;
+	:DECLARE sLabel;
+	sLabel := aShelfCodes[nSlot];
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

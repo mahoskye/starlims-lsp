@@ -1,0 +1,29 @@
+DELETE FROM with a WHERE clause and with an EXISTS subquery (reference
+§2.11); a short DELETE that fits stays inline untouched.
+-- input.ssl --
+:PROCEDURE Purge;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("delete from ordtask where ordno = ?",, {sOrdNo});
+	bOk := RunSQL("delete from ordresult r where exists (select 1 from ordtask t where t.ordno = r.ordno and t.testcode = r.testcode and t.status = 'Cancelled')");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Purge;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("delete from ordtask where ordno = ?",, {sOrdNo});
+	bOk := RunSQL("
+	    DELETE FROM ordresult r
+	    WHERE EXISTS (
+	        SELECT 1
+	        FROM ordtask t
+	        WHERE t.ordno = r.ordno
+	          AND t.testcode = r.testcode
+	          AND t.status = 'Cancelled'
+	    )
+	");
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,24 @@
+Predefined globals a base installation declares (MYUSERNAME, CRLF,
+UserLang) and the platform objects are never undeclared; CR and LF are
+listed by the reference as NOT declared, so they flag with the Chr()
+replacement in the message (diag.undeclared_variable, issue #270).
+-- input.ssl --
+:PROCEDURE BuildBanner;
+	:DECLARE sBanner;
+	sBanner := "User: " + MYUSERNAME + CRLF + "Lang: " + UserLang;
+	sBanner := sBanner + CR + LF;
+	sBanner += Session:SessionID;
+	:RETURN sBanner;
+:ENDPROC;
+-- format --
+:PROCEDURE BuildBanner;
+	:DECLARE sBanner;
+	sBanner := "User: " + MYUSERNAME + CRLF + "Lang: " + UserLang;
+	sBanner := sBanner + CR + LF;
+	sBanner += Session:SessionID;
+	:RETURN sBanner;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:23-4:25 warning undeclared_variable: Variable 'CR' is not declared; a base installation does not declare it as a global, use Chr(13) instead
+4:28-4:30 warning undeclared_variable: Variable 'LF' is not declared; a base installation does not declare it as a global, use Chr(10) instead

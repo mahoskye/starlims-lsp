@@ -1,0 +1,21 @@
+Many statements crammed onto single lines, including block openers and
+closers sharing a line with body statements. The formatter's handling of
+statements per line is recorded here (one per line, or kept), and the
+indentation must still follow the block structure.
+-- input.ssl --
+:PROCEDURE Crammed; :PARAMETERS nA, nB; :DECLARE nSum, sOut; nSum := nA + nB;
+:IF nSum > 10; sOut := "big"; :ELSE; sOut := "small"; :ENDIF; :RETURN sOut; :ENDPROC;
+-- format --
+:PROCEDURE Crammed;
+	:PARAMETERS nA, nB;
+	:DECLARE nSum, sOut;
+	nSum := nA + nB;
+	:IF nSum > 10;
+		sOut := "big";
+	:ELSE;
+		sOut := "small";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,39 @@
+Near-misses for diag.arithmetic_type_mismatch: documented pairs (date -
+number, date - date, string - string), unknown operands (loop counter,
+UPPER_SNAKE constant, user-procedure return, array element), a member
+read, unary signs after {, :=, ( and another operator, and + which is
+mixed_type_operator's.
+-- input.ssl --
+:PROCEDURE Schedule;
+	:PARAMETERS dDue, dStart, sFirst, sSecond, MAX_ROWS, aVals, oCfg;
+	:DECLARE dRemind, nDays, sJoined, x, nLeft, aOffsets, nSigned;
+	dRemind := dDue - 3;
+	nDays := dDue - dStart;
+	sJoined := sFirst - sSecond;
+	x := DoProc("Measure");
+	nLeft := MAX_ROWS - x;
+	nLeft := nLeft * aVals[1];
+	nLeft := nLeft / oCfg:sDivisor;
+	aOffsets := {-1, 2};
+	nSigned := -1;
+	nSigned := (-nSigned) * 2 - -1;
+	:RETURN {dRemind, nDays, sJoined, nLeft, aOffsets, nSigned};
+:ENDPROC;
+-- format --
+:PROCEDURE Schedule;
+	:PARAMETERS dDue, dStart, sFirst, sSecond, MAX_ROWS, aVals, oCfg;
+	:DECLARE dRemind, nDays, sJoined, x, nLeft, aOffsets, nSigned;
+	dRemind := dDue - 3;
+	nDays := dDue - dStart;
+	sJoined := sFirst - sSecond;
+	x := DoProc("Measure");
+	nLeft := MAX_ROWS - x;
+	nLeft := nLeft * aVals[1];
+	nLeft := nLeft / oCfg:sDivisor;
+	aOffsets := {-1, 2};
+	nSigned := -1;
+	nSigned := (-nSigned) * 2 - -1;
+	:RETURN {dRemind, nDays, sJoined, nLeft, aOffsets, nSigned};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

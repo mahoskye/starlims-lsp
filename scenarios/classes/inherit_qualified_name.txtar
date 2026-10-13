@@ -1,0 +1,25 @@
+An unqualified :INHERIT parent (diag.inherit_qualified_name, error): a
+bare name does not compile, the parent needs its category. The Base: use
+is reported once, here, not also by base_requires_inherit.
+-- input.ssl --
+:CLASS Counter;
+:INHERIT BaseCounter;
+:DECLARE nCount;
+
+:PROCEDURE Increment;
+	Base:Increment();
+	Me:nCount += 1;
+:ENDPROC;
+-- format --
+:CLASS Counter;
+:INHERIT BaseCounter;
+:DECLARE nCount;
+
+:PROCEDURE Increment;
+	Base:Increment();
+	Me:nCount += 1;
+:ENDPROC;
+-- diagnostics --
+2:10-2:21 error inherit_qualified_name: ':INHERIT' needs the parent's full 'Category.ClassName'; the plain name 'BaseCounter' does not compile (Specify the full name of the class in :INHERIT)
+-- diagnostics [--strict --info] --
+2:10-2:21 error inherit_qualified_name: ':INHERIT' needs the parent's full 'Category.ClassName'; the plain name 'BaseCounter' does not compile (Specify the full name of the class in :INHERIT)

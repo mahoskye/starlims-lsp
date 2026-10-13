@@ -1,0 +1,28 @@
+Dot-wrapped logical operators and literals canonicalize: `.and.` / `.or.`
+/ `.not.` → `.AND.` / `.OR.` / `.NOT.`, `.t.` / `.f.` → `.T.` / `.F.`, and
+a bare `nil` → `NIL` (fmt.keyword_case, issue #90). Mixed-case forms
+(`.And.`, `Nil`) too.
+-- input.ssl --
+:PROCEDURE Flags;
+:PARAMETERS bX, bY, bZ, vValue;
+:DECLARE bA;
+bA := bX .and. bY .or. .not. bZ;
+bA := bX .And. .Not. bY .Or. .t.;
+:IF vValue == nil .or. vValue == Nil;
+bA := .f.;
+:ENDIF;
+:RETURN bA;
+:ENDPROC;
+-- format --
+:PROCEDURE Flags;
+	:PARAMETERS bX, bY, bZ, vValue;
+	:DECLARE bA;
+	bA := bX .AND. bY .OR. .NOT. bZ;
+	bA := bX .AND. .NOT. bY .OR. .T.;
+	:IF vValue == NIL .OR. vValue == NIL;
+		bA := .F.;
+	:ENDIF;
+	:RETURN bA;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

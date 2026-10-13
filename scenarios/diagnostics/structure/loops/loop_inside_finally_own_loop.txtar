@@ -1,0 +1,48 @@
+:LOOP inside a :WHILE loop that is itself opened inside the :FINALLY
+body. The catalog states the check is token-based and blanket, so it
+still fires even though the :LOOP's own loop is wholly inside the
+:FINALLY. Same shape for :EXITWHILE (diag.loop_in_finally,
+diag.exitwhile_in_finally).
+-- input.ssl --
+:PROCEDURE FlushBuffers;
+	:PARAMETERS aBuffers;
+	:DECLARE nIdx;
+	:TRY;
+		nIdx := 0;
+	:FINALLY;
+		:WHILE nIdx < Len(aBuffers);
+			nIdx := nIdx + 1;
+			:IF Empty(aBuffers[nIdx]);
+				:LOOP;
+			:ENDIF;
+			:IF aBuffers[nIdx] == "END";
+				:EXITWHILE;
+			:ENDIF;
+		:ENDWHILE;
+	:ENDTRY;
+:ENDPROC;
+-- format --
+:PROCEDURE FlushBuffers;
+	:PARAMETERS aBuffers;
+	:DECLARE nIdx;
+	:TRY;
+		nIdx := 0;
+	:FINALLY;
+		:WHILE nIdx < Len(aBuffers);
+			nIdx := nIdx + 1;
+			:IF Empty(aBuffers[nIdx]);
+				:LOOP;
+			:ENDIF;
+
+			:IF aBuffers[nIdx] == "END";
+				:EXITWHILE;
+			:ENDIF;
+		:ENDWHILE;
+	:ENDTRY;
+:ENDPROC;
+-- diagnostics --
+10:5-10:10 error loop_in_finally: ':LOOP' inside a ':FINALLY' block is a compile-time error
+13:5-13:15 error exitwhile_in_finally: ':EXITWHILE' inside a ':FINALLY' block is a compile-time error
+-- diagnostics [--strict --info] --
+10:5-10:10 error loop_in_finally: ':LOOP' inside a ':FINALLY' block is a compile-time error
+13:5-13:15 error exitwhile_in_finally: ':EXITWHILE' inside a ':FINALLY' block is a compile-time error

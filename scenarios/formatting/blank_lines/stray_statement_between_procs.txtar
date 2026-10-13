@@ -1,0 +1,22 @@
+The boundary holds across an intervening top-level statement that does
+not start with a keyword: the blank line goes directly above the
+:PROCEDURE, not after :ENDPROC (fmt.blank_lines_between_procs).
+-- input.ssl --
+:PROCEDURE First;
+:RETURN 1;
+:ENDPROC;
+gnCounter := 0;
+:PROCEDURE Second;
+:RETURN 2;
+:ENDPROC;
+-- format --
+:PROCEDURE First;
+	:RETURN 1;
+:ENDPROC;
+gnCounter := 0;
+
+:PROCEDURE Second;
+	:RETURN 2;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

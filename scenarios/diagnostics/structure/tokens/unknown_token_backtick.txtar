@@ -1,0 +1,23 @@
+Backticks around a name (a habit from SQL dialects) are not SSL tokens:
+unknown_token (error) on each, quoting the text. unexpected_token must
+defer to the lexer-level rule (diag.unknown_token).
+-- input.ssl --
+:PROCEDURE ColumnLabel;
+	:DECLARE sLabel, nCount;
+	nCount := 4;
+	sLabel := `nCount`;
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE ColumnLabel;
+	:DECLARE sLabel, nCount;
+	nCount := 4;
+	sLabel := `nCount`;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+4:12-4:13 error unknown_token: Unknown token: '`'
+4:19-4:20 error unknown_token: Unknown token: '`'
+-- diagnostics [--strict --info] --
+4:12-4:13 error unknown_token: Unknown token: '`'
+4:19-4:20 error unknown_token: Unknown token: '`'

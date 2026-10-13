@@ -1,0 +1,29 @@
+Near-misses for diag.default_after_parameters: a run of :DEFAULT
+statements, a comment line between :PARAMETERS and :DEFAULT, and a
+multi-line :PARAMETERS list with inline comments (issue #170).
+-- input.ssl --
+:PROCEDURE PackLabel;
+	:PARAMETERS sCode, /* the item code;
+		nCopies, /* how many labels;
+		sPrinter;
+	/* fall back to one copy on the default printer;
+	:DEFAULT nCopies, 1;
+	:DEFAULT sPrinter, "LBL01";
+	:DECLARE sJob;
+	sJob := sCode + ":" + LimsString(nCopies) + "@" + sPrinter;
+	:RETURN sJob;
+:ENDPROC;
+-- format --
+:PROCEDURE PackLabel;
+	:PARAMETERS sCode,  /* the item code;
+	            nCopies,  /* how many labels;
+	            sPrinter;
+	/* fall back to one copy on the default printer;
+	:DEFAULT nCopies, 1;
+	:DEFAULT sPrinter, "LBL01";
+	:DECLARE sJob;
+	sJob := sCode + ":" + LimsString(nCopies) + "@" + sPrinter;
+	:RETURN sJob;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

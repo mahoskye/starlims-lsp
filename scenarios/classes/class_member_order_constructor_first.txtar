@@ -1,0 +1,38 @@
+Constructor placed first among the methods, after :INHERIT and the field
+:DECLARE lines. The Constructor-must-be-last check was deliberately removed
+(commit d134334), so diag.class_member_order must stay silent even under
+--info. Should be clean.
+-- input.ssl --
+:CLASS Shelf;
+:INHERIT Lab.Container;
+:DECLARE aSlots;
+:DECLARE nCapacity;
+
+:PROCEDURE Constructor;
+	:PARAMETERS nSize;
+	:DEFAULT nSize, 10;
+	Me:nCapacity := nSize;
+	Me:aSlots := {};
+:ENDPROC;
+
+:PROCEDURE Count;
+	:RETURN Len(Me:aSlots);
+:ENDPROC;
+-- format --
+:CLASS Shelf;
+:INHERIT Lab.Container;
+:DECLARE aSlots;
+:DECLARE nCapacity;
+
+:PROCEDURE Constructor;
+	:PARAMETERS nSize;
+	:DEFAULT nSize, 10;
+	Me:nCapacity := nSize;
+	Me:aSlots := {};
+:ENDPROC;
+
+:PROCEDURE Count;
+	:RETURN Len(Me:aSlots);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

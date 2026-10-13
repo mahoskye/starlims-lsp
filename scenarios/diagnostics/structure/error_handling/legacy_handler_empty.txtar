@@ -1,0 +1,44 @@
+An :ERROR handler whose body is empty before :RESUME, and a second
+procedure whose :ERROR is the last thing before :ENDPROC. Both are the
+empty-handler finding of error_handler_structure (error), plus
+deprecated_keyword on each legacy keyword (diag.error_handler_structure).
+-- input.ssl --
+:PROCEDURE ReadQuota;
+	:DECLARE nQuota;
+	nQuota := LSearch("SELECT QUOTA FROM LIMITS", 0);
+	:RETURN nQuota;
+	:ERROR;
+	:RESUME;
+:ENDPROC;
+
+:PROCEDURE ReadLimit;
+	:DECLARE nLimit;
+	nLimit := LSearch("SELECT MAXVAL FROM LIMITS", 0);
+	:ERROR;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadQuota;
+	:DECLARE nQuota;
+	nQuota := LSearch("SELECT QUOTA FROM LIMITS", 0);
+	:RETURN nQuota;
+	:ERROR;
+	:RESUME;
+:ENDPROC;
+
+:PROCEDURE ReadLimit;
+	:DECLARE nLimit;
+	nLimit := LSearch("SELECT MAXVAL FROM LIMITS", 0);
+	:ERROR;
+:ENDPROC;
+-- diagnostics --
+5:2-5:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+5:2-5:8 error error_handler_structure: ':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope
+6:2-6:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:2-12:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:2-12:8 error error_handler_structure: ':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope
+-- diagnostics [--strict --info] --
+5:2-5:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+5:2-5:8 error error_handler_structure: ':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope
+6:2-6:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:2-12:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:2-12:8 error error_handler_structure: ':ERROR' must contain at least one statement before ':RESUME' or the end of the current scope

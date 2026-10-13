@@ -1,0 +1,42 @@
+An operand-taking keyword ending its line (`:RETURN`, `:IF`, `:WHILE`)
+takes its operand from the next line: no `;` is forced after the keyword
+and the operand line takes one continuation level. A bare `:RETURN`
+followed by a keyword really has no operand and is terminated
+(fmt.semicolon_enforcement and fmt.indent_style, issue #255).
+-- input.ssl --
+:PROCEDURE Pick;
+:PARAMETERS nValue;
+:DECLARE nResult;
+nResult := 0;
+:WHILE
+nResult < nValue;
+nResult += 1;
+:ENDWHILE;
+:IF
+nResult > 10;
+:RETURN
+nResult;
+:ENDIF;
+:RETURN
+:ENDPROC;
+-- format --
+:PROCEDURE Pick;
+	:PARAMETERS nValue;
+	:DECLARE nResult;
+	nResult := 0;
+	:WHILE
+		nResult < nValue;
+		nResult += 1;
+	:ENDWHILE;
+
+	:IF
+		nResult > 10;
+		:RETURN
+			nResult;
+	:ENDIF;
+	:RETURN;
+:ENDPROC;
+-- diagnostics --
+15:1-15:9 error unexpected_token: Unexpected keyword ':ENDPROC' - expected an expression
+-- diagnostics [--strict --info] --
+15:1-15:9 error unexpected_token: Unexpected keyword ':ENDPROC' - expected an expression

@@ -1,0 +1,43 @@
+An :EXITCASE inside an :IF within a :CASE branch does not compile:
+exitcase_last_in_branch fires on that :EXITCASE (error). prefer_exitcase
+counts the nested :EXITCASE as ending its branch, so the clause is
+reported once, not twice (issue #265; diag.exitcase_last_in_branch,
+diag.prefer_exitcase).
+-- input.ssl --
+:PROCEDURE CheckLimit;
+	:PARAMETERS nValue, bEnforce;
+	:DECLARE sResult;
+	sResult := "ok";
+	:BEGINCASE;
+	:CASE nValue > 100;
+		:IF bEnforce;
+			sResult := "rejected";
+			:EXITCASE;
+		:ENDIF;
+		sResult := "warned";
+	:OTHERWISE;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sResult;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckLimit;
+	:PARAMETERS nValue, bEnforce;
+	:DECLARE sResult;
+	sResult := "ok";
+	:BEGINCASE;
+	:CASE nValue > 100;
+		:IF bEnforce;
+			sResult := "rejected";
+			:EXITCASE;
+		:ENDIF;
+		sResult := "warned";
+	:OTHERWISE;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sResult;
+:ENDPROC;
+-- diagnostics --
+9:4-9:13 error exitcase_last_in_branch: ':EXITCASE' inside a nested block does not compile: it must be the last statement directly in its ':CASE' or ':OTHERWISE' branch
+-- diagnostics [--strict --info] --
+9:4-9:13 error exitcase_last_in_branch: ':EXITCASE' inside a nested block does not compile: it must be the last statement directly in its ':CASE' or ':OTHERWISE' branch

@@ -1,0 +1,21 @@
+A script-level :PARAMETERS after a top-level statement fires
+diag.parameters_first; a second script-level :PARAMETERS list fires it
+again, since the first one counts as a statement.
+-- input.ssl --
+:DECLARE nAttempts;
+nAttempts := 0;
+:PARAMETERS sTarget;
+:PARAMETERS nRetries;
+:RETURN sTarget + LimsString(nRetries + nAttempts);
+-- format --
+:DECLARE nAttempts;
+nAttempts := 0;
+:PARAMETERS sTarget;
+:PARAMETERS nRetries;
+:RETURN sTarget + LimsString(nRetries + nAttempts);
+-- diagnostics --
+3:1-3:12 error parameters_first: Script-level ':PARAMETERS' must appear before top-level statements (leading ':PROCEDURE' blocks are allowed)
+4:1-4:12 error parameters_first: Script-level ':PARAMETERS' must appear before top-level statements (leading ':PROCEDURE' blocks are allowed)
+-- diagnostics [--strict --info] --
+3:1-3:12 error parameters_first: Script-level ':PARAMETERS' must appear before top-level statements (leading ':PROCEDURE' blocks are allowed)
+4:1-4:12 error parameters_first: Script-level ':PARAMETERS' must appear before top-level statements (leading ':PROCEDURE' blocks are allowed)

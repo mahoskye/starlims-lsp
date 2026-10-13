@@ -1,0 +1,34 @@
+Standard SQLExecute placeholder forms that complex_sql_placeholder must
+not flag (diag.complex_sql_placeholder Does not flag): a simple
+variable, property access, array indexing, a parameterless function
+call, and positional ? markers in a RunSQL call.
+-- input.ssl --
+:PROCEDURE LoadOrders;
+	:PARAMETERS sStatus, oUser, aIds;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("SELECT ordno FROM orders WHERE status = ?sStatus? AND owner = ?oUser:ID?");
+	aRows := SQLExecute("SELECT ordno FROM orders WHERE ordno = ?aIds[1]? AND logdate < ?Today()?");
+	bOk := RunSQL("UPDATE orders SET status = ? WHERE ordno = ?",, {sStatus, aIds[1]});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE LoadOrders;
+	:PARAMETERS sStatus, oUser, aIds;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE status = ?sStatus?
+	      AND owner = ?oUser:ID?
+	");
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE ordno = ?aIds[1]?
+	      AND logdate < ?Today()?
+	");
+	bOk := RunSQL("UPDATE orders SET status = ? WHERE ordno = ?",, {sStatus, aIds[1]});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

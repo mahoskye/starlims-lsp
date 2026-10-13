@@ -1,0 +1,22 @@
+Several statements crammed on one line: records whether the formatter
+splits them onto their own lines (style guide one_statement_per_line:
+"The formatter splits a line that holds two statements") and how the
+keyword statements on a crammed line are indented.
+-- input.ssl --
+:PROCEDURE Crammed;
+:DECLARE nA, nB; nA := 1; nB := 2;
+:IF nA > 0; nB := nA; :ENDIF;
+:RETURN nA + nB;
+:ENDPROC;
+-- format --
+:PROCEDURE Crammed;
+	:DECLARE nA, nB;
+	nA := 1;
+	nB := 2;
+	:IF nA > 0;
+		nB := nA;
+	:ENDIF;
+	:RETURN nA + nB;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

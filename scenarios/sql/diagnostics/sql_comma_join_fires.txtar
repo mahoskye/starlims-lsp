@@ -1,0 +1,33 @@
+Pre-ANSI comma joins in a SELECT's FROM clause (diag.sql_comma_join,
+info tier): a two-table comma join through SQLExecute and a three-table
+one through LSelect1. One finding per string, ranged on the string.
+-- input.ssl --
+:PROCEDURE OrderTasks;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, aMore;
+	aRows := SQLExecute("SELECT o.ordno, t.testcode FROM orders o, ordtask t WHERE o.ordno = t.ordno AND o.ordno = ?sOrdNo?");
+	aMore := LSelect1("SELECT o.ordno FROM orders o, ordtask t, ordresult r WHERE o.ordno = t.ordno AND r.ordno = t.ordno",, {});
+	:RETURN {aRows, aMore};
+:ENDPROC;
+-- format --
+:PROCEDURE OrderTasks;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, aMore;
+	aRows := SQLExecute("
+	    SELECT o.ordno, t.testcode
+	    FROM orders o, ordtask t
+	    WHERE o.ordno = t.ordno
+	      AND o.ordno = ?sOrdNo?
+	");
+	aMore := LSelect1("
+	    SELECT o.ordno
+	    FROM orders o, ordtask t, ordresult r
+	    WHERE o.ordno = t.ordno
+	      AND r.ordno = t.ordno
+	",, {});
+	:RETURN {aRows, aMore};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:122 info sql_comma_join: Comma join in FROM clause - ANSI JOIN ... ON syntax keeps each join condition next to its table and the WHERE clause for real filters
+5:20-5:120 info sql_comma_join: Comma join in FROM clause - ANSI JOIN ... ON syntax keeps each join condition next to its table and the WHERE clause for real filters

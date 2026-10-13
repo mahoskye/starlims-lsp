@@ -1,0 +1,27 @@
+The member-access `:` is not an operator: spaces around it are removed
+(`oUser : firstName` → `oUser:firstName`), member names keep the author's
+case, and a member call named like a built-in (`oText:upper()`) is not
+re-cased because members are case-sensitive .NET members
+(fmt.operator_spacing, fmt.builtin_function_case issue #255).
+-- input.ssl --
+:PROCEDURE ReadUser;
+:PARAMETERS oUser, oText;
+:DECLARE sName;
+sName := oUser : firstName;
+sName := oUser :lastName + oText: upper();
+oText:len(sName);
+oUser : Address : city := "Springfield";
+:RETURN sName;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadUser;
+	:PARAMETERS oUser, oText;
+	:DECLARE sName;
+	sName := oUser:firstName;
+	sName := oUser:lastName + oText:upper();
+	oText:len(sName);
+	oUser:Address:city := "Springfield";
+	:RETURN sName;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

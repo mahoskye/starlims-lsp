@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
+	"unicode"
 
 	"starlims-lsp/internal/catalog"
 	"starlims-lsp/internal/providers"
@@ -252,9 +254,62 @@ func runScenario(t *testing.T, path string) {
 		}
 	}
 
+	known := knownFailures(sc.header)
+	failed := map[string]bool{}
 	for _, flags := range formatFlags {
-		checkInvariants(t, input, inputName, flags)
+		for _, f := range checkInvariants(input, inputName, flags) {
+			failed[f.invariant] = true
+			if _, ok := known[f.invariant]; !ok {
+				t.Error(f.message)
+			}
+		}
 	}
+	for inv, why := range known {
+		if !invariantNames[inv] {
+			t.Errorf("Known failure names unknown invariant %q (want one of %s)", inv, strings.Join(sortedKeys(invariantNames), ", "))
+		} else if !failed[inv] {
+			t.Errorf("invariant %q passes now (%s): remove its Known failure line", inv, why)
+		}
+	}
+}
+
+// invariantNames are the invariants a scenario header may mark as a
+// known failure.
+var invariantNames = map[string]bool{
+	"idempotent": true, "whitespace-only": true, "no-gained-errors": true,
+	"range-stable": true, "no-panic": true, "placeholders-verbatim": true,
+}
+
+// knownFailures reads the header's "Known failure: <invariant> — <why>"
+// lines. A known failure is tolerated until it stops failing, when the
+// runner demands the line's removal — the same ratchet as the catalog's
+// expect=fail fences. <why> names the tracking issue.
+func knownFailures(header string) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.Split(header, "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Known failure:")
+		if !ok {
+			continue
+		}
+		name, why, _ := strings.Cut(strings.TrimSpace(rest), " ")
+		out[name] = strings.TrimLeft(strings.TrimSpace(why), "—- ")
+	}
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// invariantFailure is one broken invariant.
+type invariantFailure struct {
+	invariant string
+	message   string
 }
 
 // checkInvariants holds every scenario to the contracts that need no
@@ -262,25 +317,34 @@ func runScenario(t *testing.T, path string) {
 //   - nothing panics (a recovered panic surfaces as internal_error);
 //   - formatting is idempotent (feature.formatting A6);
 //   - formatting changes only whitespace, letter case and semicolons;
+//   - named SQL placeholders (?name?) survive byte for byte;
 //   - formatting introduces no error a validator did not already report;
 //   - every line of the formatted document is a fixed point of range
 //     formatting (feature.formatting A2).
-func checkInvariants(t *testing.T, input, inputName string, flags []string) {
-	t.Helper()
+func checkInvariants(input, inputName string, flags []string) []invariantFailure {
+	var fails []invariantFailure
+	fail := func(inv, format string, args ...any) {
+		fails = append(fails, invariantFailure{inv, fmt.Sprintf(format, args...)})
+	}
 	label := "format"
 	if flags != nil {
 		label = "format [" + strings.Join(flags, " ") + "]"
 	}
 	once, err := scenarioFormat(input, inputName, flags)
 	if err != nil {
-		t.Fatalf("%s: %v", label, err)
+		return []invariantFailure{{"no-panic", fmt.Sprintf("%s: %v", label, err)}}
 	}
 	twice, _ := scenarioFormat(once, inputName, flags)
 	if twice != once {
-		t.Errorf("%s: not idempotent\n%s", label, lineDiff(once, twice))
+		fail("idempotent", "%s: not idempotent\n%s", label, lineDiff(once, twice))
+	}
+	for _, ph := range namedPlaceholderRe.FindAllString(input, -1) {
+		if !strings.Contains(once, ph) {
+			fail("placeholders-verbatim", "%s: SQL placeholder %q was not kept verbatim", label, ph)
+		}
 	}
 	if a, b := semanticSkeleton(input), semanticSkeleton(once); a != b {
-		t.Errorf("%s: changed more than whitespace, case and semicolons\ninput skeleton:  %s\noutput skeleton: %s", label, a, b)
+		fail("whitespace-only", "%s: changed more than whitespace, case and semicolons\ninput skeleton:  %s\noutput skeleton: %s", label, a, b)
 	}
 
 	for _, profile := range [][]string{nil, {"--strict", "--info"}} {
@@ -288,20 +352,19 @@ func checkInvariants(t *testing.T, input, inputName string, flags []string) {
 		_, after, _ := scenarioDiagnostics(once, inputName, profile)
 		for _, d := range append(before, after...) {
 			if d.Code == providers.CodeInternalError {
-				t.Errorf("internal error (recovered panic): %s", d.Message)
+				fail("no-panic", "internal error (recovered panic): %s", d.Message)
 			}
 		}
 		if gained := gainedErrors(before, after); len(gained) > 0 {
-			t.Errorf("%s: formatting introduced errors (profile %v): %s", label, profile, strings.Join(gained, ", "))
+			fail("no-gained-errors", "%s: formatting introduced errors (profile %v): %s", label, profile, strings.Join(gained, ", "))
 		}
 	}
 
 	opts, _ := parseFormatArgs(append(append([]string{}, flags...), "--stdin"))
 	if (opts.ds || isDataSourcePath(inputName)) && providers.IsSQLModeDataSource(input) {
-		return // SQL-mode data sources are never formatted
+		return fails // SQL-mode data sources are never formatted
 	}
-	lines := strings.Split(once, "\n")
-	for i, line := range lines {
+	for i, line := range strings.Split(once, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -309,20 +372,46 @@ func checkInvariants(t *testing.T, input, inputName string, flags []string) {
 		if len(edits) == 0 {
 			continue
 		}
-		e := edits[0]
-		orig := strings.Join(lines[e.Range.Start.Line:e.Range.End.Line+1], "\n")
-		if strings.TrimSuffix(e.NewText, "\n") != orig {
-			t.Errorf("%s: range-formatting line %d of the formatted output changes it\nwas: %q\nnow: %q", label, i+1, orig, e.NewText)
+		if got := applyEdit(once, edits[0]); got != once {
+			fail("range-stable", "%s: range-formatting line %d of the formatted output changes it\n%s", label, i+1, lineDiff(once, got))
 		}
 	}
+	return fails
 }
+
+// applyEdit applies a provider TextEdit (rune-based positions, like the
+// providers package) to text.
+func applyEdit(text string, e providers.TextEdit) string {
+	offset := func(p providers.Position) int {
+		lines := strings.SplitAfter(text, "\n")
+		off := 0
+		for l := 0; l < p.Line && l < len(lines); l++ {
+			off += len(lines[l])
+		}
+		if p.Line < len(lines) {
+			runes := []rune(strings.TrimSuffix(lines[p.Line], "\n"))
+			c := min(p.Character, len(runes))
+			off += len(string(runes[:c]))
+		}
+		return off
+	}
+	start, end := offset(e.Range.Start), offset(e.Range.End)
+	if end < start {
+		end = start
+	}
+	return text[:start] + e.NewText + text[end:]
+}
+
+// namedPlaceholderRe matches a SQLExecute named placeholder such as
+// ?sName? or ?oRow:Id?: its interior reaches the database's parameter
+// binding, so formatting must not touch a byte of it (fmt.sql_in_strings).
+var namedPlaceholderRe = regexp.MustCompile(`\?[A-Za-z_][^?\n"']*\?`)
 
 // semanticSkeleton reduces source to what formatting must preserve:
 // everything but whitespace and semicolons, case-folded.
 func semanticSkeleton(s string) string {
 	return strings.Map(func(r rune) rune {
-		switch r {
-		case ' ', '\t', '\r', '\n', ';', '\uFEFF':
+		if unicode.IsSpace(r) || r == ';' || r == '\uFEFF' {
 			return -1
 		}
 		return r

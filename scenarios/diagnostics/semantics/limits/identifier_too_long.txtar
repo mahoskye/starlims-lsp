@@ -1,0 +1,20 @@
+diag.identifier_too_long: a variable whose effective name (one Hungarian
+prefix stripped) exceeds 20 characters, and a procedure name over 30
+characters. Only declarations are measured, so the later use of the long
+variable does not fire again.
+-- input.ssl --
+:PROCEDURE ReconcileCustomerAccountBalances;
+	:DECLARE nOutstandingInvoiceBalance;
+	nOutstandingInvoiceBalance := 0;
+	:RETURN nOutstandingInvoiceBalance;
+:ENDPROC;
+-- format --
+:PROCEDURE ReconcileCustomerAccountBalances;
+	:DECLARE nOutstandingInvoiceBalance;
+	nOutstandingInvoiceBalance := 0;
+	:RETURN nOutstandingInvoiceBalance;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:33 info identifier_too_long: Procedure name 'ReconcileCustomerAccountBalances' exceeds 30-character limit (length 32)
+2:11-2:37 info identifier_too_long: Variable name 'nOutstandingInvoiceBalance' exceeds 20-character limit (effective length 25 excluding prefix)

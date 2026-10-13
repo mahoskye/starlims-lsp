@@ -1,0 +1,56 @@
+A class that keeps an SQL template in a :REGION (read with GetRegion())
+and an SSL snippet in a :BEGININLINECODE block (read with GetInlineCode()
+and run with ExecUdf). The :REGION body is a multi-line token the formatter
+preserves verbatim (feature.formatting A11); the inline-code body is SSL
+and is formatted and indented like code, with its own leading :PARAMETERS
+(parameters_first, issue #168).
+-- input.ssl --
+:CLASS QueryStore;
+:DECLARE sLastSql;
+
+:PROCEDURE PendingQuery;
+	Me:sLastSql := GetRegion("PendingSamples");
+	:RETURN Me:sLastSql;
+:ENDPROC;
+
+:PROCEDURE Script;
+	:PARAMETERS nA, nB;
+	:RETURN ExecUdf(GetInlineCode("Snippet"), {nA, nB});
+:ENDPROC;
+
+:REGION PendingSamples;
+SELECT s.SampleId, s.Status
+  FROM LabSamples s
+ WHERE s.Status = 'P'
+:ENDREGION;
+
+:BEGININLINECODE Snippet;
+:PARAMETERS nLeft, nRight;
+:RETURN nLeft + nRight;
+:ENDINLINECODE;
+-- format --
+:CLASS QueryStore;
+:DECLARE sLastSql;
+
+:PROCEDURE PendingQuery;
+	Me:sLastSql := GetRegion("PendingSamples");
+	:RETURN Me:sLastSql;
+:ENDPROC;
+
+:PROCEDURE Script;
+	:PARAMETERS nA, nB;
+	:RETURN ExecUdf(GetInlineCode("Snippet"), {nA, nB});
+:ENDPROC;
+
+:REGION PendingSamples;
+SELECT s.SampleId, s.Status
+  FROM LabSamples s
+ WHERE s.Status = 'P'
+:ENDREGION;
+
+:BEGININLINECODE Snippet;
+	:PARAMETERS nLeft, nRight;
+	:RETURN nLeft + nRight;
+:ENDINLINECODE;
+-- diagnostics --
+-- diagnostics [--strict --info] --

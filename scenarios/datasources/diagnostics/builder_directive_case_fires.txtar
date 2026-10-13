@@ -1,0 +1,30 @@
+builder_directive_case fires on each wrong-cased builder directive in a
+data source (`:dsn`, `:TableName`, `:NullAsBlank`, `:invariantDateColumns`):
+the builder matches directives case-sensitively and silently ignores these.
+The message names the uppercase form and the range covers the token.
+-- input.ds --
+:dsn := DATABASE;
+:TableName := toolList;
+:NullAsBlank := true;
+:invariantDateColumns := issued_on;
+:PARAMETERS sBin := "A1";
+
+SELECT tool_id, issued_on FROM tool_issue WHERE bin_code = @sBin
+-- format --
+:dsn := DATABASE;
+:TableName := toolList;
+:NullAsBlank := true;
+:invariantDateColumns := issued_on;
+:PARAMETERS sBin := "A1";
+
+SELECT tool_id, issued_on FROM tool_issue WHERE bin_code = @sBin
+-- diagnostics --
+1:1-1:5 error builder_directive_case: Builder directives must be uppercase: use ':DSN'
+2:1-2:11 error builder_directive_case: Builder directives must be uppercase: use ':TABLENAME'
+3:1-3:13 error builder_directive_case: Builder directives must be uppercase: use ':NULLASBLANK'
+4:1-4:22 error builder_directive_case: Builder directives must be uppercase: use ':INVARIANTDATECOLUMNS'
+-- diagnostics [--strict --info] --
+1:1-1:5 error builder_directive_case: Builder directives must be uppercase: use ':DSN'
+2:1-2:11 error builder_directive_case: Builder directives must be uppercase: use ':TABLENAME'
+3:1-3:13 error builder_directive_case: Builder directives must be uppercase: use ':NULLASBLANK'
+4:1-4:22 error builder_directive_case: Builder directives must be uppercase: use ':INVARIANTDATECOLUMNS'

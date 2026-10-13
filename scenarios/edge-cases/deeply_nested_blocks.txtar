@@ -1,0 +1,89 @@
+Blocks nested twelve deep (IF, WHILE, FOR, BEGINCASE, TRY alternating)
+inside a procedure. Indentation must step one level per block and come
+back to column 0; max_block_depth reports the over-deep nesting.
+-- input.ssl --
+:PROCEDURE Deep;
+:PARAMETERS nLevel;
+:DECLARE i, j, k, sOut;
+sOut := "";
+:IF nLevel > 0;
+:WHILE nLevel > 1;
+:FOR i := 1 :TO 2;
+:IF i == 1;
+:FOR j := 1 :TO 2;
+:BEGINCASE;
+:CASE j == 1;
+:TRY;
+:FOR k := 1 :TO 2;
+:IF k == 2;
+:WHILE nLevel > 5;
+:IF .T.;
+sOut += "deep";
+nLevel := 0;
+:ENDIF;
+:ENDWHILE;
+:ENDIF;
+:NEXT;
+:CATCH;
+sOut := GetLastSSLError():Description;
+:ENDTRY;
+:EXITCASE;
+:OTHERWISE;
+:EXITCASE;
+:ENDCASE;
+:NEXT;
+:ENDIF;
+:NEXT;
+nLevel -= 1;
+:ENDWHILE;
+:ENDIF;
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Deep;
+	:PARAMETERS nLevel;
+	:DECLARE i, j, k, sOut;
+	sOut := "";
+	:IF nLevel > 0;
+		:WHILE nLevel > 1;
+			:FOR i := 1 :TO 2;
+				:IF i == 1;
+					:FOR j := 1 :TO 2;
+						:BEGINCASE;
+						:CASE j == 1;
+							:TRY;
+								:FOR k := 1 :TO 2;
+									:IF k == 2;
+										:WHILE nLevel > 5;
+											:IF .T.;
+												sOut += "deep";
+												nLevel := 0;
+											:ENDIF;
+										:ENDWHILE;
+									:ENDIF;
+								:NEXT;
+							:CATCH;
+								sOut := GetLastSSLError():Description;
+							:ENDTRY;
+							:EXITCASE;
+						:OTHERWISE;
+							:EXITCASE;
+						:ENDCASE;
+					:NEXT;
+				:ENDIF;
+			:NEXT;
+			nLevel -= 1;
+		:ENDWHILE;
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+8:1-8:1 info max_block_depth: Block nesting depth (5) exceeds maximum (4)
+9:1-9:1 info max_block_depth: Block nesting depth (6) exceeds maximum (4)
+10:1-10:1 info max_block_depth: Block nesting depth (7) exceeds maximum (4)
+12:1-12:1 info max_block_depth: Block nesting depth (8) exceeds maximum (4)
+13:1-13:1 info max_block_depth: Block nesting depth (9) exceeds maximum (4)
+14:1-14:1 info max_block_depth: Block nesting depth (10) exceeds maximum (4)
+15:1-15:1 info max_block_depth: Block nesting depth (11) exceeds maximum (4)
+16:1-16:1 info max_block_depth: Block nesting depth (12) exceeds maximum (4)

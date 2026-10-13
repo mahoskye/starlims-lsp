@@ -1,0 +1,32 @@
+:CATCH and :FINALLY left in a procedure after their :TRY and :ENDTRY were
+deleted. Both are stray_block_keyword; catch_order_before_finally and
+single_catch must not claim them (diag.stray_block_keyword first Flags
+fence). The :CATCH form is correct, so catch_clause_form is silent.
+-- input.ssl --
+:PROCEDURE StoreResult;
+	:PARAMETERS nValue;
+	:DECLARE nStored;
+	nStored := nValue;
+	:CATCH;
+	nStored := 0;
+	:FINALLY;
+	nStored := nStored + 0;
+	:RETURN nStored;
+:ENDPROC;
+-- format --
+:PROCEDURE StoreResult;
+	:PARAMETERS nValue;
+	:DECLARE nStored;
+	nStored := nValue;
+:CATCH;
+	nStored := 0;
+:FINALLY;
+	nStored := nStored + 0;
+	:RETURN nStored;
+:ENDPROC;
+-- diagnostics --
+5:2-5:8 error stray_block_keyword: ':CATCH' is outside any ':TRY' block
+7:2-7:10 error stray_block_keyword: ':FINALLY' is outside any ':TRY' block
+-- diagnostics [--strict --info] --
+5:2-5:8 error stray_block_keyword: ':CATCH' is outside any ':TRY' block
+7:2-7:10 error stray_block_keyword: ':FINALLY' is outside any ':TRY' block

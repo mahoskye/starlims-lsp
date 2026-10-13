@@ -1,0 +1,36 @@
+# and <> are valid inequality operators, but the style guide prefers !=
+(diag.not_preferred_operator, info tier, one per occurrence). != and the
+same characters inside strings and comments do not fire.
+-- input.ssl --
+:PROCEDURE CompareCodes;
+	:PARAMETERS nLeft, nRight;
+	:DECLARE sNote;
+	sNote := "a <> b # c";
+	/* note: <> and # are aliases of != here;
+	:IF nLeft <> nRight .AND. nLeft # 0;
+		sNote := "differ";
+	:ENDIF;
+	:IF nLeft != nRight;
+		sNote := sNote + "!";
+	:ENDIF;
+	:RETURN sNote;
+:ENDPROC;
+-- format --
+:PROCEDURE CompareCodes;
+	:PARAMETERS nLeft, nRight;
+	:DECLARE sNote;
+	sNote := "a <> b # c";
+	/* note: <> and # are aliases of != here;
+	:IF nLeft <> nRight .AND. nLeft # 0;
+		sNote := "differ";
+	:ENDIF;
+
+	:IF nLeft != nRight;
+		sNote := sNote + "!";
+	:ENDIF;
+	:RETURN sNote;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+6:12-6:14 info not_preferred_operator: Use '!=' instead of '<>' for inequality
+6:34-6:35 info not_preferred_operator: Use '!=' instead of '#' for inequality

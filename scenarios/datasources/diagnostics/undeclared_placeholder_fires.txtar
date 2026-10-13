@@ -1,0 +1,22 @@
+datasource_undeclared_placeholder: in the hybrid shape a @name placeholder
+with no case-insensitive match among the header's :PARAMETERS warns, most
+often a typo of a declared name (`@sFolder` for sFolderNo), ranged over
+the full span with the header offset applied.
+-- input.ds --
+:DSN := DATABASE;
+:PARAMETERS sFolderNo := "";
+
+select doc_id, doc_title
+from folder_doc
+where folder_no = @sFolder
+-- format --
+:DSN := DATABASE;
+:PARAMETERS sFolderNo := "";
+
+select doc_id, doc_title
+from folder_doc
+where folder_no = @sFolder
+-- diagnostics --
+6:19-6:27 warning datasource_undeclared_placeholder: SQL data-source placeholder '@sFolder' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.
+-- diagnostics [--strict --info] --
+6:19-6:27 warning datasource_undeclared_placeholder: SQL data-source placeholder '@sFolder' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.

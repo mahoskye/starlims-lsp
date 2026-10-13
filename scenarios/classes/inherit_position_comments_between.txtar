@@ -1,0 +1,26 @@
+Comments between :CLASS and :INHERIT are transparent: diag.inherit_position
+must stay silent. Should be clean.
+-- input.ssl --
+/* Widget base wiring;
+:CLASS Slider;
+/* The parent supplies Init and Render;
+:INHERIT Lab.Control;
+:DECLARE nValue;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:nValue := 0;
+:ENDPROC;
+-- format --
+/* Widget base wiring;
+:CLASS Slider;
+/* The parent supplies Init and Render;
+:INHERIT Lab.Control;
+:DECLARE nValue;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:nValue := 0;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

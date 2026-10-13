@@ -1,0 +1,25 @@
+Records what the formatter does with a space between a call name and its
+`(` and with spaces just inside parentheses and braces; the style guide
+asks for neither (no_space_before_call_paren, no_space_inside_parens) and
+fmt.operator_spacing says "No space is inserted ... after an opening
+delimiter".
+-- input.ssl --
+:PROCEDURE Parens;
+:PARAMETERS sValue;
+:DECLARE nLen, vResult;
+nLen := Len (sValue);
+vResult := DoProc ( "Helper", { sValue } );
+nLen := AllTrim( sValue ) + Upper (  sValue  );
+:RETURN nLen;
+:ENDPROC;
+-- format --
+:PROCEDURE Parens;
+	:PARAMETERS sValue;
+	:DECLARE nLen, vResult;
+	nLen := Len(sValue);
+	vResult := DoProc("Helper", {sValue});
+	nLen := AllTrim(sValue) + Upper(sValue);
+	:RETURN nLen;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

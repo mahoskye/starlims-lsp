@@ -1,0 +1,21 @@
+`:PROCEDURE Name(...)` with the keyword form but a parameter list: SSL
+procedures take arguments through :PARAMETERS. procedure_declaration_syntax
+fires on the `(` (parenthesized-parameters path). The block still opens
+and pairs with :ENDPROC (diag.procedure_declaration_syntax).
+-- input.ssl --
+:PROCEDURE CalcShipping(nWeight, sZone);
+	:DECLARE nCost;
+	nCost := nWeight * 1.5;
+	:RETURN nCost;
+:ENDPROC;
+-- format --
+:PROCEDURE CalcShipping(nWeight, sZone);
+	:DECLARE nCost;
+	nCost := nWeight * 1.5;
+	:RETURN nCost;
+:ENDPROC;
+-- diagnostics --
+1:24-1:25 error procedure_declaration_syntax: Procedure declarations don't take parentheses. Use ":PROCEDURE Name;" and declare arguments via ":PARAMETERS".
+-- diagnostics [--strict --info] --
+1:24-1:25 error procedure_declaration_syntax: Procedure declarations don't take parentheses. Use ":PROCEDURE Name;" and declare arguments via ":PARAMETERS".
+3:11-3:18 warning undeclared_variable: Variable 'nWeight' is not declared

@@ -1,0 +1,40 @@
+:EXITWHILE inside the :FINALLY of a :TRY nested in a :WHILE loop:
+exitwhile_in_finally (error). A :WHILE encloses it, so
+exitwhile_outside_loop is silent (diag.exitwhile_in_finally).
+-- input.ssl --
+:PROCEDURE PollJob;
+	:PARAMETERS nJobId;
+	:DECLARE sState;
+	sState := "RUNNING";
+	:WHILE sState == "RUNNING";
+		:TRY;
+			sState := LSearch("SELECT STATE FROM JOBS WHERE JOBID = ?", "DONE",, {nJobId});
+		:FINALLY;
+			:IF sState == "FAILED";
+				:EXITWHILE;
+			:ENDIF;
+		:ENDTRY;
+	:ENDWHILE;
+	:RETURN sState;
+:ENDPROC;
+-- format --
+:PROCEDURE PollJob;
+	:PARAMETERS nJobId;
+	:DECLARE sState;
+	sState := "RUNNING";
+	:WHILE sState == "RUNNING";
+		:TRY;
+			sState := LSearch("SELECT STATE FROM JOBS WHERE JOBID = ?", "DONE",,
+				{nJobId});
+		:FINALLY;
+			:IF sState == "FAILED";
+				:EXITWHILE;
+			:ENDIF;
+		:ENDTRY;
+	:ENDWHILE;
+	:RETURN sState;
+:ENDPROC;
+-- diagnostics --
+10:5-10:15 error exitwhile_in_finally: ':EXITWHILE' inside a ':FINALLY' block is a compile-time error
+-- diagnostics [--strict --info] --
+10:5-10:15 error exitwhile_in_finally: ':EXITWHILE' inside a ':FINALLY' block is a compile-time error

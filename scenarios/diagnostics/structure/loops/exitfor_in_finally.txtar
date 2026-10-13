@@ -1,0 +1,39 @@
+:EXITFOR inside the :FINALLY of a :TRY that sits in a :FOR loop: a
+compile-time error, exitfor_in_finally. The loop encloses it, so
+exitfor_outside_loop must not fire (diag.exitfor_in_finally).
+-- input.ssl --
+:PROCEDURE ProbeHosts;
+	:PARAMETERS aHosts;
+	:DECLARE nIdx, nReached;
+	nReached := 0;
+	:FOR nIdx := 1 :TO Len(aHosts);
+		:TRY;
+			nReached := nReached + 1;
+		:FINALLY;
+			:IF nReached > 3;
+				:EXITFOR;
+			:ENDIF;
+		:ENDTRY;
+	:NEXT;
+	:RETURN nReached;
+:ENDPROC;
+-- format --
+:PROCEDURE ProbeHosts;
+	:PARAMETERS aHosts;
+	:DECLARE nIdx, nReached;
+	nReached := 0;
+	:FOR nIdx := 1 :TO Len(aHosts);
+		:TRY;
+			nReached := nReached + 1;
+		:FINALLY;
+			:IF nReached > 3;
+				:EXITFOR;
+			:ENDIF;
+		:ENDTRY;
+	:NEXT;
+	:RETURN nReached;
+:ENDPROC;
+-- diagnostics --
+10:5-10:13 error exitfor_in_finally: ':EXITFOR' inside a ':FINALLY' block is a compile-time error
+-- diagnostics [--strict --info] --
+10:5-10:13 error exitfor_in_finally: ':EXITFOR' inside a ':FINALLY' block is a compile-time error

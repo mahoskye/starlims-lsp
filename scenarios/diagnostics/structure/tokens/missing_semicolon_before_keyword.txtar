@@ -1,0 +1,28 @@
+A statement that lost its `;` right before a line-leading :IF. The
+continuation reading applies only when the word after the colon is not a
+keyword, so :IF still lexes as a keyword; unexpected_token reports it,
+mentioning the previous statement may be missing its `;`. The :IF block
+must still pair with its :ENDIF (diag.unexpected_token, diag.unknown_keyword
+lexer guard).
+-- input.ssl --
+:PROCEDURE BumpVersion;
+	:PARAMETERS nVersion;
+	nVersion := nVersion + 1
+	:IF nVersion > 99;
+		nVersion := 1;
+	:ENDIF;
+	:RETURN nVersion;
+:ENDPROC;
+-- format --
+:PROCEDURE BumpVersion;
+	:PARAMETERS nVersion;
+	nVersion := nVersion + 1;
+	:IF nVersion > 99;
+		nVersion := 1;
+	:ENDIF;
+	:RETURN nVersion;
+:ENDPROC;
+-- diagnostics --
+4:2-4:5 error unexpected_token: Unexpected keyword ':IF' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+4:2-4:5 error unexpected_token: Unexpected keyword ':IF' - expected an operator or ';' (is the previous statement missing its ';'?)

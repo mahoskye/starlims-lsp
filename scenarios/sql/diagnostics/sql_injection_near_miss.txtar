@@ -1,0 +1,35 @@
+Shapes sql_injection must not flag (diag.sql_injection Does not flag):
+constant-only concatenation, a named placeholder, BuildStringForIn(...)
+as the only runtime operand, a plain variable argument built elsewhere,
+concatenation outside any SQL call, concatenation in a later argument,
+and identifier + identifier with no string literal.
+-- input.ssl --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, aIds, sConn;
+	:DECLARE sSQL, sWhere, aRows, bOk;
+	aRows := SQLExecute("SELECT custid FROM customers" + " WHERE status = 'OPEN'");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
+	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds));
+	sSQL := "SELECT custid FROM customers WHERE custname = '" + sName + "'";
+	aRows := SQLExecute(sSQL);
+	bOk := RunSQL("UPDATE customers SET status = 'X'", "LIMS" + sConn);
+	sWhere := " WHERE status = 'OPEN'";
+	aRows := SQLExecute(sSQL + sWhere);
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, aIds, sConn;
+	:DECLARE sSQL, sWhere, aRows, bOk;
+	aRows := SQLExecute("SELECT custid FROM customers" + " WHERE status = 'OPEN'");
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
+	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds));
+	sSQL := "SELECT custid FROM customers WHERE custname = '" + sName + "'";
+	aRows := SQLExecute(sSQL);
+	bOk := RunSQL("UPDATE customers SET status = 'X'", "LIMS" + sConn);
+	sWhere := " WHERE status = 'OPEN'";
+	aRows := SQLExecute(sSQL + sWhere);
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

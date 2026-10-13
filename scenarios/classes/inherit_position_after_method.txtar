@@ -1,0 +1,27 @@
+:INHERIT placed after a method, at the bottom of the class
+(diag.inherit_position, error). Base:Init() still sees the :INHERIT, so
+base_requires_inherit must not also fire.
+-- input.ssl --
+:CLASS Panel;
+:DECLARE sCaption;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:sCaption := "Panel";
+:ENDPROC;
+
+:INHERIT Lab.Control;
+-- format --
+:CLASS Panel;
+:DECLARE sCaption;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:sCaption := "Panel";
+:ENDPROC;
+
+:INHERIT Lab.Control;
+-- diagnostics --
+9:1-9:9 error inherit_position: ':INHERIT' must directly follow the ':CLASS' statement
+-- diagnostics [--strict --info] --
+9:1-9:9 error inherit_position: ':INHERIT' must directly follow the ':CLASS' statement

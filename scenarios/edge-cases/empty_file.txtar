@@ -1,0 +1,6 @@
+An empty input: no text at all. Nothing to format and nothing to
+report; the tool must not panic or invent output.
+-- input.ssl --
+-- format --
+-- diagnostics --
+-- diagnostics [--strict --info] --

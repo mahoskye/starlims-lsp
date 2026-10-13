@@ -1,0 +1,61 @@
+The SQL block indents relative to the statement's own base indent, so
+reflowed SQL deep inside :IF / :FOR / :TRY bodies sits 4 spaces past that
+statement's indentation (reference "SSL Embedding Convention"), also
+under --indent-style space.
+-- input.ssl --
+:PROCEDURE Deep;
+	:PARAMETERS aIds;
+	:DECLARE i, aRows;
+	:IF Len(aIds) > 0;
+		:FOR i := 1 :TO Len(aIds);
+			:TRY;
+				aRows := SQLExecute("select ordno, testcode, status from ordtask where ordno = ?aIds[i]? and status = 'A'");
+			:CATCH;
+				aRows := {};
+			:ENDTRY;
+		:NEXT;
+	:ENDIF;
+	:RETURN aRows;
+:ENDPROC;
+-- format [--indent-style space] --
+:PROCEDURE Deep;
+    :PARAMETERS aIds;
+    :DECLARE i, aRows;
+    :IF Len(aIds) > 0;
+        :FOR i := 1 :TO Len(aIds);
+            :TRY;
+                aRows := SQLExecute("
+                    SELECT ordno, testcode, status
+                    FROM ordtask
+                    WHERE ordno = ?aIds[i]?
+                      AND status = 'A'
+                ");
+            :CATCH;
+                aRows := {};
+            :ENDTRY;
+        :NEXT;
+    :ENDIF;
+    :RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Deep;
+	:PARAMETERS aIds;
+	:DECLARE i, aRows;
+	:IF Len(aIds) > 0;
+		:FOR i := 1 :TO Len(aIds);
+			:TRY;
+				aRows := SQLExecute("
+				    SELECT ordno, testcode, status
+				    FROM ordtask
+				    WHERE ordno = ?aIds[i]?
+				      AND status = 'A'
+				");
+			:CATCH;
+				aRows := {};
+			:ENDTRY;
+		:NEXT;
+	:ENDIF;
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,28 @@
+:LOOP written in an :IF as if it meant "retry", with no loop open:
+loop_outside_loop (error) (diag.loop_outside_loop).
+-- input.ssl --
+:PROCEDURE ConfirmPayment;
+	:PARAMETERS sReference;
+	:DECLARE bConfirmed;
+	bConfirmed := .F.;
+	:IF Empty(sReference);
+		:LOOP;
+	:ENDIF;
+	bConfirmed := .T.;
+	:RETURN bConfirmed;
+:ENDPROC;
+-- format --
+:PROCEDURE ConfirmPayment;
+	:PARAMETERS sReference;
+	:DECLARE bConfirmed;
+	bConfirmed := .F.;
+	:IF Empty(sReference);
+		:LOOP;
+	:ENDIF;
+	bConfirmed := .T.;
+	:RETURN bConfirmed;
+:ENDPROC;
+-- diagnostics --
+6:3-6:8 error loop_outside_loop: ':LOOP' must be inside a ':WHILE' or ':FOR' loop
+-- diagnostics [--strict --info] --
+6:3-6:8 error loop_outside_loop: ':LOOP' must be inside a ':WHILE' or ':FOR' loop

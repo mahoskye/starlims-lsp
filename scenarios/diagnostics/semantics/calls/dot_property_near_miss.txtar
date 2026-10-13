@@ -1,0 +1,37 @@
+Near-misses for diag.dot_property_access: colon access, deep :INCLUDE
+paths (issue #56), decimals, dotted logical operators and boolean
+literals, and dotted text inside a :REGION body (issue #164).
+-- input.ssl --
+:INCLUDE Framework.Core.Text.Helpers;
+:PROCEDURE ReadSubject;
+	:PARAMETERS bA, bB;
+	:DECLARE oMail, vOut, nRate;
+	oMail := Email{};
+	vOut := oMail:Subject;
+	nRate := 1.25;
+	:IF bA .AND. .NOT. bB .OR. bA == .T.;
+		vOut := GetRegion("Snippet");
+	:ENDIF;
+	:REGION Snippet;
+	<a onclick="window.top.go()">x.y.z</a>
+	:ENDREGION;
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:INCLUDE Framework.Core.Text.Helpers;
+:PROCEDURE ReadSubject;
+	:PARAMETERS bA, bB;
+	:DECLARE oMail, vOut, nRate;
+	oMail := Email{};
+	vOut := oMail:Subject;
+	nRate := 1.25;
+	:IF bA .AND. .NOT. bB .OR. bA == .T.;
+		vOut := GetRegion("Snippet");
+	:ENDIF;
+	:REGION Snippet;
+	<a onclick="window.top.go()">x.y.z</a>
+	:ENDREGION;
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,20 @@
+Only the :PUBLIC keyword fires diag.limit_public_vars; a script with
+:PARAMETERS and :DECLARE statements and no :PUBLIC is clean.
+-- input.ssl --
+:PARAMETERS sMode;
+:DECLARE nRuns;
+nRuns := 0;
+:IF sMode == "full";
+	nRuns := 2;
+:ENDIF;
+:RETURN nRuns;
+-- format --
+:PARAMETERS sMode;
+:DECLARE nRuns;
+nRuns := 0;
+:IF sMode == "full";
+	nRuns := 2;
+:ENDIF;
+:RETURN nRuns;
+-- diagnostics --
+-- diagnostics [--strict --info] --

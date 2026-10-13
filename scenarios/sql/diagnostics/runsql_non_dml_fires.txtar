@@ -1,0 +1,29 @@
+RunSQL given a result-returning statement (diag.runsql_non_dml): a plain
+SELECT, a WITH query hidden behind a leading SQL block comment, and a
+SELECT that leads a concatenation. Its result set is silently discarded.
+-- input.ssl --
+:PROCEDURE Probe;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("SELECT status FROM orders WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("/* recent orders */ WITH recent AS (SELECT ordno FROM orders) SELECT ordno FROM recent");
+	bOk := RunSQL("SELECT ordno FROM orders " + "WHERE status = 'A'");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Probe;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("SELECT status FROM orders WHERE ordno = ?",, {sOrdNo});
+	bOk := RunSQL("/* recent orders */ WITH recent AS (SELECT ordno FROM orders) SELECT ordno FROM recent");
+	bOk := RunSQL("SELECT ordno FROM orders " + "WHERE status = 'A'");
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+4:16-4:59 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+5:16-5:104 warning runsql_non_dml: RunSQL is for DML statements - this 'WITH' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+6:16-6:43 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+-- diagnostics [--strict --info] --
+4:16-4:59 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+5:16-5:104 warning runsql_non_dml: RunSQL is for DML statements - this 'WITH' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+6:16-6:43 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead

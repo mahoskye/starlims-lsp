@@ -1,0 +1,46 @@
+A realistic routine where several TRY-structure mistakes meet: an
+exception variable on :CATCH, a second :CATCH, and an empty :FINALLY.
+Each mistake should yield exactly its own finding and none should
+suppress another (diag.catch_clause_form, diag.single_catch,
+diag.finally_empty).
+-- input.ssl --
+:PROCEDURE ExportInvoices;
+	:PARAMETERS dFrom;
+	:DECLARE aRows, nExported;
+	nExported := 0;
+	:TRY;
+		aRows := SQLExecute("SELECT INVOICEID FROM INVOICES WHERE CREATED >= ?dFrom?");
+		nExported := Len(aRows);
+	:CATCH oFailure;
+		nExported := -1;
+	:CATCH;
+		nExported := -2;
+	:FINALLY;
+	:ENDTRY;
+	:RETURN nExported;
+:ENDPROC;
+-- format --
+:PROCEDURE ExportInvoices;
+	:PARAMETERS dFrom;
+	:DECLARE aRows, nExported;
+	nExported := 0;
+	:TRY;
+		aRows := SQLExecute("SELECT INVOICEID FROM INVOICES WHERE CREATED >= ?dFrom?");
+		nExported := Len(aRows);
+	:CATCH oFailure;
+		nExported := -1;
+	:CATCH;
+		nExported := -2;
+	:FINALLY;
+	:ENDTRY;
+	:RETURN nExported;
+:ENDPROC;
+-- diagnostics --
+8:9-8:17 error catch_clause_form: ':CATCH' does not take an exception variable; call 'GetLastSSLError()' inside the block instead
+10:2-10:8 error single_catch: Only one ':CATCH' block is allowed per ':TRY'
+12:2-12:10 error finally_empty: ':FINALLY' must contain at least one statement
+-- diagnostics [--strict --info] --
+8:9-8:17 error catch_clause_form: ':CATCH' does not take an exception variable; call 'GetLastSSLError()' inside the block instead
+8:9-8:17 warning undeclared_variable: Variable 'oFailure' is not declared
+10:2-10:8 error single_catch: Only one ':CATCH' block is allowed per ':TRY'
+12:2-12:10 error finally_empty: ':FINALLY' must contain at least one statement

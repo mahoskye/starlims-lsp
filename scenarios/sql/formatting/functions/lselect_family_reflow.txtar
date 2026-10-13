@@ -1,0 +1,41 @@
+LSelect, LSelectC and LSelect1 each take SQL as their first argument; the
+trailing skipped arguments and value arrays (4th for LSelect/LSelectC,
+3rd for LSelect1) follow the closing quote unchanged.
+-- input.ssl --
+:PROCEDURE TaskLists;
+	:PARAMETERS sOrdNo, sStatus;
+	:DECLARE aTasks, aCodes, aOpen;
+	aTasks := LSelect("select testcode, status, analyst from ordtask where ordno = ? and status <> 'X' order by testcode",,, {sOrdNo});
+	aCodes := LSelectC("select distinct testcode from ordtask where status = ? and testcode like 'QC%' order by testcode",,, {sStatus});
+	aOpen := LSelect1("select ordno, testcode from ordtask where status = ? and duedate < sysdate order by duedate, ordno",, {sStatus});
+	:RETURN {aTasks, aCodes, aOpen};
+:ENDPROC;
+-- format --
+:PROCEDURE TaskLists;
+	:PARAMETERS sOrdNo, sStatus;
+	:DECLARE aTasks, aCodes, aOpen;
+	aTasks := LSelect("
+	    SELECT testcode, status, analyst
+	    FROM ordtask
+	    WHERE ordno = ?
+	      AND status <> 'X'
+	    ORDER BY testcode
+	",,, {sOrdNo});
+	aCodes := LSelectC("
+	    SELECT DISTINCT testcode
+	    FROM ordtask
+	    WHERE status = ?
+	      AND testcode LIKE 'QC%'
+	    ORDER BY testcode
+	",,, {sStatus});
+	aOpen := LSelect1("
+	    SELECT ordno, testcode
+	    FROM ordtask
+	    WHERE status = ?
+	      AND duedate < SYSDATE
+	    ORDER BY duedate, ordno
+	",, {sStatus});
+	:RETURN {aTasks, aCodes, aOpen};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

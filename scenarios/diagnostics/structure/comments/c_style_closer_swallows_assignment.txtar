@@ -1,0 +1,29 @@
+A banner comment closed C-style, followed by an assignment. The
+assignment is inside the comment and never runs; comment_swallows_code
+(warning) reports it (diag.comment_swallows_code first Flags fence
+shape).
+Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+-- input.ssl --
+:PROCEDURE InitTotals;
+	:DECLARE nGross, nNet;
+	/* ---------------------------------
+	   Initialize the running totals
+	   --------------------------------- */
+	nGross := 0;
+	nNet := nGross;
+	:RETURN nNet;
+:ENDPROC;
+-- format --
+:PROCEDURE InitTotals;
+	:DECLARE nGross, nNet;
+	/* ---------------------------------
+	   Initialize the running totals
+	   --------------------------------- */
+	nGross := 0;
+	nNet := nGross;
+	:RETURN nNet;
+:ENDPROC;
+-- diagnostics --
+3:2-3:127 warning comment_swallows_code: This comment does not end at its '*/' - SSL comments end at ';', so it runs on and swallows 'nGross := 0'. That code never executes. End the comment with ';'
+-- diagnostics [--strict --info] --
+3:2-3:127 warning comment_swallows_code: This comment does not end at its '*/' - SSL comments end at ';', so it runs on and swallows 'nGross := 0'. That code never executes. End the comment with ';'

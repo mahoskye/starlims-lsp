@@ -1,0 +1,46 @@
+DoProc with an unqualified target inside a class method
+(diag.doproc_in_class, error): the compiler rejects it; Me:Method() is the
+fix. Near misses in the same method: a fully qualified external target
+(issue #151), a non-literal target, and ExecFunction (no class-method
+restriction).
+-- input.ssl --
+:CLASS Validator;
+:DECLARE aErrors;
+
+:PROCEDURE Check;
+	:PARAMETERS oInput, sRule;
+	:DECLARE bOk, bShape, bCustom, vExt;
+	bOk := DoProc("CheckRequired", {oInput});
+	bShape := DoProc("Lab.ShapeRules.Validate", {oInput});
+	bCustom := DoProc(sRule, {oInput});
+	vExt := ExecFunction("Lab.ShapeRules", {oInput});
+	:RETURN bOk .AND. bShape .AND. bCustom .AND. Me:CheckRequired(oInput);
+:ENDPROC;
+
+:PROCEDURE CheckRequired;
+	:PARAMETERS oInput;
+	:RETURN .NOT. Empty(oInput);
+:ENDPROC;
+-- format --
+:CLASS Validator;
+:DECLARE aErrors;
+
+:PROCEDURE Check;
+	:PARAMETERS oInput, sRule;
+	:DECLARE bOk, bShape, bCustom, vExt;
+	bOk := DoProc("CheckRequired", {oInput});
+	bShape := DoProc("Lab.ShapeRules.Validate", {oInput});
+	bCustom := DoProc(sRule, {oInput});
+	vExt := ExecFunction("Lab.ShapeRules", {oInput});
+	:RETURN bOk .AND. bShape .AND. bCustom .AND. Me:CheckRequired(oInput);
+:ENDPROC;
+
+:PROCEDURE CheckRequired;
+	:PARAMETERS oInput;
+	:RETURN .NOT. Empty(oInput);
+:ENDPROC;
+-- diagnostics --
+7:9-7:15 error doproc_in_class: Unqualified DoProc targets are a compile-time error inside class methods. Use Me:MethodName() / Base:MethodName(), or a fully qualified "Category.Script.Procedure" reference for a deployed procedure.
+-- diagnostics [--strict --info] --
+2:10-2:17 hint unused_variable: Variable 'aErrors' is declared but never used
+7:9-7:15 error doproc_in_class: Unqualified DoProc targets are a compile-time error inside class methods. Use Me:MethodName() / Base:MethodName(), or a fully qualified "Category.Script.Procedure" reference for a deployed procedure.

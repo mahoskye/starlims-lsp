@@ -1,0 +1,24 @@
+A dot operator glued to a numeric literal (`10.AND.`) is lexed as the
+operator, not as part of the number, and spaced; operators glued to a
+preceding operator (`:=.not.`, `:=-`) get exactly one space
+(fmt.operator_spacing issues #83/#88).
+-- input.ssl --
+:PROCEDURE Glued;
+:PARAMETERS nCount, bReady, bFlag;
+:IF nCount>=10.AND.bReady.or.nCount<2.5.AND..not.bFlag;
+bFlag:=.not.bFlag;
+nCount:=-nCount;
+:ENDIF;
+:RETURN bFlag;
+:ENDPROC;
+-- format --
+:PROCEDURE Glued;
+	:PARAMETERS nCount, bReady, bFlag;
+	:IF nCount >= 10 .AND. bReady .OR. nCount < 2.5 .AND. .NOT. bFlag;
+		bFlag := .NOT. bFlag;
+		nCount := -nCount;
+	:ENDIF;
+	:RETURN bFlag;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,57 @@
+Near miss for branch_target_label: spaced and compact labels reached by
+their exact text (with a whitespace-only spacing difference), a
+script-level label reached from script level, and an empty literal. Only
+deprecated_keyword warnings remain (diag.branch_target_label "Does not
+flag").
+-- input.ssl --
+:DECLARE nPass;
+nPass := 0;
+:LABEL TOP;
+nPass := nPass + 1;
+:IF nPass < 2;
+	Branch("LABEL TOP");
+:ENDIF;
+
+:PROCEDURE Loop;
+	:DECLARE nCount;
+	nCount := 0;
+	Branch("LABEL  SKIP");
+	:LABEL SKIP;
+	nCount := nCount + 1;
+	:IF nCount < 3;
+		Branch("LABELAGAIN");
+	:ENDIF;
+	:LABELAGAIN;
+	Branch("");
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:DECLARE nPass;
+nPass := 0;
+:LABEL TOP;
+nPass := nPass + 1;
+:IF nPass < 2;
+	Branch("LABEL TOP");
+:ENDIF;
+
+:PROCEDURE Loop;
+	:DECLARE nCount;
+	nCount := 0;
+	Branch("LABEL  SKIP");
+	:LABEL SKIP;
+	nCount := nCount + 1;
+	:IF nCount < 3;
+		Branch("LABELAGAIN");
+	:ENDIF;
+	:LABELAGAIN;
+	Branch("");
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+3:1-3:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+13:2-13:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+18:2-18:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+-- diagnostics [--strict --info] --
+3:1-3:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+13:2-13:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+18:2-18:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code

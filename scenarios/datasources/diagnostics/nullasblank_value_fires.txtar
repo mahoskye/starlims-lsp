@@ -1,0 +1,26 @@
+nullasblank_value: the builder reads only the words true and false, so the
+SSL literal `.F.`, a number and a quoted "true" are all ignored and
+null-to-blank stays on. Each value warns, ranged on the value. A real data
+source holds one :NULLASBLANK; three lines here record that every
+directive line is read. The `False` near miss is in
+hybrid/header_only_stub.
+-- input.ds --
+:NULLASBLANK := .F.;
+:NULLASBLANK := 0;
+:NULLASBLANK := "true";
+:PARAMETERS sMember := "";
+SELECT member_code, phone FROM member WHERE member_code = @sMember
+-- format --
+:NULLASBLANK := .F.;
+:NULLASBLANK := 0;
+:NULLASBLANK := "true";
+:PARAMETERS sMember := "";
+SELECT member_code, phone FROM member WHERE member_code = @sMember
+-- diagnostics --
+1:17-1:20 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on
+2:17-2:18 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on
+3:17-3:23 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on
+-- diagnostics [--strict --info] --
+1:17-1:20 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on
+2:17-2:18 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on
+3:17-3:23 warning nullasblank_value: ':NULLASBLANK' takes the word true or false; any other value is ignored and null-to-blank stays on

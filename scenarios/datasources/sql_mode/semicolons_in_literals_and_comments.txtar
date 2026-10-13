@@ -1,0 +1,16 @@
+Semicolons inside single-quoted literals and SQL comments are content in a
+SQL data source, and a column named like a SQL builtin (`FORMAT`) does not
+disturb classification (feature.diagnostics_pipeline A19). The near miss
+for datasource_sql_semicolon: nothing here is a bare separator.
+-- input.ds --
+/* conversions: 'all;pdf' and 'doc;txt'; keep in sync */
+update report_profile
+set FORMAT = 'all;pdf' -- previous value was 'doc;txt'; see ticket
+where profile_id = 7
+-- format --
+/* conversions: 'all;pdf' and 'doc;txt'; keep in sync */
+update report_profile
+set FORMAT = 'all;pdf' -- previous value was 'doc;txt'; see ticket
+where profile_id = 7
+-- diagnostics --
+-- diagnostics [--strict --info] --

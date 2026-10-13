@@ -1,0 +1,36 @@
+Near-misses for diag.parameters_first: :INCLUDE before the script-level
+:PARAMETERS (a textual paste, issue #168), a comment between :PROCEDURE
+and its :PARAMETERS, and a :BEGININLINECODE block opening with its own
+:PARAMETERS after top-level code.
+-- input.ssl --
+:INCLUDE Shared.Constants;
+:PARAMETERS sOrderNo;
+:DECLARE sResult;
+sResult := DoProc("Normalize", {sOrderNo});
+:BEGININLINECODE Doubler;
+:PARAMETERS nValue;
+:RETURN nValue * 2;
+:ENDINLINECODE;
+:PROCEDURE Normalize;
+	/* trims and uppercases the order number;
+	:PARAMETERS sRaw;
+	:RETURN Upper(AllTrim(sRaw));
+:ENDPROC;
+:RETURN sResult;
+-- format --
+:INCLUDE Shared.Constants;
+:PARAMETERS sOrderNo;
+:DECLARE sResult;
+sResult := DoProc("Normalize", {sOrderNo});
+:BEGININLINECODE Doubler;
+	:PARAMETERS nValue;
+	:RETURN nValue * 2;
+:ENDINLINECODE;
+:PROCEDURE Normalize;
+	/* trims and uppercases the order number;
+	:PARAMETERS sRaw;
+	:RETURN Upper(AllTrim(sRaw));
+:ENDPROC;
+:RETURN sResult;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,26 @@
+An overflowing SQL string holding N'…' literals reflows without
+separating the N prefix from its literal: N'x' and N 'x' are different
+SQL (the second is an identifier followed by a literal).
+-- input.ssl --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows;
+	aRows := SQLExecute("update samples set note = N'checked by QC', reviewer_note = N'none', status = 'R' where sampleid = ?nId?");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Notes;
+	:PARAMETERS nId;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    UPDATE samples SET
+	        note = N'checked by QC',
+	        reviewer_note = N'none',
+	        status = 'R'
+	    WHERE sampleid = ?nId?
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:128 info unicode_literal_prefix: Unicode literal prefix N'...' in embedded SQL - drop the prefix unless the target column genuinely requires it

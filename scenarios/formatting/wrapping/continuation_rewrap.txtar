@@ -1,0 +1,26 @@
+A line that is already an expression continuation (inside an open
+delimiter, following a trailing comma) and is itself over-long re-wraps
+at that line's own indent, not one level deeper, so a second pass is
+stable (fmt.max_line_length issue #218).
+-- input.ssl --
+:PROCEDURE Rewrap;
+:DECLARE vResult;
+vResult := DoProc("CalculateTotals",
+{nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarterRevenue, nFifth});
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Rewrap;
+	:DECLARE vResult;
+	vResult := DoProc("CalculateTotals",
+		{nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue,
+		nFourthQuarterRevenue, nFifth});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:2-4:22 warning undeclared_variable: Variable 'nFirstQuarterRevenue' is not declared
+4:24-4:45 warning undeclared_variable: Variable 'nSecondQuarterRevenue' is not declared
+4:47-4:67 warning undeclared_variable: Variable 'nThirdQuarterRevenue' is not declared
+4:69-4:90 warning undeclared_variable: Variable 'nFourthQuarterRevenue' is not declared
+4:92-4:98 warning undeclared_variable: Variable 'nFifth' is not declared

@@ -1,0 +1,30 @@
+A string literal missing its closing `"`. It runs to end of file, so the
+statements after it are swallowed: unterminated_string on the opening
+quote, and the :IF whose :ENDIF sits inside the swallowed text is still
+reported by unclosed_block on its opener (diag.unterminated_string).
+-- input.ssl --
+:PROCEDURE Greeting;
+	:PARAMETERS sName;
+	:DECLARE sText;
+	:IF Empty(sName);
+		sText := "Hello, guest;
+	:ENDIF;
+	:RETURN sText;
+:ENDPROC;
+-- format --
+:PROCEDURE Greeting;
+	:PARAMETERS sName;
+	:DECLARE sText;
+	:IF Empty(sName);
+		sText := "Hello, guest;
+	:ENDIF;
+	:RETURN sText;
+:ENDPROC;
+-- diagnostics --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+4:2-4:5 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+5:12-5:13 error unterminated_string: Unterminated string literal - expected a closing '"' before end of file
+-- diagnostics [--strict --info] --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+4:2-4:5 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+5:12-5:13 error unterminated_string: Unterminated string literal - expected a closing '"' before end of file

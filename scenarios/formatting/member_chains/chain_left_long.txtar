@@ -1,0 +1,22 @@
+A chain whose only possible break points are its own `:` boundaries is
+left over-long rather than split; method-call links (`:GetItem(1)`) are
+part of the chain too (fmt.atomic_property_chains "If the only way to
+satisfy the limit would be splitting a chain, the line is left over-long
+instead").
+-- input.ssl --
+:PROCEDURE Touch;
+:PARAMETERS oConfigurationManagerInstance;
+DoSomething(oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString);
+oConfigurationManagerInstance:connectionPool:GetItem(1):lastUsedConnectionDescriptor:Reset();
+:ENDPROC;
+-- format --
+:PROCEDURE Touch;
+	:PARAMETERS oConfigurationManagerInstance;
+	DoSomething(oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString);
+	oConfigurationManagerInstance:connectionPool:GetItem(1):lastUsedConnectionDescriptor:Reset();
+:ENDPROC;
+-- diagnostics --
+3:1-3:12 warning direct_procedure_call: 'DoSomething' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+-- diagnostics [--strict --info] --
+2:13-2:42 info identifier_too_long: Variable name 'oConfigurationManagerInstance' exceeds 20-character limit (effective length 28 excluding prefix)
+3:1-3:12 warning direct_procedure_call: 'DoSomething' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.

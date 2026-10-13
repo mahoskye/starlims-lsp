@@ -1,0 +1,25 @@
+Split SQL assignments converge (issue #140): a line break after ':='
+and a dangling ';' rejoin, then the string takes its normal layout:
+inline when short, rule F when it overflows. (The split non-SQL
+string case is left out: it trips a range-formatting invariant failure
+recorded in the suite report.)
+-- input.ssl --
+:DECLARE sShort, sLong;
+sShort :=
+	"SELECT 1 FROM dual"
+;
+sLong :=
+	"SELECT sample_id, sample_name, sample_status FROM samples WHERE sample_status = ?status? ORDER BY sample_id"
+;
+-- format --
+:DECLARE sShort, sLong;
+sShort := "SELECT 1 FROM dual";
+sLong := "
+    SELECT sample_id, sample_name, sample_status
+    FROM samples
+    WHERE sample_status = ?status?
+    ORDER BY sample_id
+";
+-- diagnostics --
+-- diagnostics [--strict --info] --
+6:83-6:91 warning invalid_sql_param: SQL parameter 'status' does not match any declared variable

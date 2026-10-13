@@ -1,0 +1,31 @@
+A :CATCH that lost its `;`; the next line is the handler's first
+statement. catch_clause_form reports the missing terminator with the range
+on the :CATCH keyword, not on the next token (issue #255). Records
+whether unexpected_token also reports the same statement.
+-- input.ssl --
+:PROCEDURE ReadSetting;
+	:PARAMETERS sKey;
+	:DECLARE sValue;
+	:TRY;
+		sValue := LSearch("SELECT SETTINGVALUE FROM SETTINGS WHERE SETTINGKEY = ?", "",, {sKey});
+	:CATCH
+		sValue := "";
+	:ENDTRY;
+	:RETURN sValue;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadSetting;
+	:PARAMETERS sKey;
+	:DECLARE sValue;
+	:TRY;
+		sValue := LSearch("SELECT SETTINGVALUE FROM SETTINGS WHERE SETTINGKEY = ?", "",,
+			{sKey});
+	:CATCH;
+		sValue := "";
+	:ENDTRY;
+	:RETURN sValue;
+:ENDPROC;
+-- diagnostics --
+6:2-6:8 error catch_clause_form: ':CATCH' is missing its ';' terminator - write ':CATCH;'
+-- diagnostics [--strict --info] --
+6:2-6:8 error catch_clause_form: ':CATCH' is missing its ';' terminator - write ':CATCH;'

@@ -1,0 +1,44 @@
+Top-level multi-line comments: only the first line is indented (at
+column 0 here); interior lines are preserved verbatim, including their
+own indentation and blank lines, except that trailing whitespace is
+trimmed (fmt.indent_style, fmt.trim_trailing_whitespace — the named D7
+exception). Both the style guide's multi_line_comment_layout form and the
+documentation-header form with ` * ` prefixes. (Inside a procedure,
+range-formatting a multi-line comment re-indents its interior lines, an
+invariant failure reported separately.)
+-- input.ssl --
+/*
+ * Procedure: Demo
+ * Parameters:
+ *   sInput   - the input string   
+ *   nValue - a number
+ * Returns: the processed result
+;
+/*
+Recalculate the totals before the report runs.
+
+    The report reads them without checking.
+;
+:PROCEDURE Demo;
+:PARAMETERS sInput, nValue;
+:RETURN sInput + LimsString(nValue);
+:ENDPROC;
+-- format --
+/*
+ * Procedure: Demo
+ * Parameters:
+ *   sInput   - the input string
+ *   nValue - a number
+ * Returns: the processed result
+;
+/*
+Recalculate the totals before the report runs.
+
+    The report reads them without checking.
+;
+:PROCEDURE Demo;
+	:PARAMETERS sInput, nValue;
+	:RETURN sInput + LimsString(nValue);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

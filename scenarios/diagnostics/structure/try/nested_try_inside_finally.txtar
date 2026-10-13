@@ -1,0 +1,38 @@
+Near miss for catch_order_before_finally and the in-FINALLY rules: a
+nested :TRY/:CATCH inside an outer :FINALLY has its own clause order, and
+the outer :FINALLY body is non-empty because the nested :TRY counts as a
+statement (diag.catch_order_before_finally, diag.finally_empty).
+-- input.ssl --
+:PROCEDURE ArchiveFile;
+	:PARAMETERS sPath;
+	:DECLARE bMoved, oErr;
+	bMoved := .F.;
+	:TRY;
+		bMoved := .NOT. Empty(sPath);
+	:FINALLY;
+		:TRY;
+			ErrorMes("ArchiveFile", "processed " + sPath);
+		:CATCH;
+			oErr := GetLastSSLError();
+		:ENDTRY;
+	:ENDTRY;
+	:RETURN bMoved;
+:ENDPROC;
+-- format --
+:PROCEDURE ArchiveFile;
+	:PARAMETERS sPath;
+	:DECLARE bMoved, oErr;
+	bMoved := .F.;
+	:TRY;
+		bMoved := .NOT. Empty(sPath);
+	:FINALLY;
+		:TRY;
+			ErrorMes("ArchiveFile", "processed " + sPath);
+		:CATCH;
+			oErr := GetLastSSLError();
+		:ENDTRY;
+	:ENDTRY;
+	:RETURN bMoved;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

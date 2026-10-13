@@ -1,0 +1,11 @@
+Marker-free content that is neither SSL nor SQL (prose) in a data source:
+D15 defaults it to SQL, the quiet failure, so the formatter leaves it alone
+and no SSL diagnostic (undeclared variables, missing semicolons) fires.
+-- input.ds --
+this data source was retired
+see the replacement in the shipping category
+-- format --
+this data source was retired
+see the replacement in the shipping category
+-- diagnostics --
+-- diagnostics [--strict --info] --

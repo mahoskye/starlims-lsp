@@ -1,0 +1,28 @@
+A documentation banner before :CLASS. Comments are not script code, so
+diag.class_or_script must stay silent. Should be clean.
+-- input.ssl --
+/*
+ * Class: SampleLabel
+ * Description: Builds printable labels for samples
+;
+/* Revision notes live in source control;
+:CLASS SampleLabel;
+:DECLARE sSampleId;
+
+:PROCEDURE Text;
+	:RETURN "Sample " + Me:sSampleId;
+:ENDPROC;
+-- format --
+/*
+ * Class: SampleLabel
+ * Description: Builds printable labels for samples
+;
+/* Revision notes live in source control;
+:CLASS SampleLabel;
+:DECLARE sSampleId;
+
+:PROCEDURE Text;
+	:RETURN "Sample " + Me:sSampleId;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,43 @@
+Labels: `:LABEL Name;` with a space is a keyword plus operand and is
+uppercased like any keyword; a joined `:LABELName;` is written verbatim,
+never split into `:LABEL Name;` (the two store different label text and
+Branch() matches exactly), and a miscased joined form is not recased
+either (fmt.keyword_case, issue #304).
+-- input.ssl --
+:PROCEDURE Retry;
+:DECLARE nTries;
+nTries := 0;
+:label RetryPoint;
+:LABELRETRY;
+:labelSecondTry;
+nTries += 1;
+:IF nTries < 3;
+Branch("LABELRETRY");
+:ENDIF;
+:RETURN nTries;
+:ENDPROC;
+-- format --
+:PROCEDURE Retry;
+	:DECLARE nTries;
+	nTries := 0;
+	:LABEL RetryPoint;
+	:LABELRETRY;
+	:labelSecondTry;
+	nTries += 1;
+	:IF nTries < 3;
+		Branch("LABELRETRY");
+	:ENDIF;
+	:RETURN nTries;
+:ENDPROC;
+-- diagnostics --
+4:1-4:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+4:1-4:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':LABEL'
+5:1-5:12 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:1-6:16 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:1-6:16 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'
+-- diagnostics [--strict --info] --
+4:1-4:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+4:1-4:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':LABEL'
+5:1-5:12 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:1-6:16 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:1-6:16 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'

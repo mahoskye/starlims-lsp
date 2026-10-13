@@ -1,0 +1,20 @@
+When nothing after `:=` fits on the statement line, the wrapper breaks
+after `:=` and the right-hand side moves whole to a continuation line
+(fmt.max_line_length break classes; the member chain is atomic,
+fmt.atomic_property_chains).
+-- input.ssl --
+:PROCEDURE ReadSetting;
+:DECLARE sConnectionDescriptor;
+sConnectionDescriptor := oConfigurationManagerInstance:databaseConnectionSettings:primaryName;
+:RETURN sConnectionDescriptor;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadSetting;
+	:DECLARE sConnectionDescriptor;
+	sConnectionDescriptor :=
+		oConfigurationManagerInstance:databaseConnectionSettings:primaryName;
+	:RETURN sConnectionDescriptor;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:26-3:55 warning undeclared_variable: Variable 'oConfigurationManagerInstance' is not declared

@@ -1,0 +1,55 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+A statement line without `;` followed by a continuation keyword
+(:ELSE, :CASE, :OTHERWISE, :CATCH, :FINALLY): records whether the
+missing terminator is supplied before the middle keyword
+(fmt.semicolon_enforcement lists these as "the next line starts with a
+continuation keyword" guards).
+-- input.ssl --
+:PROCEDURE Middles;
+:PARAMETERS nValue;
+:DECLARE sOut;
+:IF nValue > 0;
+sOut := "pos"
+:ELSE;
+sOut := "neg"
+:ENDIF;
+:TRY;
+sOut := LimsString(nValue)
+:CATCH;
+sOut := ""
+:FINALLY;
+nValue := 0
+:ENDTRY;
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Middles;
+	:PARAMETERS nValue;
+	:DECLARE sOut;
+	:IF nValue > 0;
+		sOut := "pos"
+	:ELSE;
+		sOut := "neg";
+	:ENDIF;
+
+	:TRY;
+		sOut := LimsString(nValue)
+	:CATCH;
+		sOut := ""
+	:FINALLY;
+		nValue := 0;
+	:ENDTRY;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+6:1-6:6 error unexpected_token: Unexpected keyword ':ELSE' - expected an operator or ';' (is the previous statement missing its ';'?)
+8:1-8:7 error unexpected_token: Unexpected keyword ':ENDIF' - expected an operator or ';' (is the previous statement missing its ';'?)
+11:1-11:7 error unexpected_token: Unexpected keyword ':CATCH' - expected an operator or ';' (is the previous statement missing its ';'?)
+13:1-13:9 error unexpected_token: Unexpected keyword ':FINALLY' - expected an operator or ';' (is the previous statement missing its ';'?)
+15:1-15:8 error unexpected_token: Unexpected keyword ':ENDTRY' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+6:1-6:6 error unexpected_token: Unexpected keyword ':ELSE' - expected an operator or ';' (is the previous statement missing its ';'?)
+8:1-8:7 error unexpected_token: Unexpected keyword ':ENDIF' - expected an operator or ';' (is the previous statement missing its ';'?)
+11:1-11:7 error unexpected_token: Unexpected keyword ':CATCH' - expected an operator or ';' (is the previous statement missing its ';'?)
+13:1-13:9 error unexpected_token: Unexpected keyword ':FINALLY' - expected an operator or ';' (is the previous statement missing its ';'?)
+15:1-15:8 error unexpected_token: Unexpected keyword ':ENDTRY' - expected an operator or ';' (is the previous statement missing its ';'?)

@@ -1,0 +1,45 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+Multi-line array literals: element lines take one continuation level and
+a closing `}` or `})` that leads its line aligns with the statement line
+itself, at any nesting depth (fmt.indent_style "a closing delimiter that
+leads a line aligns with the statement line itself").
+-- input.ssl --
+:PROCEDURE BuildRows;
+:DECLARE aRows, aHeaders;
+:IF .T.;
+aHeaders := {
+"SampleId",
+"Status",
+"Analyst"
+};
+aRows := {
+{"S-001", "Logged"},
+{"S-002", "Released"}
+};
+DoProc("Render", {aHeaders,
+aRows
+});
+:ENDIF;
+:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE BuildRows;
+	:DECLARE aRows, aHeaders;
+	:IF .T.;
+		aHeaders := {
+			"SampleId",
+			"Status",
+			"Analyst"
+		};
+		aRows := {
+			{"S-001", "Logged"},
+			{"S-002", "Released"}
+		};
+		DoProc("Render", {aHeaders,
+			aRows
+		});
+	:ENDIF;
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

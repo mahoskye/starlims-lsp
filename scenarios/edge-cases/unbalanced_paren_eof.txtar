@@ -1,0 +1,17 @@
+An unclosed '(' in a call on the last line: the statement never ends.
+The validator reports the imbalance; the formatter must not invent a
+closing token or reflow following text into the call.
+-- input.ssl --
+:DECLARE sOut;
+sOut := Upper(AllTrim("abc");
+:RETURN Left(sOut, 2
+-- format --
+:DECLARE sOut;
+sOut := Upper(AllTrim("abc");
+	:RETURN Left(sOut, 2;
+-- diagnostics --
+2:14-2:15 error unclosed_delimiter: Unclosed '('
+3:13-3:14 error unclosed_delimiter: Unclosed '('
+-- diagnostics [--strict --info] --
+2:14-2:15 error unclosed_delimiter: Unclosed '('
+3:13-3:14 error unclosed_delimiter: Unclosed '('

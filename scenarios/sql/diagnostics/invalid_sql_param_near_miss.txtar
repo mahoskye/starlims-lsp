@@ -1,0 +1,45 @@
+Placeholders invalid_sql_param must accept (diag.invalid_sql_param Does
+not flag): a :DECLAREd variable, a procedure parameter, a plain
+assignment target (issue #262 follow-up), a predefined global
+(MYUSERNAME), a property access on a declared object, a function call
+placeholder, and bare positional markers.
+-- input.ssl --
+:PROCEDURE FindSamples;
+	:PARAMETERS sSite;
+	:DECLARE sStatus, oUser, aRows, aMore, bOk;
+	sStatus := "A";
+	oUser := CreateUdObject();
+	oUser:ID := "u1";
+	sKind := "QC";
+	aRows := SQLExecute("SELECT sampleid FROM samples WHERE status = ?sStatus? AND site = ?sSite? AND kind = ?sKind?");
+	aMore := SQLExecute("SELECT sampleid FROM samples WHERE owner = ?oUser:ID? AND loggedby = ?MYUSERNAME? AND logdate < ?Today()?");
+	bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {sStatus, sSite});
+	:RETURN {aRows, aMore, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE FindSamples;
+	:PARAMETERS sSite;
+	:DECLARE sStatus, oUser, aRows, aMore, bOk;
+	sStatus := "A";
+	oUser := CreateUdObject();
+	oUser:ID := "u1";
+	sKind := "QC";
+	aRows := SQLExecute("
+	    SELECT sampleid
+	    FROM samples
+	    WHERE status = ?sStatus?
+	      AND site = ?sSite?
+	      AND kind = ?sKind?
+	");
+	aMore := SQLExecute("
+	    SELECT sampleid
+	    FROM samples
+	    WHERE owner = ?oUser:ID?
+	      AND loggedby = ?MYUSERNAME?
+	      AND logdate < ?Today()?
+	");
+	bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {sStatus, sSite});
+	:RETURN {aRows, aMore, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

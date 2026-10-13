@@ -1,0 +1,30 @@
+Set operators: UNION ALL separates two SELECT branches, each laid out at
+the clause column, with ORDER BY after the last branch (reference §2.8,
+sql_set_operation_spacing asks for blank lines around the operator).
+-- input.ssl --
+:PROCEDURE AllTasks;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, testcode from ordtask where status = ?sStatus? union all select ordno, testcode from ordtask_archive where status = ?sStatus? order by ordno");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE AllTasks;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, testcode
+	    FROM ordtask
+	    WHERE status = ?sStatus?
+
+	    UNION ALL
+
+	    SELECT ordno, testcode
+	    FROM ordtask_archive
+	    WHERE status = ?sStatus?
+	    ORDER BY ordno
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

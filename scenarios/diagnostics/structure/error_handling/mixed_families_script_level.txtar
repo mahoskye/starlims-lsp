@@ -1,0 +1,44 @@
+Top-level script code is one span however many procedures sit between
+its pieces: a top-level :TRY before a procedure and a top-level :ERROR
+handler after it meet, so mixed_error_handling_families fires on the
+:ERROR. The procedure in between uses neither family
+(diag.mixed_error_handling_families second Flags fence).
+Suspected issue: the message says the families "are mixed in the same procedure" although this span is top-level script code (diag.mixed_error_handling_families: "all top-level script code is one further span").
+-- input.ssl --
+:DECLARE nCount;
+:TRY;
+	nCount := 1;
+:CATCH;
+	nCount := 0;
+:ENDTRY;
+
+:PROCEDURE Helper;
+	:RETURN 2;
+:ENDPROC;
+
+:ERROR;
+nCount := -1;
+:RESUME;
+-- format --
+:DECLARE nCount;
+:TRY;
+	nCount := 1;
+:CATCH;
+	nCount := 0;
+:ENDTRY;
+
+:PROCEDURE Helper;
+	:RETURN 2;
+:ENDPROC;
+
+:ERROR;
+	nCount := -1;
+:RESUME;
+-- diagnostics --
+12:1-12:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:1-12:7 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+14:1-14:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+-- diagnostics [--strict --info] --
+12:1-12:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+12:1-12:7 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+14:1-14:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

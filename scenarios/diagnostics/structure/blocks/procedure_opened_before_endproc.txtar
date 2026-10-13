@@ -1,0 +1,27 @@
+A procedure missing its :ENDPROC is followed directly by the next
+:PROCEDURE, whose :ENDPROC is present. Records how the block scanner
+pairs the single :ENDPROC between two open procedures: the expected shape
+is one unclosed_block finding, not a cascade (diag.unclosed_block,
+diag.mismatched_block_end).
+-- input.ssl --
+:PROCEDURE LoadHeader;
+	:PARAMETERS sKey;
+	:RETURN "H-" + sKey;
+
+:PROCEDURE LoadDetail;
+	:PARAMETERS sKey;
+	:RETURN "D-" + sKey;
+:ENDPROC;
+-- format --
+:PROCEDURE LoadHeader;
+	:PARAMETERS sKey;
+	:RETURN "H-" + sKey;
+
+	:PROCEDURE LoadDetail;
+		:PARAMETERS sKey;
+		:RETURN "D-" + sKey;
+	:ENDPROC;
+-- diagnostics --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+-- diagnostics [--strict --info] --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'

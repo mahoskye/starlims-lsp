@@ -1,0 +1,40 @@
+A data-holder class whose fields are set and read only by callers
+(oRecord:sOrderNo from another script), never inside the class file.
+unused_variable (strict, hint) reports class-level :DECLARE names that the
+file never mentions again; a class field is a member reachable from other
+files, so single-file analysis cannot see its uses.
+Suspected issue: unused_variable flags class fields (dPlaced, nLineCount) that are public members used from other files; the catalog entry does not address class fields at all.
+-- input.ssl --
+/*
+ * Class: OrderRecord
+ * Description: Plain holder for order header values set by callers
+;
+:CLASS OrderRecord;
+:DECLARE sOrderNo, dPlaced, nLineCount;
+
+/*
+ * Procedure: IsEmpty
+ * Returns: .T. when no order number has been set
+;
+:PROCEDURE IsEmpty;
+	:RETURN Empty(Me:sOrderNo);
+:ENDPROC;
+-- format --
+/*
+ * Class: OrderRecord
+ * Description: Plain holder for order header values set by callers
+;
+:CLASS OrderRecord;
+:DECLARE sOrderNo, dPlaced, nLineCount;
+
+/*
+ * Procedure: IsEmpty
+ * Returns: .T. when no order number has been set
+;
+:PROCEDURE IsEmpty;
+	:RETURN Empty(Me:sOrderNo);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+6:20-6:27 hint unused_variable: Variable 'dPlaced' is declared but never used
+6:29-6:39 hint unused_variable: Variable 'nLineCount' is declared but never used

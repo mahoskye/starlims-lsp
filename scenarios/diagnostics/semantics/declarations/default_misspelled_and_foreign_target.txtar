@@ -1,0 +1,38 @@
+A misspelled parameter (sRegoin for sRegion) and a name that is a
+parameter of another procedure are not parameters of this scope, so both
+fire diag.default_on_declare_line, even directly after :PARAMETERS.
+Names compare case-insensitively, so SREGION is fine.
+-- input.ssl --
+:PROCEDURE RegionTotal;
+	:PARAMETERS sRegion;
+	:DEFAULT sRegoin, "north";
+	:DEFAULT SREGION, "north";
+	:DEFAULT nYear, 2024;
+	:RETURN sRegion;
+:ENDPROC;
+:PROCEDURE YearTotal;
+	:PARAMETERS nYear;
+	:DEFAULT nYear, 2024;
+	:RETURN nYear;
+:ENDPROC;
+-- format --
+:PROCEDURE RegionTotal;
+	:PARAMETERS sRegion;
+	:DEFAULT sRegoin, "north";
+	:DEFAULT SREGION, "north";
+	:DEFAULT nYear, 2024;
+	:RETURN sRegion;
+:ENDPROC;
+
+:PROCEDURE YearTotal;
+	:PARAMETERS nYear;
+	:DEFAULT nYear, 2024;
+	:RETURN nYear;
+:ENDPROC;
+-- diagnostics --
+3:11-3:18 error default_on_declare_line: ':DEFAULT' target 'sRegoin' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+5:11-5:16 error default_on_declare_line: ':DEFAULT' target 'nYear' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+-- diagnostics [--strict --info] --
+3:11-3:18 error default_on_declare_line: ':DEFAULT' target 'sRegoin' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+3:11-3:18 warning undeclared_variable: Variable 'sRegoin' is not declared
+5:11-5:16 error default_on_declare_line: ':DEFAULT' target 'nYear' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment

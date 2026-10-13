@@ -1,0 +1,29 @@
+Filtering predicates: BETWEEN … AND keeps its AND with the range rather
+than breaking it like a boolean AND (reference §2.3,
+sql_between_and_align), alongside LIKE, IS NOT NULL and a parenthesized
+OR group under WHERE.
+Suspected issue: the parenthesized OR group breaks before OR although '  AND (status = 'Logged' OR status = 'Pending')' fits; reference §2.3 "Compound conditions" keeps '(status = 'Logged' OR status = 'Pending')' inline.
+-- input.ssl --
+:PROCEDURE Window;
+	:PARAMETERS dFrom, dTo;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, logdate, description from orders where logdate between ?dFrom? and ?dTo? and description like 'QC%' and result_value is not null and (status = 'Logged' or status = 'Pending')");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Window;
+	:PARAMETERS dFrom, dTo;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, logdate, description
+	    FROM orders
+	    WHERE logdate BETWEEN ?dFrom? AND ?dTo?
+	      AND description LIKE 'QC%'
+	      AND result_value IS NOT NULL
+	      AND (status = 'Logged'
+	           OR status = 'Pending')
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

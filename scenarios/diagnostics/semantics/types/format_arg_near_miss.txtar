@@ -1,0 +1,49 @@
+Near-misses for diag.format_arg_not_array: array-literal and
+array-typed second arguments, NIL, unresolvable arguments (v-prefixed,
+loop counter, user procedure, array element, Eval), receivers that are
+not strings (oDoc, array element), and the .NET String:Format, which is
+variadic. Under strict, String itself is an undeclared variable: nothing
+in this file declares it (the catalog fence has the same shape).
+-- input.ssl --
+:PROCEDURE Greet;
+	:PARAMETERS sName, vThing, aTemplates, oDoc, fnBuild;
+	:DECLARE sFmt, sMsg, aArgs, x;
+	sFmt := "Hello {0}";
+	aArgs := {sName};
+	sMsg := sFmt:Format("Hello {0}", {sName});
+	sMsg := sFmt:Format("Hello {0}", aArgs);
+	sMsg := sFmt:Format("Hello {0}", NIL);
+	sMsg := sFmt:Format("{0}", vThing);
+	x := 1;
+	sMsg := sFmt:Format("{0}", x);
+	sMsg := sFmt:Format("{0}", DoProc("Label", {sName}));
+	sMsg := sFmt:Format("{0}", aArgs[1]);
+	sMsg := sFmt:Format("{0}", Eval(fnBuild));
+	sMsg := oDoc:Format("plain", "utf-8");
+	sMsg := aTemplates[1]:Format("{0}", vThing);
+	sMsg := String:Format("{0} of {1}", 1, 2);
+	:RETURN sMsg;
+:ENDPROC;
+-- format --
+:PROCEDURE Greet;
+	:PARAMETERS sName, vThing, aTemplates, oDoc, fnBuild;
+	:DECLARE sFmt, sMsg, aArgs, x;
+	sFmt := "Hello {0}";
+	aArgs := {sName};
+	sMsg := sFmt:Format("Hello {0}", {sName});
+	sMsg := sFmt:Format("Hello {0}", aArgs);
+	sMsg := sFmt:Format("Hello {0}", NIL);
+	sMsg := sFmt:Format("{0}", vThing);
+	x := 1;
+	sMsg := sFmt:Format("{0}", x);
+	sMsg := sFmt:Format("{0}", DoProc("Label", {sName}));
+	sMsg := sFmt:Format("{0}", aArgs[1]);
+	sMsg := sFmt:Format("{0}", Eval(fnBuild));
+	sMsg := oDoc:Format("plain", "utf-8");
+	sMsg := aTemplates[1]:Format("{0}", vThing);
+	sMsg := String:Format("{0} of {1}", 1, 2);
+	:RETURN sMsg;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+17:10-17:16 warning undeclared_variable: Variable 'String' is not declared

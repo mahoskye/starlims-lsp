@@ -1,0 +1,41 @@
+A class-level :DECLARE after the first method: fields belong before the
+methods that use them (diag.class_member_order, info tier, so it appears
+only under --info). Method-local :DECLARE statements inside a body never
+count.
+-- input.ssl --
+:CLASS Tally;
+:INHERIT Lab.Counter;
+:DECLARE nTotal;
+
+:PROCEDURE Add;
+	:PARAMETERS nDelta;
+	:DECLARE nOld;
+	nOld := Me:nTotal;
+	Me:nTotal := nOld + nDelta;
+:ENDPROC;
+
+:DECLARE nLastDelta;
+
+:PROCEDURE Last;
+	:RETURN Me:nLastDelta;
+:ENDPROC;
+-- format --
+:CLASS Tally;
+:INHERIT Lab.Counter;
+:DECLARE nTotal;
+
+:PROCEDURE Add;
+	:PARAMETERS nDelta;
+	:DECLARE nOld;
+	nOld := Me:nTotal;
+	Me:nTotal := nOld + nDelta;
+:ENDPROC;
+
+:DECLARE nLastDelta;
+
+:PROCEDURE Last;
+	:RETURN Me:nLastDelta;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+12:1-12:9 info class_member_order: Class members must be ordered as ':DECLARE' fields, then methods

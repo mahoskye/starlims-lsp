@@ -1,0 +1,18 @@
+A hybrid document whose header is badly spaced and whose body is ragged
+SQL. SQL-mode data sources get no edits from the formatter at all, header
+included (feature.formatting A9): the formatter would otherwise inject
+semicolons into the SQL. Diagnostics stay on the header only.
+-- input.ds --
+:DSN:=DATABASE;
+:PARAMETERS   sKind := "X" ,nTop := 10;
+select   kind_code,kind_label
+   from kind_lookup
+      where kind_code = @sKind
+-- format --
+:DSN:=DATABASE;
+:PARAMETERS   sKind := "X" ,nTop := 10;
+select   kind_code,kind_label
+   from kind_lookup
+      where kind_code = @sKind
+-- diagnostics --
+-- diagnostics [--strict --info] --

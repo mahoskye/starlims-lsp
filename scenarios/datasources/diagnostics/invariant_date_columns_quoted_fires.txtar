@@ -1,0 +1,18 @@
+invariant_date_columns_quoted: the builder keeps quotes as part of the
+column name, so a quoted name in :INVARIANTDATECOLUMNS matches no column.
+Each string-literal name warns on its span; the bare name between them is
+silent.
+-- input.ds --
+:INVARIANTDATECOLUMNS := "booked_on", returned_on, 'due_on';
+:PARAMETERS sMember := "";
+SELECT booked_on, returned_on, due_on FROM loan WHERE member_code = @sMember
+-- format --
+:INVARIANTDATECOLUMNS := "booked_on", returned_on, 'due_on';
+:PARAMETERS sMember := "";
+SELECT booked_on, returned_on, due_on FROM loan WHERE member_code = @sMember
+-- diagnostics --
+1:26-1:37 warning invariant_date_columns_quoted: ':INVARIANTDATECOLUMNS' takes bare column names; the quotes are kept as part of the name, so it matches no column
+1:52-1:60 warning invariant_date_columns_quoted: ':INVARIANTDATECOLUMNS' takes bare column names; the quotes are kept as part of the name, so it matches no column
+-- diagnostics [--strict --info] --
+1:26-1:37 warning invariant_date_columns_quoted: ':INVARIANTDATECOLUMNS' takes bare column names; the quotes are kept as part of the name, so it matches no column
+1:52-1:60 warning invariant_date_columns_quoted: ':INVARIANTDATECOLUMNS' takes bare column names; the quotes are kept as part of the name, so it matches no column

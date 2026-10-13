@@ -1,0 +1,26 @@
+A file holding nothing but comments: single-line, multi-line, a banner
+with the semicolon alone on the last line, and comment-region markers.
+Comments are statements terminated by ';' and must survive formatting
+untouched.
+-- input.ssl --
+/* First note;
+/*
+ * A banner block with several lines
+ * and no code at all
+;
+/* region Notes;
+/* A note inside a comment region;
+/* endregion;
+      /* An indented comment;
+-- format --
+/* First note;
+/*
+ * A banner block with several lines
+ * and no code at all
+;
+/* region Notes;
+/* A note inside a comment region;
+/* endregion;
+/* An indented comment;
+-- diagnostics --
+-- diagnostics [--strict --info] --

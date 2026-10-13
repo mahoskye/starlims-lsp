@@ -1,0 +1,21 @@
+An extra `)` at the end of an expression with nothing open:
+unmatched_delimiter on the stray closer. unexpected_token defers to it
+(diag.unmatched_delimiter first Flags fence).
+-- input.ssl --
+:PROCEDURE NetPrice;
+	:PARAMETERS nGross, nTax;
+	:DECLARE nNet;
+	nNet := (nGross - nTax) * 1.0);
+	:RETURN nNet;
+:ENDPROC;
+-- format --
+:PROCEDURE NetPrice;
+	:PARAMETERS nGross, nTax;
+	:DECLARE nNet;
+	nNet := (nGross - nTax) * 1.0);
+	:RETURN nNet;
+:ENDPROC;
+-- diagnostics --
+4:31-4:32 error unmatched_delimiter: Unmatched ')'
+-- diagnostics [--strict --info] --
+4:31-4:32 error unmatched_delimiter: Unmatched ')'

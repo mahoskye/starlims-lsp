@@ -1,0 +1,24 @@
+A lone ':' as a statement, a ':' with a space before a keyword name, and
+a ':' at end of file. The validator must report each without panicking,
+and the formatter must not glue the colon onto a neighboring token.
+Suspected issue: no diagnostic for ':;', ': IF nCount > 0;' or a trailing ':' (only the then-unmatched :ENDIF is reported); unexpected_token says it flags the first token a statement cannot accept, and a lone ':' can begin no SSL statement.
+-- input.ssl --
+:DECLARE nCount;
+:;
+nCount := 1;
+: IF nCount > 0;
+nCount += 1;
+:ENDIF;
+:
+-- format --
+:DECLARE nCount;
+:;
+nCount := 1;
+: IF nCount > 0;
+nCount += 1;
+:ENDIF;
+:
+-- diagnostics --
+6:1-6:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+-- diagnostics [--strict --info] --
+6:1-6:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start

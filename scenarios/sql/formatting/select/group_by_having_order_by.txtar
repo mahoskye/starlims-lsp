@@ -1,0 +1,25 @@
+Aggregation: GROUP BY at the clause column with HAVING indented 2 under
+it (reference §2.4, sql_having_indent), ORDER BY with DESC kept on its
+column, and aggregate calls packed in the SELECT list.
+-- input.ssl --
+:PROCEDURE Stats;
+	:DECLARE aRows;
+	aRows := SQLExecute("select testcode, count(*) as task_count, avg(result_value) as avg_result, min(result_value) as min_result, max(result_value) as max_result from ordresult where status = 'Complete' group by testcode having count(*) > 5 order by task_count desc");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Stats;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT testcode, COUNT(*) AS task_count, AVG(result_value) AS avg_result,
+	           MIN(result_value) AS min_result, MAX(result_value) AS max_result
+	    FROM ordresult
+	    WHERE status = 'Complete'
+	    GROUP BY testcode
+	      HAVING COUNT(*) > 5
+	    ORDER BY task_count DESC
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

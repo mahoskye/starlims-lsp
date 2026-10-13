@@ -1,0 +1,41 @@
+A class Constructor that returns a value (diag.constructor_return_value,
+error). Near misses in the same class: a bare :RETURN; early exit in the
+Constructor and :RETURN with a value from an ordinary method.
+-- input.ssl --
+:CLASS Gauge;
+:DECLARE nLevel;
+
+:PROCEDURE Constructor;
+	:PARAMETERS nStart;
+	:IF Empty(nStart);
+		Me:nLevel := 0;
+		:RETURN;
+	:ENDIF;
+	Me:nLevel := nStart;
+	:RETURN .T.;
+:ENDPROC;
+
+:PROCEDURE Level;
+	:RETURN Me:nLevel;
+:ENDPROC;
+-- format --
+:CLASS Gauge;
+:DECLARE nLevel;
+
+:PROCEDURE Constructor;
+	:PARAMETERS nStart;
+	:IF Empty(nStart);
+		Me:nLevel := 0;
+		:RETURN;
+	:ENDIF;
+	Me:nLevel := nStart;
+	:RETURN .T.;
+:ENDPROC;
+
+:PROCEDURE Level;
+	:RETURN Me:nLevel;
+:ENDPROC;
+-- diagnostics --
+11:2-11:9 error constructor_return_value: ':RETURN' inside a Constructor cannot return a value
+-- diagnostics [--strict --info] --
+11:2-11:9 error constructor_return_value: ':RETURN' inside a Constructor cannot return a value

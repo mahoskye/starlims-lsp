@@ -1,0 +1,44 @@
+Keyword-shaped lines inside a top-level multi-line string or comment are
+literal text: no blank line is inserted between an `:ENDIF;` line and an
+`:IF` line inside them, and blank lines inside them are not touched
+(fmt.blank_line_between_blocks and fmt.max_consecutive_blank_lines, D7).
+Kept at top level: inside a procedure, range formatting re-indents the
+literal's interior lines, an invariant failure reported separately.
+-- input.ssl --
+:DECLARE sTxt;
+sTxt := "header
+:ENDIF;
+:IF x
+
+
+footer";
+/*
+:ENDWHILE
+:WHILE y
+
+
+
+;
+:IF .T.;
+sTxt := "";
+:ENDIF;
+-- format --
+:DECLARE sTxt;
+sTxt := "header
+:ENDIF;
+:IF x
+
+
+footer";
+/*
+:ENDWHILE
+:WHILE y
+
+
+
+;
+:IF .T.;
+	sTxt := "";
+:ENDIF;
+-- diagnostics --
+-- diagnostics [--strict --info] --

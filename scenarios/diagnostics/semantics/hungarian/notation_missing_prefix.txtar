@@ -1,0 +1,28 @@
+diag.hungarian_notation (opt-in, --hungarian): declared names without an
+allowed prefix fire — a bare word (Total), a lowercase word whose first
+letters spell a prefix but continue lowercase (notes, bins), and an
+unknown prefix (cName). Usage sites are never checked. Off by default, so
+the editor and strict profiles stay quiet.
+-- input.ssl --
+:PROCEDURE CountNotes;
+	:PARAMETERS notes, cName;
+	:DECLARE Total, bins;
+	Total := Len(notes);
+	bins := Total + Len(cName);
+	:RETURN bins;
+:ENDPROC;
+-- diagnostics [--hungarian] --
+2:14-2:19 warning hungarian_notation: Variable 'notes' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:21-2:26 warning hungarian_notation: Variable 'cName' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+3:11-3:16 warning hungarian_notation: Variable 'Total' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+3:18-3:22 warning hungarian_notation: Variable 'bins' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+-- format --
+:PROCEDURE CountNotes;
+	:PARAMETERS notes, cName;
+	:DECLARE Total, bins;
+	Total := Len(notes);
+	bins := Total + Len(cName);
+	:RETURN bins;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

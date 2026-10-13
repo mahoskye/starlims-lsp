@@ -1,0 +1,28 @@
+Near-misses for diag.global_assignment: a status-keyword-named member on
+an object (oTally:pending), a declared local whose name collides with a
+status keyword ignoring case (issue #169), and STARLIMSDEPT, which is not
+in the checked set (only MYUSERNAME is built in).
+-- input.ssl --
+:PROCEDURE ResetTally;
+	:PARAMETERS sDept;
+	:DECLARE oTally, approved;
+	oTally := CreateUdObject();
+	oTally:pending := 0;
+	oTally:approved := 0;
+	approved := 0;
+	STARLIMSDEPT := sDept;
+	:RETURN oTally;
+:ENDPROC;
+-- format --
+:PROCEDURE ResetTally;
+	:PARAMETERS sDept;
+	:DECLARE oTally, approved;
+	oTally := CreateUdObject();
+	oTally:pending := 0;
+	oTally:approved := 0;
+	approved := 0;
+	STARLIMSDEPT := sDept;
+	:RETURN oTally;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,21 @@
+Stray whitespace before `;` is removed on statements and keyword lines
+(fmt.operator_spacing "No space is inserted before ;"). A doubled `;;`
+is not collapsed: the empty statement after it is kept and moves to its
+own line like any other statement.
+-- input.ssl --
+:PROCEDURE Tidy ;
+:DECLARE nValue ;
+nValue := 1   ;
+nValue += 1;;
+:RETURN nValue	;
+:ENDPROC ;
+-- format --
+:PROCEDURE Tidy;
+	:DECLARE nValue;
+	nValue := 1;
+	nValue += 1;
+	;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

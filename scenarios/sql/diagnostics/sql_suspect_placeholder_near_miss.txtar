@@ -1,0 +1,22 @@
+Placeholders sql_suspect_placeholder must accept
+(diag.sql_suspect_placeholder Does not flag): a quoted-literal
+placeholder ?'Y'? (an established idiom), a plain ?sUser?, and <<…>>
+text outside any placeholder (here in a character literal).
+-- input.ssl --
+:PROCEDURE Stamp;
+	:PARAMETERS sUser;
+	:DECLARE aRows;
+	aRows := SQLExecute("INSERT INTO auditlog (who, active) VALUES (?sUser?, ?'Y'?)");
+	aRows := SQLExecute("UPDATE auditlog SET note = '<<pending>>' WHERE who = ?sUser?");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Stamp;
+	:PARAMETERS sUser;
+	:DECLARE aRows;
+	aRows := SQLExecute("INSERT INTO auditlog (who, active) VALUES (?sUser?, ?'Y'?)");
+	aRows := SQLExecute("UPDATE auditlog SET note = '<<pending>>' WHERE who = ?sUser?");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

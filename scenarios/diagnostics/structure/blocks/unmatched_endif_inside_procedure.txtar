@@ -1,0 +1,22 @@
+A stray :ENDIF inside a procedure with no block open inside it. The
+procedure is a frame, not a block the :ENDIF could be crossing, so this is
+unmatched_block_end, not mismatched_block_end, and the :ENDPROC still
+closes the procedure cleanly (diag.unmatched_block_end).
+-- input.ssl --
+:PROCEDURE ResetCounter;
+	:DECLARE nCount;
+	nCount := 0;
+	:ENDIF;
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE ResetCounter;
+	:DECLARE nCount;
+	nCount := 0;
+:ENDIF;
+:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+4:2-4:8 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+-- diagnostics [--strict --info] --
+4:2-4:8 error unmatched_block_end: Unexpected ':ENDIF' without matching block start

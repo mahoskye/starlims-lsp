@@ -1,0 +1,31 @@
+:EXITFOR used to leave a :WHILE loop. An enclosing :WHILE does not count:
+exitfor_outside_loop fires (compiler rule: :EXITFOR exits FOR loops only)
+(diag.exitfor_outside_loop second Flags fence).
+-- input.ssl --
+:PROCEDURE WaitForSlot;
+	:DECLARE nAttempts;
+	nAttempts := 0;
+	:WHILE nAttempts < 10;
+		nAttempts := nAttempts + 1;
+		:IF nAttempts == 5;
+			:EXITFOR;
+		:ENDIF;
+	:ENDWHILE;
+	:RETURN nAttempts;
+:ENDPROC;
+-- format --
+:PROCEDURE WaitForSlot;
+	:DECLARE nAttempts;
+	nAttempts := 0;
+	:WHILE nAttempts < 10;
+		nAttempts := nAttempts + 1;
+		:IF nAttempts == 5;
+			:EXITFOR;
+		:ENDIF;
+	:ENDWHILE;
+	:RETURN nAttempts;
+:ENDPROC;
+-- diagnostics --
+7:4-7:12 error exitfor_outside_loop: ':EXITFOR' must be inside a ':FOR' loop
+-- diagnostics [--strict --info] --
+7:4-7:12 error exitfor_outside_loop: ':EXITFOR' must be inside a ':FOR' loop

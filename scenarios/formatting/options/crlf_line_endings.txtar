@@ -1,0 +1,22 @@
+CRLF line endings are normalized to LF throughout, and a second pass is
+byte-identical (feature.formatting A10).
+-- input.ssl --
+:PROCEDURE Windows;
+:DECLARE nValue;
+nValue := 1;
+:IF nValue > 0;
+nValue += 1;
+:ENDIF;
+:RETURN nValue;
+:ENDPROC;
+-- format --
+:PROCEDURE Windows;
+	:DECLARE nValue;
+	nValue := 1;
+	:IF nValue > 0;
+		nValue += 1;
+	:ENDIF;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

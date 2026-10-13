@@ -1,0 +1,45 @@
+Near miss for exitwhile_in_finally: :EXITWHILE after the :ENDTRY and in
+the :CATCH handler, both inside the :WHILE. The FINALLY region ends at
+:ENDTRY, and :CATCH is not part of it (diag.exitwhile_in_finally
+"Does not flag" fences).
+-- input.ssl --
+:PROCEDURE DrainInbox;
+	:DECLARE nLeft, oErr;
+	nLeft := 20;
+	:WHILE nLeft > 0;
+		:TRY;
+			nLeft := nLeft - 1;
+		:CATCH;
+			oErr := GetLastSSLError();
+			:EXITWHILE;
+		:FINALLY;
+			nLeft := nLeft - 0;
+		:ENDTRY;
+		:IF nLeft < 5;
+			:EXITWHILE;
+		:ENDIF;
+	:ENDWHILE;
+	:RETURN nLeft;
+:ENDPROC;
+-- format --
+:PROCEDURE DrainInbox;
+	:DECLARE nLeft, oErr;
+	nLeft := 20;
+	:WHILE nLeft > 0;
+		:TRY;
+			nLeft := nLeft - 1;
+		:CATCH;
+			oErr := GetLastSSLError();
+			:EXITWHILE;
+		:FINALLY;
+			nLeft := nLeft - 0;
+		:ENDTRY;
+
+		:IF nLeft < 5;
+			:EXITWHILE;
+		:ENDIF;
+	:ENDWHILE;
+	:RETURN nLeft;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

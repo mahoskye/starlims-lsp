@@ -1,0 +1,26 @@
+SQLExecute's first argument is SQL (fmt.sql_in_strings): an overflowing
+single-line query with ?name? placeholders reflows to rule F inside a
+procedure, the SQL block 4 spaces past the statement's base indent and
+the closing quote glued to ');'. Placeholders survive verbatim.
+-- input.ssl --
+:PROCEDURE OpenOrders;
+	:PARAMETERS sStatus, sSite;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, custid, logdate from orders where status = ?sStatus? and site = ?sSite? order by logdate desc");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE OpenOrders;
+	:PARAMETERS sStatus, sSite;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, custid, logdate
+	    FROM orders
+	    WHERE status = ?sStatus?
+	      AND site = ?sSite?
+	    ORDER BY logdate DESC
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

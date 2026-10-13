@@ -1,0 +1,35 @@
+Near-misses for diag.invalid_limstypeex_comparison: valid result names,
+= prefix matches that can be true either way round ("NUM", "STRINGS"),
+a non-literal comparand, and LimsTypeEx used in IIF/concatenation. The
+<> on the valid name is still not_preferred_operator's (info) finding.
+-- input.ssl --
+:PROCEDURE Classify;
+	:PARAMETERS vValue, sExpected;
+	:DECLARE bHit, sDesc;
+	bHit := LimsTypeEx(vValue) == "NUMERIC";
+	bHit := bHit .OR. LimsTypeEx(vValue) = "NUM";
+	bHit := bHit .OR. "STRINGS" = LimsTypeEx(vValue);
+	bHit := bHit .OR. LimsTypeEx(vValue) == sExpected;
+	bHit := bHit .AND. LimsTypeEx(vValue) <> "CODEBLOCK";
+	sDesc := "type " + LimsTypeEx(vValue);
+	sDesc := IIF(bHit, LimsTypeEx(vValue), sDesc);
+	:RETURN sDesc;
+:ENDPROC;
+-- format --
+:PROCEDURE Classify;
+	:PARAMETERS vValue, sExpected;
+	:DECLARE bHit, sDesc;
+	bHit := LimsTypeEx(vValue) == "NUMERIC";
+	bHit := bHit .OR. LimsTypeEx(vValue) = "NUM";
+	bHit := bHit .OR. "STRINGS" = LimsTypeEx(vValue);
+	bHit := bHit .OR. LimsTypeEx(vValue) == sExpected;
+	bHit := bHit .AND. LimsTypeEx(vValue) <> "CODEBLOCK";
+	sDesc := "type " + LimsTypeEx(vValue);
+	sDesc := IIf(bHit, LimsTypeEx(vValue), sDesc);
+	:RETURN sDesc;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+5:39-5:40 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+6:30-6:31 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+8:40-8:42 info not_preferred_operator: Use '!=' instead of '<>' for inequality

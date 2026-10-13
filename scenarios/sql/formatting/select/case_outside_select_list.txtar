@@ -1,0 +1,43 @@
+CASE lays out the same way outside the SELECT list (issue #271): in
+WHERE and ORDER BY it stays after the clause keyword with WHEN/ELSE 4
+past CASE and END aligned; in UPDATE SET it stays on its assignment; and
+a CASE inside an aggregate that fits stays inline (reference §2.7).
+-- input.ssl --
+:PROCEDURE Ranked;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("select ordno, testcode, sum(case when status = 'Complete' then 1 else 0 end) as done from ordtask where case when duedate is null then 'N' else 'Y' end = 'Y' group by ordno, testcode order by case when testcode = 'pH' then 1 when testcode = 'TOC' then 2 else 3 end, ordno");
+	bOk := RunSQL("update ordtask set status = case when result_value > high_limit then 'High' when result_value < low_limit then 'Low' else 'Normal' end where ordno = ?",, {sOrdNo});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Ranked;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("
+	    SELECT ordno, testcode, SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done
+	    FROM ordtask
+	    WHERE CASE
+	              WHEN duedate IS NULL THEN 'N'
+	              ELSE 'Y'
+	          END = 'Y'
+	    GROUP BY ordno, testcode
+	    ORDER BY CASE
+	                 WHEN testcode = 'pH' THEN 1
+	                 WHEN testcode = 'TOC' THEN 2
+	                 ELSE 3
+	             END, ordno
+	");
+	bOk := RunSQL("
+	    UPDATE ordtask SET
+	        status = CASE
+	                     WHEN result_value > high_limit THEN 'High'
+	                     WHEN result_value < low_limit THEN 'Low'
+	                     ELSE 'Normal'
+	                 END
+	    WHERE ordno = ?
+	",, {sOrdNo});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

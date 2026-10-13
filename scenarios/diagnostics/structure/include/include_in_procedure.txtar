@@ -1,0 +1,21 @@
+An :INCLUDE inside a procedure body is not supported: include_in_procedure
+(warning). include_early must not also report it (diag.include_in_procedure,
+diag.include_early hand-off).
+-- input.ssl --
+:PROCEDURE FormatAll;
+	:INCLUDE Common.StringHelpers;
+	:DECLARE nCount;
+	nCount := 0;
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE FormatAll;
+	:INCLUDE Common.StringHelpers;
+	:DECLARE nCount;
+	nCount := 0;
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+2:2-2:10 warning include_in_procedure: ':INCLUDE' inside a procedure body is not supported
+-- diagnostics [--strict --info] --
+2:2-2:10 warning include_in_procedure: ':INCLUDE' inside a procedure body is not supported

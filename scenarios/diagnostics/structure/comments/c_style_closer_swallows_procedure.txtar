@@ -1,0 +1,27 @@
+A banner above a procedure closed C-style: the comment runs on to the
+first `;`, which ends the :PROCEDURE line, so the declaration is inside
+the comment. comment_swallows_code (warning) names the swallowed
+fragment; the orphaned :ENDPROC then surfaces as unmatched_block_end,
+the puzzling symptom the catalog rationale describes
+(diag.comment_swallows_code).
+Suspected issue: the range of a diagnostic on a multi-line comment ends on the comment's first line at column start+token length (past the line's end) instead of at the comment's real end; diag.c_style_comment_closer says "The range covers the comment."
+-- input.ssl --
+/* Helper: trims and upper-cases a code
+*/
+:PROCEDURE CleanCode;
+	:PARAMETERS sCode;
+	:RETURN Upper(AllTrim(sCode));
+:ENDPROC;
+-- format --
+/* Helper: trims and upper-cases a code
+*/
+:PROCEDURE CleanCode;
+:PARAMETERS sCode;
+:RETURN Upper(AllTrim(sCode));
+:ENDPROC;
+-- diagnostics --
+1:1-1:65 warning comment_swallows_code: This comment does not end at its '*/' - SSL comments end at ';', so it runs on and swallows ':PROCEDURE CleanCode'. That code never executes. End the comment with ';'
+6:1-6:9 error unmatched_block_end: Unexpected ':ENDPROC' without matching block start
+-- diagnostics [--strict --info] --
+1:1-1:65 warning comment_swallows_code: This comment does not end at its '*/' - SSL comments end at ';', so it runs on and swallows ':PROCEDURE CleanCode'. That code never executes. End the comment with ';'
+6:1-6:9 error unmatched_block_end: Unexpected ':ENDPROC' without matching block start

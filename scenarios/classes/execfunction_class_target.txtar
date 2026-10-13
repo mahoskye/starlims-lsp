@@ -1,0 +1,26 @@
+ExecFunction targets that might name class files. diag.execfunction_class_target
+resolves targets through the workspace index, which the --validate CLI
+(and so this suite) does not have: the check is documented as silent here.
+This scenario pins that silence; the firing case is covered by provider
+tests with a populated index. CreateUdObject on a qualified class is the
+correct pattern beside it.
+-- input.ssl --
+:PROCEDURE Recalculate;
+	:PARAMETERS nSampleId;
+	:DECLARE oTools, vResult;
+	vResult := ExecFunction("Lab.SampleTools", {nSampleId});
+	vResult := ExecFunction("Lab.SampleTools.Recalculate", {nSampleId});
+	oTools := CreateUdObject("Lab.SampleTools");
+	:RETURN oTools:Recalculate(nSampleId);
+:ENDPROC;
+-- format --
+:PROCEDURE Recalculate;
+	:PARAMETERS nSampleId;
+	:DECLARE oTools, vResult;
+	vResult := ExecFunction("Lab.SampleTools", {nSampleId});
+	vResult := ExecFunction("Lab.SampleTools.Recalculate", {nSampleId});
+	oTools := CreateUdObject("Lab.SampleTools");
+	:RETURN oTools:Recalculate(nSampleId);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

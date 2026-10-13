@@ -1,0 +1,36 @@
+The `/*@private;` / `/*@protected;` access modifiers use comment syntax
+but are not ordinary comments: the style-guide schema says formatters
+"must not respace, recase or separate them from :PROCEDURE"
+(procedures.visibility_annotations). Records how the formatter treats
+them at a procedure boundary: annotation text and its attachment to the
+following :PROCEDURE.
+-- input.ssl --
+:PROCEDURE PublicEntry;
+:RETURN DoProc("Helper");
+:ENDPROC;
+/*@private;
+:PROCEDURE Helper;
+:RETURN 1;
+:ENDPROC;
+/*@protected;
+:PROCEDURE Shared;
+:RETURN 2;
+:ENDPROC;
+-- format --
+:PROCEDURE PublicEntry;
+	:RETURN DoProc("Helper");
+:ENDPROC;
+
+/*@private;
+:PROCEDURE Helper;
+	:RETURN 1;
+:ENDPROC;
+
+/*@protected;
+:PROCEDURE Shared;
+	:RETURN 2;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:1-4:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated
+8:1-8:14 info visibility_annotation_usage: Visibility annotation '/*@protected;' - this team convention prefers procedures unannotated

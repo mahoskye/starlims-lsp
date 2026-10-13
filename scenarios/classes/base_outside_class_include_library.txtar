@@ -1,0 +1,36 @@
+A classless file of nothing but :PROCEDURE blocks: the shape of an include
+library whose procedures compile inside an inheriting :CLASS via :INCLUDE.
+Base: and Me: here report at the warning tier, not error
+(diag.base_outside_class and diag.me_outside_class, issues #171 and #255).
+-- input.ssl --
+/* Shared helpers pasted into widget classes with :INCLUDE;
+:PROCEDURE RefreshAll;
+	Base:Refresh();
+	Me:nRefreshCount += 1;
+	:RETURN Me:nRefreshCount;
+:ENDPROC;
+
+:PROCEDURE ResetAll;
+	Me:nRefreshCount := 0;
+:ENDPROC;
+-- format --
+/* Shared helpers pasted into widget classes with :INCLUDE;
+:PROCEDURE RefreshAll;
+	Base:Refresh();
+	Me:nRefreshCount += 1;
+	:RETURN Me:nRefreshCount;
+:ENDPROC;
+
+:PROCEDURE ResetAll;
+	Me:nRefreshCount := 0;
+:ENDPROC;
+-- diagnostics --
+3:2-3:6 warning base_outside_class: 'Base:MemberName' outside a ':CLASS' definition — valid only if this file is an include library compiled into an inheriting class via ':INCLUDE'
+4:2-4:4 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'
+5:10-5:12 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'
+9:2-9:4 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'
+-- diagnostics [--strict --info] --
+3:2-3:6 warning base_outside_class: 'Base:MemberName' outside a ':CLASS' definition — valid only if this file is an include library compiled into an inheriting class via ':INCLUDE'
+4:2-4:4 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'
+5:10-5:12 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'
+9:2-9:4 warning me_outside_class: 'Me' outside a ':CLASS' definition — valid only if this file is an include library compiled into a class via ':INCLUDE'

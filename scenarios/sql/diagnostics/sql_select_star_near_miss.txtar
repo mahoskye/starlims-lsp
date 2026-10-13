@@ -1,0 +1,29 @@
+Stars sql_select_star must accept (diag.sql_select_star Does not flag):
+COUNT(*), an explicit column list, the multiplication operator, and a
+SELECT * probe directly inside NOT EXISTS (...).
+-- input.ssl --
+:PROCEDURE Counts;
+	:DECLARE nCount, aRows;
+	nCount := LSearch("SELECT COUNT(*) FROM orders", 0);
+	aRows := SQLExecute("SELECT ordno, qty * price AS total FROM orders");
+	aRows := SQLExecute("SELECT o.ordno FROM orders o WHERE NOT EXISTS (SELECT * FROM ordtask t WHERE t.ordno = o.ordno)");
+	:RETURN {nCount, aRows};
+:ENDPROC;
+-- format --
+:PROCEDURE Counts;
+	:DECLARE nCount, aRows;
+	nCount := LSearch("SELECT COUNT(*) FROM orders", 0);
+	aRows := SQLExecute("SELECT ordno, qty * price AS total FROM orders");
+	aRows := SQLExecute("
+	    SELECT o.ordno
+	    FROM orders o
+	    WHERE NOT EXISTS (
+	        SELECT *
+	        FROM ordtask t
+	        WHERE t.ordno = o.ordno
+	    )
+	");
+	:RETURN {nCount, aRows};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

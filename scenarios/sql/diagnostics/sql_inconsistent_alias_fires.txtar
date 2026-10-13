@@ -1,0 +1,21 @@
+A SELECT list mixing explicit AS aliases with bare aliases
+(diag.sql_inconsistent_alias, info tier), plainly and after a TOP 10
+prefix whose count must not count as an item.
+-- input.ssl --
+:PROCEDURE Aliases;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno fno FROM orders o");
+	aRows := SQLExecute("SELECT TOP 10 o.ordno ordnum, o.status AS st FROM orders o");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Aliases;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno fno FROM orders o");
+	aRows := SQLExecute("SELECT TOP 10 o.ordno ordnum, o.status AS st FROM orders o");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:22-3:79 info sql_inconsistent_alias: SELECT list mixes explicit 'AS alias' and bare 'expr alias' forms - a uniform explicit AS keeps aliases scannable
+4:22-4:82 info sql_inconsistent_alias: SELECT list mixes explicit 'AS alias' and bare 'expr alias' forms - a uniform explicit AS keeps aliases scannable

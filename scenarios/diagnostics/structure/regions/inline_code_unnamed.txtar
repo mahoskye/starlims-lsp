@@ -1,0 +1,17 @@
+A :BEGININLINECODE block with no name, so GetInlineCode() has nothing to
+read it by: inline_code_naming (error), missing-name path, ranged on the
+keyword (diag.inline_code_naming first Flags fence).
+-- input.ssl --
+:BEGININLINECODE;
+:DECLARE sGreeting;
+sGreeting := "hello";
+:ENDINLINECODE;
+-- format --
+:BEGININLINECODE;
+	:DECLARE sGreeting;
+	sGreeting := "hello";
+:ENDINLINECODE;
+-- diagnostics --
+1:1-1:17 error inline_code_naming: ':BEGININLINECODE' requires a name (identifier or quoted string)
+-- diagnostics [--strict --info] --
+1:1-1:17 error inline_code_naming: ':BEGININLINECODE' requires a name (identifier or quoted string)

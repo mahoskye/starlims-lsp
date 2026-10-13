@@ -1,0 +1,34 @@
+A :CASE branch whose only :RETURN sits inside an :IF can fall through when
+the condition is false, so it still needs an :EXITCASE: prefer_exitcase
+fires on that :CASE (issue #139 final-statement-only rule;
+diag.prefer_exitcase last Flags fence).
+-- input.ssl --
+:PROCEDURE FirstMatch;
+	:PARAMETERS nKind, bStrict;
+	:BEGINCASE;
+	:CASE nKind == 1;
+		:IF bStrict;
+			:RETURN "strict";
+		:ENDIF;
+	:OTHERWISE;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN "loose";
+:ENDPROC;
+-- format --
+:PROCEDURE FirstMatch;
+	:PARAMETERS nKind, bStrict;
+	:BEGINCASE;
+	:CASE nKind == 1;
+		:IF bStrict;
+			:RETURN "strict";
+		:ENDIF;
+	:OTHERWISE;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN "loose";
+:ENDPROC;
+-- diagnostics --
+4:2-4:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+-- diagnostics [--strict --info] --
+4:2-4:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'

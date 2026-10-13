@@ -1,0 +1,30 @@
+Consistent SELECT lists sql_inconsistent_alias must accept
+(diag.sql_inconsistent_alias Does not flag): only AS aliases, only bare
+aliases, no aliases with qualified columns, a TOP 10 count beside an AS
+alias (issue #255 false positive), and DISTINCT with a * item.
+-- input.ssl --
+:PROCEDURE Aliases;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno AS fno FROM orders o");
+	aRows := SQLExecute("SELECT o.ordno orderno, o.folderno fno FROM orders o");
+	aRows := SQLExecute("SELECT o.ordno, o.folderno FROM orders o");
+	aRows := SQLExecute("SELECT TOP 10 o.ordno, o.folderno AS fno FROM orders o");
+	aRows := SQLExecute("SELECT DISTINCT o.status AS st, COUNT(*) AS n FROM orders o GROUP BY o.status");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Aliases;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno AS fno FROM orders o");
+	aRows := SQLExecute("SELECT o.ordno orderno, o.folderno fno FROM orders o");
+	aRows := SQLExecute("SELECT o.ordno, o.folderno FROM orders o");
+	aRows := SQLExecute("SELECT TOP 10 o.ordno, o.folderno AS fno FROM orders o");
+	aRows := SQLExecute("
+	    SELECT DISTINCT o.status AS st, COUNT(*) AS n
+	    FROM orders o
+	    GROUP BY o.status
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,22 @@
+Near miss for comment_text_after_terminator (issue #304): a multi-line
+comment is followed by an assignment to a variable whose name is an SSL
+keyword name (`label`). An identifier followed by `:=` is a statement,
+not a stranded header line. Clean of comment findings.
+-- input.ssl --
+:PROCEDURE ReadLabel;
+	:DECLARE label;
+	/* collect the request values
+	before they are parsed;
+	label := Upper("draft");
+	:RETURN label;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadLabel;
+	:DECLARE label;
+	/* collect the request values
+	before they are parsed;
+	label := Upper("draft");
+	:RETURN label;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

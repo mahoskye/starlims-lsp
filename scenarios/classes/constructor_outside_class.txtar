@@ -1,0 +1,31 @@
+A script procedure named Constructor (diag.constructor_outside_class,
+warning): outside a class it is just an oddly named procedure. A procedure
+with another name in the same script is the near miss.
+-- input.ssl --
+:PROCEDURE Constructor;
+	:PARAMETERS sName;
+	:DECLARE sLabel;
+	sLabel := "Built " + sName;
+	:RETURN sLabel;
+:ENDPROC;
+
+:PROCEDURE Build;
+	:PARAMETERS sName;
+	:RETURN DoProc("Constructor", {sName});
+:ENDPROC;
+-- format --
+:PROCEDURE Constructor;
+	:PARAMETERS sName;
+	:DECLARE sLabel;
+	sLabel := "Built " + sName;
+	:RETURN sLabel;
+:ENDPROC;
+
+:PROCEDURE Build;
+	:PARAMETERS sName;
+	:RETURN DoProc("Constructor", {sName});
+:ENDPROC;
+-- diagnostics --
+1:1-1:12 warning constructor_outside_class: 'Constructor' is only meaningful inside a ':CLASS' definition
+-- diagnostics [--strict --info] --
+1:1-1:12 warning constructor_outside_class: 'Constructor' is only meaningful inside a ':CLASS' definition

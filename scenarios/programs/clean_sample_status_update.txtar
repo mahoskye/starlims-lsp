@@ -1,0 +1,233 @@
+A complete server script written to AGENTS.md conventions: script-level
+:PARAMETERS / :DEFAULT, same-file procedures called through DoProc,
+SQLExecute with ?name? placeholders, RunSQL with positional '?' and a
+value array, TRY/CATCH with GetLastSSLError, a BEGINCASE status
+transition table and an envelope return. Expected nearly clean under
+every profile: any finding is either a real defect in the input or a
+false positive worth reporting.
+-- input.ssl --
+/*
+ * Script: SampleStatusUpdate
+ * Description: Moves one sample to a new status when the transition is allowed
+ * Parameters:
+ *   sSampleId - the sample to update
+ *   sNewStatus - the requested status code
+ *   sUserId - the user requesting the change
+ * Returns: {bSuccess, sMessage}
+;
+:PARAMETERS sSampleId, sNewStatus, sUserId;
+:DEFAULT sSampleId, "";
+:DEFAULT sNewStatus, "";
+:DEFAULT sUserId, "SYSTEM";
+:DECLARE sCurrentStatus, bAllowed, bUpdated, sMessage, oErr;
+
+sSampleId := AllTrim(sSampleId);
+sNewStatus := Upper(AllTrim(sNewStatus));
+
+:IF Empty(sSampleId) .OR. Empty(sNewStatus);
+	:RETURN {.F., "Sample and status are required"};
+:ENDIF;
+
+:TRY;
+	sCurrentStatus := DoProc("LoadStatus", {sSampleId});
+	:IF Empty(sCurrentStatus);
+		:RETURN {.F., "Sample " + sSampleId + " was not found"};
+	:ENDIF;
+
+	bAllowed := DoProc("IsTransitionAllowed", {sCurrentStatus, sNewStatus});
+	:IF .NOT. bAllowed;
+		:RETURN {.F., "Cannot move from " + sCurrentStatus + " to " + sNewStatus};
+	:ENDIF;
+
+	bUpdated := DoProc("WriteStatus", {sSampleId, sNewStatus, sUserId});
+	:IF bUpdated;
+		sMessage := "Sample " + sSampleId + " is now " + sNewStatus;
+	:ELSE;
+		sMessage := "The status update did not apply";
+	:ENDIF;
+:CATCH;
+	oErr := GetLastSSLError();
+	ErrorMes("SampleStatusUpdate", oErr:Description);
+	:RETURN {.F., "The update failed"};
+:ENDTRY;
+
+:RETURN {bUpdated, sMessage};
+
+/*
+ * Procedure: LoadStatus
+ * Parameters:
+ *   sSampleId - the sample to read
+ * Returns: the current status code, or "" when the sample does not exist
+;
+:PROCEDURE LoadStatus;
+	:PARAMETERS sSampleId;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT Status FROM LabSamples WHERE SampleId = ?sSampleId?");
+	:IF Len(aRows) == 0;
+		:RETURN "";
+	:ENDIF;
+	:RETURN aRows[1][1];
+:ENDPROC;
+
+/*
+ * Procedure: IsTransitionAllowed
+ * Parameters:
+ *   sFrom - the current status code
+ *   sTo - the requested status code
+ * Returns: .T. when the workflow allows the move
+;
+:PROCEDURE IsTransitionAllowed;
+	:PARAMETERS sFrom, sTo;
+	:DECLARE aAllowed;
+	:BEGINCASE;
+	:CASE sFrom == "LOGGED";
+		aAllowed := {"RECEIVED", "CANCELLED"};
+		:EXITCASE;
+	:CASE sFrom == "RECEIVED";
+		aAllowed := {"TESTING", "CANCELLED"};
+		:EXITCASE;
+	:CASE sFrom == "TESTING";
+		aAllowed := {"REVIEW"};
+		:EXITCASE;
+	:CASE sFrom == "REVIEW";
+		aAllowed := {"RELEASED", "TESTING"};
+		:EXITCASE;
+	:OTHERWISE;
+		aAllowed := {};
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN AScanExact(aAllowed, sTo) > 0;
+:ENDPROC;
+
+/*
+ * Procedure: WriteStatus
+ * Parameters:
+ *   sSampleId - the sample to update
+ *   sStatus - the new status code
+ *   sUserId - the user recorded on the change
+ * Returns: .T. when the row was updated
+;
+:PROCEDURE WriteStatus;
+	:PARAMETERS sSampleId, sStatus, sUserId;
+	:DECLARE sSQL, bOk;
+	sSQL := "UPDATE LabSamples SET Status = ?, ChangedBy = ?, ChangedOn = ? WHERE SampleId = ?";
+	bOk := RunSQL(sSQL,, {sStatus, sUserId, Now(), sSampleId});
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+/*
+ * Script: SampleStatusUpdate
+ * Description: Moves one sample to a new status when the transition is allowed
+ * Parameters:
+ *   sSampleId - the sample to update
+ *   sNewStatus - the requested status code
+ *   sUserId - the user requesting the change
+ * Returns: {bSuccess, sMessage}
+;
+:PARAMETERS sSampleId, sNewStatus, sUserId;
+:DEFAULT sSampleId, "";
+:DEFAULT sNewStatus, "";
+:DEFAULT sUserId, "SYSTEM";
+:DECLARE sCurrentStatus, bAllowed, bUpdated, sMessage, oErr;
+
+sSampleId := AllTrim(sSampleId);
+sNewStatus := Upper(AllTrim(sNewStatus));
+
+:IF Empty(sSampleId) .OR. Empty(sNewStatus);
+	:RETURN {.F., "Sample and status are required"};
+:ENDIF;
+
+:TRY;
+	sCurrentStatus := DoProc("LoadStatus", {sSampleId});
+	:IF Empty(sCurrentStatus);
+		:RETURN {.F., "Sample " + sSampleId + " was not found"};
+	:ENDIF;
+
+	bAllowed := DoProc("IsTransitionAllowed", {sCurrentStatus, sNewStatus});
+	:IF .NOT. bAllowed;
+		:RETURN {.F., "Cannot move from " + sCurrentStatus + " to " + sNewStatus};
+	:ENDIF;
+
+	bUpdated := DoProc("WriteStatus", {sSampleId, sNewStatus, sUserId});
+	:IF bUpdated;
+		sMessage := "Sample " + sSampleId + " is now " + sNewStatus;
+	:ELSE;
+		sMessage := "The status update did not apply";
+	:ENDIF;
+:CATCH;
+	oErr := GetLastSSLError();
+	ErrorMes("SampleStatusUpdate", oErr:Description);
+	:RETURN {.F., "The update failed"};
+:ENDTRY;
+
+:RETURN {bUpdated, sMessage};
+
+/*
+ * Procedure: LoadStatus
+ * Parameters:
+ *   sSampleId - the sample to read
+ * Returns: the current status code, or "" when the sample does not exist
+;
+:PROCEDURE LoadStatus;
+	:PARAMETERS sSampleId;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT Status FROM LabSamples WHERE SampleId = ?sSampleId?");
+	:IF Len(aRows) == 0;
+		:RETURN "";
+	:ENDIF;
+	:RETURN aRows[1][1];
+:ENDPROC;
+
+/*
+ * Procedure: IsTransitionAllowed
+ * Parameters:
+ *   sFrom - the current status code
+ *   sTo - the requested status code
+ * Returns: .T. when the workflow allows the move
+;
+:PROCEDURE IsTransitionAllowed;
+	:PARAMETERS sFrom, sTo;
+	:DECLARE aAllowed;
+	:BEGINCASE;
+	:CASE sFrom == "LOGGED";
+		aAllowed := {"RECEIVED", "CANCELLED"};
+		:EXITCASE;
+	:CASE sFrom == "RECEIVED";
+		aAllowed := {"TESTING", "CANCELLED"};
+		:EXITCASE;
+	:CASE sFrom == "TESTING";
+		aAllowed := {"REVIEW"};
+		:EXITCASE;
+	:CASE sFrom == "REVIEW";
+		aAllowed := {"RELEASED", "TESTING"};
+		:EXITCASE;
+	:OTHERWISE;
+		aAllowed := {};
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN AScanExact(aAllowed, sTo) > 0;
+:ENDPROC;
+
+/*
+ * Procedure: WriteStatus
+ * Parameters:
+ *   sSampleId - the sample to update
+ *   sStatus - the new status code
+ *   sUserId - the user recorded on the change
+ * Returns: .T. when the row was updated
+;
+:PROCEDURE WriteStatus;
+	:PARAMETERS sSampleId, sStatus, sUserId;
+	:DECLARE sSQL, bOk;
+	sSQL := "
+	    UPDATE LabSamples SET
+	        Status = ?,
+	        ChangedBy = ?,
+	        ChangedOn = ?
+	    WHERE SampleId = ?
+	";
+	bOk := RunSQL(sSQL,, {sStatus, sUserId, Now(), sSampleId});
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

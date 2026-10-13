@@ -1,0 +1,45 @@
+Near-misses for diag.invalid_native_member (D10): undocumented members are
+.NET passthroughs (aItems:Length, aItems:Clone(), sText:PadLeft(5));
+parameters, NIL-assigned and DoProc-passed variables are not judged;
+a .NET collection in an a-prefixed variable may have :Count; objects
+ignore member case.
+-- input.ssl --
+:PROCEDURE Probe;
+	:PARAMETERS aRows;
+	:DECLARE aItems, sText, aNames, oRec, aPassed, vOut;
+	aItems := {1, 2, 3};
+	sText := "abc";
+	vOut := aItems:Length;
+	vOut := aItems:Clone();
+	vOut := sText:PadLeft(5);
+	vOut := aRows:Count;
+	aNames := LimsNETConnect(, "System.Collections.Generic.List<String>");
+	vOut := aNames:Count;
+	oRec := CreateUdObject();
+	vOut := oRec:tojson();
+	aPassed := {1};
+	DoProc("Fill", {aPassed});
+	vOut := aPassed:Count;
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Probe;
+	:PARAMETERS aRows;
+	:DECLARE aItems, sText, aNames, oRec, aPassed, vOut;
+	aItems := {1, 2, 3};
+	sText := "abc";
+	vOut := aItems:Length;
+	vOut := aItems:Clone();
+	vOut := sText:PadLeft(5);
+	vOut := aRows:Count;
+	aNames := LimsNETConnect(, "System.Collections.Generic.List<String>");
+	vOut := aNames:Count;
+	oRec := CreateUdObject();
+	vOut := oRec:tojson();
+	aPassed := {1};
+	DoProc("Fill", {aPassed});
+	vOut := aPassed:Count;
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

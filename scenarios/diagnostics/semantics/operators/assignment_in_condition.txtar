@@ -1,0 +1,56 @@
+:= at the top level of an :IF, :WHILE or :CASE condition is almost
+always a mistyped comparison (diag.assignment_in_condition, warning, on
+the := token; the message names the keyword). Two in one condition give
+two findings.
+-- input.ssl --
+:PROCEDURE Drain;
+	:PARAMETERS nLevel, nMode;
+	:DECLARE nOut;
+	:IF nLevel := 0;
+		:RETURN 0;
+	:ENDIF;
+	:WHILE nLevel := nLevel - 1;
+		nOut := nLevel;
+	:ENDWHILE;
+	:BEGINCASE;
+	:CASE nMode := 1 .OR. nOut := 2;
+		nOut := 1;
+		:EXITCASE;
+	:OTHERWISE;
+		nOut := 0;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Drain;
+	:PARAMETERS nLevel, nMode;
+	:DECLARE nOut;
+	:IF nLevel := 0;
+		:RETURN 0;
+	:ENDIF;
+
+	:WHILE nLevel := nLevel - 1;
+		nOut := nLevel;
+	:ENDWHILE;
+
+	:BEGINCASE;
+	:CASE nMode := 1 .OR. nOut := 2;
+		nOut := 1;
+		:EXITCASE;
+	:OTHERWISE;
+		nOut := 0;
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nOut;
+:ENDPROC;
+-- diagnostics --
+4:13-4:15 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
+7:16-7:18 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
+11:14-11:16 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:29-11:31 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+-- diagnostics [--strict --info] --
+4:13-4:15 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
+7:16-7:18 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
+11:14-11:16 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:29-11:31 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?

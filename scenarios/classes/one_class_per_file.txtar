@@ -1,0 +1,36 @@
+Two :CLASS definitions in one file (diag.one_class_per_file, error, on
+the second :CLASS only). The first :CLASS is the file's first statement,
+so class_or_script stays silent.
+-- input.ssl --
+:CLASS Alpha;
+:DECLARE nCount;
+
+:PROCEDURE Work;
+	Me:nCount += 1;
+:ENDPROC;
+
+:CLASS Beta;
+:DECLARE sName;
+
+:PROCEDURE Name;
+	:RETURN Me:sName;
+:ENDPROC;
+-- format --
+:CLASS Alpha;
+:DECLARE nCount;
+
+:PROCEDURE Work;
+	Me:nCount += 1;
+:ENDPROC;
+
+:CLASS Beta;
+:DECLARE sName;
+
+:PROCEDURE Name;
+	:RETURN Me:sName;
+:ENDPROC;
+-- diagnostics --
+8:1-8:7 error one_class_per_file: Only one ':CLASS' definition is allowed per file
+-- diagnostics [--strict --info] --
+8:1-8:7 error one_class_per_file: Only one ':CLASS' definition is allowed per file
+9:1-9:9 info class_member_order: Class members must be ordered as ':DECLARE' fields, then methods

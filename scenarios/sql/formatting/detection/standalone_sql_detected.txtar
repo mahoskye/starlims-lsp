@@ -1,0 +1,28 @@
+detectSQLStrings is on by default, so a SQL string assigned to a
+variable outside any SQL call is detected and reflowed when it
+overflows (fmt.sql_in_strings); a short one stays inline.
+-- input.ssl --
+:PROCEDURE Build;
+	:PARAMETERS sStatus;
+	:DECLARE sSQL, sCount, aRows;
+	sSQL := "select ordno, custid, logdate, status from orders where status = ?sStatus? order by logdate desc";
+	sCount := "select count(*) from orders";
+	aRows := SQLExecute(sSQL);
+	:RETURN {aRows, sCount};
+:ENDPROC;
+-- format --
+:PROCEDURE Build;
+	:PARAMETERS sStatus;
+	:DECLARE sSQL, sCount, aRows;
+	sSQL := "
+	    SELECT ordno, custid, logdate, status
+	    FROM orders
+	    WHERE status = ?sStatus?
+	    ORDER BY logdate DESC
+	";
+	sCount := "select count(*) from orders";
+	aRows := SQLExecute(sSQL);
+	:RETURN {aRows, sCount};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,27 @@
+RunSQL's first argument is SQL; the skipped connection argument and the
+value array stay on the closing line (reference §7.2: '",, {…});').
+An overflowing UPDATE takes the SET-on-its-own-lines layout with one
+assignment per line and AND indented 2 under WHERE.
+-- input.ssl --
+:PROCEDURE Complete;
+	:PARAMETERS sNewStatus, sUser, sOrdNo, sTestCode;
+	:DECLARE bOk;
+	bOk := RunSQL("update ordtask set status = ?, completed_by = ?, completed_date = sysdate where ordno = ? and testcode = ?",, {sNewStatus, sUser, sOrdNo, sTestCode});
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Complete;
+	:PARAMETERS sNewStatus, sUser, sOrdNo, sTestCode;
+	:DECLARE bOk;
+	bOk := RunSQL("
+	    UPDATE ordtask SET
+	        status = ?,
+	        completed_by = ?,
+	        completed_date = SYSDATE
+	    WHERE ordno = ?
+	      AND testcode = ?
+	",, {sNewStatus, sUser, sOrdNo, sTestCode});
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

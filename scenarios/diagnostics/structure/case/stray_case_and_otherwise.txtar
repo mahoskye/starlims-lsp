@@ -1,0 +1,42 @@
+A :CASE and :OTHERWISE whose :BEGINCASE was deleted. Both are
+stray_block_keyword; prefer_exitcase ignores stray :CASE tokens, and the
+dangling :ENDCASE is unmatched_block_end (diag.stray_block_keyword,
+diag.prefer_exitcase, diag.unmatched_block_end).
+-- input.ssl --
+:PROCEDURE ColorFor;
+	:PARAMETERS nCode;
+	:DECLARE sColor;
+	:CASE nCode == 1;
+		sColor := "red";
+		:EXITCASE;
+	:OTHERWISE;
+		sColor := "grey";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sColor;
+:ENDPROC;
+-- format --
+:PROCEDURE ColorFor;
+	:PARAMETERS nCode;
+	:DECLARE sColor;
+:CASE nCode == 1;
+	sColor := "red";
+	:EXITCASE;
+:OTHERWISE;
+	sColor := "grey";
+	:EXITCASE;
+:ENDCASE;
+:RETURN sColor;
+:ENDPROC;
+-- diagnostics --
+4:2-4:7 error stray_block_keyword: ':CASE' is outside any ':BEGINCASE' block
+6:3-6:12 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+7:2-7:12 error stray_block_keyword: ':OTHERWISE' is outside any ':BEGINCASE' block
+9:3-9:12 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+10:2-10:10 error unmatched_block_end: Unexpected ':ENDCASE' without matching block start
+-- diagnostics [--strict --info] --
+4:2-4:7 error stray_block_keyword: ':CASE' is outside any ':BEGINCASE' block
+6:3-6:12 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+7:2-7:12 error stray_block_keyword: ':OTHERWISE' is outside any ':BEGINCASE' block
+9:3-9:12 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+10:2-10:10 error unmatched_block_end: Unexpected ':ENDCASE' without matching block start

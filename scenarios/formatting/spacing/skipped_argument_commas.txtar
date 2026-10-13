@@ -1,0 +1,34 @@
+Skipped arguments: adjacent commas stay tight and the last comma of the
+run still gets its space before the next value (`{a,, b}`); a spaced run
+`, ,` collapses to the tight form; a comma right before a closer takes no
+space (fmt.comma_spacing issue #218; style guide skip_commas_adjacent).
+-- input.ssl --
+:PROCEDURE Skips;
+:PARAMETERS sStatus, sSampleId;
+:DECLARE vResult, bOk;
+vResult := DoProc("MyProc", {sStatus,,sSampleId});
+vResult := DoProc("MyProc", {sStatus, , sSampleId});
+vResult := DoProc("MyProc", {sStatus,, , sSampleId});
+bOk := RunSQL("UPDATE sample SET status = ? WHERE id = ?" , , {sStatus, sSampleId});
+vResult := LSearch("SELECT name FROM sample WHERE id = ?",,  , {sSampleId});
+vResult := DoProc("Trailing", {sStatus,,});
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Skips;
+	:PARAMETERS sStatus, sSampleId;
+	:DECLARE vResult, bOk;
+	vResult := DoProc("MyProc", {sStatus,, sSampleId});
+	vResult := DoProc("MyProc", {sStatus,, sSampleId});
+	vResult := DoProc("MyProc", {sStatus,,, sSampleId});
+	bOk := RunSQL("UPDATE sample SET status = ? WHERE id = ?",, {sStatus, sSampleId});
+	vResult := LSearch("SELECT name FROM sample WHERE id = ?",,, {sSampleId});
+	vResult := DoProc("Trailing", {sStatus,,});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+5:37-5:40 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+6:37-6:41 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+7:59-7:62 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+8:58-8:63 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate

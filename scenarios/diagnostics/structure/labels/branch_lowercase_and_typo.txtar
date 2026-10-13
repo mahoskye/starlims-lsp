@@ -1,0 +1,53 @@
+Three literal Branch targets that cannot land: a lowercase compact target
+(keywords are uppercase and the match is exact), a typo of the label
+name, and a label that lives in another procedure (labels resolve within
+the current procedure). Each is branch_target_label on its literal
+(diag.branch_target_label, "No such label" case).
+-- input.ssl --
+:PROCEDURE StepThrough;
+	:DECLARE nStep;
+	nStep := 0;
+	Branch("labeldone");
+	Branch("LABEL DNOE");
+	Branch("LABEL CLEANUP");
+	:LABELDONE;
+	:LABEL DONE;
+	nStep := nStep + 1;
+	:RETURN nStep;
+:ENDPROC;
+
+:PROCEDURE Cleanup;
+	:LABEL CLEANUP;
+	:RETURN .T.;
+:ENDPROC;
+-- format --
+:PROCEDURE StepThrough;
+	:DECLARE nStep;
+	nStep := 0;
+	Branch("labeldone");
+	Branch("LABEL DNOE");
+	Branch("LABEL CLEANUP");
+	:LABELDONE;
+	:LABEL DONE;
+	nStep := nStep + 1;
+	:RETURN nStep;
+:ENDPROC;
+
+:PROCEDURE Cleanup;
+	:LABEL CLEANUP;
+	:RETURN .T.;
+:ENDPROC;
+-- diagnostics --
+4:9-4:20 error branch_target_label: Branch target string must include the label token text, such as "LABEL SKIP" or "LABELSKIP"
+5:9-5:21 error branch_target_label: Branch target "LABEL DNOE" matches no ':LABEL' in this procedure; the target must equal the label text exactly, keyword included
+6:9-6:24 error branch_target_label: Branch target "LABEL CLEANUP" matches no ':LABEL' in this procedure; the target must equal the label text exactly, keyword included
+7:2-7:12 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:2-8:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+14:2-14:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+-- diagnostics [--strict --info] --
+4:9-4:20 error branch_target_label: Branch target string must include the label token text, such as "LABEL SKIP" or "LABELSKIP"
+5:9-5:21 error branch_target_label: Branch target "LABEL DNOE" matches no ':LABEL' in this procedure; the target must equal the label text exactly, keyword included
+6:9-6:24 error branch_target_label: Branch target "LABEL CLEANUP" matches no ':LABEL' in this procedure; the target must equal the label text exactly, keyword included
+7:2-7:12 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:2-8:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+14:2-14:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code

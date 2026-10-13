@@ -1,0 +1,24 @@
+Stray closing delimiters with no opener: an extra ')' after a value, an
+extra '}' after an array literal, and an extra ']' after a subscript.
+Each should be one unmatched_delimiter finding, without cascading into
+the statements that follow.
+-- input.ssl --
+:DECLARE aItems, nFirst;
+nFirst := 1);
+aItems := {1, 2, 3}};
+nFirst := aItems[1]];
+:RETURN nFirst;
+-- format --
+:DECLARE aItems, nFirst;
+nFirst := 1);
+aItems := {1, 2, 3}};
+nFirst := aItems[1]];
+:RETURN nFirst;
+-- diagnostics --
+2:12-2:13 error unmatched_delimiter: Unmatched ')'
+3:20-3:21 error unmatched_delimiter: Unmatched '}'
+4:20-4:21 error unmatched_delimiter: Unmatched ']'
+-- diagnostics [--strict --info] --
+2:12-2:13 error unmatched_delimiter: Unmatched ')'
+3:20-3:21 error unmatched_delimiter: Unmatched '}'
+4:20-4:21 error unmatched_delimiter: Unmatched ']'

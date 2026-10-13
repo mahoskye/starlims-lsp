@@ -1,0 +1,30 @@
+A user class named after a built-in class (diag.class_name_collision,
+warning): Email shadows the built-in only locally, confusing readers. The
+Email{} instantiation inside the method is a use, not a declaration, and
+must not flag.
+-- input.ssl --
+:CLASS Email;
+:DECLARE oInner;
+
+:PROCEDURE Constructor;
+	Me:oInner := Email{};
+:ENDPROC;
+
+:PROCEDURE Send;
+	:RETURN Me:oInner:Send();
+:ENDPROC;
+-- format --
+:CLASS Email;
+:DECLARE oInner;
+
+:PROCEDURE Constructor;
+	Me:oInner := Email{};
+:ENDPROC;
+
+:PROCEDURE Send;
+	:RETURN Me:oInner:Send();
+:ENDPROC;
+-- diagnostics --
+1:8-1:13 warning class_name_collision: ':CLASS Email' shadows the built-in SSL class "Email". Pick a different name to avoid confusion when readers reach for the built-in.
+-- diagnostics [--strict --info] --
+1:8-1:13 warning class_name_collision: ':CLASS Email' shadows the built-in SSL class "Email". Pick a different name to avoid confusion when readers reach for the built-in.

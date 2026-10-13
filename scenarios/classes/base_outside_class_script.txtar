@@ -1,0 +1,24 @@
+A script (top-level statements, no :CLASS) that reaches for Base:. Outside
+a class there is no parent to delegate to, so the reference is an error
+(diag.base_outside_class, error tier: any top-level statement makes the
+file a script, issue #255). The member access on another receiver
+(oUri:Base) is a near miss that must stay silent (diag.base_standalone
+D10 exemption).
+-- input.ssl --
+:PARAMETERS oUri;
+:DECLARE sRoot, nCount;
+nCount := 1;
+sRoot := oUri:Base;
+Base:Init();
+:RETURN sRoot;
+-- format --
+:PARAMETERS oUri;
+:DECLARE sRoot, nCount;
+nCount := 1;
+sRoot := oUri:Base;
+Base:Init();
+:RETURN sRoot;
+-- diagnostics --
+5:1-5:5 error base_outside_class: 'Base:MemberName' can only be used inside a ':CLASS' definition
+-- diagnostics [--strict --info] --
+5:1-5:5 error base_outside_class: 'Base:MemberName' can only be used inside a ':CLASS' definition

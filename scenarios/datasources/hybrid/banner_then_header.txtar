@@ -1,0 +1,38 @@
+A terminated `/* ... */` banner before the directives is masked out of the
+header so hybrid detection still applies at unshifted positions
+(feature.diagnostics_pipeline A17). datasource_default_required fires in
+the SQL-mode header: each name without an inline `:=` default reports an
+error ranged on the name, on the header's own line (proving positions are
+unshifted), and the defaulted name between them is silent. STARLIMS 12
+fails such a run with "No default value for one or more parameters." The
+maintainer once believed `:PARAMETERS p1;` was accepted; the catalog
+entry (reinstated in #263/#269) is the current authority. The banner and
+the SQL body report nothing.
+-- input.ds --
+/* ==========================================
+   Data source: open returns by warehouse
+   ========================================== */
+:DSN := DATABASE;
+:PARAMETERS sWarehouse, nMinAge := 1, nMaxAge;
+
+SELECT r.return_id, r.opened_on
+FROM goods_return r
+WHERE r.warehouse_code = @sWarehouse
+  AND r.age_days BETWEEN @nMinAge AND @nMaxAge
+-- format --
+/* ==========================================
+   Data source: open returns by warehouse
+   ========================================== */
+:DSN := DATABASE;
+:PARAMETERS sWarehouse, nMinAge := 1, nMaxAge;
+
+SELECT r.return_id, r.opened_on
+FROM goods_return r
+WHERE r.warehouse_code = @sWarehouse
+  AND r.age_days BETWEEN @nMinAge AND @nMaxAge
+-- diagnostics --
+5:13-5:23 error datasource_default_required: Data source parameter 'sWarehouse' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+5:39-5:46 error datasource_default_required: Data source parameter 'nMaxAge' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+-- diagnostics [--strict --info] --
+5:13-5:23 error datasource_default_required: Data source parameter 'sWarehouse' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+5:39-5:46 error datasource_default_required: Data source parameter 'nMaxAge' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)

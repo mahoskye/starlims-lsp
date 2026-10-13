@@ -1,0 +1,108 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (issue to file)
+Known failure: no-gained-errors — an unterminated :EXITCASE before :OTHERWISE stays unterminated, adding exitcase_last_in_branch (issue to file)
+Lines that finish a statement without `;` get one when the next line
+starts a new statement: after an identifier, number, string, closing
+delimiter, postfix `++` (issue #99), a code-block literal and a bare
+keyword (fmt.semicolon_enforcement). `:BEGINCASE` always ends with `;`.
+-- input.ssl --
+:PROCEDURE Terminate
+:PARAMETERS nValue
+:DECLARE sLabel, aList, fnDouble, nCount
+nCount := 0
+sLabel := "start"
+aList := {1, 2}
+fnDouble := {|n| n * 2}
+nCount++
+:BEGINCASE
+:CASE nValue == 1
+sLabel := Upper(sLabel)
+:EXITCASE
+:OTHERWISE
+sLabel := ""
+:EXITCASE
+:ENDCASE
+:RETURN sLabel
+:ENDPROC
+-- format --
+:PROCEDURE Terminate;
+	:PARAMETERS nValue;
+	:DECLARE sLabel, aList, fnDouble, nCount;
+	nCount := 0;
+	sLabel := "start";
+	aList := {1, 2};
+	fnDouble := {|n| n * 2};
+	nCount++;
+	:BEGINCASE;
+	:CASE nValue == 1;
+		sLabel := Upper(sLabel);
+		:EXITCASE
+	:OTHERWISE;
+		sLabel := "";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:35-3:41 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:1-4:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:1-4:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:8-4:10 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+5:1-5:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:1-5:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:8-5:10 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+6:1-6:6 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+6:1-6:6 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+6:7-6:9 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+7:1-7:9 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+7:1-7:9 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+7:10-7:12 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+8:1-8:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+8:1-8:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+10:7-10:13 hint redeclare_is_noop: Variable 'nValue' is already declared (first declared at line 2). Re-declaration is silently ignored at runtime.
+10:7-10:13 hint redeclare_is_noop: Variable 'nValue' is already declared (first declared at line 2). Re-declaration is silently ignored at runtime.
+11:1-11:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:1-11:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:8-11:10 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:11-11:16 hint redeclare_is_noop: Variable 'Upper' is already declared (first declared at line 11). Re-declaration is silently ignored at runtime.
+11:17-11:23 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:17-11:23 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:1-14:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:1-14:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:8-14:10 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+17:9-17:15 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+17:9-17:15 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+-- diagnostics [--strict --info] --
+3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:35-3:41 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:1-4:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:1-4:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+4:8-4:10 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+5:1-5:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:1-5:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:8-5:10 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+6:1-6:6 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+6:1-6:6 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+6:7-6:9 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+7:1-7:9 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+7:1-7:9 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+7:10-7:12 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+8:1-8:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+8:1-8:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+10:7-10:13 hint redeclare_is_noop: Variable 'nValue' is already declared (first declared at line 2). Re-declaration is silently ignored at runtime.
+10:7-10:13 hint redeclare_is_noop: Variable 'nValue' is already declared (first declared at line 2). Re-declaration is silently ignored at runtime.
+11:1-11:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:1-11:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:8-11:10 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:11-11:16 hint redeclare_is_noop: Variable 'Upper' is already declared (first declared at line 11). Re-declaration is silently ignored at runtime.
+11:17-11:23 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+11:17-11:23 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:1-14:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:1-14:7 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+14:8-14:10 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+17:9-17:15 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+17:9-17:15 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.

@@ -1,0 +1,39 @@
++ between different known types errors at run time
+(diag.mixed_type_operator, warning, on the +): string + number, number +
+date (the reverse of the supported date + number), a product added to a
+string (precedence honored), and a chain that reports once on the + that
+introduces the mismatch.
+-- input.ssl --
+:PROCEDURE Caption;
+	:PARAMETERS nCount, dWhen, oRec;
+	:DECLARE sCaption, dLater;
+	sCaption := "Total: " + 5;
+	sCaption := sCaption + nCount;
+	dLater := 7 + dWhen;
+	sCaption := nCount * 2 + sCaption;
+	sCaption := oRec:Name + " - " + nCount + " items";
+	:RETURN sCaption + LimsString(dLater);
+:ENDPROC;
+-- format --
+:PROCEDURE Caption;
+	:PARAMETERS nCount, dWhen, oRec;
+	:DECLARE sCaption, dLater;
+	sCaption := "Total: " + 5;
+	sCaption := sCaption + nCount;
+	dLater := 7 + dWhen;
+	sCaption := nCount * 2 + sCaption;
+	sCaption := oRec:Name + " - " + nCount + " items";
+	:RETURN sCaption + LimsString(dLater);
+:ENDPROC;
+-- diagnostics --
+4:24-4:25 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+5:23-5:24 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+6:14-6:15 warning mixed_type_operator: Mixed types in '+' operation: numeric + date. The '+' operator requires both operands to be the same type (both strings or both numeric)
+7:25-7:26 warning mixed_type_operator: Mixed types in '+' operation: numeric + string. The '+' operator requires both operands to be the same type (both strings or both numeric)
+8:32-8:33 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+-- diagnostics [--strict --info] --
+4:24-4:25 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+5:23-5:24 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+6:14-6:15 warning mixed_type_operator: Mixed types in '+' operation: numeric + date. The '+' operator requires both operands to be the same type (both strings or both numeric)
+7:25-7:26 warning mixed_type_operator: Mixed types in '+' operation: numeric + string. The '+' operator requires both operands to be the same type (both strings or both numeric)
+8:32-8:33 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)

@@ -1,0 +1,27 @@
+An :ERROR handler placed first in its procedure, after only :PARAMETERS
+and :DECLARE (which do not count as protected statements). It protects
+nothing and the code after it never runs on the success path:
+error_handler_structure "handler placed first" (diag.error_handler_structure
+third Flags fence).
+-- input.ssl --
+:PROCEDURE ComputeYield;
+	:PARAMETERS nInput, nOutput;
+	:DECLARE nYield;
+	:ERROR;
+	nYield := nOutput / nInput;
+	:RETURN nYield;
+:ENDPROC;
+-- format --
+:PROCEDURE ComputeYield;
+	:PARAMETERS nInput, nOutput;
+	:DECLARE nYield;
+	:ERROR;
+		nYield := nOutput / nInput;
+		:RETURN nYield;
+:ENDPROC;
+-- diagnostics --
+4:2-4:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+4:2-4:8 error error_handler_structure: ':ERROR' protects only the statements before it in the procedure; placed first it protects nothing. Move it to the end of the procedure
+-- diagnostics [--strict --info] --
+4:2-4:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+4:2-4:8 error error_handler_structure: ':ERROR' protects only the statements before it in the procedure; placed first it protects nothing. Move it to the end of the procedure

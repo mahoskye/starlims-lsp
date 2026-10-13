@@ -1,0 +1,35 @@
+A line ending in `:=` or in a binary operator continues on the next line:
+no `;` is forced and the next line takes one continuation level
+(fmt.indent_style issue #89, fmt.semicolon_enforcement). The source
+breaks are kept: the wrapper never moves a trailing operator to the
+start of the next line (fmt.max_line_length "never moves or joins a
+line break the source already has"). The `1` line
+lacks its `;` and the next line is a statement, so one is added.
+-- input.ssl --
+:PROCEDURE Compute;
+:PARAMETERS nBase, nRate;
+:DECLARE nTotal, bReady;
+nTotal :=
+nBase * nRate;
+bReady := nTotal > 0 .AND.
+nRate < 1;
+nTotal := nTotal -
+1
+:RETURN nTotal;
+:ENDPROC;
+-- format --
+:PROCEDURE Compute;
+	:PARAMETERS nBase, nRate;
+	:DECLARE nTotal, bReady;
+	nTotal :=
+		nBase * nRate;
+	bReady := nTotal > 0 .AND.
+		nRate < 1;
+	nTotal := nTotal -
+		1;
+	:RETURN nTotal;
+:ENDPROC;
+-- diagnostics --
+10:1-10:8 error unexpected_token: Unexpected keyword ':RETURN' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+10:1-10:8 error unexpected_token: Unexpected keyword ':RETURN' - expected an operator or ';' (is the previous statement missing its ';'?)

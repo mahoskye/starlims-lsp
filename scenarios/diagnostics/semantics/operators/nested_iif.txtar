@@ -1,0 +1,21 @@
+An IIF nested inside another IIF's parentheses fires diag.nested_iif
+(info, on the inner IIF), once per nested call however deep: three
+levels give two findings. Matching is case-insensitive (iif).
+-- input.ssl --
+:PROCEDURE Grade;
+	:PARAMETERS nScore;
+	:DECLARE sGrade;
+	sGrade := IIF(nScore >= 90, "A", IIF(nScore >= 75, "B", iif(nScore >= 50, "C", "F")));
+	:RETURN sGrade;
+:ENDPROC;
+-- format --
+:PROCEDURE Grade;
+	:PARAMETERS nScore;
+	:DECLARE sGrade;
+	sGrade := IIf(nScore >= 90, "A", IIf(nScore >= 75, "B", IIf(nScore >= 50, "C", "F")));
+	:RETURN sGrade;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:35-4:38 info nested_iif: Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.
+4:58-4:61 info nested_iif: Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.

@@ -1,0 +1,69 @@
+Adjacent sibling control-flow blocks at the same indent get exactly one
+blank line between them, for every closer/opener pairing (:ENDIF, :NEXT,
+:ENDWHILE, :ENDCASE, :ENDTRY followed by :IF, :FOR, :WHILE, :BEGINCASE,
+:TRY) (fmt.blank_line_between_blocks).
+-- input.ssl --
+:PROCEDURE Siblings;
+:PARAMETERS nValue;
+:DECLARE i, sOut;
+:IF nValue > 0;
+sOut := "positive";
+:ENDIF;
+:FOR i := 1 :TO nValue;
+sOut += "x";
+:NEXT;
+:WHILE nValue > 10;
+nValue -= 1;
+:ENDWHILE;
+:BEGINCASE;
+:CASE nValue == 1;
+sOut := "one";
+:EXITCASE;
+:ENDCASE;
+:TRY;
+sOut := LimsString(nValue);
+:CATCH;
+sOut := "";
+:ENDTRY;
+:IF Empty(sOut);
+sOut := "none";
+:ENDIF;
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Siblings;
+	:PARAMETERS nValue;
+	:DECLARE i, sOut;
+	:IF nValue > 0;
+		sOut := "positive";
+	:ENDIF;
+
+	:FOR i := 1 :TO nValue;
+		sOut += "x";
+	:NEXT;
+
+	:WHILE nValue > 10;
+		nValue -= 1;
+	:ENDWHILE;
+
+	:BEGINCASE;
+	:CASE nValue == 1;
+		sOut := "one";
+		:EXITCASE;
+	:ENDCASE;
+
+	:TRY;
+		sOut := LimsString(nValue);
+	:CATCH;
+		sOut := "";
+	:ENDTRY;
+
+	:IF Empty(sOut);
+		sOut := "none";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+13:1-13:11 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling
+-- diagnostics [--strict --info] --
+13:1-13:11 hint missing_otherwise: ':BEGINCASE' has no ':OTHERWISE' clause; consider adding one for default handling

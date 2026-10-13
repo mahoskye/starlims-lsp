@@ -1,0 +1,24 @@
+An end-of-line comment counts toward the width and is never split: the
+code before it wraps (here after commas) so the comment fits, travelling
+with the last fragment; and a comment glued right after a comma is not a
+break candidate (fmt.max_line_length, issue #258). Kept to comma breaks:
+an operator-led wrap line trips the range-formatting invariant, reported
+separately.
+-- input.ssl --
+:PROCEDURE Log;
+:PARAMETERS sSampleId, sTestCode, sAnalystName;
+DoProc("WriteAuditEntry", {sSampleId, sTestCode, sAnalystName});  /* audit trail entry for the release step;
+aFields := {"SampleId", "TestCode", "AnalystName", "RunDate",/*the columns the export expects in order;
+"Status"};
+:ENDPROC;
+-- format --
+:PROCEDURE Log;
+	:PARAMETERS sSampleId, sTestCode, sAnalystName;
+	DoProc("WriteAuditEntry", {sSampleId, sTestCode,
+		sAnalystName});  /* audit trail entry for the release step;
+	aFields := {"SampleId", "TestCode", "AnalystName",
+		"RunDate",  /*the columns the export expects in order;
+		"Status"};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,37 @@
+Detection edge cases, recorded as the formatter currently treats them:
+an overflowing SQL statement led by a SQL block comment, one holding
+COLLATE, one with a leading WITH (detected and reflowed), and an
+overflowing single-line query that the SSL wrapper moves to the next
+line after ':=' instead of the SQL engine reflowing it.
+Suspected issue: the comment-led and COLLATE statements overflow but are not detected as SQL, so they are never reflowed (fmt.sql_in_strings: "Single-line SQL that overflows the line ... is reflowed"); detection requires the first token to be a command keyword and reads "custname COLLATE Latin1_General_CI_AS" as a three-bare-word prose run.
+Suspected issue: the last query overflows its line (95 columns) yet is not reflowed; the statement wraps after ':=' instead, a shape fmt.sql_in_strings never names ("Single-line SQL that overflows the line ... is reflowed ... A rewrite ALWAYS takes the rule-F multi-line form").
+-- input.ssl --
+:PROCEDURE Edges;
+	:DECLARE aRows;
+	aRows := SQLExecute("/* recent */ select ordno, custid, logdate, status from orders where status = 'A' order by ordno");
+	aRows := SQLExecute("select custname, custid from customers where custid > 1 order by custname collate Latin1_General_CI_AS");
+	aRows := SQLExecute("with recent as (select ordno from orders where status = 'A') select ordno, status from recent");
+	aRows := SQLExecute("select o.ordno from orders o join ordtask t on t.ordno = o.ordno");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Edges;
+	:DECLARE aRows;
+	aRows := SQLExecute("/* recent */ select ordno, custid, logdate, status from orders where status = 'A' order by ordno");
+	aRows := SQLExecute("select custname, custid from customers where custid > 1 order by custname collate Latin1_General_CI_AS");
+	aRows := SQLExecute("
+	    WITH recent AS (
+	        SELECT ordno
+	        FROM orders
+	        WHERE status = 'A'
+	    )
+	    SELECT ordno, status
+	    FROM recent
+	");
+	aRows :=
+		SQLExecute("select o.ordno from orders o join ordtask t on t.ordno = o.ordno");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:126 info unjustified_collate: COLLATE in embedded SQL without a justification comment - document why the forced collation is needed in a comment directly above this statement
