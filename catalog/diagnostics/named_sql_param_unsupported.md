@@ -5,7 +5,7 @@ kind: diagnostic
 status: active
 authority: tool
 schema_ref: null
-default_severity: warning
+default_severity: error
 severity_overridable: true
 suppressible: true
 tests:
@@ -22,6 +22,17 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      Severity warning -> error, matching the style guide's
+      named_sql_param_unsupported (authoritative, error). The warning was
+      justified by coverage (only literal first arguments are read), but
+      coverage limits false negatives, not the certainty of a reported
+      finding, and severity encodes the kind of finding. A reported
+      `?name?` in a positional function fails or mismatches at run time.
+      Corpus: 2 findings, both genuine (a positional value array beside a
+      named marker; a named marker with no value array).
 issues: []
 ---
 
@@ -33,7 +44,7 @@ named substitution; the positional family — `GetDataSet`, `GetDataSetEx`,
 `GetDataSetWithSchemaFromSelect`, `GetDataSetXMLFromSelect`,
 `GetNETDataSet`, `GetTables`, `RunSQL`, `LSearch`, `LSelect`, `LSelect1`,
 `LSelectC`, `XmlExportSql` — passes `?name?` through to the database
-verbatim, where it fails or silently mismatches. Warning severity, ranged
+verbatim, where it fails or silently mismatches. Error severity, ranged
 on the offending string token, at most one diagnostic per string. Function
 name matching is case-insensitive; only the first top-level string argument
 of the call is inspected.
@@ -79,8 +90,9 @@ The style guide's SQL parameters section (support_level: authoritative)
 records that only `SQLExecute` supports `?name?` substitution while the
 other database functions take positional `?` with parameter arrays; the
 function list in `constants.ParameterizedSQLFunctions` mirrors it. Passing
-a named placeholder to a positional function is a real bug, but the check
-reads only the literal first string argument — dynamically built SQL is
-invisible to it — so warning severity is honest about coverage. Severity
-and both boundary cases are pinned in providers_test.go
+a named placeholder to a positional function fails or binds the wrong
+values at run time, so a reported finding is an error. The check reads
+only the literal first string argument — dynamically built SQL is
+invisible to it — which limits what it finds, not how certain a finding
+is. Severity and both boundary cases are pinned in providers_test.go
 (TestGetDiagnostics_NamedSQLParamsWithWrongFunction*).

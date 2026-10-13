@@ -1846,7 +1846,7 @@ func TestGetDiagnostics_KeywordMustBeUppercase(t *testing.T) {
 }
 
 func TestGetDiagnostics_UnknownColonKeyword(t *testing.T) {
-	text := `:ENDCLASS;`
+	text := `:ENDWITH;`
 
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
@@ -1857,6 +1857,29 @@ func TestGetDiagnostics_UnknownColonKeyword(t *testing.T) {
 	}
 
 	t.Fatal("expected unknown keyword diagnostic")
+}
+
+// :ENDCLASS is a known invalid form, not an unknown name: it gets its own
+// error code (issue #269), in scripts and data sources alike.
+func TestGetDiagnostics_EndClassInvalid(t *testing.T) {
+	for _, isDS := range []bool{false, true} {
+		opts := DefaultDiagnosticOptions()
+		opts.IsDataSourceFile = isDS
+		found := false
+		// An SSL-mode body (a := assignment) so a data source is checked
+		// as SSL, not routed to SQL mode.
+		for _, d := range GetDiagnostics(":DECLARE nX;\nnX := 1;\n:ENDCLASS;", opts) {
+			if d.Code == CodeUnknownKeyword {
+				t.Errorf("data source %v: :ENDCLASS must not read as unknown", isDS)
+			}
+			if d.Code == CodeEndClassInvalid && d.Severity == SeverityError {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("data source %v: want endclass_invalid at error", isDS)
+		}
+	}
 }
 
 func TestGetDiagnostics_LegacyCompactLabelAccepted(t *testing.T) {
@@ -4695,8 +4718,8 @@ func TestGetDiagnostics_NamedSQLParamsWithWrongFunction(t *testing.T) {
 			for _, d := range diagnostics {
 				if strings.Contains(d.Message, "Named SQL parameter") && strings.Contains(d.Message, tc.funcName) {
 					found = true
-					if d.Severity != SeverityWarning {
-						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					if d.Severity != SeverityError {
+						t.Errorf("expected SeverityError, got %d", d.Severity)
 					}
 					break
 				}
@@ -8458,8 +8481,10 @@ func TestGetDiagnostics_DataSource_BuilderDirectiveCaseSensitive(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testing.T) {
-	// In regular script files, builder directives should be flagged as unknown keywords
+func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlagged(t *testing.T) {
+	// In regular script files, a builder directive is a known form that is
+	// valid only in data sources: its own error code, not unknown_keyword
+	// (issue #269).
 	code := `:DSN := MyConnection;`
 
 	opts := DefaultDiagnosticOptions()
@@ -8468,12 +8493,15 @@ func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testin
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Unknown SSL keyword") {
+		if d.Code == CodeUnknownKeyword {
+			t.Errorf(":DSN must not read as unknown: %s", d.Message)
+		}
+		if d.Code == CodeBuilderDirectiveOutsideDatasource && d.Severity == SeverityError {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("expected unknown keyword diagnostic for :DSN in regular script file")
+		t.Fatal("expected builder_directive_outside_datasource error for :DSN in regular script file")
 	}
 }
 

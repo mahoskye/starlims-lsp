@@ -37,6 +37,14 @@ history:
       `:REPLACE` and inserting a `;` that split the chain. The
       continuation reading yields to a real keyword, so a lost `;` before
       a line-leading `:IF` still lexes the keyword.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      :ENDCLASS and the builder directives outside a data source moved to
+      their own error codes (endclass_invalid,
+      builder_directive_outside_datasource). They are known invalid forms,
+      so the "the keyword list may have a gap" reasoning behind this
+      rule's warning severity does not apply to them.
 issues: []
 ---
 
@@ -64,14 +72,14 @@ It must NOT flag:
   `keyword_uppercase` (error), not an unknown keyword;
 - `:ENDFOR` — recognized-but-invalid, reported as `endfor_invalid` with a
   targeted ":NEXT" message;
+- `:ENDCLASS` — known invalid, reported as `endclass_invalid` (error);
 - legacy label forms: `:LABELName;` is valid compact label syntax and emits
   nothing; a miscased legacy form (`:labelName;`) is `label_keyword_form`,
   not this rule;
 - colon member access on an object (lexer guard above);
-- in data-source files (`IsDataSourceFile`), the builder directives `:DSN`,
-  `:TABLENAME`, `:NULLASBLANK`, `:INVARIANTDATECOLUMNS`. In ordinary
-  scripts those directives are not exempt and do flag — they are only
-  meaningful in data-source files.
+- the builder directives `:DSN`, `:TABLENAME`, `:NULLASBLANK`,
+  `:INVARIANTDATECOLUMNS`: valid in data-source files, and reported as
+  `builder_directive_outside_datasource` (error) anywhere else.
 
 ## Examples
 

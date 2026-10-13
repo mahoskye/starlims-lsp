@@ -4,7 +4,7 @@ title: Bare statement separator in a SQL data-source body
 kind: diagnostic
 status: active
 authority: authoritative
-schema_ref: module_structure.data_source_modules.sql_data_source.comments
+schema_ref: module_structure.data_source_modules.file_types.sql_data_source.comments
 default_severity: error
 severity_overridable: true
 suppressible: false
@@ -33,6 +33,11 @@ history:
       stray separators in the header region, which the mask had hidden;
       the test is a separator with no statement before it, rather than
       the `*/;` spelling specifically.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      schema_ref corrected to module_structure.data_source_modules.file_types.sql_data_source.comments; the old path stopped resolving
+      when the style guide moved these lints under a rules list.
 issues: ["ssl-style-guide#50"]
 ---
 

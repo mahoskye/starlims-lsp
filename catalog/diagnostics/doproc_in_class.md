@@ -4,7 +4,7 @@ title: DoProc call inside a class method
 kind: diagnostic
 status: active
 authority: authoritative
-schema_ref: lints.compile_errors.doproc_in_class
+schema_ref: lints.compile_errors.rules.doproc_in_class
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -34,6 +34,11 @@ history:
       check now flags only string-literal targets without a qualifier
       dot (the provable class-local/base form); non-literal targets are
       left alone as unprovable. Message reworded accordingly.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      schema_ref corrected to lints.compile_errors.rules.doproc_in_class; the old path stopped resolving
+      when the style guide moved these lints under a rules list.
 issues: ["ssl-style-guide#49"]
 ---
 

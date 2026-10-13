@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`inherit_qualified_name` (error).** `:INHERIT BaseCounter;` doesn't
+  compile: the parent must be named `Category.ClassName`. The rule was
+  reserved but never implemented, because the style guide used to accept
+  both forms. It no longer does (#269).
+- **`endclass_invalid` and `builder_directive_outside_datasource`
+  (errors).** `:ENDCLASS`, and `:DSN`/`:TABLENAME`/`:NULLASBLANK`/
+  `:INVARIANTDATECOLUMNS` outside a data source, are known invalid forms.
+  They were reported as `unknown_keyword` warnings, and now get their own
+  codes and messages (#269).
+
+### Changed
+- **`named_sql_param_unsupported` is an error** (was a warning). A
+  `?name?` marker in a positional SQL function fails or binds the wrong
+  values at run time. This raises an existing code to error, so a file
+  that only had this warning now validates as invalid (#269).
+
+### Fixed
+- **Catalog `schema_ref`s resolve again.** Thirteen entries pointed at
+  style-guide schema paths that had moved (`lints.compile_errors.*` now
+  sits under `.rules`, and similar). The style guide's catalog
+  cross-check now resolves every reference (#269).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

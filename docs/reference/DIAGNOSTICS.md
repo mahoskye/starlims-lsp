@@ -19,6 +19,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `begincase_requires_case` | BEGINCASE block with no CASE clause | error | tool | active | [diag.begincase_requires_case](../../catalog/diagnostics/begincase_requires_case.md) |
 | `branch_target_label` | Branch() target string without the LABEL token | error | tool | active | [diag.branch_target_label](../../catalog/diagnostics/branch_target_label.md) |
 | `builder_directive_case` | Data source builder directive not uppercase | error | tool | active | [diag.builder_directive_case](../../catalog/diagnostics/builder_directive_case.md) |
+| `builder_directive_outside_datasource` | Data source builder directive outside a data source | error | authoritative | active | [diag.builder_directive_outside_datasource](../../catalog/diagnostics/builder_directive_outside_datasource.md) |
 | `builtin_excess_arguments` | Surplus builtin arguments silently dropped at compile time | warning | tool | active | [diag.builtin_excess_arguments](../../catalog/diagnostics/builtin_excess_arguments.md) |
 | `c_style_comment_closer` | C-style */ before a comment's terminating semicolon | info | style_only | active | [diag.c_style_comment_closer](../../catalog/diagnostics/c_style_comment_closer.md) |
 | `catch_clause_form` | CATCH takes no exception variable or clause content | error | tool | active | [diag.catch_clause_form](../../catalog/diagnostics/catch_clause_form.md) |
@@ -48,6 +49,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `doproc_in_class` | DoProc call inside a class method | error | authoritative | active | [diag.doproc_in_class](../../catalog/diagnostics/doproc_in_class.md) |
 | `dot_property_access` | Dot notation used for property access | error | tool | active | [diag.dot_property_access](../../catalog/diagnostics/dot_property_access.md) |
 | `empty_optional_param_array` | Trailing empty array passed for an optional parameter | info | tool | active | [diag.empty_optional_param_array](../../catalog/diagnostics/empty_optional_param_array.md) |
+| `endclass_invalid` | :ENDCLASS used to close a class | error | authoritative | active | [diag.endclass_invalid](../../catalog/diagnostics/endclass_invalid.md) |
 | `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | tool | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
 | `equals_vs_strict_equals` | String comparison with = is prefix matching | info | advisory | active | [diag.equals_vs_strict_equals](../../catalog/diagnostics/equals_vs_strict_equals.md) |
 | `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
@@ -68,7 +70,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `identifier_too_short` | Identifier shorter than a minimum length (never implemented) | info | tool | removed | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
 | `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
-| `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
+| `inherit_qualified_name` | :INHERIT parent written as a plain class name | error | authoritative | active | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
@@ -86,7 +88,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `missing_otherwise` | BEGINCASE without an OTHERWISE clause | hint | tool | active | [diag.missing_otherwise](../../catalog/diagnostics/missing_otherwise.md) |
 | `mixed_error_handling_families` | Legacy :ERROR/:RESUME mixed with :TRY/:CATCH in one procedure | warning | tool | active | [diag.mixed_error_handling_families](../../catalog/diagnostics/mixed_error_handling_families.md) |
 | `mixed_type_operator` | Mixed operand types in a '+' operation | warning | tool | active | [diag.mixed_type_operator](../../catalog/diagnostics/mixed_type_operator.md) |
-| `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | warning | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
+| `named_sql_param_unsupported` | Named SQL parameter used with a positional-only function | error | tool | active | [diag.named_sql_param_unsupported](../../catalog/diagnostics/named_sql_param_unsupported.md) |
 | `negative_logic` | Negated IF condition with an ELSE branch | info | advisory | active | [diag.negative_logic](../../catalog/diagnostics/negative_logic.md) |
 | `nested_iif` | IIF call nested inside another IIF call | info | advisory | active | [diag.nested_iif](../../catalog/diagnostics/nested_iif.md) |
 | `nil_in_operations` | NIL literal in an arithmetic or string operation | warning | style_only | active | [diag.nil_in_operations](../../catalog/diagnostics/nil_in_operations.md) |
