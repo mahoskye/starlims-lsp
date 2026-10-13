@@ -103,6 +103,13 @@ history:
       where it is written, WHEN/ELSE sit 4 past it, END aligns with it,
       and THEN values break 4 past WHEN as a set. A sign after a keyword
       such as ELSE stays attached ('ELSE -1' had become 'ELSE - 1').
+  - date: 2026-10-13
+    ref: "issue #286"
+    note: >-
+      A WHEN predicate that fits on its WHEN line keeps its AND/OR inline,
+      as the style guide's §5.2 example does; only an overflowing
+      predicate breaks before each AND/OR (Rule B). Corpus: 30 of 6,228
+      files format differently, all idempotent.
 issues: ["#81", "#82"]
 ---
 
@@ -185,8 +192,10 @@ are considered. Within the exception:
   its WHEN/ELSE; and a CASE written too far right for its WHEN lines
   (or whose THEN values fit only once moved) continues on the next
   line like any other wrap. WHEN/ELSE sit 4 columns past CASE, END
-  aligns with CASE, and AND/OR continuing a WHEN predicate sit one
-  indent past WHEN. THEN values are inline or broken as a set: when
+  aligns with CASE. A WHEN predicate stays on its WHEN line when
+  `WHEN <predicate> THEN` fits there; otherwise it breaks before each
+  top-level AND/OR, which sit one indent past WHEN (Rule B). A predicate
+  holding a subquery always breaks. THEN values are inline or broken as a set: when
   any branch would overflow with its value inline, or any value is
   itself a CASE, every THEN value of that CASE starts its own line 4
   past its WHEN (a value opening a subquery stays on the THEN line —
@@ -549,6 +558,31 @@ aRows := SQLExecute("
            SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done
     FROM order_tasks
     GROUP BY customer_id
+");
+```
+
+A short WHEN predicate keeps its AND/OR on the WHEN line; a long one
+breaks before each AND/OR, one step past WHEN (issue #286):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT s.sample_id, CASE WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent' WHEN s.status_code_for_the_sample = 'B' AND s.priority_level_of_the_sample = 2 AND s.department_code = 'QC' THEN 'review' ELSE 'normal' END AS label FROM samples s");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT s.sample_id,
+           CASE
+               WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent'
+               WHEN s.status_code_for_the_sample = 'B'
+                   AND s.priority_level_of_the_sample = 2
+                   AND s.department_code = 'QC' THEN 'review'
+               ELSE 'normal'
+           END AS label
+    FROM samples s
 ");
 ```
 
