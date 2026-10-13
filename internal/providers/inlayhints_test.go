@@ -479,7 +479,7 @@ func TestGetInlayHints_CaseInsensitiveDoProc(t *testing.T) {
 	}
 }
 
-// [spec feature.inlay_hints/A9] — a member call is not the like-named
+// [spec feature.inlay_hints/A10] — a member call is not the like-named
 // built-in: `sName:Replace(...)` (a .NET passthrough) and `Me:Left(...)`
 // (a class method) get no built-in parameter-name hints (issue #255).
 func TestGetInlayHints_MemberCallsGetNoBuiltinHints(t *testing.T) {

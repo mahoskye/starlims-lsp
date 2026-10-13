@@ -28,7 +28,7 @@ history:
   - date: 2026-10-13
     ref: "issue #255"
     note: >-
-      Member calls get no built-in hints (A9): `sName:Replace(...)` is a
+      Member calls get no built-in hints (A10): `sName:Replace(...)` is a
       .NET passthrough and `Me:Left(...)` a class method, yet both were
       labelled with the like-named SSL built-in's parameters (D10). Stale
       "inner-array hints not implemented" text removed; minParameterCount
@@ -76,7 +76,7 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - A6: Given `ssl.inlayHints.enabled: false`, when hints are requested, then the result is empty.
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
-- A9: Given `sOut := sName:Replace("a", "b");` or `x := Me:Left("abc", 2);`, when hints are requested, then no hints are produced for the member call, while a plain `Left("abc", 2)` call keeps its hints.
+- A10: Given `sOut := sName:Replace("a", "b");` or `x := Me:Left("abc", 2);`, when hints are requested, then no hints are produced for the member call, while a plain `Left("abc", 2)` call keeps its hints.
 
 ## Rationale
 
