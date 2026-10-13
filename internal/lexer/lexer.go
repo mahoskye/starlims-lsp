@@ -684,20 +684,6 @@ func (l *Lexer) advance() {
 	l.pos++
 }
 
-// GetTokenAtPosition returns the token at a specific position.
-func GetTokenAtPosition(tokens []Token, line, column int) *Token {
-	for i := range tokens {
-		token := &tokens[i]
-		if token.Line == line {
-			tokenEnd := token.Column + len(token.Text)
-			if column >= token.Column && column <= tokenEnd {
-				return token
-			}
-		}
-	}
-	return nil
-}
-
 // ContextType represents the type of context at a position.
 type ContextType int
 
@@ -718,23 +704,9 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 		tokenStartLine := token.Line
 		tokenStartCol := token.Column
 
-		// Calculate end position by counting newlines in the token text
+		// Calculate the end position by walking the token text: columns
+		// count runes, matching the lexer's Column.
 		tokenEndLine := tokenStartLine
-		tokenEndCol := tokenStartCol + len(token.Text)
-
-		for _, r := range token.Text {
-			if r == '\n' {
-				tokenEndLine++
-				tokenEndCol = 1
-			} else {
-				if tokenEndLine > tokenStartLine || tokenEndLine == tokenStartLine {
-					// Only increment if we're past the newline
-				}
-			}
-		}
-
-		// Recalculate properly
-		tokenEndLine = tokenStartLine
 		currentCol := tokenStartCol
 		for _, r := range token.Text {
 			if r == '\n' {
@@ -744,7 +716,7 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 				currentCol++
 			}
 		}
-		tokenEndCol = currentCol
+		tokenEndCol := currentCol
 
 		// Check if position is within this token
 		inToken := false
@@ -790,12 +762,10 @@ func GetWordAtPosition(text string, line, column int) string {
 		return ""
 	}
 
-	lineText := lines[line-1]
-	if column < 1 || column > len(lineText)+1 {
+	runes := []rune(lines[line-1])
+	if column < 1 || column > len(runes)+1 {
 		return ""
 	}
-
-	runes := []rune(lineText)
 
 	// Find word boundaries
 	start := column - 1

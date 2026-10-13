@@ -21,9 +21,9 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 
 	// Check if we're inside a string or comment - if so, return no completions
 	// (with one exception below).
-	// LSP positions are 0-based, our functions expect 1-based
-	line := int(params.Position.Line) + 1
-	column := int(params.Position.Character) + 1
+	// LSP positions are 0-based UTF-16; our functions expect 1-based
+	// line and rune column.
+	line, column := s.position(uri, params.Position)
 	if lexer.IsInsideStringOrComment(cache.Tokens, line, column) {
 		// Exception: inside a DoProc("…") / ExecFunction("…") string argument,
 		// offer dispatch-target completions (vs-code-ssl-formatter#74; the
@@ -342,9 +342,9 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 
 	cache := s.documents.ParseDocument(uri, version)
 
-	// LSP positions are 0-based, our functions expect 1-based
-	line := int(params.Position.Line) + 1
-	column := int(params.Position.Character) + 1
+	// LSP positions are 0-based UTF-16; our functions expect 1-based
+	// line and rune column.
+	line, column := toInternalPosition(content, params.Position)
 
 	// Check if we're inside a string or comment
 	ctx := lexer.GetContextAtPosition(cache.Tokens, line, column)
@@ -509,12 +509,13 @@ func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.Def
 	}
 
 	cache := s.documents.ParseDocument(uri, version)
+	line, column := toInternalPosition(content, params.Position)
 
 	locations := providers.FindDefinitionCrossFile(
 		content,
 		cache.Tokens,
-		int(params.Position.Line)+1,
-		int(params.Position.Character)+1,
+		line,
+		column,
 		uri,
 		cache.Procedures,
 		cache.Variables,
@@ -552,8 +553,7 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 	// Get cached procedures and variables for scope-aware search
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
-	line := int(params.Position.Line) + 1
-	column := int(params.Position.Character) + 1
+	line, column := toInternalPosition(content, params.Position)
 
 	// Cursor on a dotted dispatch string: the subject is the resolved
 	// procedure, wherever it lives — same-file word matches would name an
@@ -705,33 +705,16 @@ func containsSubstring(value, query string) bool {
 // ':' is at the start of a line.
 //
 // `position` points to the cursor location AFTER the ':' was inserted, so the
-// ':' itself sits at character-1 and the preceding char (if any) is at
-// character-2. character is in UTF-16 code units per LSP, but SSL source is
-// ASCII in practice so byte indexing is safe.
+// ':' itself sits one UTF-16 unit before it. The position is converted to a
+// byte offset in the line, so a non-ASCII character earlier on the line
+// cannot shift the check (issue #258).
 func colonStartsToken(content string, position protocol.Position) bool {
-	if position.Character < 2 {
+	lineStart := positionOffset(content, int(position.Line), 0)
+	colon := positionOffset(content, int(position.Line), int(position.Character)) - 1
+	if colon <= lineStart {
 		return true
 	}
-	line := int(position.Line)
-	idx := 0
-	current := 0
-	for idx < len(content) && current < line {
-		if content[idx] == '\n' {
-			current++
-		}
-		idx++
-	}
-	// idx now points at the start of the target line (or end of content).
-	target := int(position.Character) - 2
-	for j := 0; j < target; j++ {
-		if idx+j >= len(content) || content[idx+j] == '\n' {
-			return true
-		}
-	}
-	if idx+target >= len(content) {
-		return true
-	}
-	c := content[idx+target]
+	c := content[colon-1]
 	return c == ' ' || c == '\t' || c == '\r'
 }
 
@@ -882,6 +865,10 @@ func (s *SSLServer) handleSignatureHelp(context *glsp.Context, params *protocol.
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
 
+	// The client's UTF-16 character offset becomes a rune index in place,
+	// the unit the providers count in (issue #258).
+	params.Position = s.runePosition(uri, params.Position)
+
 	// Get signature help - LSP positions are 0-based, our functions expect 1-based
 	help := providers.GetSignatureHelpWithProcedures(
 		cache.Tokens,
@@ -998,10 +985,11 @@ func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
 
+	line, column := toInternalPosition(content, params.Position)
 	result := providers.PrepareRename(
 		content,
-		int(params.Position.Line)+1,
-		int(params.Position.Character)+1,
+		line,
+		column,
 		uri,
 		cache.Procedures,
 		cache.Variables,
@@ -1033,8 +1021,7 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 
 	version := s.documentVersion[uri]
 	cache := s.documents.ParseDocument(uri, version)
-	line := int(params.Position.Line) + 1
-	column := int(params.Position.Character) + 1
+	line, column := toInternalPosition(content, params.Position)
 
 	if s.workspaceIndex != nil {
 		// Subject: dotted dispatch string under the cursor. Conservative

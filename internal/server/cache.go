@@ -1,6 +1,9 @@
 package server
 
 import (
+	"fmt"
+	"os"
+	"runtime/debug"
 	"sync"
 
 	"starlims-lsp/internal/lexer"
@@ -95,22 +98,42 @@ func (dm *DocumentManager) ParseDocument(uri string, version int) *DocumentCache
 		return &DocumentCache{Version: version}
 	}
 
-	// Parse
+	cache := parseContent(uri, version, content)
+	dm.SetCache(uri, cache)
+	return cache
+}
+
+// parseContent lexes and parses content into a cache entry. A panic in the
+// lexer or parser is contained here (issue #258): it is logged with its
+// stack, and the document gets a degraded entry — the tokens when lexing
+// completed, an empty program node, and no procedures or variables — so
+// every feature keeps answering, from less information, instead of the
+// same panic recurring in each request against this version.
+func parseContent(uri string, version int, content string) (cache *DocumentCache) {
+	var tokens []lexer.Token
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "ssl-lsp: panic parsing %s: %v\n%s\n", uri, r, debug.Stack())
+			cache = &DocumentCache{
+				Version: version,
+				Tokens:  tokens,
+				AST:     &parser.Node{Type: parser.NodeProgram},
+			}
+		}
+	}()
+
 	lex := lexer.NewLexer(content)
-	tokens := lex.Tokenize()
+	tokens = lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 
-	cache := &DocumentCache{
+	return &DocumentCache{
 		Version:    version,
 		Tokens:     tokens,
 		AST:        ast,
 		Procedures: p.ExtractProcedures(ast),
 		Variables:  p.ExtractVariables(ast),
 	}
-
-	dm.SetCache(uri, cache)
-	return cache
 }
 
 // OpenURIs returns the set of currently open document URIs.
