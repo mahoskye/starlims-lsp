@@ -81,6 +81,7 @@ type regionEvent struct {
 }
 
 // GetDocumentSymbols returns all document symbols.
+// API (no production caller): the text-input form of GetDocumentSymbolsFromTokens, which the server calls.
 func GetDocumentSymbols(text string) []DocumentSymbol {
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
@@ -428,6 +429,7 @@ func regionNameSpan(token lexer.Token, name string) (int, int) {
 }
 
 // GetFoldingRanges returns folding ranges for the document.
+// API (no production caller): the text-input form of GetFoldingRangesFromTokens, which the server calls.
 func GetFoldingRanges(text string) []FoldingRange {
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()

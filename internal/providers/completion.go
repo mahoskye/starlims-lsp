@@ -81,52 +81,29 @@ func GetKeywordCompletions() []CompletionItem {
 func GetFunctionCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, fnName := range constants.SSLFunctionNames {
-		items = append(items, buildFunctionCompletion(fnName, false))
+		items = append(items, buildFunctionCompletion(fnName))
 	}
 	return items
 }
 
-// GetFunctionSnippetCompletions returns function snippet completions with parameter placeholders.
-func GetFunctionSnippetCompletions() []CompletionItem {
-	var items []CompletionItem
-	for _, fnName := range constants.SSLFunctionNames {
-		items = append(items, buildFunctionCompletion(fnName, true))
-	}
-	return items
-}
-
-func buildFunctionCompletion(fnName string, useSnippet bool) CompletionItem {
+func buildFunctionCompletion(fnName string) CompletionItem {
 	detail := "SSL Function"
 	doc := fmt.Sprintf("Built-in SSL function: %s", fnName)
-	insertText := fnName
-	label := fnName
-	kind := CompletionKindFunction
-	format := InsertTextFormatPlainText
-
-	if useSnippet {
-		label = fnName + "()"
-		kind = CompletionKindSnippet
-		format = InsertTextFormatSnippet
-		insertText = fmt.Sprintf("%s($0)", fnName)
-	}
 
 	// Try to get richer info from signatures
 	if sig, ok := constants.GetFunctionSignature(fnName); ok {
 		docInfo := buildFunctionDoc(sig)
 		detail = docInfo.Detail
 		doc = docInfo.Documentation
-		if useSnippet {
-			insertText = buildFunctionSnippet(fnName, sig)
-		}
 	}
 
 	return CompletionItem{
-		Label:            label,
-		Kind:             kind,
+		Label:            fnName,
+		Kind:             CompletionKindFunction,
 		Detail:           detail,
 		Documentation:    doc,
-		InsertText:       insertText,
-		InsertTextFormat: format,
+		InsertText:       fnName,
+		InsertTextFormat: InsertTextFormatPlainText,
 	}
 }
 

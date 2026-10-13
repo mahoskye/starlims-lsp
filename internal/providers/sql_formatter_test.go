@@ -2604,36 +2604,6 @@ func TestIsSQLString_RealQueriesStillDetected(t *testing.T) {
 	}
 }
 
-// Issue #82: classification coverage for IsSQLDocument (see also
-// TestIsSQLDocument in sql_mode_test.go) — the data-source classifier
-// shares the validator, so the stricter rules must not regress plain-SQL
-// data-source files (feature.diagnostics_pipeline A10).
-func TestIsSQLDocument_Classification(t *testing.T) {
-	sqlDocs := []string{
-		"SELECT s.sample_id, s.sample_name\nFROM samples s\nWHERE s.sample_status = :status\nORDER BY s.sample_id\n",
-		"-- lookup for the samples grid\nSELECT sample_id, sample_name FROM samples WHERE sample_status = ?\n",
-		"/* legacy report query */\nSELECT ordno, testcode FROM ordtask WHERE status = ?\n",
-		"UPDATE samples SET sample_status = ? WHERE sample_id = ?\n",
-	}
-	for _, d := range sqlDocs {
-		if !IsSQLDocument(d) {
-			t.Errorf("IsSQLDocument(%q) = false, want true", d)
-		}
-	}
-
-	nonSQLDocs := []string{
-		":PARAMETERS sStatus := \"A\";\n:DECLARE aRes;\naRes := SQLExecute(\"SELECT 1 FROM DUAL\");\n",
-		"/* SSL leading comment;\nnX := 1;\n",
-		"Select the samples from the rack and update the status column before continuing with the run",
-		"",
-	}
-	for _, d := range nonSQLDocs {
-		if IsSQLDocument(d) {
-			t.Errorf("IsSQLDocument(%q) = true, want false", d)
-		}
-	}
-}
-
 // Issue #93 (S34/S35): INSERT column lists and VALUES use block style —
 // '(' on the keyword line with a space after the table name, list indented
 // one level, ')' on its own line at column 0.

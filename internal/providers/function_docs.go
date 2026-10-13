@@ -161,20 +161,3 @@ func returnLine(sig constants.FunctionSignature) string {
 	}
 	return line
 }
-
-func buildFunctionSnippet(functionName string, sig constants.FunctionSignature) string {
-	var snippetParams []string
-	paramIdx := 1
-	for _, param := range sig.Parameters {
-		if param.Required {
-			snippetParams = append(snippetParams, fmt.Sprintf("${%d:%s}", paramIdx, param.Name))
-			paramIdx++
-		}
-	}
-
-	if len(snippetParams) == 0 {
-		return fmt.Sprintf("%s($0)", functionName)
-	}
-
-	return fmt.Sprintf("%s(%s)", functionName, strings.Join(snippetParams, ", "))
-}

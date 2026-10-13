@@ -744,34 +744,6 @@ func getVariableHover(word string, variables []parser.VariableInfo) *Hover {
 	return nil
 }
 
-// GetHoverForToken returns hover for a specific token.
-func GetHoverForToken(token *lexer.Token, procedures []parser.ProcedureInfo, variables []parser.VariableInfo) *Hover {
-	word := token.Text
-
-	switch token.Type {
-	case lexer.TokenKeyword:
-		return getKeywordHover(word)
-	case lexer.TokenIdentifier:
-		if hover := getFunctionHover(word); hover != nil {
-			return hover
-		}
-		if hover := getClassHover(word); hover != nil {
-			return hover
-		}
-		if hover := getReturnsObjectHover(word); hover != nil {
-			return hover
-		}
-		if hover := getProcedureHover(word, procedures); hover != nil {
-			return hover
-		}
-		return getVariableHover(word, variables)
-	case lexer.TokenOperator:
-		return getOperatorHover(word)
-	default:
-		return nil
-	}
-}
-
 // SQLPlaceholder represents a SQL parameter placeholder.
 type SQLPlaceholder struct {
 	Name     string // Parameter name (empty for positional)

@@ -306,7 +306,7 @@ func indexOfNextSignificantToken(tokens []lexer.Token, idx int) int {
 }
 
 func isClassMethodContext(tokens []lexer.Token, procedures []parser.ProcedureInfo, line int) bool {
-	if !isClassFile(tokens) {
+	if !isClassFileFromTokens(tokens) {
 		return false
 	}
 
@@ -314,18 +314,6 @@ func isClassMethodContext(tokens []lexer.Token, procedures []parser.ProcedureInf
 		if line >= proc.StartLine && line <= proc.EndLine {
 			return true
 		}
-	}
-
-	return false
-}
-
-func isClassFile(tokens []lexer.Token) bool {
-	for _, token := range tokens {
-		if token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
-			continue
-		}
-
-		return token.Type == lexer.TokenKeyword && strings.EqualFold(token.Text, ":CLASS")
 	}
 
 	return false
