@@ -3,7 +3,7 @@ id: diag.nil_not_empty_string
 title: NIL compared against a default-value literal
 kind: diagnostic
 status: active
-authority: advisory
+authority: authoritative
 schema_ref: lints.type_safety.nil_not_empty_string
 default_severity: info
 config:
@@ -24,6 +24,11 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Authority corrected advisory -> authoritative to mirror the style
+      guide record (nil_not_empty_string, authoritative, info).
 issues: []
 ---
 
@@ -78,9 +83,10 @@ It must NOT flag:
 
 ## Rationale
 
-The schema lists `nil_not_empty_string` under `lints.type_safety` with
-`severity: info` (advisory): "NIL is not the same as empty string, zero,
-or .F. — all declared variables initialize to empty string, not NIL.
+The style guide's `nil_not_empty_string` record (authoritative, info)
+keeps the schema's `lints.type_safety` message: "NIL is not the same as
+empty string, zero, or .F. — all declared variables initialize to empty
+string, not NIL.
 NIL = NIL is .T., NIL = \"\" is .F." The code is legal and merely always
 false, so this is an info-level teaching diagnostic rather than a
 warning. Introduced in the 2026-03-21 alignment pass (history).

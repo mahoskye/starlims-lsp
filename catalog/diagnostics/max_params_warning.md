@@ -3,7 +3,7 @@ id: diag.max_params_warning
 title: Procedure has too many parameters
 kind: diagnostic
 status: active
-authority: style_only
+authority: advisory
 schema_ref: lints.class_rules.max_params_warning
 default_severity: info
 config:
@@ -14,6 +14,7 @@ spec_options:
   include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/diagnostics_audit_test.go
 history:
   - date: 2026-03-21
     ref: "commit cdbfee6"
@@ -30,25 +31,34 @@ history:
       API-shape advice. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Range moved onto the procedure name (it had started at column 0 of
+      the :PROCEDURE line), and the Behavior text brought up to date: both
+      tiers have been info since the info-tier expansion. Authority
+      corrected style_only -> advisory to mirror the style guide record
+      (max_params_warning). That record's severity (warning) disagrees with
+      this entry; a parameter count is API-shape advice, not a likely bug,
+      so info stands and the record is the side to correct.
 issues: []
 ---
 
 ## Behavior
 
-Flags a `:PROCEDURE` whose `:PARAMETERS` list exceeds a size threshold,
-reported once per procedure at the procedure name. This rule deliberately
-emits two severities under one code:
+Flags a `:PROCEDURE` whose `:PARAMETERS` list has more than 8 names,
+reported once per procedure, ranged on the procedure name. Both tiers are
+info severity under one code and differ only in message:
 
-- **More than 20 parameters** (warning): mirrors the STARLIMS threshold —
-  the platform itself warns at 20; the procedure "should be refactored".
-- **9 to 20 parameters** (hint): the style guide recommends at most 8 per
-  procedure, so counts of 9–20 get a gentle nudge only.
-
-`default_severity: warning` records the over-20 path; a severity override
-via `ssl.diagnostics.rules` remaps both paths.
+- **More than 20 parameters**: the message cites the platform's own
+  threshold — STARLIMS itself warns past 20 — and says the procedure
+  should be refactored.
+- **9 to 20 parameters**: the message cites the style guide's
+  recommendation of at most 8 per procedure.
 
 It must NOT flag procedures with 8 or fewer parameters, including
-procedures with no `:PARAMETERS` statement at all.
+procedures with no `:PARAMETERS` statement at all. A script-level
+`:PARAMETERS` statement (outside any `:PROCEDURE`) is not counted.
 
 ## Examples
 
@@ -78,11 +88,12 @@ procedures with no `:PARAMETERS` statement at all.
 
 ## Rationale
 
-The schema defines `max_params_warning` under `lints.class_rules` with
-`threshold: 20` and `severity: warning` (style_only): "Procedures with
-more than 20 parameters generate a warning." The style guide separately
-recommends at most 8 (`lints.style_rules.max_params_per_procedure: 8`);
-the implementation folds both into one code, warning at the platform
-threshold and hinting at the style threshold, so the schema-backed limit
-stays prominent while the softer recommendation stays quiet. Both tiers
-have been present since the rule was introduced (history).
+The style guide's `max_params_warning` record (advisory) merges two
+schema values: the recommended maximum of 8
+(`lints.style_rules.max_params_per_procedure`) and the platform threshold
+of 20 (`lints.class_rules.max_params_warning`: "Procedures with more than
+20 parameters generate a warning."). The tool folds both into one code
+with a threshold-specific message. Info severity (D13's opt-in advisory
+tier): a long parameter list is API-shape advice, never a likely bug, so
+the record's `severity: warning` is not mirrored here. Both tiers have
+been present since the rule was introduced (history).

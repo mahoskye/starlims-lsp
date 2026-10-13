@@ -3,7 +3,7 @@ id: diag.nil_in_operations
 title: NIL literal in an arithmetic or string operation
 kind: diagnostic
 status: active
-authority: style_only
+authority: authoritative
 schema_ref: lints.type_safety.nil_in_operations
 default_severity: warning
 config:
@@ -12,6 +12,7 @@ severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/diagnostics_audit_test.go
 history:
   - date: 2026-03-21
     ref: "commit cdbfee6"
@@ -31,14 +32,26 @@ history:
       already matches; a fence pins NIL comparisons against numbers and
       dates.
 issues: []
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Moved onto the expression tree: the operand must be the NIL literal
+      itself. `1 + NIL:ToString()` had been reported here as well as by
+      nil_method_call, because the nearest token to the `+` was NIL; its
+      operand is a member call. No change on the production corpus.
+      Authority corrected style_only -> authoritative to mirror the style
+      guide record (nil_in_operations). Whether the literal-only finding
+      should be an error is an open question on #255 (see Rationale).
+issues: ["#255"]
 ---
 
 ## Behavior
 
-Flags the operators `+`, `-`, `*`, `/` when the nearest significant token
-on either side is the literal `NIL`, at the operator's range. Detection
-is deliberately literal-only: it fires exactly when `NIL` itself is
-written as an operand, which is always a runtime error in SSL.
+Flags the operators `+`, `-`, `*`, `/` (and a unary minus) when an
+operand, read from the expression tree, is the literal `NIL` itself, at
+the operator's range. Detection is deliberately literal-only: it fires
+exactly when `NIL` itself is written as an operand, which is always a
+runtime error in SSL.
 
 It must NOT flag:
 
@@ -49,7 +62,11 @@ It must NOT flag:
 - `NIL` used with comparison operators (`=`, `==`, `!=`) — comparisons
   against NIL are legal and covered by `nil_not_empty_string` where
   relevant;
-- assignments of NIL (`x := NIL;`), which are legal.
+- assignments of NIL (`x := NIL;`), which are legal;
+- a member chain on NIL (`1 + NIL:ToString()`) — the operand is the
+  member call, not NIL, and the defect is `nil_method_call`'s;
+- compound assignments (`x += NIL;`), which are statements rather than
+  operations in the expression grammar.
 
 ## Examples
 
@@ -93,13 +110,23 @@ x := NIL;
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+x := 1 + NIL:ToString();
+```
+
 ## Rationale
 
-The schema lists `nil_in_operations` under `lints.type_safety` with
-`severity: warning` (style_only): "Using NIL in arithmetic or string
-operations causes error. Use Empty() to check for NIL first." A literal
-NIL operand can never be intentional working code, but the check stays a
-warning (not an error) because the pipeline's type checks are heuristic
-by policy, and its literal-only scope keeps the false-positive rate at
-zero at the cost of missing NIL-bearing variables. Introduced in the
-2026-03-21 alignment pass (history).
+The style guide's `nil_in_operations` record (authoritative, warning),
+from the schema's `lints.type_safety`: "Using NIL in arithmetic or string
+operations causes error." A literal
+NIL operand can never be intentional working code. The literal-only scope
+keeps the false-positive rate at zero at the cost of missing NIL-bearing
+variables. Introduced in the 2026-03-21 alignment pass (history).
+
+Open question (#255): by the severity-encodes-kind rule, an operand that
+is the NIL literal itself is a guaranteed runtime failure, which argues
+for `error`. The entry stays at `warning` — the style guide record's
+severity — until that is decided, because a severity change is breaking
+for consumers that gate on it.
