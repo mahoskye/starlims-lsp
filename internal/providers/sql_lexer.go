@@ -4,6 +4,7 @@ package providers
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // SQLTokenType represents the type of a SQL token.
@@ -30,6 +31,9 @@ type SQLToken struct {
 	Text   string
 	Line   int
 	Column int
+	// Unterminated is set on a string, quoted identifier or block comment
+	// that ran to the end of the input without its closing delimiter.
+	Unterminated bool
 }
 
 // SQLLexer tokenizes SQL strings.
@@ -59,9 +63,17 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
+		// Classify by the whole UTF-8 sequence, not its first byte: a
+		// lead or continuation byte read as a Latin-1 rune misclassified
+		// non-ASCII text (U+00A0 and U+0085 are spaces, U+00C3 a letter)
+		// and readUnknown re-encoded single bytes as runes, corrupting
+		// every non-ASCII character in reformatted SQL (issue #256, found
+		// by FuzzFormat). Invalid bytes decode to utf8.RuneError, width 1,
+		// and pass through readUnknown unchanged.
+		r, _ := l.current()
 
 		switch {
-		case unicode.IsSpace(rune(char)):
+		case unicode.IsSpace(r):
 			tokens = append(tokens, l.readWhitespace())
 		case char == '-' && l.peek() == '-':
 			tokens = append(tokens, l.readLineComment())
@@ -71,9 +83,9 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 			tokens = append(tokens, l.readString())
 		case char == '?':
 			tokens = append(tokens, l.readSSLParameter())
-		case unicode.IsDigit(rune(char)):
+		case unicode.IsDigit(r):
 			tokens = append(tokens, l.readNumber())
-		case unicode.IsLetter(rune(char)) || char == '_':
+		case isSQLIdentRune(r) && !unicode.IsDigit(r):
 			tokens = append(tokens, l.readIdentifierOrKeyword())
 		case strings.ContainsRune("(),;.{}", rune(char)):
 			tokens = append(tokens, l.readPunctuation())
@@ -85,6 +97,25 @@ func (l *SQLLexer) Tokenize() []SQLToken {
 	}
 
 	return tokens
+}
+
+// current decodes the rune at the cursor and its width in bytes.
+func (l *SQLLexer) current() (rune, int) {
+	return utf8.DecodeRuneInString(l.input[l.pos:])
+}
+
+// consumeRune appends the raw bytes of the rune at the cursor to text and
+// advances past it, so invalid bytes are carried through verbatim.
+func (l *SQLLexer) consumeRune(text *strings.Builder, size int) {
+	text.WriteString(l.input[l.pos : l.pos+size])
+	for i := 0; i < size; i++ {
+		l.advance()
+	}
+}
+
+// isSQLIdentRune reports whether r can continue a SQL identifier.
+func isSQLIdentRune(r rune) bool {
+	return r != utf8.RuneError && (unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_')
 }
 
 func (l *SQLLexer) peek() byte {
@@ -111,9 +142,12 @@ func (l *SQLLexer) readWhitespace() SQLToken {
 	col := l.column
 	var text strings.Builder
 
-	for l.pos < len(l.input) && unicode.IsSpace(rune(l.input[l.pos])) {
-		text.WriteByte(l.input[l.pos])
-		l.advance()
+	for l.pos < len(l.input) {
+		r, size := l.current()
+		if !unicode.IsSpace(r) {
+			break
+		}
+		l.consumeRune(&text, size)
 	}
 
 	return SQLToken{Type: SQLTokenWhitespace, Text: text.String(), Line: line, Column: col}
@@ -154,6 +188,7 @@ func (l *SQLLexer) readBlockComment() SQLToken {
 	isHint := l.pos < len(l.input) && l.input[l.pos] == '+'
 
 	// Read until */
+	closed := false
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 		text.WriteByte(char)
@@ -161,14 +196,15 @@ func (l *SQLLexer) readBlockComment() SQLToken {
 		if char == '*' && l.pos < len(l.input) && l.input[l.pos] == '/' {
 			text.WriteByte(l.input[l.pos])
 			l.advance()
+			closed = true
 			break
 		}
 	}
 
 	if isHint {
-		return SQLToken{Type: SQLTokenHint, Text: text.String(), Line: line, Column: col}
+		return SQLToken{Type: SQLTokenHint, Text: text.String(), Line: line, Column: col, Unterminated: !closed}
 	}
-	return SQLToken{Type: SQLTokenComment, Text: text.String(), Line: line, Column: col}
+	return SQLToken{Type: SQLTokenComment, Text: text.String(), Line: line, Column: col, Unterminated: !closed}
 }
 
 func (l *SQLLexer) readString() SQLToken {
@@ -180,6 +216,7 @@ func (l *SQLLexer) readString() SQLToken {
 	text.WriteByte(quote)
 	l.advance()
 
+	closed := false
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 		text.WriteByte(char)
@@ -191,12 +228,13 @@ func (l *SQLLexer) readString() SQLToken {
 				text.WriteByte(l.input[l.pos])
 				l.advance()
 			} else {
+				closed = true
 				break
 			}
 		}
 	}
 
-	return SQLToken{Type: SQLTokenString, Text: text.String(), Line: line, Column: col}
+	return SQLToken{Type: SQLTokenString, Text: text.String(), Line: line, Column: col, Unterminated: !closed}
 }
 
 func (l *SQLLexer) readNumber() SQLToken {
@@ -204,9 +242,12 @@ func (l *SQLLexer) readNumber() SQLToken {
 	col := l.column
 	var text strings.Builder
 
-	for l.pos < len(l.input) && (unicode.IsDigit(rune(l.input[l.pos])) || l.input[l.pos] == '.') {
-		text.WriteByte(l.input[l.pos])
-		l.advance()
+	for l.pos < len(l.input) {
+		r, size := l.current()
+		if !unicode.IsDigit(r) && r != '.' {
+			break
+		}
+		l.consumeRune(&text, size)
 	}
 
 	return SQLToken{Type: SQLTokenNumber, Text: text.String(), Line: line, Column: col}
@@ -218,13 +259,11 @@ func (l *SQLLexer) readIdentifierOrKeyword() SQLToken {
 	var text strings.Builder
 
 	for l.pos < len(l.input) {
-		char := l.input[l.pos]
-		if unicode.IsLetter(rune(char)) || unicode.IsDigit(rune(char)) || char == '_' {
-			text.WriteByte(char)
-			l.advance()
-		} else {
+		r, size := l.current()
+		if !isSQLIdentRune(r) {
 			break
 		}
+		l.consumeRune(&text, size)
 	}
 
 	tokenText := text.String()
@@ -321,7 +360,7 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 		}
 
 		if parenDepth == 0 {
-			if unicode.IsSpace(rune(c)) || strings.ContainsRune(",;+-*/%=!<>", rune(c)) {
+			if (c < utf8.RuneSelf && unicode.IsSpace(rune(c))) || strings.ContainsRune(",;+-*/%=!<>", rune(c)) {
 				break
 			}
 		}
@@ -360,7 +399,8 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 func (l *SQLLexer) readUnknown() SQLToken {
 	line := l.line
 	col := l.column
-	text := string(l.input[l.pos])
-	l.advance()
-	return SQLToken{Type: SQLTokenUnknown, Text: text, Line: line, Column: col}
+	var text strings.Builder
+	_, size := l.current()
+	l.consumeRune(&text, size)
+	return SQLToken{Type: SQLTokenUnknown, Text: text.String(), Line: line, Column: col}
 }
