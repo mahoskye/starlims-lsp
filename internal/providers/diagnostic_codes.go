@@ -1,5 +1,15 @@
 package providers
 
+// Data-source header and parameter-list rules from the reference's
+// data-sources guide (issue #260). A separate block so adding them does not
+// realign the stable-code table below.
+const (
+	CodeEmptyParameters                  = "empty_parameters"
+	CodeDatasourceSQLQuestionPlaceholder = "datasource_sql_question_placeholder"
+	CodeNullAsBlankValue                 = "nullasblank_value"
+	CodeInvariantDateColumnsQuoted       = "invariant_date_columns_quoted"
+)
+
 // Diagnostic codes are stable, machine-readable identifiers for diagnostic
 // rules. Clients use them to wire quick-fix code actions, suppression
 // comments, and per-rule severity overrides.
