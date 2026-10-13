@@ -100,6 +100,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real code labels .NET collections, where `:Count` is valid, with an `a`
   prefix. `++`/`--` on a value that is certainly a string is reported too
   (#267).
+- **`--strict`: `invalid_sql_param` agrees with `undeclared_variable`.** A
+  variable created by assignment (`sStatus := "A";` with no `:DECLARE`)
+  exists at run time, and `undeclared_variable` already treated that
+  assignment as a declaration, but `invalid_sql_param` reported every
+  `?sStatus?` marker for it. On the production corpus `--strict` reported
+  9,478 of these findings; 540 remain.
 
 ## [0.24.0] - 2026-09-21
 

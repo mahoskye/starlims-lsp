@@ -14,6 +14,7 @@ spec_options:
   check_sql_params: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/sql_param_assignment_test.go
 history:
   - date: 2026-02-02
     ref: "commit 0935ab2"
@@ -32,6 +33,14 @@ history:
       Names declared by resolved :INCLUDE targets count as declared
       (feature.cross_file_resolution A18-A19), closing the
       included-script false-positive noted in the Rationale.
+  - date: 2026-10-13
+    ref: "#262 follow-up (strict-profile measurement)"
+    note: >-
+      Assignment targets count as declared. undeclared_variable already
+      read `sName := ...;` as a declaration, so under --strict the two
+      rules disagreed about the same name and every ?name? marker for an
+      assigned variable was reported. Corpus under --strict: 9,478 ->
+      540 findings.
 issues: []
 ---
 
@@ -48,7 +57,11 @@ Treated as declared: names from `:DECLARE`/`:PUBLIC`/`:PARAMETERS`
 statements, procedure parameters, built-in predefined globals and status
 keywords, names configured in `ssl.diagnostics.globals`, and names
 declared by the file's resolved `:INCLUDE` targets (the include
-declaration closure, `feature.cross_file_resolution` A18-A19).
+declaration closure, `feature.cross_file_resolution` A18-A19), and any
+name that is the target of a plain assignment (`sName := ...;`, not a
+member assignment `oObj:sName := ...`). An assigned variable exists at run
+time, so `?sName?` substitutes it; `undeclared_variable` reads the same
+assignment as a declaration, and the two rules must agree.
 
 It must NOT flag:
 
@@ -82,6 +95,17 @@ sSql := "SELECT * FROM samples WHERE id = ?nSampleId?";
 ```ssl
 :DECLARE sSql;
 sSql := "SELECT * FROM samples WHERE id = ?";
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE aRows;
+	sStatus := "A";
+	aRows := SQLExecute("SELECT * FROM Orders WHERE Status = ?sStatus?");
+	:RETURN aRows;
+:ENDPROC;
 ```
 
 ## Rationale
