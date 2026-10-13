@@ -1116,6 +1116,13 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev .
 		return false
 	}
 
+	// A '-' never touches a following '-': `--` opens a line comment that
+	// swallows the rest of the line on the next pass (issue #303, found by
+	// FuzzFormat).
+	if prev.Text == "-" && strings.HasPrefix(curr.Text, "-") {
+		return true
+	}
+
 	// Space around operators — but not between unary minus/plus and its operand.
 	// Unary context: - or + after ( or , (no space before or after the sign).
 	// After = or other operators, keep space before the sign but not after.
@@ -1191,6 +1198,14 @@ func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseInd
 	}
 
 	formatted := f.FormatSQL(content, baseIndent+f.indentString)
+
+	// SQL that FormatSQL declined to touch (an unclosed quote or comment)
+	// stays inline. Wrapping multi-line content in the rule-F newlines
+	// anyway grew the string by a line on every pass (issue #303, found
+	// by FuzzFormat).
+	if formatted == content && hasUnterminatedSQLToken(content) {
+		return string(quoteChar) + content + string(closeChar)
+	}
 
 	// A rewrite always takes the rule-F multi-line form (issue #219
 	// decision): the old path emitted changed-but-single-line output
@@ -1588,6 +1603,18 @@ func IsReformattableSQLString(content string) bool {
 		return false
 	}
 	return IsSQLString(content)
+}
+
+// hasUnterminatedSQLToken reports whether the SQL lexer finds an unclosed
+// quote, quoted identifier or block comment in content — the shape
+// FormatSQL returns unchanged.
+func hasUnterminatedSQLToken(content string) bool {
+	for _, t := range NewSQLLexer(content).Tokenize() {
+		if t.Unterminated {
+			return true
+		}
+	}
+	return false
 }
 
 // hasUnterminatedSQLBlockComment reports whether content leaves a `/*`

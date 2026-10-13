@@ -46,6 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   break inside an unclosed delimiter; and a mashed `:LABELName` followed
   by an operator. None of these occur in the production corpus, whose
   formatted output is byte-identical before and after (#256).
+- **Embedded SQL formatting is idempotent on four more malformed
+  shapes.** A number followed by a spaced `.` (`0 .A` was joined to
+  `0.A`, which the SQL lexer re-read as the number `0.` and re-spaced to
+  `0. A`); a lone `?` glued to a following unknown character or `.`,
+  which the next pass paired with a later `?` as one placeholder; two
+  minus signs joined into `--`, which the next pass read as a line
+  comment; and multi-line SQL with an unclosed quote, which gained a
+  wrapping line on every pass. A `.` now belongs to a number only before
+  a digit or at the literal's end, so a trailing-dot literal such as `1.`
+  still reads whole. A placeholder now opens only on a name, a quoted
+  expression or the empty `??`. The production corpus formats
+  byte-identically before and after, and its diagnostics are unchanged
+  (#303).
 - **Incremental document sync counts UTF-16 code units.** LSP positions
   are UTF-16, but the server applied edits by rune index, so every edit
   after a character outside the Basic Multilingual Plane (an emoji in a
