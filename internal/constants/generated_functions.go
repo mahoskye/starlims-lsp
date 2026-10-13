@@ -2580,7 +2580,7 @@ var GeneratedFunctionSignatures = map[string]FunctionSignature{
 		ReturnType:        "NIL",
 		ReturnDescription: "Does not return a value for application logic. Redirects control flow when a matching label is found.",
 		Parameters: []FunctionParameter{
-			{Name: "vTarget", Type: "any", Required: true, Conditional: false, Default: "", Description: "Target label text. A string literal is used directly as the target text. Any other expression is evaluated and converted to a string before SSL compares it to the labels in the current procedure."},
+			{Name: "vTarget", Type: "any", Required: true, Conditional: false, Default: "", Description: "Target label text. A string literal is used directly as the target text and must match a label exactly, including case. Any other expression never matches a label, so the call falls through to the next statement."},
 		},
 	},
 	"buildarray": {
@@ -3984,7 +3984,7 @@ var GeneratedFunctionSignatures = map[string]FunctionSignature{
 		Name:              "GetInlineCode",
 		Description:       "Retrieves a named inline code block as a string.",
 		ReturnType:        "string",
-		ReturnDescription: "The inline code text for the named block. Returns an empty string when no inline code blocks are defined in the current execution context. Returns the code unchanged when `aVariables` is omitted or `NIL`.",
+		ReturnDescription: "The inline code text for the named block. Returns an empty string when no inline code blocks are stored in the current execution context, including when the call runs before execution reaches the first `:BEGININLINECODE` block. Returns the code unchanged when `aVariables` is omitted or `NIL`.",
 		Parameters: []FunctionParameter{
 			{Name: "sValue", Type: "string", Required: true, Conditional: false, Default: "", Description: "Name of the inline code block to retrieve."},
 			{Name: "aVariables", Type: "array", Required: false, Conditional: false, Default: "NIL", Description: "Array of variable names to substitute with their current values in the returned code."},

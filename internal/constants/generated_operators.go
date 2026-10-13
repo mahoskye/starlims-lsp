@@ -25,6 +25,8 @@ var GeneratedOperatorDetails = map[string]OperatorDetails{
 		Syntax:  "leftBoolean .AND. rightBoolean",
 		TypeBehavior: []OperatorTypeBehavior{
 			{Left: "boolean", Right: "boolean", Result: "boolean", Behavior: "Returns .T. only when both operands are .T.. If the left operand is .F., the right operand is not evaluated."},
+			{Left: "boolean", Right: "any other type", Result: "the right operand", Behavior: "When the left operand is .T., .AND. returns the right operand unchanged, so .T. .AND. \"x\" returns \"x\". When the left operand is .F., the result is .F. and the right operand is not evaluated."},
+			{Left: "any other type", Right: "any", Result: "error", Behavior: "Raises a runtime error. A non-boolean left operand cannot be converted to a logical value."},
 		},
 	},
 	"assignment": {
