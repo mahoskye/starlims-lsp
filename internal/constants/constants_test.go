@@ -172,6 +172,9 @@ func TestKeywordAndOperatorDescriptions(t *testing.T) {
 	if !strings.Contains(desc, "without it") || !strings.Contains(desc, "evaluated") {
 		t.Errorf("EXITCASE description must explain that without it, later :CASE blocks are still evaluated; got: %q", desc)
 	}
+	if !strings.Contains(desc, "last statement") || !strings.Contains(desc, ":IF") {
+		t.Errorf("EXITCASE description must state the last-in-branch restriction (issue #265); got: %q", desc)
+	}
 
 	// FINALLY must list all four restricted keywords
 	desc = SSLKeywordDescriptions["FINALLY"]
