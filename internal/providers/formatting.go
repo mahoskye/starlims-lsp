@@ -74,8 +74,10 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 		return nil
 	}
 
-	formatted := formatTokens(tokens, opts)
-	formatted = applyPostFormatPasses(formatted, opts)
+	formatted, ok := formatToFixedPoint(tokens, opts)
+	if !ok {
+		return nil
+	}
 
 	// Return a single edit replacing the entire document
 	lines := strings.Split(text, "\n")
@@ -94,6 +96,33 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 			NewText: formatted,
 		},
 	}
+}
+
+// maxFormatPasses bounds formatToFixedPoint. Well-formed input is stable
+// after one pass; the extra passes absorb a malformed shape that settles
+// on the second.
+const maxFormatPasses = 3
+
+// formatToFixedPoint formats until the output formats to itself, so the
+// result always satisfies feature.formatting A6 (formatting it again
+// changes nothing). When no fixed point is reached within maxFormatPasses
+// — malformed input the formatter keeps rewriting, such as a code block
+// whose string never closes (issue #311) — it reports false and the
+// caller leaves the text unchanged, as for an unterminated string.
+func formatToFixedPoint(tokens []lexer.Token, opts FormattingOptions) (string, bool) {
+	formatted := applyPostFormatPasses(formatTokens(tokens, opts), opts)
+	for pass := 1; pass < maxFormatPasses; pass++ {
+		again := lexer.NewLexer(formatted).Tokenize()
+		if hasUnterminatedString(again) {
+			return "", false
+		}
+		next := applyPostFormatPasses(formatTokens(again, opts), opts)
+		if next == formatted {
+			return formatted, true
+		}
+		formatted = next
+	}
+	return "", false
 }
 
 // FormatDocumentRange formats a specific range of an SSL document.

@@ -30,7 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Idempotence:** a comma before a same-line comment no longer gains a
   space on every other pass, and an unterminated nested bracket string
   (`[[a]`) is left unformatted instead of getting a `;` inside it.
-- `:REGION` indentation after a member-like token is stable (#311, shape 4).
+- **Formatting always reaches a fixed point (#311).** A document is
+  formatted until its output formats to itself (at most three passes);
+  malformed input that never settles is left unchanged rather than
+  rewritten differently on every save. Well-formed code is unaffected.
 
 ## [0.24.0] - 2026-09-21
 

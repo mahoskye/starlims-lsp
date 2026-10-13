@@ -71,6 +71,15 @@ history:
       a boundary (A11): formatting one line from inside a multi-line
       comment appended a ';' that ended the comment early. The pass
       subset range formatting applies is now stated.
+  - date: 2026-10-13
+    ref: "issue #311"
+    note: >-
+      A6 is now guaranteed by construction: a document is formatted until
+      its output formats to itself (at most three passes), and when no
+      fixed point is reached the formatter declines, leaving the text
+      unchanged. Fuzzing had found malformed shapes the formatter kept
+      rewriting; well-formed input is unaffected (corpus output
+      byte-identical).
 issues: []
 ---
 
