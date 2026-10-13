@@ -69,6 +69,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `identifier_too_short` | Identifier shorter than a minimum length (never implemented) | info | tool | removed | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
 | `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
+| `include_quoted_target` | :INCLUDE target written as a string | error | authoritative | active | [diag.include_quoted_target](../../catalog/diagnostics/include_quoted_target.md) |
 | `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |

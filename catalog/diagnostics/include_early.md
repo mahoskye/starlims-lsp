@@ -35,6 +35,10 @@ history:
     note: >-
       Narrowed to the late-placement path only; the in-procedure path now
       emits its intended code, include_in_procedure.
+  - date: 2026-10-13
+    ref: "issue #266"
+    note: >-
+      Examples now use the identifier target form; the quoted form does not compile (include_quoted_target).
 issues: ["#30"]
 ---
 
@@ -57,7 +61,7 @@ An `:INCLUDE` inside a procedure body is not this rule's concern — it emits
 
 ```ssl
 :DECLARE nCount;
-:INCLUDE "MyLibrary";
+:INCLUDE Common.MyLibrary;
 ```
 
 ### Does not flag
@@ -66,7 +70,7 @@ An `:INCLUDE` inside a procedure body is not this rule's concern — it emits
 /* module header;
 :PARAMETERS sName;
 :DEFAULT sName, "";
-:INCLUDE "MyLibrary";
+:INCLUDE Common.MyLibrary;
 :DECLARE nCount;
 ```
 
@@ -74,7 +78,7 @@ An `:INCLUDE` inside a procedure body is not this rule's concern — it emits
 
 ```ssl
 :PROCEDURE Setup;
-	:INCLUDE "MyLibrary";
+	:INCLUDE Common.MyLibrary;
 :ENDPROC;
 ```
 

@@ -28,6 +28,10 @@ history:
       Emit site retagged to CodeIncludeInProcedure; include_early narrowed
       to the late-placement path. The two situations are now configurable
       apart in ssl.diagnostics.rules.
+  - date: 2026-10-13
+    ref: "issue #266"
+    note: >-
+      Examples now use the identifier target form; the quoted form does not compile (include_quoted_target).
 issues: ["#30"]
 ---
 
@@ -47,14 +51,14 @@ the file — top-level placement is `include_early`'s concern.
 
 ```ssl
 :PROCEDURE Setup;
-	:INCLUDE "MyLibrary";
+	:INCLUDE Common.MyLibrary;
 :ENDPROC;
 ```
 
 ### Does not flag
 
 ```ssl
-:INCLUDE "MyLibrary";
+:INCLUDE Common.MyLibrary;
 :PROCEDURE Setup;
 	:DECLARE nCount;
 :ENDPROC;
