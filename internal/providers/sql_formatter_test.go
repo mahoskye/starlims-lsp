@@ -1164,17 +1164,192 @@ func TestSQLFormatter_CTEFormatting(t *testing.T) {
 
 // --- CASE WHEN indent with nested context ---
 
-func TestSQLFormatter_CaseWhenInWhere(t *testing.T) {
-	// CASE in WHERE clause: WHEN should still be indented 2 spaces under CASE
-	opts := DefaultSQLFormattingOptions()
-	opts.Style = "canonicalCompact"
-	f := NewSQLFormatter(opts)
+// Issue #271: CASE lays out the same way in every clause — CASE stays where
+// it is written, WHEN/ELSE 4 past CASE, END aligned with CASE
+// (sql-canonical-compact-reference §2.3 "CASE in WHERE", §5.1-5.3). It used
+// to move to its own line at the clause column with WHEN/ELSE only 2 under.
+func TestSQLFormatter_CaseLayoutEveryClause(t *testing.T) {
+	cases := []struct{ name, input, want string }{
+		{
+			name:  "WHERE",
+			input: "SELECT ordno FROM orders WHERE CASE WHEN status = 'L' THEN 1 WHEN status = 'C' THEN 2 ELSE 0 END > 0",
+			want: "SELECT ordno\n" +
+				"FROM orders\n" +
+				"WHERE CASE\n" +
+				"          WHEN status = 'L' THEN 1\n" +
+				"          WHEN status = 'C' THEN 2\n" +
+				"          ELSE 0\n" +
+				"      END > 0",
+		},
+		{
+			name:  "AND condition",
+			input: "SELECT ordno FROM orders WHERE status = 'X' AND CASE WHEN a = 1 THEN 1 ELSE 0 END = 1",
+			want: "SELECT ordno\n" +
+				"FROM orders\n" +
+				"WHERE status = 'X'\n" +
+				"  AND CASE\n" +
+				"          WHEN a = 1 THEN 1\n" +
+				"          ELSE 0\n" +
+				"      END = 1",
+		},
+		{
+			name:  "ORDER BY",
+			input: "SELECT ordno, testcode FROM ordtask ORDER BY CASE WHEN status = 'L' THEN 1 WHEN status = 'C' THEN 2 ELSE 3 END, ordno",
+			want: "SELECT ordno, testcode\n" +
+				"FROM ordtask\n" +
+				"ORDER BY CASE\n" +
+				"             WHEN status = 'L' THEN 1\n" +
+				"             WHEN status = 'C' THEN 2\n" +
+				"             ELSE 3\n" +
+				"         END, ordno",
+		},
+		{
+			// WHEN used to land left of the assignment it belongs to.
+			name:  "UPDATE SET assignment",
+			input: "UPDATE ordtask SET status = CASE WHEN result_value > high_limit THEN 'High' ELSE 'Normal' END, moddate = SYSDATE WHERE ordno = ?",
+			want: "UPDATE ordtask SET\n" +
+				"    status = CASE\n" +
+				"                 WHEN result_value > high_limit THEN 'High'\n" +
+				"                 ELSE 'Normal'\n" +
+				"             END,\n" +
+				"    moddate = SYSDATE\n" +
+				"WHERE ordno = ?",
+		},
+		{
+			// The first SELECT item keeps its CASE on the SELECT line, at the
+			// SELECT-list column (reference §2.10 subquery update).
+			name:  "first SELECT item",
+			input: "SELECT CASE WHEN status = 1 THEN 'Active' ELSE 'Unknown' END AS label FROM orders",
+			want: "SELECT CASE\n" +
+				"           WHEN status = 1 THEN 'Active'\n" +
+				"           ELSE 'Unknown'\n" +
+				"       END AS label\n" +
+				"FROM orders",
+		},
+		{
+			name:  "subquery SELECT list",
+			input: "SELECT ordno FROM orders WHERE x IN (SELECT CASE WHEN a = 1 THEN b ELSE c END FROM t2)",
+			want: "SELECT ordno\n" +
+				"FROM orders\n" +
+				"WHERE x IN (\n" +
+				"    SELECT CASE\n" +
+				"               WHEN a = 1 THEN b\n" +
+				"               ELSE c\n" +
+				"           END\n" +
+				"    FROM t2\n" +
+				")",
+		},
+		{
+			// Nested CASE as a THEN value: its own line 4 past WHEN, its
+			// branches 4 past it (reference §5.3). It used to collapse back
+			// to the outer CASE's column.
+			name:  "nested CASE in THEN",
+			input: "SELECT ordno, CASE WHEN status = 'Complete' THEN CASE WHEN result_value IS NULL THEN 'No Result' WHEN result_value > threshold THEN 'OOS' ELSE 'Within Spec' END ELSE 'Incomplete' END AS evaluation FROM ordresult",
+			want: "SELECT ordno,\n" +
+				"       CASE\n" +
+				"           WHEN status = 'Complete' THEN\n" +
+				"               CASE\n" +
+				"                   WHEN result_value IS NULL THEN 'No Result'\n" +
+				"                   WHEN result_value > threshold THEN 'OOS'\n" +
+				"                   ELSE 'Within Spec'\n" +
+				"               END\n" +
+				"           ELSE 'Incomplete'\n" +
+				"       END AS evaluation\n" +
+				"FROM ordresult",
+		},
+		{
+			// A branch that overflows with its value inline breaks every THEN
+			// value of that CASE 4 past WHEN (consistency rule); a short ELSE
+			// stays inline, and its sign stays attached (reference §5.2).
+			name: "THEN values broken",
+			input: "SELECT ordno, CASE WHEN result_value IS NOT NULL THEN ROUND(result_value / baseline_value * 100, 2) + adjustment_factor " +
+				"WHEN result_value IS NULL THEN 0 ELSE -1 END AS pct FROM ordresult",
+			want: "SELECT ordno,\n" +
+				"       CASE\n" +
+				"           WHEN result_value IS NOT NULL THEN\n" +
+				"               ROUND(result_value / baseline_value * 100, 2) + adjustment_factor\n" +
+				"           WHEN result_value IS NULL THEN\n" +
+				"               0\n" +
+				"           ELSE -1\n" +
+				"       END AS pct\n" +
+				"FROM ordresult",
+		},
+		{
+			// A CASE that fits inside a function's argument list stays inline
+			// (reference §2.7 / §7.3: SUM(CASE WHEN ... END)).
+			name:  "inline inside an aggregate",
+			input: "SELECT customer_id, SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done FROM order_tasks GROUP BY customer_id",
+			want: "SELECT customer_id, SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done\n" +
+				"FROM order_tasks\n" +
+				"GROUP BY customer_id",
+		},
+		{
+			// A predicate that leaves no room for THEN wraps THEN onto its
+			// own line at the WHEN column, the value following it
+			// (reference §2.10 form).
+			name:  "THEN wrapped under WHEN",
+			input: "SELECT ordno, CASE WHEN SUBSTR(sample_text, 1, INSTR(sample_text, ':', 1) - 1) = 'XXXXXXXXXXXX' THEN 'a' ELSE 'b' END AS q FROM t",
+			want: "SELECT ordno,\n" +
+				"       CASE\n" +
+				"           WHEN SUBSTR(sample_text, 1, INSTR(sample_text, ':', 1) - 1) = 'XXXXXXXXXXXX'\n" +
+				"           THEN 'a'\n" +
+				"           ELSE 'b'\n" +
+				"       END AS q\n" +
+				"FROM t",
+		},
+		{
+			// A CASE written too far right for its branches continues on the
+			// next line instead, like any other wrap.
+			name:  "CASE too far right wraps",
+			input: "SELECT a FROM t GROUP BY first_long_column_name, second_long_column_name, CASE WHEN status_code = 'A' THEN 'Active' ELSE 'Other' END",
+			want: "SELECT a\n" +
+				"FROM t\n" +
+				"GROUP BY first_long_column_name, second_long_column_name,\n" +
+				"    CASE\n" +
+				"        WHEN status_code = 'A' THEN 'Active'\n" +
+				"        ELSE 'Other'\n" +
+				"    END",
+		},
+		{
+			// A parenthesized CASE item moves to its own line as a whole
+			// when it would overflow, like any other SELECT item (Rule C).
+			name:  "parenthesized CASE item",
+			input: "SELECT sample_id, client_id, project_name, project_no, status, (CASE WHEN status = 'A' THEN 'Black' ELSE 'Gray' END) AS row_color FROM projects",
+			want: "SELECT sample_id, client_id, project_name, project_no, status,\n" +
+				"       (CASE WHEN status = 'A' THEN 'Black' ELSE 'Gray' END) AS row_color\n" +
+				"FROM projects",
+		},
+		{
+			name:  "aggregate argument too long to stay inline",
+			input: "SELECT customer_id, SUM(CASE WHEN status = 'Complete' AND result_value > threshold_value THEN 1 ELSE 0 END) AS done FROM order_tasks",
+			want: "SELECT customer_id,\n" +
+				"       SUM(CASE\n" +
+				"               WHEN status = 'Complete'\n" +
+				"                   AND result_value > threshold_value THEN 1\n" +
+				"               ELSE 0\n" +
+				"           END) AS done\n" +
+				"FROM order_tasks",
+		},
+	}
+	runSQLLayoutCases(t, cases)
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	for _, tc := range cases {
+		if again := f.FormatSQL(tc.want, ""); again != tc.want {
+			t.Errorf("not idempotent (%s):\n%s", tc.name, again)
+		}
+	}
+}
 
-	input := "SELECT ordno FROM orders WHERE CASE WHEN status = 'L' THEN 1 WHEN status = 'C' THEN 2 ELSE 0 END > 0"
-	result := f.FormatSQL(input, "")
-
-	if !strings.Contains(result, "\n  WHEN") {
-		t.Errorf("expected WHEN indented 2 spaces under CASE in WHERE, got:\n%s", result)
+// Issue #271: a sign directly after an operand-introducing keyword is
+// unary — `ELSE -1` used to become `ELSE - 1`. A sign after a value keyword
+// such as END stays a binary operator.
+func TestSQLFormatter_UnarySignAfterKeyword(t *testing.T) {
+	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	got := f.FormatSQL("SELECT CASE WHEN a > 0 THEN -a ELSE -1 END - 1 AS x FROM t WHERE b = 1 AND -c < 0", "")
+	for _, want := range []string{"THEN -a", "ELSE -1", "END - 1", "AND -c < 0"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in:\n%s", want, got)
+		}
 	}
 }
 
