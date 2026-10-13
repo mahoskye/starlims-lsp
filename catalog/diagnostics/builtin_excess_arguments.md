@@ -48,6 +48,11 @@ history:
       diagnostic that replaced the file's real output. Corpus
       differential over 6,228 production files: identical output to the
       token implementation (97 hits before and after).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Rationale notes Branch as the exception: the reference makes a
+      second Branch argument a compile-time error.
 issues: []
 ---
 
@@ -150,8 +155,10 @@ It must NOT flag:
 
 ## Rationale
 
-Surplus arguments are never evaluated and produce no compile-time signal
-(issue #200), so wrong arity survives indefinitely — the corpus scan for
+Surplus arguments are never evaluated and, with one exception, produce no
+compile-time signal (issue #200) — `Branch` is the exception: the
+reference makes a second `Branch` argument a compile-time error, which
+this rule still reports at its usual warning, so wrong arity survives indefinitely — the corpus scan for
 this rule surfaced 31 standing examples in stock and documentation code
 (`GetUserData("NAME")`, `SetUserPassword(u, p, .F.)`,
 `LimsTime(Now())` — each silently ignoring an argument the author

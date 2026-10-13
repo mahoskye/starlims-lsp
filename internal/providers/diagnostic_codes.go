@@ -149,4 +149,6 @@ const (
 	CodeSQLSelectStar               = "sql_select_star"
 	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
 	CodeHungarianTypeMismatch       = "hungarian_type_mismatch"
+	CodeEqualsEmptyString           = "equals_empty_string"
+	CodeInheritPosition             = "inherit_position"
 )

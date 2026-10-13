@@ -3,7 +3,7 @@ id: diag.complex_sql_placeholder
 title: Complex expression inside a SQLExecute named placeholder
 kind: diagnostic
 status: active
-authority: tool
+authority: advisory
 schema_ref: null
 default_severity: info
 config:
@@ -25,6 +25,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to advisory: the style-guide record
+      complex_sql_placeholder (level advisory) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

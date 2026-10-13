@@ -2692,43 +2692,43 @@ func TestGetDiagnostics_BareLogicalOperators_ValidSyntax(t *testing.T) {
 }
 
 func TestGetDiagnostics_DefaultOnDeclareLine(t *testing.T) {
+	// diag.default_on_declare_line, re-scoped in issue #255: a :DEFAULT
+	// whose target is not a :PARAMETERS name, on any line.
 	text := `:PROCEDURE Test;
+:PARAMETERS sIn;
 :DECLARE sName; :DEFAULT sName, "";
+:DECLARE sOther;
+:DEFAULT sOther, 1;
 :ENDPROC;`
 
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// Should find error for :DEFAULT on same line as :DECLARE (language constraint)
-	foundDefaultError := false
+	var lines []int
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
-			foundDefaultError = true
+		if d.Code == CodeDefaultOnDeclareLine {
 			if d.Severity != SeverityError {
-				t.Errorf("expected error severity for DEFAULT on DECLARE line, got %v", d.Severity)
+				t.Errorf("expected error severity, got %v", d.Severity)
 			}
+			lines = append(lines, d.Range.Start.Line)
 		}
 	}
-
-	if !foundDefaultError {
-		t.Error("expected error for :DEFAULT on same line as :DECLARE")
+	if len(lines) != 2 || lines[0] != 2 || lines[1] != 4 {
+		t.Errorf("expected default_on_declare_line on lines 2 and 4 (0-based), got %v", lines)
 	}
 }
 
 func TestGetDiagnostics_DefaultOnDeclareLine_ValidSyntax(t *testing.T) {
-	text := `:PROCEDURE Test;
-:PARAMETERS sName;
-:DEFAULT sName, "";
-:DECLARE sLocal;
+	// A :DEFAULT on a parameter never flags, even when a :DECLARE shares
+	// its line or a script-level :PARAMETERS supplies the name.
+	text := `:PARAMETERS sTop;
+:DEFAULT sTop, "";
+:PROCEDURE Test;
+:PARAMETERS sName; :DEFAULT sName, ""; :DECLARE sLocal;
 :ENDPROC;`
 
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-
-	// Should NOT find warning - :DEFAULT is with :PARAMETERS (correct) and :DECLARE is separate
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
-			t.Errorf("unexpected DEFAULT/DECLARE warning when syntax is valid: %s", d.Message)
+	for _, d := range GetDiagnostics(text, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDefaultOnDeclareLine {
+			t.Errorf("unexpected default_on_declare_line at line %d: %s", d.Range.Start.Line, d.Message)
 		}
 	}
 }
@@ -6536,16 +6536,25 @@ func TestGetDiagnostics_ClassMemberOrder_DeclareBeforeInherit(t *testing.T) {
 :INHERIT BaseClass;
 :PROCEDURE DoWork;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, infoEnabledOptions())
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
+	// :INHERIT not directly after :CLASS is a compile error, reported as
+	// diag.inherit_position at error severity, not as the info-tier
+	// class_member_order note (issue #255).
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "INHERIT") && (strings.Contains(d.Message, "before") || strings.Contains(d.Message, "order")) {
+		if d.Code == CodeInheritPosition {
 			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("inherit_position severity = %v, want error", d.Severity)
+			}
+		}
+		if d.Code == CodeClassMemberOrder {
+			t.Errorf("misplaced :INHERIT must not also report class_member_order: %s", d.Message)
 		}
 	}
 	if !found {
-		t.Error("expected diagnostic about :INHERIT needing to come before :DECLARE")
+		t.Error("expected inherit_position for :INHERIT after :DECLARE")
 	}
 }
 
@@ -9221,14 +9230,20 @@ func TestGetDiagnostics_InvalidLimsTypeExComparisonFlagged(t *testing.T) {
 }
 
 func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
-	// Valid result strings in any casing and non-literal comparands are
-	// out of scope.
+	// Valid result strings, prefix matches under `=`, and non-literal
+	// comparands are out of scope (issue #255).
 	code := `:PROCEDURE Check;
 :PARAMETERS uValue, sExpected;
 :IF LimsTypeEx(uValue) == "NUMERIC";
 	:RETURN .T.;
 :ENDIF;
-:IF limstypeex(uValue) = "string";
+:IF limstypeex(uValue) = "STRING";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) = "NUM";
+	:RETURN .T.;
+:ENDIF;
+:IF "STRINGS" = LimsTypeEx(uValue);
 	:RETURN .T.;
 :ENDIF;
 :IF LimsTypeEx(uValue) == sExpected;
@@ -9243,6 +9258,45 @@ func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
 		if d.Code == CodeInvalidLimsTypeExComparison {
 			t.Errorf("unexpected invalid_limstypeex_comparison at line %d: %s", d.Range.Start.Line, d.Message)
 		}
+	}
+}
+
+func TestGetDiagnostics_InvalidLimsTypeExComparisonCaseAndOperators(t *testing.T) {
+	// String comparison is case-sensitive, so a lowercase result name can
+	// never match; `<>` and `#` are inequality like `!=` (issue #255).
+	code := `:PROCEDURE Check;
+:PARAMETERS uValue;
+:IF LimsTypeEx(uValue) == "numeric";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) <> "NUMBER";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) # "NUMBER";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) = "NUMBERS";
+	:RETURN .T.;
+:ENDIF;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	always := 0
+	for _, d := range diagnostics {
+		if d.Code == CodeInvalidLimsTypeExComparison {
+			lines = append(lines, d.Range.Start.Line)
+			if strings.Contains(d.Message, "always true") {
+				always++
+			}
+		}
+	}
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 invalid_limstypeex_comparison findings, got lines %v", lines)
+	}
+	if always != 2 {
+		t.Errorf("expected the two inequality findings to say 'always true', got %d", always)
 	}
 }
 

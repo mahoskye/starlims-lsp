@@ -17,6 +17,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Only a top-level `:=` in the condition flags. A parenthesized
+      assignment (`(x := f()) != NIL`, the assign-and-test idiom) and an
+      assignment inside a call argument or array literal no longer flag.
 issues: []
 ---
 
@@ -36,7 +42,11 @@ It must NOT flag:
 - comparison operators (`=`, `==`) inside conditions;
 - the loop-variable initializer of `:FOR i := 1 :TO n;` — `:FOR` is not a
   tracked condition keyword and its `:=` is the only legal way to write
-  the loop.
+  the loop;
+- an assignment inside brackets in the condition — the parenthesized
+  assign-and-test idiom (`:IF (oRow := Fetch()) != NIL;`), or an
+  assignment inside a call argument or array literal. Only a top-level
+  `:=` reads as a mistyped comparison (issue #255).
 
 ## Examples
 
@@ -79,6 +89,19 @@ nCount := 6;
 
 ### Does not flag
 
+The parenthesized form is a deliberate assign-and-test.
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE nCount;
+:IF (nCount := DoProc("Count")) > 0;
+nCount := nCount - 1;
+:ENDIF;
+:ENDPROC;
+```
+
+### Does not flag
+
 ```ssl
 :PROCEDURE Demo;
 :DECLARE i, nTotal;
@@ -96,5 +119,6 @@ from C-family habits, and SSL makes it easier to hit because `=`
 (comparison) and `:=` (assignment) differ by one keystroke. Severity is
 warning rather than error because the construct is syntactically valid SSL
 and could conceivably be intentional — the rule points at the suspicious
-token and asks. Introduced with the gotcha batch (commit 7261172); the code
+token and asks. Parentheses are the conventional way to say "I meant
+it", so a bracketed assignment stays silent (issue #255). Introduced with the gotcha batch (commit 7261172); the code
 slug was stabilized in PR #3 (v0.4.0).

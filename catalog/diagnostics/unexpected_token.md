@@ -76,6 +76,12 @@ history:
       with the point, glued to an `e` identifier). A well-formed number
       glued to a stray `E` — `2.0E+nVar`, which used to defer to a rule
       that then stayed silent — is now reported here.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Defers the operand after a prefix bare `Not` (`:IF Not bReady;`)
+      to bare_logical_operator, which already reports the cause; the old
+      deferral looked only at the unexpected token itself.
 issues: ["#240", "#244", "#246"]
 ---
 
@@ -146,7 +152,9 @@ It must NOT flag:
   including the `.identifier` shape that `dot_property_access` owns), a
   C-style operator or glued `===`/`!==` pair
   (`invalid_operator_sequence`), a bare `AND`/`OR`/`NOT` word in operator
-  position (`bare_logical_operator`), a colon form that is not an SSL
+  position (`bare_logical_operator`) — including the operand after a
+  prefix bare `Not`, where the parser read `Not` as a value and stopped
+  on what followed (issue #255) — a colon form that is not an SSL
   keyword (`unknown_keyword` / `endfor_invalid`), the exponent shapes
   `scientific_notation` owns — an identifier glued to a number that has
   no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — a
@@ -205,6 +213,20 @@ nCount := 2;
 :DECLARE nCount;
 nCount := 1
 nCount := 2;
+```
+
+### Does not flag
+
+A prefix bare `Not` is `bare_logical_operator`'s finding; the operand
+after it is not reported again.
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS bReady;
+:IF Not bReady;
+	bReady := .T.;
+:ENDIF;
+:ENDPROC;
 ```
 
 ### Does not flag

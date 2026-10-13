@@ -3,7 +3,7 @@ id: diag.label_keyword_form
 title: Label keyword written in the wrong case
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -25,6 +25,11 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority set to authoritative: keyword case-sensitivity is
+      documented language behavior (reference keywords/LABEL).
 issues: []
 ---
 

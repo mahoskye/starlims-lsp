@@ -3,8 +3,8 @@ id: diag.keyword_uppercase
 title: SSL keyword not written in uppercase
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: keywords.case
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -22,6 +22,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code keyword_uppercase assigned.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      keyword_uppercase (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. The 'lints-only
+      schema_ref' explanation is removed; schema_ref set to
+      keywords.case.
 issues: []
 ---
 
@@ -75,9 +83,8 @@ without the leading colon (identifiers).
 
 Keyword casing is authoritative language behavior — the schema's core
 principles state all block keywords are colon-prefixed and must be
-UPPERCASE, and the runtime is case-sensitive — hence error severity.
-(`authority: tool` because the schema encodes this in `keywords`, not as a
-`lints` rule slug; the entry follows the catalog's lints-only `schema_ref`
-convention.) The rule stays high-precision by handing near-miss cases
+UPPERCASE (`keywords.case`, the entry's `schema_ref`; style-guide record
+keyword_uppercase), and the runtime is case-sensitive — hence error
+severity. The rule stays high-precision by handing near-miss cases
 (unknown keywords, `:ENDFOR`, label forms, builder directives) to their own
 codes rather than mislabeling them as casing problems (cdbfee6, f6e78ef).

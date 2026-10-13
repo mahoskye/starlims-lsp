@@ -33,6 +33,13 @@ history:
       stray separators in the header region, which the mask had hidden;
       the test is a separator with no statement before it, rather than
       the `*/;` spelling specifically.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Rationale rewritten to match the Behavior (error: STARLIMS refuses
+      the document), replacing a stale advisory-warning paragraph.
+      Fences carry inline :PARAMETERS defaults, which a data source
+      requires.
 issues: ["ssl-style-guide#50"]
 ---
 
@@ -113,7 +120,7 @@ where FORMAT = 'all;msoffice->pdf' -- default is 'all;msoffice->pdf'; keep
 
 ```ssl
 :DSN := "LimsDB";
-:PARAMETERS pDocType;
+:PARAMETERS pDocType := "";
 
 select DOCTYPE from DOCTYPESCONVERSION where DOCTYPE = @pDocType
 ```
@@ -126,10 +133,11 @@ level authoritative) settles that SQL data sources use SQL comment syntax
 and that semicolons inside comments and quoted literals are content with
 no syntactic significance — those cases must be silent, where they
 previously drove the whole file into SSL parsing and produced token
-errors (issue #154's UpdateDocTypes shape). What the schema deliberately
-leaves undefined is a bare `;` between statements: the body is emitted
-into a single GetSSLDataset call, so separator support depends on the
-database platform. That earns an advisory warning — visible enough to
-catch an accidental paste of a multi-statement script, soft enough that a
-team whose platform accepts batches can turn it off — rather than an
-authoritative error the schema does not back.
+errors (issue #154). A bare `;` between statements is the other half:
+the body runs as a single SQL command and STARLIMS refuses a document
+containing a stray separator (`Invalid SQL statement: remove any
+misplaced semicolons(;)`; style-guide record datasource_sql_semicolon,
+authoritative, error). A runtime refusal is an error, which is why the
+rule reports at error severity. Mode detection is what keeps it precise:
+the `*/;` banner closer that is correct in an SSL-mode data source is
+never judged here.

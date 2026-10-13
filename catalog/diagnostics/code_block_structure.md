@@ -3,9 +3,9 @@ id: diag.code_block_structure
 title: Code block literal without a bound variable
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
-default_severity: warning
+authority: authoritative
+schema_ref: expressions.code_block_literals.min_parameters
+default_severity: error
 severity_overridable: true
 suppressible: true
 tests:
@@ -20,6 +20,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Raised to error: the reference (special-forms/code-block) states
+      `{|| ...}` is a compile-time error. The private corpus has zero
+      findings, so no valid document changes. authority corrected to
+      authoritative: the style-guide record code_block_structure (level
+      authoritative) names this rule in enforced_by, so the guide is not
+      silent.
 issues: []
 ---
 
@@ -28,8 +37,8 @@ issues: []
 Flags a code block literal `{|params| expr}` whose parameter list between
 the pipes is empty — `{|| expr}`, including whitespace-only variants such as
 `{| | expr}` or a tab between the pipes. Per the SSL grammar, code blocks
-require at least one bound variable. The range covers the whole code block
-token.
+require at least one bound variable, and `{|| expr}` does not compile, so
+the finding is an error. The range covers the whole code block token.
 
 It must NOT flag:
 
@@ -79,6 +88,10 @@ It must NOT flag:
 ## Rationale
 
 The SSL grammar (ssl-ebnf-grammar.md, cited at the be7a174 introduction)
-requires a bound variable between the pipes; `{|| ...}` is malformed.
-Warning rather than error because the check is lexer-shape-based and the
-style guide itself is silent (`authority: tool`).
+requires a bound variable between the pipes, and the reference
+(special-forms/code-block) states that `{|| ...}` is a compile-time
+error. The rule shipped at warning while the style guide was silent;
+issue #255 raised it to error, the severity for a compile error, after
+the private corpus showed zero findings — no document that validated
+before fails now. The lexer captures a code block as one token, so the
+shape test is exact.

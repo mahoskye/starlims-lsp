@@ -10,47 +10,48 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 
 | Code | Title | Default severity | Authority | Status | Entry |
 |------|-------|------------------|-----------|--------|-------|
-| `arithmetic_type_mismatch` | Mismatched operand types in arithmetic | warning | tool | active | [diag.arithmetic_type_mismatch](../../catalog/diagnostics/arithmetic_type_mismatch.md) |
+| `arithmetic_type_mismatch` | Mismatched operand types in arithmetic | warning | authoritative | active | [diag.arithmetic_type_mismatch](../../catalog/diagnostics/arithmetic_type_mismatch.md) |
 | `assignment_in_condition` | Assignment operator used in a condition | warning | tool | active | [diag.assignment_in_condition](../../catalog/diagnostics/assignment_in_condition.md) |
-| `bare_logical_operator` | Bare AND/OR/NOT instead of .AND./.OR./.NOT. | error | tool | active | [diag.bare_logical_operator](../../catalog/diagnostics/bare_logical_operator.md) |
-| `base_outside_class` | Base member access outside a class definition | error | tool | active | [diag.base_outside_class](../../catalog/diagnostics/base_outside_class.md) |
-| `base_requires_inherit` | Base member access in a class without :INHERIT | error | tool | active | [diag.base_requires_inherit](../../catalog/diagnostics/base_requires_inherit.md) |
-| `base_standalone` | Base used without a member access | error | tool | active | [diag.base_standalone](../../catalog/diagnostics/base_standalone.md) |
-| `begincase_requires_case` | BEGINCASE block with no CASE clause | error | tool | active | [diag.begincase_requires_case](../../catalog/diagnostics/begincase_requires_case.md) |
-| `branch_target_label` | Branch() target string without the LABEL token | error | tool | active | [diag.branch_target_label](../../catalog/diagnostics/branch_target_label.md) |
-| `builder_directive_case` | Data source builder directive not uppercase | error | tool | active | [diag.builder_directive_case](../../catalog/diagnostics/builder_directive_case.md) |
+| `bare_logical_operator` | Bare AND/OR/NOT instead of .AND./.OR./.NOT. | error | authoritative | active | [diag.bare_logical_operator](../../catalog/diagnostics/bare_logical_operator.md) |
+| `base_outside_class` | Base member access outside a class definition | error | authoritative | active | [diag.base_outside_class](../../catalog/diagnostics/base_outside_class.md) |
+| `base_requires_inherit` | Base member access in a class without :INHERIT | error | authoritative | active | [diag.base_requires_inherit](../../catalog/diagnostics/base_requires_inherit.md) |
+| `base_standalone` | Base used without a member access | error | authoritative | active | [diag.base_standalone](../../catalog/diagnostics/base_standalone.md) |
+| `begincase_requires_case` | BEGINCASE block with no CASE clause | error | authoritative | active | [diag.begincase_requires_case](../../catalog/diagnostics/begincase_requires_case.md) |
+| `branch_target_label` | Branch() target string without the LABEL token | error | authoritative | active | [diag.branch_target_label](../../catalog/diagnostics/branch_target_label.md) |
+| `builder_directive_case` | Data source builder directive not uppercase | error | authoritative | active | [diag.builder_directive_case](../../catalog/diagnostics/builder_directive_case.md) |
 | `builtin_excess_arguments` | Surplus builtin arguments silently dropped at compile time | warning | tool | active | [diag.builtin_excess_arguments](../../catalog/diagnostics/builtin_excess_arguments.md) |
 | `c_style_comment_closer` | C-style */ before a comment's terminating semicolon | info | style_only | active | [diag.c_style_comment_closer](../../catalog/diagnostics/c_style_comment_closer.md) |
-| `catch_clause_form` | CATCH takes no exception variable or clause content | error | tool | active | [diag.catch_clause_form](../../catalog/diagnostics/catch_clause_form.md) |
-| `catch_order_before_finally` | CATCH appearing after FINALLY in a TRY block | error | tool | active | [diag.catch_order_before_finally](../../catalog/diagnostics/catch_order_before_finally.md) |
-| `class_instantiation_curly` | Built-in class instantiated with parentheses | error | tool | active | [diag.class_instantiation_curly](../../catalog/diagnostics/class_instantiation_curly.md) |
+| `catch_clause_form` | CATCH takes no exception variable or clause content | error | authoritative | active | [diag.catch_clause_form](../../catalog/diagnostics/catch_clause_form.md) |
+| `catch_order_before_finally` | CATCH appearing after FINALLY in a TRY block | error | authoritative | active | [diag.catch_order_before_finally](../../catalog/diagnostics/catch_order_before_finally.md) |
+| `class_instantiation_curly` | Built-in class instantiated with parentheses | error | authoritative | active | [diag.class_instantiation_curly](../../catalog/diagnostics/class_instantiation_curly.md) |
 | `class_member_order` | Class members ordered :INHERIT, :DECLARE, then methods | info | advisory | active | [diag.class_member_order](../../catalog/diagnostics/class_member_order.md) |
-| `class_name_collision` | User-defined :CLASS shadows a built-in SSL class | warning | tool | active | [diag.class_name_collision](../../catalog/diagnostics/class_name_collision.md) |
+| `class_name_collision` | User-defined :CLASS shadows a built-in SSL class | warning | advisory | active | [diag.class_name_collision](../../catalog/diagnostics/class_name_collision.md) |
 | `class_or_script` | :CLASS must be the file's first significant statement | error | authoritative | active | [diag.class_or_script](../../catalog/diagnostics/class_or_script.md) |
-| `code_block_comparison` | Code blocks compared with = or == | warning | style_only | active | [diag.code_block_comparison](../../catalog/diagnostics/code_block_comparison.md) |
-| `code_block_structure` | Code block literal without a bound variable | warning | tool | active | [diag.code_block_structure](../../catalog/diagnostics/code_block_structure.md) |
+| `code_block_comparison` | Code blocks compared with = or == | warning | authoritative | active | [diag.code_block_comparison](../../catalog/diagnostics/code_block_comparison.md) |
+| `code_block_structure` | Code block literal without a bound variable | error | authoritative | active | [diag.code_block_structure](../../catalog/diagnostics/code_block_structure.md) |
 | `comment_swallows_code` | Comment runs past its '*/' and swallows the next statement | warning | authoritative | active | [diag.comment_swallows_code](../../catalog/diagnostics/comment_swallows_code.md) |
 | `comment_termination` | Comment missing its semicolon terminator | error | authoritative | active | [diag.comment_termination](../../catalog/diagnostics/comment_termination.md) |
 | `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | warning | tool | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
-| `complex_sql_placeholder` | Complex expression inside a SQLExecute named placeholder | info | tool | active | [diag.complex_sql_placeholder](../../catalog/diagnostics/complex_sql_placeholder.md) |
-| `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | style_only | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
+| `complex_sql_placeholder` | Complex expression inside a SQLExecute named placeholder | info | advisory | active | [diag.complex_sql_placeholder](../../catalog/diagnostics/complex_sql_placeholder.md) |
+| `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | authoritative | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
-| `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | tool | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
+| `createudobject_builtin_misuse` | CreateUdObject used to construct a built-in SSL class | error | authoritative | active | [diag.createudobject_builtin_misuse](../../catalog/diagnostics/createudobject_builtin_misuse.md) |
 | `datasource_default_required` | Data source parameter missing its inline default (removed — premise was wrong) | error | authoritative | removed | [diag.datasource_default_required](../../catalog/diagnostics/datasource_default_required.md) |
 | `datasource_sql_semicolon` | Bare statement separator in a SQL data-source body | error | authoritative | active | [diag.datasource_sql_semicolon](../../catalog/diagnostics/datasource_sql_semicolon.md) |
 | `datasource_undeclared_placeholder` | Undeclared @name placeholder in a SQL data-source body | warning | authoritative | active | [diag.datasource_undeclared_placeholder](../../catalog/diagnostics/datasource_undeclared_placeholder.md) |
 | `declare_initializer` | :DECLARE with inline initializer | error | authoritative | active | [diag.declare_initializer](../../catalog/diagnostics/declare_initializer.md) |
 | `default_after_parameters` | :DEFAULT must immediately follow :PARAMETERS | error | authoritative | active | [diag.default_after_parameters](../../catalog/diagnostics/default_after_parameters.md) |
-| `default_on_declare_line` | :DEFAULT on the same line as :DECLARE | error | tool | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |
-| `deprecated_keyword` | Legacy keyword discouraged in new code | warning | tool | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
-| `direct_procedure_call` | Procedure called directly instead of via DoProc/ExecFunction | error | tool | active | [diag.direct_procedure_call](../../catalog/diagnostics/direct_procedure_call.md) |
-| `dollar_string_only` | $ containment operator with non-string operands | warning | style_only | active | [diag.dollar_string_only](../../catalog/diagnostics/dollar_string_only.md) |
+| `default_on_declare_line` | :DEFAULT on a name that is not a parameter | error | authoritative | active | [diag.default_on_declare_line](../../catalog/diagnostics/default_on_declare_line.md) |
+| `deprecated_keyword` | Legacy keyword discouraged in new code | warning | advisory | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
+| `direct_procedure_call` | Procedure called directly instead of via DoProc/ExecFunction | error | authoritative | active | [diag.direct_procedure_call](../../catalog/diagnostics/direct_procedure_call.md) |
+| `dollar_string_only` | $ containment operator with non-string operands | warning | authoritative | active | [diag.dollar_string_only](../../catalog/diagnostics/dollar_string_only.md) |
 | `doproc_in_class` | DoProc call inside a class method | error | authoritative | active | [diag.doproc_in_class](../../catalog/diagnostics/doproc_in_class.md) |
-| `dot_property_access` | Dot notation used for property access | error | tool | active | [diag.dot_property_access](../../catalog/diagnostics/dot_property_access.md) |
-| `empty_optional_param_array` | Trailing empty array passed for an optional parameter | info | tool | active | [diag.empty_optional_param_array](../../catalog/diagnostics/empty_optional_param_array.md) |
-| `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | tool | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
+| `dot_property_access` | Dot notation used for property access | error | authoritative | active | [diag.dot_property_access](../../catalog/diagnostics/dot_property_access.md) |
+| `empty_optional_param_array` | Trailing empty array passed for an optional parameter | info | style_only | active | [diag.empty_optional_param_array](../../catalog/diagnostics/empty_optional_param_array.md) |
+| `endfor_invalid` | :ENDFOR used to terminate a FOR loop | error | authoritative | active | [diag.endfor_invalid](../../catalog/diagnostics/endfor_invalid.md) |
+| `equals_empty_string` | `= ""` comparison that is always true | warning | authoritative | active | [diag.equals_empty_string](../../catalog/diagnostics/equals_empty_string.md) |
 | `equals_vs_strict_equals` | String comparison with = is prefix matching | info | advisory | active | [diag.equals_vs_strict_equals](../../catalog/diagnostics/equals_vs_strict_equals.md) |
-| `error_handler_structure` | Empty :ERROR handler | error | tool | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
+| `error_handler_structure` | Empty :ERROR handler | error | authoritative | active | [diag.error_handler_structure](../../catalog/diagnostics/error_handler_structure.md) |
 | `execfunction_class_target` | ExecFunction targets a class file | error | authoritative | active | [diag.execfunction_class_target](../../catalog/diagnostics/execfunction_class_target.md) |
 | `execfunction_missing_quotes` | Unquoted namespace path in ExecFunction/DoProc | error | tool | active | [diag.execfunction_missing_quotes](../../catalog/diagnostics/execfunction_missing_quotes.md) |
 | `exitcase_after_return` | Unreachable :EXITCASE after a branch-level :RETURN | hint | tool | active | [diag.exitcase_after_return](../../catalog/diagnostics/exitcase_after_return.md) |
@@ -58,24 +59,25 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `exitfor_outside_loop` | EXITFOR outside a FOR loop | error | authoritative | active | [diag.exitfor_outside_loop](../../catalog/diagnostics/exitfor_outside_loop.md) |
 | `exitwhile_in_finally` | EXITWHILE inside a FINALLY block | error | authoritative | active | [diag.exitwhile_in_finally](../../catalog/diagnostics/exitwhile_in_finally.md) |
 | `exitwhile_outside_loop` | :EXITWHILE outside a :WHILE loop | error | authoritative | active | [diag.exitwhile_outside_loop](../../catalog/diagnostics/exitwhile_outside_loop.md) |
-| `finally_empty` | Empty :FINALLY block | error | tool | active | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
-| `for_numeric_values` | :FOR loop parts must be numeric | warning | style_only | active | [diag.for_numeric_values](../../catalog/diagnostics/for_numeric_values.md) |
-| `format_arg_not_array` | sFmt:Format called with a scalar instead of the values array | warning | tool | active | [diag.format_arg_not_array](../../catalog/diagnostics/format_arg_not_array.md) |
+| `finally_empty` | Empty :FINALLY block | error | authoritative | active | [diag.finally_empty](../../catalog/diagnostics/finally_empty.md) |
+| `for_numeric_values` | :FOR loop parts must be numeric | warning | authoritative | active | [diag.for_numeric_values](../../catalog/diagnostics/for_numeric_values.md) |
+| `format_arg_not_array` | sFmt:Format called with a scalar instead of the values array | warning | authoritative | active | [diag.format_arg_not_array](../../catalog/diagnostics/format_arg_not_array.md) |
 | `global_assignment` | Assignment to a global variable | error | tool | active | [diag.global_assignment](../../catalog/diagnostics/global_assignment.md) |
-| `hungarian_notation` | Missing Hungarian notation prefix | warning | advisory | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
-| `hungarian_type_mismatch` | Hungarian prefix disagrees with the assigned expression's type | warning | advisory | active | [diag.hungarian_type_mismatch](../../catalog/diagnostics/hungarian_type_mismatch.md) |
-| `identifier_too_long` | Identifier exceeds style-guide length limit | info | tool | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
+| `hungarian_notation` | Missing Hungarian notation prefix | warning | style_only | active | [diag.hungarian_notation](../../catalog/diagnostics/hungarian_notation.md) |
+| `hungarian_type_mismatch` | Hungarian prefix disagrees with the assigned expression's type | warning | style_only | active | [diag.hungarian_type_mismatch](../../catalog/diagnostics/hungarian_type_mismatch.md) |
+| `identifier_too_long` | Identifier exceeds style-guide length limit | info | style_only | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
 | `identifier_too_short` | Identifier shorter than a minimum length (never implemented) | info | tool | removed | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
 | `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
+| `inherit_position` | :INHERIT not directly after :CLASS | error | authoritative | active | [diag.inherit_position](../../catalog/diagnostics/inherit_position.md) |
 | `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
-| `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
-| `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
+| `inline_code_naming` | :BEGININLINECODE requires a name | error | authoritative | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
+| `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | authoritative | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
-| `keyword_uppercase` | SSL keyword not written in uppercase | error | tool | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
-| `label_keyword_form` | Label keyword written in the wrong case | error | tool | active | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
-| `limit_public_vars` | PUBLIC variables discouraged | info | style_only | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
+| `keyword_uppercase` | SSL keyword not written in uppercase | error | authoritative | active | [diag.keyword_uppercase](../../catalog/diagnostics/keyword_uppercase.md) |
+| `label_keyword_form` | Label keyword written in the wrong case | error | authoritative | active | [diag.label_keyword_form](../../catalog/diagnostics/label_keyword_form.md) |
+| `limit_public_vars` | PUBLIC variables discouraged | info | advisory | active | [diag.limit_public_vars](../../catalog/diagnostics/limit_public_vars.md) |
 | `loop_in_finally` | LOOP inside a FINALLY block | error | authoritative | active | [diag.loop_in_finally](../../catalog/diagnostics/loop_in_finally.md) |
 | `loop_outside_loop` | :LOOP outside a :WHILE or :FOR loop | error | authoritative | active | [diag.loop_outside_loop](../../catalog/diagnostics/loop_outside_loop.md) |
 | `max_block_depth` | Block nesting exceeds the configured maximum depth | info | advisory | active | [diag.max_block_depth](../../catalog/diagnostics/max_block_depth.md) |

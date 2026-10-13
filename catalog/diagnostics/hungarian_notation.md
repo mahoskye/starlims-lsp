@@ -3,7 +3,7 @@ id: diag.hungarian_notation
 title: Missing Hungarian notation prefix
 kind: diagnostic
 status: active
-authority: advisory
+authority: style_only
 schema_ref: lints.hungarian_notation
 default_severity: warning
 severity_overridable: true
@@ -48,7 +48,13 @@ history:
       sharing a switch with the type cross-check simply forced consumers
       to take a whole-codebase convention audit to get a correctness
       signal.
-issues: []
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority set to style_only, the level of the records
+      hungarian_variable_names and documented_hungarian_prefixes.
+      Severity question recorded on issue #300.
+issues: ["#300"]
 ---
 
 ## Behavior

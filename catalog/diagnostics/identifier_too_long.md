@@ -3,8 +3,8 @@ id: diag.identifier_too_long
 title: Identifier exceeds style-guide length limit
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: style_only
+schema_ref: naming.length_limits.variable_body_max
 default_severity: info
 severity_overridable: true
 suppressible: true
@@ -33,6 +33,12 @@ history:
       previously produced no names at all, so every name it declared was
       invisible to this behavior. No change on the production corpus's
       default-on output; the names it recovers were simply missing before.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to style_only: the style-guide record
+      identifier_length_limits (level style_only) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

@@ -21,6 +21,11 @@ history:
       lint_rules: a @name with no matching :PARAMETERS declaration is not
       substituted and fails when the query executes; a declared parameter
       never referenced is harmless and stays silent.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Fences carry inline :PARAMETERS defaults, which a data source
+      requires.
 issues: ["ssl-style-guide#51"]
 ---
 
@@ -60,7 +65,7 @@ override to silence it.
 
 ```ssl
 :DSN := "LimsDB";
-:PARAMETERS pFolderNo;
+:PARAMETERS pFolderNo := "";
 
 select SAMPLEID from SAMPLES where FOLDERNO = @pFolder
 ```
@@ -73,13 +78,13 @@ select SAMPLEID from SAMPLES where FOLDERNO = @pFolderNo
 
 ```ssl
 :DSN := "LimsDB";
-:PARAMETERS pFolderNo;
+:PARAMETERS pFolderNo := "";
 
 select SAMPLEID from SAMPLES where FOLDERNO = @PFOLDERNO
 ```
 
 ```ssl
-:PARAMETERS pFolderNo;
+:PARAMETERS pFolderNo := "";
 
 select @@ROWCOUNT from SAMPLES where FOLDERNO = @pFolderNo
 ```
@@ -89,7 +94,7 @@ select SAMPLEID from SAMPLES where NOTE = '@pX' -- mentions @pY
 ```
 
 ```ssl
-:PARAMETERS pFolderNo;
+:PARAMETERS pFolderNo := "";
 
 select SAMPLEID from SAMPLES
 ```

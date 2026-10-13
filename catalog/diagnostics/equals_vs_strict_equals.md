@@ -28,20 +28,33 @@ history:
       inequality, there is no prefix-match asymmetry to warn about. The
       companion warning on = (prefix-match vs == exact) was deliberately
       kept. Any future re-broadening must revisit issue #14 first.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Behavior corrected to what the code does: it fires when an operand
+      is a string literal, not any string-typed expression. The always-
+      true `x = ""` comparison is split out as diag.equals_empty_string
+      at warning.
 issues: []
 ---
 
 ## Behavior
 
-Flags a `=` comparison where either operand is a string: in SSL, `=` on
-strings performs prefix matching (`"abc" = "ab"` is true), which is rarely
-what the author means. The suggestion is `==` for exact comparison.
+Flags a `=` comparison where either adjacent operand is a string
+literal: in SSL, `=` on strings performs prefix matching (`"abc" = "ab"` is
+true), which is rarely what the author means. The suggestion is `==` for
+exact comparison. Only a literal operand is evidence here; `sA = sB`
+between two string-typed names does not flag.
+
+The sharpest case, `x = ""`, is true for every string `x`, so it is also
+reported at warning by `diag.equals_empty_string`.
 
 It must NOT flag:
 
 - `!=` with string operands — `!=` is exact inequality (issue #14);
 - `==` comparisons — already exact;
-- `=` between non-string operands.
+- `=` between non-string operands;
+- `=` between two operands neither of which is a string literal.
 
 ## Examples
 

@@ -3,8 +3,8 @@ id: diag.inline_code_naming
 title: ":BEGININLINECODE requires a name"
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: blocks.inline_code
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -20,6 +20,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code inline_code_naming assigned.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Rationale cited a schema path that does not exist
+      (keywords.inline_code); the requirement lives at
+      blocks.inline_code.identifier_required, now the schema_ref.
+      authority set to authoritative (reference
+      keywords/BEGININLINECODE: the block name is required).
 issues: []
 ---
 
@@ -72,8 +80,7 @@ It must NOT flag when the block is named with a bare identifier
 ## Rationale
 
 The style guide schema marks the name as required
-(`keywords.inline_code.identifier_required: true`, forms `bare_identifier`
-and `quoted_identifier`); an unnamed block is invalid, not merely unstyled,
-hence error severity. Following the catalog convention, `schema_ref` stays
-null because the schema encodes this under `keywords`, not as a `lints`
-rule slug. Introduced in cdbfee6 with the style-guide alignment pass.
+(`blocks.inline_code.identifier_required: true`, forms `bare_identifier`
+and `quoted_identifier`, the entry's `schema_ref`), and the reference
+(keywords/BEGININLINECODE) states the block name is required; an unnamed
+block is invalid, not merely unstyled, hence error severity. Introduced in cdbfee6 with the style-guide alignment pass.

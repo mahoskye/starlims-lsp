@@ -20,6 +20,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      An :ENDFOR closing an open :FOR (endfor_invalid's finding) now
+      closes that loop, so the typo no longer also reports
+      unclosed_block on the :FOR.
 issues: []
 ---
 
@@ -51,7 +57,10 @@ It must NOT flag:
 - correctly paired blocks, however deeply nested;
 - a stray end keyword with nothing open — that is `unmatched_block_end`;
 - an end keyword that matches no open block at any depth — that is
-  `mismatched_block_end`, and no opener is popped.
+  `mismatched_block_end`, and no opener is popped;
+- a `:FOR` closed by the invalid `:ENDFOR` — `endfor_invalid` reports the
+  typo, and the `:ENDFOR` still closes the loop it was meant to close
+  (issue #255).
 
 ## Examples
 
@@ -68,6 +77,16 @@ It must NOT flag:
 :PROCEDURE Demo;
 	:IF nCount > 0;
 		nCount := 1;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE i;
+	:FOR i := 1 :TO 10;
+	:ENDFOR;
 :ENDPROC;
 ```
 
