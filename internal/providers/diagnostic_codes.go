@@ -150,3 +150,11 @@ const (
 	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
 	CodeHungarianTypeMismatch       = "hungarian_type_mismatch"
 )
+
+// Pipeline-level codes: emitted by the diagnostics pipeline itself rather
+// than by a rule.
+const (
+	// CodeInternalError reports a panic recovered during diagnostic
+	// collection (feature.diagnostics_pipeline A7).
+	CodeInternalError = "internal_error"
+)

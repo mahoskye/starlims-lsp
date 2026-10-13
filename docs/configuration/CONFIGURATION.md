@@ -110,7 +110,7 @@ interface DiagnosticOptions {
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
-  rules: { [slug: string]: "off" | "info" | "warn" | "warning" | "error" };
+  rules: { [slug: string]: "off" | "hint" | "info" | "warn" | "warning" | "error" };
   endpointPatterns: string[];
 }
 
@@ -619,9 +619,13 @@ Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `
 Per-rule severity overrides, keyed by the diagnostic's stable code slug
 (the `Code` value shown with each diagnostic; canonical list in
 `internal/providers/diagnostic_codes.go` and `catalog/diagnostics/`).
-Recognized values: `"off"` (drop the diagnostic), `"info"`, `"warn"`,
-`"warning"`, `"error"`. Slugs not present in the map pass through with
-their default severity; unknown slugs are ignored. Added in v0.5.0
+Recognized values: `"off"` (drop the diagnostic), `"hint"`, `"info"`,
+`"warn"`, `"warning"`, `"error"`. Slugs and values are matched
+case-insensitively. Slugs not present in the map pass through with
+their default severity; unknown slugs are ignored, and so is an entry
+with any other value — it changes nothing, and does not exempt the rule
+from the info gate (`ssl.diagnostics.infoDiagnostics`). Added in v0.5.0;
+`"hint"` and case-insensitive matching added in the release after v0.24.0
 (catalog: DECISIONS.md D2).
 
 ```json

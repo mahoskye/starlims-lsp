@@ -70,6 +70,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `inherit_qualified_name` | Inherit base-name form (never implemented) | warning | style_only | removed | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | tool | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
+| `internal_error` | Internal error during diagnostic collection | error | tool | active | [diag.internal_error](../../catalog/diagnostics/internal_error.md) |
 | `invalid_limstypeex_comparison` | LimsTypeEx compared against a string outside its result set | error | tool | active | [diag.invalid_limstypeex_comparison](../../catalog/diagnostics/invalid_limstypeex_comparison.md) |
 | `invalid_operator_sequence` | C-style operator that is invalid in SSL | error | tool | active | [diag.invalid_operator_sequence](../../catalog/diagnostics/invalid_operator_sequence.md) |
 | `invalid_sql_param` | Named SQL parameter matches no declared variable | warning | tool | active | [diag.invalid_sql_param](../../catalog/diagnostics/invalid_sql_param.md) |
