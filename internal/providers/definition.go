@@ -245,17 +245,21 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 
 		matches := wordRegex.FindAllStringIndex(lineText, -1)
 		for _, match := range matches {
+			// Regex matches are byte offsets; positions count runes
+			// (issue #307).
+			matchCol := utf8.RuneCountInString(lineText[:match[0]])
+			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
+
 			// Skip declaration if not including it
 			if !includeDeclaration && declarationFound {
-				if i == declarationLine && match[0] <= declarationChar && declarationChar < match[1] {
+				if i == declarationLine && matchCol <= declarationChar && declarationChar < matchCol+matchLen {
 					continue
 				}
 			}
 
 			// Skip matches inside comments and non-dispatch strings; keep
 			// DoProc/ExecFunction first-argument dispatch targets (issue #43).
-			matchOffset := lineStartOffsets[i] + utf8.RuneCountInString(lineText[:match[0]])
-			matchLen := utf8.RuneCountInString(lineText[match[0]:match[1]])
+			matchOffset := lineStartOffsets[i] + matchCol
 			if !isReferenceMatch(tokens, matchOffset, matchLen) {
 				continue
 			}
@@ -270,8 +274,8 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 			locations = append(locations, Location{
 				URI: uri,
 				Range: Range{
-					Start: Position{Line: i, Character: match[0]},
-					End:   Position{Line: i, Character: match[0] + len(word)},
+					Start: Position{Line: i, Character: matchCol},
+					End:   Position{Line: i, Character: matchCol + matchLen},
 				},
 			})
 		}
@@ -281,7 +285,7 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 }
 
 // resolveDeclarationPosition locates the symbol's declaration from the parsed
-// procedures/variables (0-based line, byte column within the line). Scope
+// procedures/variables (0-based line, rune column within the line). Scope
 // precedence mirrors FindDefinition: local/parameter in the cursor's
 // procedure, then public, then any declared variable. Returns found=false
 // when the symbol has no known declaration or no symbol info was provided.
@@ -296,7 +300,7 @@ func resolveDeclarationPosition(wordLower string, wordRegex *regexp.Regexp, line
 			return 0, 0, false
 		}
 		if m := wordRegex.FindStringIndex(lines[declLine]); m != nil {
-			return declLine, m[0], true
+			return declLine, utf8.RuneCountInString(lines[declLine][:m[0]]), true
 		}
 		return declLine, 0, true
 	}

@@ -10,6 +10,7 @@ tests:
   - internal/providers/identifier_roles_test.go
   - internal/providers/providers_test.go
   - internal/server/handler_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 / f27f727"
@@ -59,6 +60,13 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Location ranges count UTF-16 code units (A17): they carried
+      rune columns, one unit early per emoji before the target on
+      the same line. A cross-file target is converted against its
+      own file's text.
 issues: ["#41"]
 ---
 
@@ -107,6 +115,11 @@ issues: ["#41"]
   A shaped receiver whose shape lacks the member is null — never a
   fallback to an unrelated same-named symbol. Unshaped receivers keep
   the prior word-based behavior.
+- Location ranges count characters in UTF-16 code units, the encoding
+  the server advertises, converted against the target document's
+  current text (the open buffer, or the file on disk), so a character
+  outside the Basic Multilingual Plane before the target on its line
+  cannot shift the range (issue #307).
 
 ## Acceptance
 
@@ -126,6 +139,7 @@ issues: ["#41"]
 - A14: Given `oObj := CreateUDObject({{"Name", "x"}});` followed by `oObj:Total := 5;` and later uses, when go-to-definition is invoked on `Name` or `Total` after `oObj:`, then the Location is the initializer key or the first augmenting assignment respectively.
 - A15: Given the same shaped `oObj` and go-to-definition on the member in `oObj:Unknown`, when the member is not in the inferred shape, then the response is null — even if an unrelated variable named `Unknown` exists in the file.
 - A16: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when definition is requested, then no location is returned — a property is not the like-named local, and no answer beats a wrong one.
+- A17: Given a declaration preceded on its line by an emoji (one character, two UTF-16 code units), when go-to-definition is invoked on a use, then the returned range starts and ends at the declared name's UTF-16 offsets (issue #307).
 
 ## Rationale
 

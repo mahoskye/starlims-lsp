@@ -10,6 +10,7 @@ config:
   - ssl.inlayHints.minParameterCount
 tests:
   - internal/providers/inlayhints_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-02-02
     ref: "b44eaf9"
@@ -25,6 +26,12 @@ history:
       string-literal first argument resolves to a same-file procedure and
       the array elements are hinted with its parameter names. Dynamic
       targets stay unhinted.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Hint positions count UTF-16 code units (A9): they carried rune
+      columns, one unit early per emoji before the argument on its
+      line.
 issues: ["#46"]
 ---
 
@@ -52,6 +59,9 @@ Serves `textDocument/inlayHint` with parameter-name hints:
   `ssl.inlayHints.minParameterCount` (default 2) suppresses hints for
   functions whose signature has fewer parameters than the threshold.
 - Only calls within the client-requested line range are processed.
+- Hint positions count characters in UTF-16 code units, the encoding
+  the server advertises, so a character outside the Basic Multilingual
+  Plane earlier on the line cannot shift a hint (issue #307).
 
 ## Acceptance
 
@@ -63,6 +73,7 @@ Serves `textDocument/inlayHint` with parameter-name hints:
 - A6: Given `ssl.inlayHints.enabled: false`, when hints are requested, then the result is empty.
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
+- A9: Given `sX := "<emoji>" + Left(sX, 1);` with an emoji (one character, two UTF-16 code units) in the string, when hints are requested, then each hint sits at its argument's UTF-16 offset (issue #307).
 
 ## Rationale
 

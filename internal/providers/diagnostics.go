@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
@@ -2584,7 +2585,8 @@ func isFirstSignificantStatementKeyword(tokens []lexer.Token, keyword string) bo
 	return false
 }
 
-// tokenToRange converts a token to an LSP range.
+// tokenToRange converts a token to a range, its end in runes like its
+// start (issue #307).
 func tokenToRange(token lexer.Token) Range {
 	return Range{
 		Start: Position{
@@ -2593,7 +2595,7 @@ func tokenToRange(token lexer.Token) Range {
 		},
 		End: Position{
 			Line:      token.Line - 1,
-			Character: token.Column - 1 + len(token.Text),
+			Character: token.Column - 1 + utf8.RuneCountInString(token.Text),
 		},
 	}
 }
@@ -4666,7 +4668,7 @@ func checkEmptyOptionalParamArrays(tokens []lexer.Token) []Diagnostic {
 			Severity: SeverityInfo,
 			Range: Range{
 				Start: Position{Line: tokens[argStarts[argPos]].Line - 1, Character: tokens[argStarts[argPos]].Column - 1},
-				End:   Position{Line: tokens[argEnds[argPos]].Line - 1, Character: tokens[argEnds[argPos]].Column - 1 + len(tokens[argEnds[argPos]].Text)},
+				End:   Position{Line: tokens[argEnds[argPos]].Line - 1, Character: tokens[argEnds[argPos]].Column - 1 + utf8.RuneCountInString(tokens[argEnds[argPos]].Text)},
 			},
 			Message: fmt.Sprintf("Omit the trailing empty array for '%s' instead of passing '{}'", token.Text),
 			Source:  "ssl-lsp",

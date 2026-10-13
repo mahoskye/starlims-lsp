@@ -249,36 +249,28 @@ func getWordRange(text string, line, column int, word string) *Range {
 	}
 
 	lineText := lines[line-1]
-	wordLower := strings.ToLower(word)
 
-	// Find the word in the line, accounting for the cursor position
-	pos := 0
-	for {
-		idx := strings.Index(strings.ToLower(lineText[pos:]), wordLower)
-		if idx == -1 {
-			break
+	// Find the whole-word occurrence holding the cursor. The scan runs
+	// over bytes; the cursor and the returned range count runes (issue
+	// #307), so a non-ASCII character earlier on the line cannot shift
+	// either.
+	for b := 0; b+len(word) <= len(lineText); b++ {
+		end := b + len(word)
+		if !strings.EqualFold(lineText[b:end], word) {
+			continue
+		}
+		// Verify it's a whole word (not part of a larger identifier)
+		if (b > 0 && isIdentifierChar(lineText[b-1])) || (end < len(lineText) && isIdentifierChar(lineText[end])) {
+			continue
 		}
 
-		startCol := pos + idx + 1 // 1-based column
-		endCol := startCol + len(word)
-
-		// Check if cursor is within this occurrence
+		startCol := utf8.RuneCountInString(lineText[:b]) + 1 // 1-based column
+		endCol := startCol + utf8.RuneCountInString(word)
 		if column >= startCol && column <= endCol {
-			// Verify it's a whole word (not part of a larger identifier)
-			isWordStart := startCol == 1 || !isIdentifierChar(lineText[startCol-2])
-			isWordEnd := endCol > len(lineText) || !isIdentifierChar(lineText[endCol-1])
-
-			if isWordStart && isWordEnd {
-				return &Range{
-					Start: Position{Line: line - 1, Character: startCol - 1},
-					End:   Position{Line: line - 1, Character: endCol - 1},
-				}
+			return &Range{
+				Start: Position{Line: line - 1, Character: startCol - 1},
+				End:   Position{Line: line - 1, Character: endCol - 1},
 			}
-		}
-
-		pos += idx + 1
-		if pos >= len(lineText) {
-			break
 		}
 	}
 

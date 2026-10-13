@@ -28,6 +28,7 @@ tests:
   - internal/providers/sql_formatter_test.go
   - internal/server/server_test.go
   - internal/server/handler_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 (v0.1.0)"
@@ -63,6 +64,12 @@ history:
       semicolons into SQL and re-cased bind variables. Formatting them
       with the SQL engine is deferred until the SQL lexer understands
       Oracle-style :bind variables.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      The full-document edit ends at the last line's length in UTF-16
+      code units (A11). It used the byte length, an overshoot
+      clients clamped to the line end.
 issues: []
 ---
 
@@ -113,6 +120,10 @@ not restate them.
   statement semicolons into SQL and re-case `:bind` variables. The CLI,
   which has no file-type context, applies the same content classifier to
   every input. SSL-mode data sources format normally.
+- Edit ranges count characters in UTF-16 code units, the encoding the
+  server advertises: the full-document edit ends at the last line's
+  UTF-16 length, and a range edit ends at the UTF-16 length of its last
+  line (issue #307).
 
 ## Acceptance
 
@@ -126,6 +137,7 @@ not restate them.
 - A8: Given different `ssl.format.*` option values (e.g. indentStyle tab vs space), when the same document is formatted under each, then the outputs differ accordingly — the configured options are honored.
 - A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
 - A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
+- A11: Given a document whose last line holds an emoji (one character, two UTF-16 code units), when `textDocument/formatting` is requested, then the full-document edit ends at that line's UTF-16 length (issue #307).
 
 ## Rationale
 

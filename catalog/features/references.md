@@ -12,6 +12,7 @@ tests:
   - internal/providers/crossfile_test.go
   - internal/server/handler_test.go
   - internal/server/cross_file_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "f27f727 (v0.2.0)"
@@ -50,6 +51,14 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Locations count UTF-16 code units (A17). The word-match search
+      reported byte columns, so any non-ASCII text before a match
+      on the same line shifted it; each location is now converted
+      against its own document's text, including closed files
+      reached cross-file.
 issues: ["#42", "#43", "#125"]
 ---
 
@@ -104,6 +113,11 @@ issues: ["#42", "#43", "#125"]
   (case-insensitive) and the match spans the entire string content — the
   dispatch-target case. Code-context matches (including code blocks) are
   kept.
+- Locations count characters in UTF-16 code units, the encoding the
+  server advertises. Each location is converted against its own
+  document's current text (the open buffer, or the file on disk for a
+  closed file), so a character outside the Basic Multilingual Plane
+  earlier on the line cannot shift it (issue #307).
 
 ## Acceptance
 
@@ -123,6 +137,7 @@ issues: ["#42", "#43", "#125"]
 - A14: Given a dotted dispatch self-site inside the definition file, when references are requested on the procedure, then that site appears exactly once in the results.
 - A15: Given a variable `sName` and a member access `oRec:sName`, when references are requested on the variable, then the member-access occurrence is NOT returned.
 - A16: Given a variable and a procedure sharing a name, when references are requested from one of them, then only that symbol's own occurrences are returned.
+- A17: Given an emoji (one character, two UTF-16 code units) or an accented letter before an occurrence on the same line — in the current document, or in a closed caller file reached cross-file — when references are requested, then the location starts and ends at the occurrence's UTF-16 offsets (issue #307).
 
 ## Rationale
 

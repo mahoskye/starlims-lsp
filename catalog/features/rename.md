@@ -10,6 +10,7 @@ tests:
   - internal/providers/identifier_roles_test.go
   - internal/providers/rename_test.go
   - internal/server/cross_file_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2025-12-05
     ref: "vs-code-ssl-formatter#40"
@@ -47,6 +48,15 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Edit and prepare-rename ranges count UTF-16 code units (A19),
+      closing the position-encoding Known gap. Word-match edits carried
+      byte columns and token-based ones rune columns, so text before a
+      site on the same line could shift an edit; each document's edits
+      are now converted against that document's own text, including
+      closed files in a cross-file rename.
 issues: ["#43", "#125"]
 ---
 
@@ -104,6 +114,11 @@ issues: ["#43", "#125"]
   this feature; see Known gaps).
 - Without a workspace index, rename behaves exactly as the single-file
   contract: a single WorkspaceEdit against the current document.
+- Edit and prepare-rename ranges count characters in UTF-16 code units, the
+  encoding the server advertises. Each document's edits are converted
+  against that document's current text — the open buffer, or the file on
+  disk for a closed file — so a character outside the Basic Multilingual
+  Plane earlier on the line cannot shift an edit (issue #307).
 
 ## Acceptance
 
@@ -125,6 +140,7 @@ issues: ["#43", "#125"]
 - A16: Given a caller file rewritten on disk after indexing (site moved, no re-index), when the rename executes, then the edit is computed at the site's fresh position from current disk content.
 - A17: Given a variable `sName` and a member access `oRec:sName` in the same file, when the variable is renamed, then the member access is NOT edited — a property belongs to the receiver's type, not to the file's variable of that spelling.
 - A18: Given a variable `sName` and a `:PROCEDURE sName;` in the same file, when the variable is renamed then the procedure header and its call sites are NOT edited, and when the procedure is renamed then the variable's declaration and uses are NOT edited.
+- A19: Given an emoji (one character, two UTF-16 code units) before an occurrence on the same line — in the current document, or in a closed caller file reached by a cross-file rename — when prepare-rename or rename runs, then the returned range and every edit start and end at the occurrence's UTF-16 offsets, not one unit early (issue #307).
 
 ## Rationale
 
@@ -163,7 +179,3 @@ splice the new name into the wrong bytes.
   sight (1-part scoping rule) — renaming the procedure breaks it silently.
 - **Concatenated dispatch strings.** `DoProc("CAT." + sName)` is never
   edited.
-- **Position encoding.** The server does not negotiate `positionEncoding`
-  and computes byte columns; non-ASCII characters before a site on the same
-  line can skew edit columns under UTF-16 clients. Pre-existing; multi-file
-  edits widen the blast radius.

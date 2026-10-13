@@ -13,6 +13,7 @@ tests:
   - internal/providers/sql_mode_test.go
   - internal/providers/region_body_test.go
   - internal/server/server_test.go
+  - internal/server/utf16_output_test.go
   - cmd/starlims-lsp/validate_test.go
 history:
   - date: 2026-04-30
@@ -165,6 +166,14 @@ history:
       own catalog entry. Rule overrides: keys match case-insensitively,
       "hint" is a recognized value, and an unrecognized value no longer
       exempts the rule from the info gate (A2, A3).
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Published ranges count UTF-16 code units (A32). They carried the
+      lexer's rune columns, so each character outside the Basic
+      Multilingual Plane (an emoji) earlier on the line put a range one
+      unit too far left. The SQL lexer behind the data-source checks
+      counted bytes, which also skewed ranges after accented text.
 issues: []
 ---
 
@@ -181,6 +190,12 @@ rules (those are `diag.*` entries).
 - Every emitted diagnostic MUST carry a stable, machine-readable `Code`
   slug (canonical list in `internal/providers/diagnostic_codes.go`) and
   `Source: "ssl-lsp"`, propagated to the LSP wire.
+- Published ranges count characters in UTF-16 code units, the encoding the
+  server advertises (`positionEncoding: "utf-16"`). Checks compute rune
+  columns; the server converts each range against the document's text when
+  it publishes, so a character outside the Basic Multilingual Plane (two
+  UTF-16 units) earlier on the line cannot shift a range (issue #307). The
+  `--validate` CLI reports 1-based rune columns.
 - Severity overrides: `ssl.diagnostics.rules` maps a Code slug to one of
   `off` (drop the diagnostic), `hint`, `info`, `warn`/`warning`, or
   `error` (remap severity). Keys and values are matched
@@ -307,6 +322,7 @@ rules (those are `diag.*` entries).
 - A29: Given the `--validate` CLI, when `--strict` is passed, then `undeclared_variable`, `unused_variable`, and `invalid_sql_param` are all enabled for that run, and no other opt-in option is — `--strict` implies neither `--info` nor the Hungarian checks; without it all three stay off, so the CLI default matches the editor default. None of the three is error severity, so a document whose only findings are strict findings stays `valid` (issue #249).
 - A30: Given a data-source document, when a caller enables `CheckUndeclaredVars`, `CheckUnusedVars`, or `CheckSQLParams`, then none of the three runs — the data-source dialect does not follow SSL scoping (directive values are bare identifiers used as values, `:PARAMETERS` carries inline `:=` defaults, and the SQL body names columns and keywords), and `checkDataSourceUndeclaredPlaceholders` is its placeholder check instead. The same options on an ordinary SSL document still report (issue #249).
 - A31: Given a `.ds` document whose builder-directive / `:PARAMETERS` header is preceded by a banner written in SSL comment style (a `/*` run closed by `;` rather than `*/`), when the header is split, then the banner is masked to blanks like the terminated form and the header scan reaches the directives beneath it — so the body classifies on its own content and a SQL body stays in SQL mode. The leading-unterminated-comment signal decides only the headerless shapes: a comment-only stub and an SSL data source opening with an unterminated comment both still classify as SSL (issue #249, preserving A16/A22).
+- A32: Given a line holding an emoji (one character, two UTF-16 code units) before a flagged construct — an SSL finding such as `!==`, or an undeclared `@name` placeholder in a SQL data-source body — when diagnostics are published, then the range starts and ends at the construct's UTF-16 offsets, not one unit early; a line without such characters is unaffected (issue #307).
 
 ## Rationale
 
