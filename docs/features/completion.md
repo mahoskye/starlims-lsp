@@ -154,7 +154,7 @@ Snippet templates follow the bundled style-guide defaults:
 - Procedure snippets place `:DEFAULT` immediately after `:PARAMETERS`
 - SQL snippets use `SQLExecute` named-parameter style and `RunSQL` positional-parameter style
 - Class snippets avoid an extra class-body indent because `:CLASS` extends to EOF and has no `:ENDCLASS`
-- Region snippets use comment-based `/* region ...;` / `/* endregion;` rather than legacy functional `:REGION`
+- Region snippets use comment-based `/* region ...;` / `/* endregion;` rather than functional `:REGION` (which stores its body as text for `GetRegion()`)
 - Procedure completions insert `DoProc(...)` dispatch snippets in script files, and `Me:MethodName(...)` snippets when completion is requested inside a `:CLASS` method (because `DoProc` is a compile-time error inside class methods — all forms are rejected)
 - Class-context forms (`Me`, `Base`, `Constructor`) are only offered in class-method context
 

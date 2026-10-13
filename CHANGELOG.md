@@ -263,6 +263,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   format, `Eval` does not run a string, `:INHERIT` and `CreateUdObject`
   need category-qualified names, and `UsrMes` had its arguments reversed
   (#259).
+An audit of inherited and legacy behavior (#257). Every compatibility
+shim, alias, fallback, and setting was traced to its origin and its
+consumers, and given a decision. The full record is in
+`docs/reviews/legacy-inventory.md`. No setting, CLI flag, diagnostic
+code, or output format changes for either distribution.
+
+### Fixed
+- **Docs no longer call `:REGION` and `:BEGININLINECODE` "legacy".** Both
+  are current, supported SSL (bodies stored for `GetRegion()` /
+  `GetInlineCode()`). #28 settled that when it removed `region_legacy`,
+  but several docs still said otherwise, including one that claimed the
+  LSP emits an info diagnostic for `:REGION`. The keyword hover text is
+  replaced by the reference's own in #287.
+- **CONFIGURATION.md matches the server.** `builtinFunctionCase` defaults
+  to `"PascalCase"`, not `"preserve"`. `endpointPatterns` are
+  case-insensitive substrings, not globs (the old example could never
+  match). `max_block_depth` is info-tier, not a warning. `unusedVariables`
+  is a client setting. `signatureHelp.autoTrigger` applies only at
+  startup. Section 10 now maps the VS Code extension's setting names to
+  server keys instead of presenting server keys as VS Code settings, and
+  Appendix A lists all settings.
+- `diag.deprecated_keyword` catalog frontmatter: `authority: style_only`,
+  `schema_ref: lints.deprecated_keywords`. The style guide owns the rule
+  now. Behavior and warning severity are unchanged.
+
+### Removed
+- **Dead internals, no behavior change.** Removed: the unread `root`
+  argument of `Parser.ExtractVariables`, and `style != "compact"` guards
+  that could no longer be false after `compact` became an alias. (The
+  unread `procedures` argument of `GetSignatureHelpWithProcedures` and the
+  unreachable curated signatures are left to #287, which replaces the
+  curated signature data with the reference's.)
+
+### Deprecated
+- **`ssl.format.sql.style: "compact"`** was already a deprecated alias
+  for `canonicalCompact` (#219). It now has a removal plan. First the VS
+  Code extension drops it from its enum and migrates stored values. Then
+  the next LSP minor release removes the alias. Nothing changes in this
+  release. `--format` callers are unaffected: the CLI cannot select a SQL
+  style.
 
 ## [0.24.0] - 2026-09-21
 

@@ -383,8 +383,8 @@ func TestFindProcedureAtLine(t *testing.T) {
 func TestParser_ExtractVariables_Declare(t *testing.T) {
 	input := `:DECLARE alpha, beta;`
 
-	p, root := parseInput(t, input)
-	variables := p.ExtractVariables(root)
+	p, _ := parseInput(t, input)
+	variables := p.ExtractVariables()
 
 	if len(variables) != 2 {
 		t.Fatalf("expected 2 variables, got %d", len(variables))
@@ -411,8 +411,8 @@ func TestParser_ExtractVariables_PublicAndParameters(t *testing.T) {
 	input := `:PUBLIC gamma;
 :PARAMETERS delta;`
 
-	p, root := parseInput(t, input)
-	variables := p.ExtractVariables(root)
+	p, _ := parseInput(t, input)
+	variables := p.ExtractVariables()
 
 	gamma := findVariable(variables, "gamma")
 	delta := findVariable(variables, "delta")

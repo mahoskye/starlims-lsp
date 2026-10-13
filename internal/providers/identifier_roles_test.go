@@ -26,7 +26,7 @@ func symbolInfo(t *testing.T, text string) ([]parser.ProcedureInfo, []parser.Var
 	t.Helper()
 	p := parser.NewParser(lexer.NewLexer(text).Tokenize())
 	ast := p.Parse()
-	return p.ExtractProcedures(ast), p.ExtractVariables(ast)
+	return p.ExtractProcedures(ast), p.ExtractVariables()
 }
 
 func editedLines(res *RenameResult) []int {

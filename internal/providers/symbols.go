@@ -98,7 +98,7 @@ func GetDocumentSymbolsFromTokens(tokens []lexer.Token, ast *parser.Node) []Docu
 func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []DocumentSymbol {
 	// Extract all elements first
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	regions := extractRegions(tokens)
 
 	// Build procedure symbols

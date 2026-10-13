@@ -24,8 +24,9 @@ type SQLFormattingOptions struct {
 // SQL formatting styles:
 // - "standard": Simple clause breaks (FROM, WHERE, JOIN on new lines).
 // - "canonicalCompact": Balanced formatting with indented AND/OR and smart column wrapping.
-// - "compact": Minimal formatting, single line where possible.
 // - "expanded": Each column/condition on its own line.
+// "compact" is a deprecated alias for "canonicalCompact" (issue #219),
+// kept while the VS Code extension still offers it (issue #257).
 
 // DefaultSQLFormattingOptions returns default SQL formatting options.
 // Default follows the official STARLIMS Style Guide.
@@ -362,8 +363,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				style = "canonicalCompact"
 			}
 
-			// Break conditions for major clauses (all styles except compact)
-			if style != "compact" && SQLBreakBeforeKeywords[upperText] && t.Type == SQLTokenKeyword {
+			// Break conditions for major clauses
+			if SQLBreakBeforeKeywords[upperText] && t.Type == SQLTokenKeyword {
 				// Don't break before JOIN if preceded by modifier
 				if upperText == "JOIN" && prev != nil && SQLJoinModifiers[prevUpper] {
 					needsBreak = false
@@ -468,13 +469,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// SET clause formatting. Plain UPDATE breaks every assignment to
 			// its own line (S38); MERGE keeps the first assignment on the
 			// UPDATE SET line and aligns the rest under it (S43, issue #95).
-			if style != "compact" && prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
+			if prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
 				}
 			}
-			if style != "compact" && prev != nil && prev.Text == "," && currentClause == "SET" && parenDepth == 0 {
+			if prev != nil && prev.Text == "," && currentClause == "SET" && parenDepth == 0 {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
@@ -492,7 +493,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// (S34/S35, issue #93): the '(' stays on its keyword's line,
 			// the list starts on the next line indented one level, and the
 			// ')' closes on its own line at the parent indent.
-			if style != "compact" && rootCommand != "MERGE" && t.Text == "(" &&
+			if rootCommand != "MERGE" && t.Text == "(" &&
 				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
 				subqueryParenDepths[parenDepth] = true
 				closerIndent := ""
@@ -504,7 +505,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 			// Content of a block paren starts on its own line, one level past
 			// the closer's indent.
-			if style != "compact" && prev != nil && prev.Text == "(" && t.Text != ")" {
+			if prev != nil && prev.Text == "(" && t.Text != ")" {
 				if closerIndent, ok := blockParens[parenDepth]; ok {
 					needsBreak = true
 					extraIndent = closerIndent
@@ -512,7 +513,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 
 			// Subquery SELECT — parenDepth already provides one level of indent
-			if style != "compact" && upperText == "SELECT" && prev != nil && prev.Text == "(" {
+			if upperText == "SELECT" && prev != nil && prev.Text == "(" {
 				needsBreak = true
 				subqueryParenDepths[parenDepth] = true
 			}
