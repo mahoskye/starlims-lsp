@@ -133,9 +133,14 @@ tests. Tests exist to cover stated criteria, not to inflate counts.
 
 No formatter behavior may modify the content of string literals or
 comments — spacing, casing, operators, semicolons inside them are the
-author's bytes. Sole deliberate exception: detected SQL strings
-(fmt.sql_in_strings), a boundary that was reversed twice before settling
-(extension #28 → #50/#51 → #64).
+author's bytes. This binds the line-oriented post-passes too: a line that
+begins inside a multi-line string, comment, code block or `:REGION` body is
+never edited, separated or capped (issue #255). Two deliberate exceptions:
+detected SQL strings (fmt.sql_in_strings), a boundary that was reversed
+twice before settling (extension #28 → #50/#51 → #64); and trailing
+whitespace at the line ends of a multi-line comment's interior, which
+fmt.trim_trailing_whitespace removes because it is invisible and changes
+nothing the comment says (string line ends are never trimmed).
 
 ## D6 — Quiet-by-default interaction (2026-05-06→14, PRs #10/#13)
 

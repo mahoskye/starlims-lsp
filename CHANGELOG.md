@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The formatter no longer changes string, comment or region contents.**
+  The blank-line-between-blocks pass (default on) inserted a blank line
+  inside multi-line strings, comments and `:REGION` bodies, which changed a
+  string's runtime value; the blank-line cap collapsed blank lines there
+  too. Both line-oriented passes now skip lines that start inside a
+  literal (DECISIONS.md D7).
+- **Range formatting reads the whole document.** Formatting a selection
+  inside a multi-line comment or `[...]` string could add a `;` that ended
+  the comment early. The range now widens to whole tokens.
+- **No `;` after a keyword whose operand is on the next line.**
+  `:IF` / `bReady;` became `:IF;`, and `:RETURN` / `nX;` changed meaning.
+- **Built-in casing leaves member calls alone.** `oS:replace(...)` was
+  re-cased to `oS:Replace(...)`; .NET members are case-sensitive.
+- **Code-block literals:** a brace inside a string in the body no longer
+  opens or closes the literal (`{|x| x + "}"}` ended early, `"{"` swallowed
+  the file); `commaSpacing: false` applies inside the body.
+- **Wrapping keeps the source's separators** (`commaSpacing` and
+  `operatorSpacing` off are honored on wrapped lines), never breaks before
+  an end-of-line comment, and stays stable on chained continuations.
+- **Idempotence:** a comma before a same-line comment no longer gains a
+  space on every other pass, and an unterminated nested bracket string
+  (`[[a]`) is left unformatted instead of getting a `;` inside it.
+- `:REGION` indentation after a member-like token is stable (#311, shape 4).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

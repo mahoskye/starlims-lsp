@@ -21,6 +21,13 @@ history:
       The streaming formatter no longer collapses source blank-line runs to
       one; 0 now genuinely preserves vertical whitespace, and caps > 1 are
       reachable. Capping (when set) is done entirely by the post-pass.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Blank lines inside a multi-line string literal were capped like
+      source blank lines, changing the string's value; lines inside a
+      multi-line string, comment, code block or :REGION body are now
+      left alone (D7).
 issues: ["#37"]
 ---
 
@@ -34,6 +41,9 @@ unchanged — the streaming formatter emits exactly the newlines the source
 had, so authors keep multi-blank-line groupings through a format (issue
 #37). Intermediate caps work too: a cap of 2 turns a five-blank-line run
 into two, leaving one- and two-blank runs alone.
+
+Blank lines inside a multi-line string literal, comment, code block or
+`:REGION` body are literal content, not a run: they are never capped (D7).
 
 Procedure boundaries are the exception: fmt.blank_lines_between_procs
 normalizes the run between `:ENDPROC;` and the next `:PROCEDURE` to its own
@@ -89,6 +99,18 @@ A cap of 1 keeps the single normalized blank line at a procedure boundary:
 
 :PROCEDURE Second;
 :ENDPROC;
+```
+
+Blank lines inside a multi-line string are part of its value and survive
+the cap:
+
+### Idempotent
+
+```ssl
+sTxt := "first
+
+
+last";
 ```
 
 ## Rationale
