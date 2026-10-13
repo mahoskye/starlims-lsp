@@ -28,13 +28,7 @@ func GetHover(text string, line, column int, procedures []parser.ProcedureInfo, 
 	if hover := getKeywordHover(word); hover != nil {
 		return hover
 	}
-	if hover := getMeKeywordHover(word); hover != nil {
-		return hover
-	}
-	if hover := getBaseKeywordHover(word); hover != nil {
-		return hover
-	}
-	if hover := getConstructorHover(word); hover != nil {
+	if hover := getClassContextHover(word); hover != nil {
 		return hover
 	}
 	if hover := getFunctionHover(word); hover != nil {
@@ -105,7 +99,7 @@ func GetEndpointAmbientHover(word string) *Hover {
 		b.WriteString(det.Summary)
 		b.WriteString("\n\n")
 	}
-	b.WriteString("Not declared with `:DECLARE` — do not qualify with `Me:`. Available only in endpoint scripts.\n")
+	b.WriteString("Pre-set by the runtime in endpoint scripts; not declared with `:DECLARE`.\n")
 	if det.Syntax != "" {
 		b.WriteString("\n**Syntax:**\n\n```ssl\n")
 		b.WriteString(det.Syntax)
@@ -115,28 +109,41 @@ func GetEndpointAmbientHover(word string) *Hover {
 	obj := constants.GeneratedReturnsObjectDetails[strings.ToLower(backing)]
 	writeMemberTables(&b, obj.Properties, obj.Methods)
 
-	if meta, ok := constants.LookupMeta(backing); ok {
-		if extra := formatElementMeta(meta); extra != "" {
-			b.WriteString("\n")
-			b.WriteString(extra)
+	// One set of sections: the ambient's own page (how Request/Response
+	// behave in and outside an endpoint) followed by the backing object's.
+	var merged constants.ElementMeta
+	appendMeta := func(m constants.ElementMeta, ok bool) {
+		if !ok {
+			return
 		}
+		merged.Exceptions = append(merged.Exceptions, m.Exceptions...)
+		merged.Caveats = append(merged.Caveats, m.Caveats...)
+		merged.BestPractices.Dont = append(merged.BestPractices.Dont, m.BestPractices.Dont...)
+	}
+	appendMeta(constants.LookupMetaByID("ssl.special_form." + slug))
+	appendMeta(constants.LookupMeta(backing))
+	if extra := formatElementMeta(merged); extra != "" {
+		b.WriteString("\n")
+		b.WriteString(extra)
 	}
 
 	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 
-// getKeywordHover returns hover information for a keyword.
+// getKeywordHover returns hover information for a keyword: the published
+// summary and syntax block, then the reference caveats and don't-list
+// (issue #252 — the hand-written one-liners this replaced had drifted).
 func getKeywordHover(word string) *Hover {
 	upper := strings.ToUpper(strings.TrimPrefix(word, ":"))
 
 	if constants.IsKeyword(upper) {
-		description := constants.SSLKeywordDescriptions[upper]
-		if description == "" {
-			description = fmt.Sprintf("SSL keyword: %s", upper)
+		det := constants.GeneratedKeywordDetails[upper]
+		summary := det.Summary
+		if summary == "" {
+			summary = fmt.Sprintf("SSL keyword: %s", upper)
 		}
-		return &Hover{
-			Contents: fmt.Sprintf("**:%s**\n\n%s", upper, description),
-		}
+		return &Hover{Contents: renderReferenceHover(
+			fmt.Sprintf("**:%s** *(keyword)*", upper), summary, det.Syntax, "ssl.keyword."+strings.ToLower(upper))}
 	}
 
 	if constants.IsBuilderDirective(upper) {
@@ -145,57 +152,57 @@ func getKeywordHover(word string) *Hover {
 			description = fmt.Sprintf("SQL data source builder directive: %s", upper)
 		}
 		return &Hover{
-			Contents: fmt.Sprintf("**:%s** *(builder directive)*\n\n%s\n\nOnly valid in data source files (`.ds`, `.ds.txt`). Preprocessed by `SqlDataSourceBuilder` before SSL compilation.", upper, description),
+			Contents: fmt.Sprintf("**:%s** *(data source directive)*\n\n%s\n\n"+
+				"Only meaningful in SQL data source files (`.ds`, `.ds.txt`), where it is read before the query runs. "+
+				"Not an SSL keyword; the name is case-sensitive, so write it in uppercase.", upper, description),
 		}
 	}
 
 	return nil
 }
 
-// getMeKeywordHover returns hover information for the 'Me' keyword.
-func getMeKeywordHover(word string) *Hover {
-	if strings.EqualFold(word, "Me") {
-		return &Hover{
-			Contents: "**Me**\n\n" +
-				"*Self-reference keyword*\n\n" +
-				"Refers to the current object instance within a class definition.\n\n" +
-				"**Usage:**\n" +
-				"- Access class members: `Me:PropertyName`\n" +
-				"- Call class methods: `Me:MethodName()`\n" +
-				"- Pass self as argument: `ExecFunction(\"Module.Script\", {Me})`",
+// renderReferenceHover renders a reference element hover: a heading, the
+// published summary, an optional SSL syntax block, and the element's
+// caveats and don't-list looked up by reference ID.
+func renderReferenceHover(heading, summary, syntax, metaID string) string {
+	var b strings.Builder
+	b.WriteString(heading)
+	if summary != "" {
+		b.WriteString("\n\n")
+		b.WriteString(summary)
+	}
+	if syntax != "" {
+		b.WriteString("\n\n```ssl\n")
+		b.WriteString(syntax)
+		b.WriteString("\n```")
+	}
+	if meta, ok := constants.LookupMetaByID(metaID); ok {
+		if extra := formatElementMeta(meta); extra != "" {
+			b.WriteString("\n\n")
+			b.WriteString(extra)
 		}
 	}
-	return nil
+	return b.String()
 }
 
-func getBaseKeywordHover(word string) *Hover {
-	if strings.EqualFold(word, "Base") {
-		return &Hover{
-			Contents: "**Base**\n\n" +
-				"*Parent-class reference*\n\n" +
-				"Used inside a `:CLASS` method to access inherited members.\n\n" +
-				"**Usage:**\n" +
-				"- Call a parent method: `Base:MethodName()`\n" +
-				"- Access an inherited member: `Base:PropertyName`\n\n" +
-				"`Base` must be followed by `:MemberName` and is only meaningful in class context.",
-		}
+// getClassContextHover returns hover for the class-context forms `Me`,
+// `Base`, and `Constructor`, rendered from their published special-form
+// pages (issue #252).
+func getClassContextHover(word string) *Hover {
+	var slug, name string
+	switch strings.ToLower(word) {
+	case "me":
+		slug, name = "me", "Me"
+	case "base":
+		slug, name = "base", "Base"
+	case "constructor":
+		slug, name = "constructor", "Constructor"
+	default:
+		return nil
 	}
-	return nil
-}
-
-func getConstructorHover(word string) *Hover {
-	if strings.EqualFold(word, "Constructor") {
-		return &Hover{
-			Contents: "**Constructor**\n\n" +
-				"*Reserved class constructor name*\n\n" +
-				"Inside a `:CLASS`, define the constructor with `:PROCEDURE Constructor;`.\n\n" +
-				"**Rules:**\n" +
-				"- Constructors belong inside a `:CLASS`\n" +
-				"- Class member order must be `:INHERIT`, `:DECLARE`, regular methods, then `Constructor`\n" +
-				"- `:RETURN` cannot return a value from a constructor",
-		}
-	}
-	return nil
+	det := constants.GeneratedSpecialFormDetails[slug]
+	return &Hover{Contents: renderReferenceHover(
+		fmt.Sprintf("**%s** *(class context)*", name), det.Summary, det.Syntax, "ssl.special_form."+slug)}
 }
 
 // getFunctionHover returns hover information for a built-in function.
@@ -219,22 +226,29 @@ func getFunctionHover(word string) *Hover {
 	return nil
 }
 
+// formatFunctionHover renders a built-in function hover top to bottom: the
+// call form(s) as SSL, what the function does, each parameter with its
+// type, optionality, and default, then what it returns (issue #252).
 func formatFunctionHover(docInfo functionDoc) string {
+	forms := make([]string, 0, len(docInfo.Forms))
+	for _, f := range docInfo.Forms {
+		forms = append(forms, f.Label)
+	}
 	sections := []string{
-		fmt.Sprintf("**%s**", docInfo.Label),
-		"Built-in SSL function",
+		"```ssl\n" + strings.Join(forms, "\n") + "\n```",
+		"*Built-in SSL function*",
 	}
 
-	if docInfo.Detail != "" {
-		sections = append(sections, fmt.Sprintf("`%s`", docInfo.Detail))
-	}
-
-	if docInfo.Documentation != "" {
-		sections = append(sections, docInfo.Documentation)
+	if docInfo.Description != "" {
+		sections = append(sections, docInfo.Description)
 	}
 
 	if len(docInfo.Parameters) > 0 {
 		sections = append(sections, formatFunctionParameters(docInfo.Parameters))
+	}
+
+	if docInfo.ReturnLine != "" {
+		sections = append(sections, docInfo.ReturnLine)
 	}
 
 	return strings.Join(sections, "\n\n")
@@ -271,9 +285,8 @@ func formatElementMeta(meta constants.ElementMeta) string {
 			builder.WriteString("\n- ")
 			builder.WriteString(ex.Trigger)
 			if ex.Message != "" {
-				builder.WriteString(" — `")
-				builder.WriteString(ex.Message)
-				builder.WriteString("`")
+				builder.WriteString(" — ")
+				builder.WriteString(exceptionMessage(ex.Message))
 			}
 		}
 	}
@@ -301,6 +314,18 @@ func formatElementMeta(meta constants.ElementMeta) string {
 	}
 
 	return builder.String()
+}
+
+// exceptionMessage renders a documented exception message as inline code.
+// A few published messages mix the runtime text with prose ("…, then
+// <text> on the second line") and arrive with stray backticks from the
+// extraction; wrapping those in a code span would break the span, so they
+// render as plain text with the backticks removed.
+func exceptionMessage(msg string) string {
+	if strings.Contains(msg, "`") {
+		return strings.ReplaceAll(msg, "`", "")
+	}
+	return "`" + msg + "`"
 }
 
 func formatFunctionParameters(params []ParameterInformation) string {
@@ -362,6 +387,9 @@ func getClassHover(word string) *Hover {
 				fmt.Fprintf(&b, " — %s", c.Description)
 			}
 			b.WriteString("\n")
+			for _, p := range c.Parameters {
+				fmt.Fprintf(&b, "  - `%s`: %s\n", p.Name, parameterDoc(p))
+			}
 		}
 	}
 
@@ -444,25 +472,25 @@ func writeMemberTables(b *strings.Builder, properties []constants.ClassProperty,
 	}
 }
 
-// getLiteralHover returns hover information for a literal.
+// getLiteralHover returns hover information for a literal from its
+// published reference page.
 func getLiteralHover(word string) *Hover {
 	canonical, ok := constants.CanonicalSSLLiteral(strings.ToUpper(word))
-	if ok {
-		description := constants.SSLLiteralDescriptions[canonical]
-		if description == "" {
-			description = fmt.Sprintf("SSL literal: %s", canonical)
-		}
-		return &Hover{
-			Contents: fmt.Sprintf("**%s**\n\n%s", canonical, description),
-		}
+	if !ok {
+		return nil
 	}
-
-	return nil
+	description := constants.SSLLiteralDescriptions[canonical]
+	if description == "" {
+		description = fmt.Sprintf("SSL literal: %s", canonical)
+	}
+	return &Hover{Contents: renderReferenceHover(
+		fmt.Sprintf("**%s** *(literal)*", canonical), description, "", "ssl.literal."+constants.LiteralSlug(canonical))}
 }
 
-// getOperatorHover returns hover information for an operator. The hover
-// includes the curated short description plus the type-behavior table from
-// the published reference when one is available (e.g. for `+=`, `==`, `$`).
+// getOperatorHover returns hover information for an operator: the published
+// summary and syntax, the type-behavior table, then the reference caveats
+// and don't-list. For `=`, `==`, and `!=` the table and don't-list carry the
+// string semantics (prefix match vs exact match) in full.
 func getOperatorHover(word string) *Hover {
 	upper := strings.ToUpper(word)
 
@@ -470,31 +498,41 @@ func getOperatorHover(word string) *Hover {
 		return nil
 	}
 
-	description := constants.SSLOperatorDescriptions[upper]
-	if description == "" {
-		description = fmt.Sprintf("SSL operator: %s", upper)
+	slug := constants.OperatorSlug(upper)
+	det := constants.GeneratedOperatorDetails[slug]
+	summary := det.Summary
+	if summary == "" {
+		summary = fmt.Sprintf("SSL operator: %s", upper)
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "**%s**\n\n%s", upper, description)
+	heading := fmt.Sprintf("**%s**", upper)
+	if slug != "" {
+		heading += fmt.Sprintf(" *(%s)*", slug)
+	}
+	b.WriteString(heading)
+	b.WriteString("\n\n")
+	b.WriteString(summary)
+	if det.Syntax != "" {
+		b.WriteString("\n\n```ssl\n")
+		b.WriteString(det.Syntax)
+		b.WriteString("\n```")
+	}
 
-	// The operator description lookup is keyed by symbol; the JSON-derived
-	// detail map is keyed by symbol too via GeneratedOperatorBySymbol.
-	if det, ok := constants.GeneratedOperatorBySymbol[word]; ok && len(det.TypeBehavior) > 0 {
+	if len(det.TypeBehavior) > 0 {
 		b.WriteString("\n\n**Type behavior:**\n\n")
 		b.WriteString("| Left | Right | Result | Behavior |\n")
-		b.WriteString("|------|-------|--------|----------|\n")
+		b.WriteString("|------|-------|--------|----------|")
 		for _, row := range det.TypeBehavior {
-			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n",
+			fmt.Fprintf(&b, "\n| %s | %s | %s | %s |",
 				orDash(row.Left), orDash(row.Right), orDash(row.Result), row.Behavior)
 		}
-	} else if det, ok := constants.GeneratedOperatorBySymbol[upper]; ok && len(det.TypeBehavior) > 0 {
-		b.WriteString("\n\n**Type behavior:**\n\n")
-		b.WriteString("| Left | Right | Result | Behavior |\n")
-		b.WriteString("|------|-------|--------|----------|\n")
-		for _, row := range det.TypeBehavior {
-			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n",
-				orDash(row.Left), orDash(row.Right), orDash(row.Result), row.Behavior)
+	}
+
+	if meta, ok := constants.LookupMetaByID("ssl.operator." + slug); ok && slug != "" {
+		if extra := formatElementMeta(meta); extra != "" {
+			b.WriteString("\n\n")
+			b.WriteString(extra)
 		}
 	}
 
@@ -848,21 +886,23 @@ func GetSQLPlaceholderHover(stringContent string, columnInString int) *Hover {
 		if columnInString >= p.Start && columnInString < p.End {
 			if p.IsNamed {
 				return &Hover{
-					Contents: fmt.Sprintf("**SQL Parameter: %s**\n\n"+
-						"*Named parameter placeholder*\n\n"+
-						"This placeholder will be replaced with the value of `%s` at runtime.\n\n"+
-						"**Syntax:** `?parameterName?`",
+					Contents: fmt.Sprintf("**SQL parameter `?%s?`** *(named placeholder)*\n\n"+
+						"`SQLExecute` binds the current value of `%s` from the calling scope as a query parameter "+
+						"when the statement runs; the value is not spliced into the SQL text. "+
+						"An array variable expands to one `?` per element, for `IN (...)` lists; "+
+						"it must be a local variable, not an object property.\n\n"+
+						"Only `SQLExecute` substitutes `?name?`. `RunSQL`, `LSearch`, `LSelect1`, `GetDataSet` "+
+						"and the other SQL functions take positional `?` with a values array.",
 						p.Name, p.Name),
 				}
 			}
 			// Positional parameter
 			ordinal := getOrdinal(p.Position)
 			return &Hover{
-				Contents: fmt.Sprintf("**SQL Parameter #%d**\n\n"+
-					"*Positional parameter placeholder*\n\n"+
-					"This is the %s parameter in the query. It will be replaced with "+
-					"the corresponding value from the parameters array at runtime.\n\n"+
-					"**Syntax:** `?`",
+				Contents: fmt.Sprintf("**SQL parameter #%d** *(positional placeholder)*\n\n"+
+					"Bound to the %s element of the values array passed with the query, "+
+					"such as `RunSQL(sSQL,, {…})`. Values are bound as parameters, not spliced into the SQL text, "+
+					"and the number of `?` placeholders must match the number of values.",
 					p.Position, ordinal),
 			}
 		}

@@ -3587,8 +3587,8 @@ func TestGetHover_MeKeyword(t *testing.T) {
 	if !strings.Contains(hover.Contents, "Me") {
 		t.Errorf("expected hover to contain 'Me', got: %s", hover.Contents)
 	}
-	if !strings.Contains(strings.ToLower(hover.Contents), "self-reference") {
-		t.Errorf("expected hover to explain Me is a self-reference, got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "current class instance") {
+		t.Errorf("expected hover to explain Me refers to the current class instance, got: %s", hover.Contents)
 	}
 }
 
@@ -4262,12 +4262,15 @@ func TestGetSQLPlaceholderHover_NamedParameter(t *testing.T) {
 		t.Fatal("expected hover for named parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter: userId") {
-		t.Errorf("expected hover to contain 'SQL Parameter: userId', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter `?userId?`") {
+		t.Errorf("expected hover to name the placeholder, got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "Named parameter") {
-		t.Errorf("expected hover to mention 'Named parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "named placeholder") || !strings.Contains(hover.Contents, "binds the current value of `userId`") {
+		t.Errorf("expected hover to explain SQLExecute binds the variable's value, got: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "Only `SQLExecute` substitutes") {
+		t.Errorf("expected hover to say only SQLExecute substitutes named placeholders, got: %s", hover.Contents)
 	}
 }
 
@@ -4282,12 +4285,12 @@ func TestGetSQLPlaceholderHover_PositionalParameter(t *testing.T) {
 		t.Fatal("expected hover for positional parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter #1") {
-		t.Errorf("expected hover to contain 'SQL Parameter #1', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter #1") {
+		t.Errorf("expected hover to contain 'SQL parameter #1', got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "1st parameter") {
-		t.Errorf("expected hover to mention '1st parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "1st element of the values array") {
+		t.Errorf("expected hover to mention the 1st values-array element, got: %s", hover.Contents)
 	}
 }
 
@@ -4301,12 +4304,12 @@ func TestGetSQLPlaceholderHover_SecondPositionalParameter(t *testing.T) {
 		t.Fatal("expected hover for second positional parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter #2") {
-		t.Errorf("expected hover to contain 'SQL Parameter #2', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter #2") {
+		t.Errorf("expected hover to contain 'SQL parameter #2', got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "2nd parameter") {
-		t.Errorf("expected hover to mention '2nd parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "2nd element of the values array") {
+		t.Errorf("expected hover to mention the 2nd values-array element, got: %s", hover.Contents)
 	}
 }
 
@@ -7447,7 +7450,7 @@ func TestGetDiagnostics_CodeBlockWithParams_NoWarning(t *testing.T) {
 
 // ==================== Source-of-Truth Validation Tests ====================
 // Tests below validate alignment between the implementation and the
-// authoritative language rules in dev/ssl-style-guide/agent-guides/.
+// published SSL reference.
 
 func TestGetHover_Me_NoDirectCallExample(t *testing.T) {
 	// Source of truth: custom procedures cannot be called directly.
@@ -7465,8 +7468,8 @@ Me:Helper();
 	if strings.Contains(hover.Contents, "DoSomething(Me)") {
 		t.Error("Me hover should not suggest direct procedure calls like DoSomething(Me)")
 	}
-	if !strings.Contains(hover.Contents, "ExecFunction") {
-		t.Error("Me hover should show ExecFunction example for passing self as argument")
+	if !strings.Contains(hover.Contents, "Me:MethodName()") {
+		t.Error("Me hover should show the Me:MethodName() form for calling sibling methods")
 	}
 }
 
@@ -8193,8 +8196,8 @@ func TestGetHover_BuilderDirective(t *testing.T) {
 	if hover == nil {
 		t.Fatal("expected hover info for :DSN builder directive")
 	}
-	if !strings.Contains(hover.Contents, "builder directive") {
-		t.Error("expected hover to mention 'builder directive'")
+	if !strings.Contains(hover.Contents, "data source directive") {
+		t.Error("expected hover to identify a data source directive")
 	}
 	if !strings.Contains(hover.Contents, "database connection") {
 		t.Error("expected hover to describe DSN purpose")

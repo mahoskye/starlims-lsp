@@ -203,97 +203,83 @@ func IsSQLFunction(upper string) bool {
 	return false
 }
 
-// SSLKeywordDescriptions maps keywords to their descriptions.
-var SSLKeywordDescriptions = map[string]string{
-	"IF":              "Conditional statement - executes code block if condition is true",
-	"ELSE":            "Alternative code path when IF condition is false",
-	"ENDIF":           "Marks the end of an IF conditional block",
-	"WHILE":           "Loop that executes while condition is true",
-	"ENDWHILE":        "Marks the end of a WHILE loop",
-	"FOR":             "Loop with counter variable",
-	"TO":              "Specifies the upper bound of a FOR loop",
-	"STEP":            "Specifies the increment for a FOR loop",
-	"NEXT":            "Marks the end of a FOR loop",
-	"BEGINCASE":       "Starts a CASE block where each :CASE evaluates an independent boolean expression",
-	"CASE":            "Evaluates a CASE condition within a BEGINCASE block",
-	"OTHERWISE":       "Runs when no earlier CASE body has executed",
-	"ENDCASE":         "Marks the end of a CASE statement",
-	"TRY":             "Begins a structured error handling block; requires at least one CATCH or FINALLY",
-	"CATCH":           "Handles an error raised inside a TRY block; use GetLastSSLError() for details",
-	"FINALLY":         "Runs cleanup code after TRY/CATCH; :RETURN, :EXITFOR, :EXITWHILE, and :LOOP are compile-time errors inside :FINALLY",
-	"ENDTRY":          "Marks the end of a TRY/CATCH/FINALLY block",
-	"PROCEDURE":       "Defines a reusable code procedure/function",
-	"ENDPROC":         "Marks the end of a PROCEDURE",
-	"PARAMETERS":      "Declares procedure parameters",
-	"DEFAULT":         "Sets default value for a parameter",
-	"RETURN":          "Returns a value from a procedure",
-	"DECLARE":         "Declares local variables",
-	"PUBLIC":          "Declares public/global variables",
-	"INCLUDE":         "Includes external SSL file",
-	"REGION":          "Begins a legacy functional text-capture region used with GetRegion()",
-	"ENDREGION":       "Ends a legacy functional text-capture region",
-	"CLASS":           "Defines a class",
-	"INHERIT":         "Specifies base class for inheritance",
-	"EXITFOR":         "Exits a FOR loop immediately",
-	"EXITWHILE":       "Exits a WHILE loop immediately",
-	"EXITCASE":        "Stops evaluating further CASE blocks in the current BEGINCASE; without it, later :CASE expressions are still evaluated and additional matching bodies may execute",
-	"LOOP":            "Jump back to start of loop",
-	"BEGININLINECODE": "Begins a legacy named inline-code storage block",
-	"ENDINLINECODE":   "Ends a legacy named inline-code storage block",
-	"ERROR":           "Legacy error handling marker; prefer TRY/CATCH/FINALLY",
-	"RESUME":          "Legacy resume-mode error handling keyword; prefer TRY/CATCH/FINALLY",
-	"LABEL":           "Defines a legacy Branch() target label",
+// SSLKeywordDescriptions maps each keyword (uppercase, no colon) to its
+// one-line description: the published reference summary (issue #252). The
+// hand-written one-liners this replaced had drifted (`:PUBLIC` described as
+// call-stack scoped, `:ERROR` as a marker); hover adds the reference syntax
+// block, caveats, and don't-list on top.
+var SSLKeywordDescriptions = buildKeywordDescriptions()
+
+func buildKeywordDescriptions() map[string]string {
+	out := make(map[string]string, len(GeneratedKeywordDetails))
+	for kw, det := range GeneratedKeywordDetails {
+		out[strings.ToUpper(kw)] = det.Summary
+	}
+	return out
 }
 
-// DataSourceBuilderDirectiveDescriptions maps builder directives to their descriptions.
+// DataSourceBuilderDirectiveDescriptions maps builder directives to their
+// descriptions. The directives are not SSL elements, so the reference
+// covers them in its data-sources guide rather than in the element data;
+// these follow that guide.
 var DataSourceBuilderDirectiveDescriptions = map[string]string{
-	"DSN":                  "Specifies the database connection name for a SQL data source",
-	"TABLENAME":            "Specifies the dataset table name for a SQL data source",
-	"NULLASBLANK":          "When true, null values are converted to blank strings in the dataset",
-	"INVARIANTDATECOLUMNS": "Specifies which date columns should remain culture-invariant",
+	"DSN":       "Names the database connection the data source runs against: `:DSN := name;`.",
+	"TABLENAME": "Names the table in the resulting dataset: `:TABLENAME := name;`.",
+	"NULLASBLANK": "Controls null-to-blank conversion: `:NULLASBLANK := true;` or `false`, matched case-insensitively. " +
+		"With `true` (also the behavior when the directive is absent), a NULL column value comes back as a blank value " +
+		"of the column's type; with `false`, as NIL. The SSL literals `.T.` and `.F.` are ignored here without an error.",
+	"INVARIANTDATECOLUMNS": "Lists columns treated as invariant (culture-neutral) dates, as bare comma-separated names: " +
+		"`:INVARIANTDATECOLUMNS := logdate, releasedate;`. A quoted name raises no error but keeps its quotes, so it matches no column.",
 }
 
-// SSLOperatorDescriptions maps operators to their descriptions.
-var SSLOperatorDescriptions = map[string]string{
-	".AND.": "Logical AND operator",
-	".OR.":  "Logical OR operator",
-	".NOT.": "Logical NOT operator",
-	":=":    "Assignment operator",
-	"+=":    "Add and assign operator",
-	"-=":    "Subtract and assign operator",
-	"*=":    "Multiply and assign operator",
-	"/=":    "Divide and assign operator",
-	"%=":    "Modulo and assign operator",
-	"^=":    "Power and assign operator",
-	"=":     "Equality comparison operator; for strings this is loose (prefix) matching — .T. if right is empty or left starts with right",
-	"==":    "Strict equality comparison operator; use for exact string equality",
-	"!=":    "Not equal operator — exact-match negation (opposite of ==, not =, since SSL's = does prefix matching on strings)",
-	"<>":    "Not equal operator (equivalent to !=, but != is preferred)",
-	">":     "Greater than comparison operator",
-	"<":     "Less than comparison operator",
-	">=":    "Greater than or equal comparison operator",
-	"<=":    "Less than or equal comparison operator",
-	"+":     "Addition operator",
-	"-":     "Subtraction operator",
-	"*":     "Multiplication operator",
-	"/":     "Division operator",
-	"%":     "Modulo operator",
-	"^":     "Power/exponentiation operator",
-	"**":    "Power/exponentiation operator (alias for ^)",
-	"++":    "Increment operator",
-	"--":    "Decrement operator",
-	"<<":    "Bitwise left shift operator",
-	">>":    "Bitwise right shift operator",
-	"$":     "String containment operator; left $ right is .T. if left is found inside right",
-	"#":     "Not equal operator (equivalent to !=, but != is preferred)",
-	"!":     "Logical NOT operator (alternative to .NOT.)",
+// SSLOperatorDescriptions maps each operator symbol to its published
+// reference summary (issue #252). Hover adds the type-behavior table,
+// caveats, and don't-list, which carry the `=` / `==` / `!=` string
+// semantics in full.
+var SSLOperatorDescriptions = buildOperatorDescriptions()
+
+func buildOperatorDescriptions() map[string]string {
+	out := make(map[string]string, len(GeneratedOperatorDetails))
+	for _, det := range GeneratedOperatorDetails {
+		if det.Symbol != "" {
+			out[strings.ToUpper(det.Symbol)] = det.Summary
+		}
+	}
+	return out
 }
 
-// SSLLiteralDescriptions maps literals to their descriptions.
-var SSLLiteralDescriptions = map[string]string{
-	".T.": "Boolean true literal",
-	".F.": "Boolean false literal",
-	"NIL": "Null/nothing literal",
+// OperatorSlug returns the reference slug ("equals", "not-equals", ...) for
+// an operator symbol, case-insensitively, or "" when the symbol is unknown.
+func OperatorSlug(symbol string) string {
+	for slug, det := range GeneratedOperatorDetails {
+		if det.Symbol != "" && strings.EqualFold(det.Symbol, symbol) {
+			return slug
+		}
+	}
+	return ""
+}
+
+// literalSlugs maps each canonical literal to its reference slug.
+var literalSlugs = map[string]string{".T.": "true", ".F.": "false", "NIL": "nil"}
+
+// LiteralSlug returns the reference slug for a canonical literal (".T." ->
+// "true"), or "" when it is not one.
+func LiteralSlug(canonical string) string {
+	return literalSlugs[canonical]
+}
+
+// SSLLiteralDescriptions maps each canonical literal to its published
+// reference summary (issue #252).
+var SSLLiteralDescriptions = buildLiteralDescriptions()
+
+func buildLiteralDescriptions() map[string]string {
+	out := make(map[string]string, len(literalSlugs))
+	for lit, slug := range literalSlugs {
+		if det, ok := GeneratedLiteralDetails[slug]; ok {
+			out[lit] = det.Summary
+		}
+	}
+	return out
 }
 
 // Helper functions for checking membership

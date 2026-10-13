@@ -131,7 +131,7 @@ The Language Server Protocol implementation sources:
 | Purpose | File |
 |---------|------|
 | Canonical public SSL inventories | `internal/constants/canonical.go` |
-| Legacy function signature corpus | `internal/constants/signatures.go` |
+| Documented function signature overrides | `internal/constants/function_overrides.go` |
 | Keywords, literals, operators, and legacy inventories | `internal/constants/constants.go` |
 | Parser | `internal/parser/parser.go` |
 | Diagnostics | `internal/providers/diagnostics.go` |

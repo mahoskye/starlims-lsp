@@ -67,7 +67,7 @@ starlims-lsp/
 │   └── constants/
 │       ├── constants.go         # Keywords, literals, operators, legacy inventories
 │       ├── canonical.go         # Canonical public functions/classes
-│       └── signatures.go        # Legacy signature corpus
+│       └── function_overrides.go # Documented overrides of generated signatures
 └── docs/                        # This documentation
 ```
 
@@ -167,13 +167,13 @@ Static SSL language data:
 │  ├── Built-in Classes (22)                              │
 │  └── Source-only additions / exclusions / canonicalize  │
 ├─────────────────────────────────────────────────────────┤
-│  signatures.go                                          │
-│  └── Legacy signature corpus                            │
-│      ├── Merged with source-only signatures             │
-│      ├── Return type                                    │
-│      └── Description                                    │
-│      ├── Name                                           │
-│      ├── Parameters (name, type, optional)              │
+│  generated_functions.go (from the vendored reference)   │
+│  └── Function signatures                                │
+│      ├── Name, description                              │
+│      ├── Parameters (name, type, required, default)     │
+│      └── Return type and description                    │
+│  function_overrides.go                                  │
+│  └── Documented gap-fills (call forms, dropped rows)    │
 └─────────────────────────────────────────────────────────┘
 ```
 

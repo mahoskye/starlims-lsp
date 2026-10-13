@@ -29,6 +29,14 @@ history:
       (categories-only level 0 per the noise policy); the pre-existing
       vs-code-ssl-formatter#74 same-file exception is now documented
       here and A5 narrowed to non-dispatch strings.
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Built-in function, keyword, operator, and literal completion
+      documentation now comes from the vendored reference (shared with
+      hover), and function snippets use reference parameter names as
+      placeholders (`SQLExecute(${1:sCommandString})`). The trigger and
+      context contract below is unchanged.
 issues: []
 ---
 

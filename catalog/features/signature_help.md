@@ -9,6 +9,7 @@ config:
   - ssl.intellisense.signatureHelp.autoTrigger
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/hover_reference_test.go
   - internal/providers/element_reference_test.go
   - internal/server/handler_test.go
   - internal/server/server_test.go
@@ -31,7 +32,16 @@ history:
       handler actually calls (brace-context detection); the unwired
       text-based GetSignatureHelp entry point deleted. Array-literal
       commas no longer advance the enclosing call's parameter index.
-issues: ["#40"]
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Labels and parameter documentation now come from the
+      reference-generated signatures shared with hover (A10): reference
+      parameter names, optional parameters bracketed, and each
+      parameter's type, optional status, and default in its
+      documentation. `CreateUdObject` shows one signature per call form
+      (A9).
+issues: ["#40", "#252"]
 ---
 
 ## Behavior
@@ -47,8 +57,15 @@ issues: ["#40"]
 - Inside built-in class instantiation `ClassName{...}`, constructor signature
   help MUST be shown, one signature per documented constructor form.
   (Currently unreachable through the LSP handler — see Known gaps.)
-- Function lookup MUST be case-insensitive; optional parameters MUST be
-  rendered bracketed (e.g. `[friendlyName: variant]`).
+- Function lookup MUST be case-insensitive. The label MUST use the
+  reference parameter names with optional parameters bracketed and the
+  return type appended (e.g. `SQLExecute(sCommandString,
+  [sConnectionName], ...) → any`); each parameter's documentation MUST
+  give its type, optional status, and documented default before its
+  description.
+- A function the reference documents with alternative call forms
+  (`CreateUdObject`) MUST return one signature per form, with the active
+  signature the first form that has a parameter at the active index.
 - By default the server MUST NOT advertise any trigger characters — help
   appears only on explicit invocation. When
   `ssl.intellisense.signatureHelp.autoTrigger` is `true`, `(` and `,` MUST be
@@ -69,6 +86,8 @@ issues: ["#40"]
 - A6: Given default configuration, when the server capabilities are advertised, then no signature-help trigger characters are declared; given `ssl.intellisense.signatureHelp.autoTrigger: true`, then `(` and `,` are declared with `,` as retrigger.
 - A7: Given the cursor on a statement outside any function call (e.g. after `x := 5;`), when signature help is invoked, then the response is null.
 - A8: Given the cursor inside `Email{`, when signature help is requested over LSP, then the Email constructor signatures are returned, one per documented constructor form.
+- A9: Given the cursor after `CreateUdObject("Cat.Cls", `, when signature help is invoked, then three signatures are returned (one per call form) and the active one is `CreateUdObject(sClassName, [aArgs])`.
+- A10: Given the cursor after `SQLExecute(sSQL, `, when signature help is invoked, then the label begins `SQLExecute(sCommandString, [sConnectionName], ` and ends `→ any`, and the second parameter is `sConnectionName` with documentation naming its default; every built-in's signature-help parameter labels are its reference parameter names.
 
 ## Rationale
 
