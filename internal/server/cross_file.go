@@ -184,22 +184,38 @@ func (r liveResolver) siteUnambiguousForWrite(raw, defURI, procName string) bool
 // script's full text, so its declarations belong to the including file.
 // Open included documents contribute their live-buffer declarations.
 func (r liveResolver) includeDeclaredVariables(tokens []lexer.Token, selfURI string) []string {
-	if r.s.workspaceIndex == nil {
-		return nil
-	}
+	names, _ := r.includeClosure(tokens, selfURI)
+	return names
+}
+
+// includeClosure walks the include closure once and returns its declared
+// names together with whether every :INCLUDE target in it was read. A
+// document with no :INCLUDE is trivially complete; one with an include
+// but no workspace index, or with a target that resolves to no readable
+// file, is not — diagnostics then cannot see what the include declares
+// (DECISIONS.md D10, issue #304).
+func (r liveResolver) includeClosure(tokens []lexer.Token, selfURI string) ([]string, bool) {
 	targets := providers.ExtractIncludeTargets(tokens)
 	if len(targets) == 0 {
-		return nil
+		return nil, true
+	}
+	if r.s.workspaceIndex == nil {
+		return nil, false
 	}
 
 	openURIs := r.s.documents.OpenURIs()
 	visited := map[string]bool{selfURI: true}
 	var names []string
+	complete := true
 
 	var walk func(targets []string)
 	walk = func(targets []string) {
 		for _, target := range targets {
-			for _, res := range r.s.workspaceIndex.ResolveIncludeTarget(target) {
+			resolved := r.s.workspaceIndex.ResolveIncludeTarget(target)
+			if len(resolved) == 0 {
+				complete = false
+			}
+			for _, res := range resolved {
 				if visited[res.URI] {
 					continue
 				}
@@ -216,6 +232,7 @@ func (r liveResolver) includeDeclaredVariables(tokens []lexer.Token, selfURI str
 
 				fs, ok := r.s.workspaceIndex.FileSymbolsFor(res.URI)
 				if !ok {
+					complete = false
 					continue
 				}
 				names = append(names, fs.DeclaredVars...)
@@ -224,7 +241,7 @@ func (r liveResolver) includeDeclaredVariables(tokens []lexer.Token, selfURI str
 		}
 	}
 	walk(targets)
-	return names
+	return names, complete
 }
 
 // scriptDisplayName renders a file's identity for hover panels:

@@ -64,6 +64,14 @@ history:
       script, which rename then treated as an unambiguous caller). A7
       strengthened; class-only classification gets its criterion (A20).
   - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      The include closure reports whether it is complete (A23). A
+      document whose :INCLUDE could not be read no longer gets
+      undeclared_variable findings: on the production corpus's
+      unmodified product code, 134 of the 210 --strict findings in files
+      with an :INCLUDE named a variable the included script declares.
+  - date: 2026-10-13
     ref: "issue #258"
     note: >-
       One canonical file URI (A21). The index keyed files by an unescaped
@@ -146,10 +154,15 @@ as declared in the including file. The closure is transitive — included
 scripts' own `:INCLUDE`s contribute too — with a visited-set cycle guard,
 and an ambiguous include target contributes the union of all its
 resolution candidates (erring toward fewer false positives). Unresolvable
-targets contribute nothing; without a workspace index, diagnostics behave
-exactly as before (single-file). Open included documents contribute their
+targets contribute nothing. Open included documents contribute their
 live-buffer declarations, consistent with the open-document overlay.
 Consumers: `diag.undeclared_variable` and `diag.invalid_sql_param`.
+The closure also reports whether it is complete: every `:INCLUDE` target
+in it resolved to a readable file. A document with an `:INCLUDE` whose
+closure is incomplete — a target that does not resolve, or no workspace
+index at all, as in `--validate` — gets no `undeclared_variable`
+findings, since the unread script may declare any name (DECISIONS.md
+D10, issue #304). `invalid_sql_param` keeps its single-file behavior.
 
 **Candidate ordering and cap**: anchored canonical-layout matches order
 before flat matches, path-lexicographic within each group, capped at 10.
@@ -208,6 +221,7 @@ so a stale parse cannot re-add a deleted file.
 - A20: Given a dotted dispatch target whose every candidate is a `:CLASS` file, when class-only classification runs, then it is true; when any candidate is an ordinary script, or there is no candidate, then it is false.
 - A21: Given workspace files under a path containing a space and a client that sends `%20`-escaped URIs (and, on Windows, `file:///c%3A/...` drive URIs), when the client opens, closes, renames across, or reports watched-file events for those files, then each file is indexed under exactly one key — the open-document overlay applies, cross-file rename reaches the closed callers, workspace symbols list an open file once, a didClose re-index leaves one entry, and a Delete event removes it — and the URIs in responses are the client's own spelling; Windows paths and URIs convert in both directions (drive letters, percent-encoding, UNC).
 - A22: Given background indexing, when a file's parse panics, then the panic is logged and only that file is skipped; when watched-file Created/Changed events arrive, then the handler returns without parsing and the files are indexed on the background worker; and when a Delete event arrives while a re-index of the same file is queued or parsing, then the file is not added back.
+- A23: Given a document with `:INCLUDE B;` and a name declared nowhere, when diagnostics run with undeclared checking on, then `undeclared_variable` flags the name only when B resolves through the workspace index (the closure is complete); when B does not resolve, or there is no workspace index, then the document gets no `undeclared_variable` finding, and a document without an `:INCLUDE` is checked as before (issue #304).
 
 ## Rationale
 

@@ -96,6 +96,14 @@ type DiagnosticOptions struct {
 	// undeclared_variable and invalid_sql_param.
 	IncludeDeclaredVariables []string
 
+	// IncludesResolved reports that the caller read every :INCLUDE target
+	// in the file's include closure (the server sets it from its workspace
+	// index). When a file has an :INCLUDE and this is false — always so in
+	// workspace-less consumers like --validate — the declarations the
+	// include splices in are unknown, so undeclared_variable stays silent
+	// for that file (DECISIONS.md D10, issue #304).
+	IncludesResolved bool
+
 	// ClassFileDispatchTargets lists this document's dispatch target
 	// strings that resolve through the workspace index to class files only
 	// (diag.execfunction_class_target, issue #143). Matched
@@ -369,7 +377,9 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkGlobalAssignment(tokens, variables, opts.GlobalVariables)...)
 
 	// Check for undeclared variable usage (opt-in)
-	if opts.CheckUndeclaredVars {
+	// An :INCLUDE the caller could not read splices in declarations this
+	// check cannot see, so it stays silent rather than guess (issue #304).
+	if opts.CheckUndeclaredVars && (opts.IncludesResolved || len(ExtractIncludeTargets(tokens)) == 0) {
 		diagnostics = append(diagnostics, checkUndeclaredVariables(tokens, p, opts.GlobalVariables, opts.IncludeDeclaredVariables, opts.IsEndpointFile)...)
 	}
 
@@ -843,7 +853,8 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
 		// semicolon almost certainly terminated the comment prematurely.
 		if strings.Contains(token.Text, "\n") &&
-			nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) {
+			nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) &&
+			!startsAssignment(tokens, nextIdx) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Range:    tokenToRange(token),
@@ -877,6 +888,23 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// startsAssignment reports whether the identifier at idx is the target of
+// an assignment — the next significant token on its line is `:=` or a
+// compound assignment operator. A keyword-named variable assigned on the
+// line after a comment (`parameters := ...`) is code, not a doc header cut
+// in half (issue #304).
+func startsAssignment(tokens []lexer.Token, idx int) bool {
+	next := nextSignificantTokenIndex(tokens, idx+1)
+	if next < 0 || tokens[next].Line != tokens[idx].Line || tokens[next].Type != lexer.TokenOperator {
+		return false
+	}
+	switch tokens[next].Text {
+	case ":=", "+=", "-=", "*=", "/=", "^=", "%=":
+		return true
+	}
+	return false
 }
 
 // startsOrphanedProse reports whether the significant token at idx begins a
@@ -1256,6 +1284,33 @@ type zeroSubscript struct {
 	// member is true when the receiver is reached through `:` member
 	// access (`dataSet:Tables[0]`).
 	member bool
+	// dataTables is true when the receiver chain passes through a
+	// `:Tables` member: the .NET DataSet's table collection and the
+	// DataTable members reached from it, all 0-based (issue #304).
+	dataTables bool
+}
+
+// throughTablesMember reports whether a subscript receiver's member chain
+// passes through a `:Tables` member (`ds:Tables[0]`,
+// `ds:Tables[0]:Rows[0]`). No SSL built-in class has a Tables member; it
+// is the .NET DataSet's 0-based table collection, so index 0 there and on
+// the DataTable members reached from it is valid (issue #304).
+func throughTablesMember(e *parser.Expr) bool {
+	for e != nil {
+		if e.Kind == parser.ExprMember && strings.EqualFold(e.Name, "Tables") {
+			return true
+		}
+		switch e.Kind {
+		case parser.ExprMember, parser.ExprIndex, parser.ExprCall:
+			if len(e.Children) == 0 {
+				return false
+			}
+			e = e.Children[0]
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // collectZeroSubscripts records every subscript that is exactly the
@@ -1282,6 +1337,7 @@ func collectZeroSubscripts(tokens []lexer.Token, stmts []parser.StatementExprs) 
 				site.base = strings.ToUpper(recv.Name)
 			case parser.ExprMember:
 				site.member = true
+				site.dataTables = throughTablesMember(recv)
 			default:
 				ok = false
 			}
@@ -1341,7 +1397,7 @@ func checkZeroBasedArrayIndex(tokens []lexer.Token, stmts []parser.StatementExpr
 		}
 
 		site, ok := sites[i]
-		if !ok {
+		if !ok || site.dataTables {
 			continue
 		}
 		if site.member || netDerived[site.base] {
@@ -1698,8 +1754,22 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 	var diagnostics []Diagnostic
 
 	inFileProcs := make(map[string]bool)
-	for _, proc := range p.ExtractProcedures(ast) {
+	procs := p.ExtractProcedures(ast)
+	for _, proc := range procs {
 		inFileProcs[strings.ToUpper(proc.Name)] = true
+	}
+	// insideOwnProcedure reports whether a call on line `line` sits in the
+	// body of the procedure it names. That is the shape of a procedure
+	// wrapping a same-named built-in the published inventory does not
+	// list, so the error tier's proof (the target is this file's
+	// procedure) does not hold there (issue #304).
+	insideOwnProcedure := func(upperName string, line int) bool {
+		for _, proc := range procs {
+			if strings.ToUpper(proc.Name) == upperName && line > proc.StartLine && line <= proc.EndLine {
+				return true
+			}
+		}
+		return false
 	}
 
 	for i, token := range tokens {
@@ -1764,11 +1834,18 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 				if !isDeclaration {
 					severity := SeverityError
 					message := fmt.Sprintf("Custom procedures cannot be called directly. Use DoProc(\"%s\", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.", token.Text)
-					if !inFileProcs[upperName] {
+					switch {
+					case !inFileProcs[upperName]:
 						// Unknown callable: possibly an uncataloged vendor
 						// built-in rather than a custom procedure (issue #167).
 						severity = SeverityWarning
 						message = fmt.Sprintf("'%s' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.", token.Text)
+					case insideOwnProcedure(upperName, token.Line):
+						// A procedure calling its own name: recursion
+						// written C-style, or a wrapper around a same-named
+						// vendor built-in (issue #304).
+						severity = SeverityWarning
+						message = fmt.Sprintf("'%s' is called inside its own procedure. If this is recursion, dispatch it via DoProc(\"%s\", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.", token.Text, token.Text)
 					}
 					diagnostics = append(diagnostics, Diagnostic{
 						Severity: severity,
@@ -5765,11 +5842,22 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 // Style guide: "Do NOT call instance methods on NIL (raises error)".
 // This uses conservative analysis — only flags cases where a variable is
 // compared to NIL or known to be NIL from assignment context.
+//
+// Tracking replays assignments in source order, with two flow-aware
+// guards (issue #304): a use guarded by a negated-emptiness test of the
+// same variable (`!Empty(v)`, `v != NIL`) in an enclosing :IF/:WHILE
+// condition or an earlier `.AND.` operand of the same condition is
+// skipped, and a NIL assignment inside an :IF branch or loop body that
+// ends in :RETURN does not reach code after that branch.
 func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
 	// Track variables assigned NIL
 	nilVars := make(map[string]bool)
+	flow := newNilFlow()
+	// condGuards marks, per token index inside an :IF/:WHILE condition,
+	// the variables an earlier `.AND.` operand proved non-empty.
+	condGuards := make(map[int]map[string]bool)
 
 	// isQualified reports whether the identifier at idx is a `:`-qualified
 	// member (`Me:oClient`, `oOuter:oInner`) rather than a bare local —
@@ -5786,9 +5874,31 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 
 		// Locals live per procedure; tracking resets at each boundary.
 		if token.Type == lexer.TokenKeyword {
-			switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
+			kw := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
+			switch kw {
 			case "PROCEDURE", "ENDPROC":
 				nilVars = make(map[string]bool)
+				flow = newNilFlow()
+			case "IF", "WHILE":
+				end, body, inCond := nilConditionGuards(tokens, i+1)
+				for idx, vars := range inCond {
+					condGuards[idx] = vars
+				}
+				flow.open(body, end)
+			case "FOR":
+				flow.open(nil, i)
+			case "BEGINCASE", "TRY":
+				flow.openOpaque()
+			case "ELSE":
+				flow.branch(nilVars)
+			case "ENDIF", "ENDWHILE", "NEXT":
+				flow.close(nilVars)
+			case "ENDCASE", "ENDTRY":
+				flow.closeOpaque()
+			case "RETURN":
+				flow.markReturned()
+			case "EXITWHILE", "EXITFOR", "LOOP":
+				flow.markJumped()
 			}
 		}
 
@@ -5799,13 +5909,15 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 			if prevIdx >= 0 && nextIdx >= 0 &&
 				tokens[prevIdx].Type == lexer.TokenIdentifier && !isQualified(prevIdx) {
 				nextTok := tokens[nextIdx]
+				name := strings.ToUpper(tokens[prevIdx].Text)
 				isNilAssign := strings.EqualFold(nextTok.Text, "NIL") &&
 					(nextTok.Type == lexer.TokenIdentifier || nextTok.Type == lexer.TokenKeyword)
 				if isNilAssign {
-					nilVars[strings.ToUpper(tokens[prevIdx].Text)] = true
+					flow.recordNil(name, nilVars[name])
+					nilVars[name] = true
 				} else {
 					// Any non-NIL assignment clears the flag
-					delete(nilVars, strings.ToUpper(tokens[prevIdx].Text))
+					delete(nilVars, name)
 				}
 			}
 		}
@@ -5841,7 +5953,9 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 		// Check for method calls on variables known to be NIL. A
 		// `:`-qualified occurrence is a member in a chain
 		// (`Me:oClient:Send(...)`), not the tracked local.
-		if token.Type == lexer.TokenIdentifier && nilVars[strings.ToUpper(token.Text)] && !isQualified(i) {
+		upper := strings.ToUpper(token.Text)
+		if token.Type == lexer.TokenIdentifier && nilVars[upper] && !isQualified(i) &&
+			!condGuards[i][upper] && !flow.guarded(upper, i) {
 			nextIdx := nextSignificantTokenIndex(tokens, i+1)
 			if nextIdx >= 0 && tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == ":" {
 				// Check it's a member access, not assignment
@@ -5860,6 +5974,302 @@ func checkNilMethodCalls(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// nilFrame is one open block for checkNilMethodCalls' flow guards.
+type nilFrame struct {
+	// opaque frames (:BEGINCASE, :TRY) neither guard nor restore: a CASE
+	// branch can fall through to the next, and a :CATCH runs after part
+	// of the :TRY body, so their sections are not isolated paths.
+	opaque bool
+	// guards are the variables the condition proved non-empty for the
+	// current branch, active after token index guardsFrom (the
+	// condition's `;`). Cleared at :ELSE and when the variable is
+	// reassigned NIL inside the branch.
+	guards     map[string]bool
+	guardsFrom int
+	// returned is set by a :RETURN directly in the current branch;
+	// jumped by :EXITWHILE/:EXITFOR/:LOOP anywhere inside, which can
+	// leave the branch before that :RETURN.
+	returned, jumped bool
+	// saved holds, for each variable assigned NIL in the current branch,
+	// its state before the branch's first such assignment.
+	saved map[string]bool
+	// mayNil collects the NIL assignments that reach the end of an
+	// earlier branch of this :IF, re-applied at :ENDIF.
+	mayNil map[string]bool
+}
+
+type nilFlowState struct {
+	frames []*nilFrame
+}
+
+func newNilFlow() *nilFlowState { return &nilFlowState{} }
+
+func (f *nilFlowState) open(guards map[string]bool, guardsFrom int) {
+	f.frames = append(f.frames, &nilFrame{
+		guards:     guards,
+		guardsFrom: guardsFrom,
+		saved:      map[string]bool{},
+		mayNil:     map[string]bool{},
+	})
+}
+
+func (f *nilFlowState) openOpaque() {
+	f.frames = append(f.frames, &nilFrame{opaque: true, saved: map[string]bool{}, mayNil: map[string]bool{}})
+}
+
+func (f *nilFlowState) top() *nilFrame {
+	if len(f.frames) == 0 {
+		return nil
+	}
+	return f.frames[len(f.frames)-1]
+}
+
+// recordNil notes a NIL assignment: the innermost non-opaque frame
+// remembers the variable's prior state, and every open frame stops
+// guarding it.
+func (f *nilFlowState) recordNil(name string, prior bool) {
+	for _, fr := range f.frames {
+		delete(fr.guards, name)
+	}
+	if fr := f.top(); fr != nil {
+		if _, seen := fr.saved[name]; !seen {
+			fr.saved[name] = prior
+		}
+	}
+}
+
+func (f *nilFlowState) markReturned() {
+	if fr := f.top(); fr != nil {
+		fr.returned = true
+	}
+}
+
+func (f *nilFlowState) markJumped() {
+	for _, fr := range f.frames {
+		fr.jumped = true
+	}
+}
+
+// endBranch settles the current branch of the top frame: NIL assignments
+// that reach its end are kept in mayNil, and every NIL assignment made in
+// the branch is undone so the next branch (or the code after a branch
+// that returned) starts from the state before it.
+func (f *nilFlowState) endBranch(fr *nilFrame, nilVars map[string]bool) {
+	reaches := !fr.returned || fr.jumped
+	for name, prior := range fr.saved {
+		if reaches && nilVars[name] {
+			fr.mayNil[name] = true
+		}
+		if prior {
+			nilVars[name] = true
+		} else {
+			delete(nilVars, name)
+		}
+	}
+	fr.saved = map[string]bool{}
+	fr.returned = false
+}
+
+// branch handles :ELSE: the THEN branch's NIL assignments cannot reach
+// the ELSE branch, and the ELSE branch is not guarded by the condition.
+func (f *nilFlowState) branch(nilVars map[string]bool) {
+	fr := f.top()
+	if fr == nil || fr.opaque {
+		return
+	}
+	f.endBranch(fr, nilVars)
+	fr.guards = nil
+}
+
+// close handles the end of an :IF or loop: assignments that reached the
+// end of any branch apply after the block, and the frame's remaining
+// prior states pass to the enclosing frame.
+func (f *nilFlowState) close(nilVars map[string]bool) {
+	fr := f.top()
+	if fr == nil || fr.opaque {
+		return
+	}
+	f.endBranch(fr, nilVars)
+	f.frames = f.frames[:len(f.frames)-1]
+	for name := range fr.mayNil {
+		prior := nilVars[name]
+		f.recordNil(name, prior)
+		nilVars[name] = true
+	}
+}
+
+func (f *nilFlowState) closeOpaque() {
+	fr := f.top()
+	if fr == nil || !fr.opaque {
+		return
+	}
+	f.frames = f.frames[:len(f.frames)-1]
+	// Assignments inside pass through unchanged; the enclosing frame
+	// still owns their prior states.
+	if parent := f.top(); parent != nil {
+		for name, prior := range fr.saved {
+			if _, seen := parent.saved[name]; !seen {
+				parent.saved[name] = prior
+			}
+		}
+	}
+}
+
+func (f *nilFlowState) guarded(name string, idx int) bool {
+	for _, fr := range f.frames {
+		if idx > fr.guardsFrom && fr.guards[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// nilConditionGuards reads an :IF/:WHILE condition starting at token
+// index start, through its terminating `;`. It returns the `;` index,
+// the variables the whole condition proves non-empty (a top-level
+// `.AND.` chain, no top-level `.OR.`, with an operand `!Empty(v)`,
+// `.NOT. Empty(v)`, or `v != NIL`), and, per later token index, the
+// variables proven by an earlier operand of the same `.AND.` chain —
+// `.AND.` short-circuits, so `!Empty(v) .AND. v:Prop` never reaches
+// `v:Prop` when v is empty (issue #304).
+func nilConditionGuards(tokens []lexer.Token, start int) (int, map[string]bool, map[int]map[string]bool) {
+	inCond := map[int]map[string]bool{}
+	all := map[string]bool{}
+	chain := map[string]bool{}
+	hasOr := false
+	depth := 0
+	end := len(tokens)
+	operandStart := true
+	for j := start; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+			continue
+		}
+		if t.Type == lexer.TokenPunctuation {
+			switch t.Text {
+			case "(", "[", "{":
+				depth++
+			case ")", "]", "}":
+				depth--
+			case ";":
+				if depth <= 0 {
+					end = j
+				}
+			}
+			if end == j {
+				break
+			}
+		}
+		if depth == 0 && t.Type == lexer.TokenOperator {
+			switch strings.ToUpper(t.Text) {
+			case ".OR.":
+				hasOr = true
+				chain = map[string]bool{}
+				operandStart = true
+				continue
+			case ".AND.":
+				operandStart = true
+				continue
+			}
+		}
+		atOperandStart := operandStart
+		operandStart = false
+		if depth == 0 && atOperandStart && t.Type != lexer.TokenPunctuation {
+			if name, next := nonEmptyOperand(tokens, j); name != "" {
+				chain[name] = true
+				all[name] = true
+				j = next - 1
+				continue
+			}
+		}
+		if t.Type == lexer.TokenIdentifier && len(chain) > 0 {
+			vars := make(map[string]bool, len(chain))
+			for name := range chain {
+				vars[name] = true
+			}
+			inCond[j] = vars
+		}
+	}
+	if hasOr {
+		all = nil
+	}
+	return end, all, inCond
+}
+
+// nonEmptyOperand matches a non-emptiness test starting at token index
+// idx — `!Empty(v)`, `.NOT. Empty(v)`, `v != NIL` (or `<>`, `#`, and
+// with NIL first) — and returns the upper-cased variable and the index
+// just past the operand, or "" when the tokens are anything else.
+func nonEmptyOperand(tokens []lexer.Token, idx int) (string, int) {
+	sig := func(from int) int { return nextSignificantTokenIndex(tokens, from) }
+	isNil := func(k int) bool {
+		return k >= 0 && strings.EqualFold(tokens[k].Text, "NIL") &&
+			(tokens[k].Type == lexer.TokenIdentifier || tokens[k].Type == lexer.TokenKeyword)
+	}
+	isNotEqual := func(k int) bool {
+		if k < 0 || tokens[k].Type != lexer.TokenOperator {
+			return false
+		}
+		switch tokens[k].Text {
+		case "!=", "<>", "#":
+			return true
+		}
+		return false
+	}
+	bareIdent := func(k int) bool {
+		return k >= 0 && tokens[k].Type == lexer.TokenIdentifier && !strings.EqualFold(tokens[k].Text, "NIL")
+	}
+	// operandEnds requires the operand to finish at a top-level `.AND.`,
+	// `.OR.`, `)` or the statement's `;`, so `v != NIL + x` is not read
+	// as a test.
+	operandEnds := func(k int) bool {
+		if k < 0 {
+			return true
+		}
+		t := tokens[k]
+		if t.Type == lexer.TokenOperator {
+			u := strings.ToUpper(t.Text)
+			return u == ".AND." || u == ".OR."
+		}
+		return t.Type == lexer.TokenPunctuation && (t.Text == ";" || t.Text == ")")
+	}
+
+	t := tokens[idx]
+	if t.Type == lexer.TokenOperator && (t.Text == "!" || strings.EqualFold(t.Text, ".NOT.")) {
+		fn := sig(idx + 1)
+		open := sig(fn + 1)
+		if fn < 0 || open < 0 || !strings.EqualFold(tokens[fn].Text, "Empty") ||
+			tokens[open].Type != lexer.TokenPunctuation || tokens[open].Text != "(" {
+			return "", idx + 1
+		}
+		v := sig(open + 1)
+		closeIdx := sig(v + 1)
+		if !bareIdent(v) || closeIdx < 0 || tokens[closeIdx].Type != lexer.TokenPunctuation || tokens[closeIdx].Text != ")" {
+			return "", idx + 1
+		}
+		if !operandEnds(sig(closeIdx + 1)) {
+			return "", idx + 1
+		}
+		return strings.ToUpper(tokens[v].Text), closeIdx + 1
+	}
+	if bareIdent(idx) {
+		op := sig(idx + 1)
+		n := sig(op + 1)
+		if isNotEqual(op) && isNil(n) && operandEnds(sig(n+1)) {
+			return strings.ToUpper(t.Text), n + 1
+		}
+		return "", idx + 1
+	}
+	if isNil(idx) {
+		op := sig(idx + 1)
+		v := sig(op + 1)
+		if isNotEqual(op) && bareIdent(v) && operandEnds(sig(v+1)) {
+			return strings.ToUpper(tokens[v].Text), v + 1
+		}
+	}
+	return "", idx + 1
 }
 
 func nextSignificantTokenIndex(tokens []lexer.Token, start int) int {
@@ -6157,6 +6567,14 @@ func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []
 			nextIdx++
 		}
 		if nextIdx < len(tokens) && tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == "(" {
+			continue
+		}
+
+		// A name followed by `{` on its line is class instantiation
+		// (`FormDto{}`), not a variable read — the class may be one the
+		// published inventory does not list (issue #304).
+		if nextIdx < len(tokens) && tokens[nextIdx].Line == token.Line &&
+			tokens[nextIdx].Type == lexer.TokenPunctuation && tokens[nextIdx].Text == "{" {
 			continue
 		}
 

@@ -175,6 +175,14 @@ history:
       unit too far left. The SQL lexer behind the data-source checks
       counted bytes, which also skewed ranges after accented text.
   - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      A mid-line `:ENDREGION;` (with its semicolon) now closes a region
+      body at the colon. Only a line-leading closer counted, so a JSON
+      template ending `}:ENDREGION;` in shipped product code ran to end
+      of file and reported unclosed_block. A mid-line `:ENDREGION`
+      without its `;` is still body text.
+  - date: 2026-10-13
     ref: "issue #258"
     note: >-
       The 100-diagnostic cap now applies after sorting by severity, then
@@ -285,12 +293,14 @@ rules (those are `diag.*` entries).
   ssl-style-guide#48; the former `datasource_default_required` rule is
   removed).
 - Region bodies are opaque payload (issue #164): the text between a
-  `:REGION <name>;` header and its line-leading `:ENDREGION` closer is
+  `:REGION <name>;` header and its `:ENDREGION` closer is
   stored for `GetRegion()` retrieval, not executed, so the lexer captures
   it as a single raw token and NO diagnostic ever fires on body content —
   regions legitimately hold HTML, JavaScript, XML, and SQL templates. A
-  mid-line `:ENDREGION` is body text; only a line-leading one (optionally
-  indented) closes the region. A region with no closer consumes to EOF as
+  line-leading `:ENDREGION` (optionally indented) closes the region, and
+  so does a complete `:ENDREGION;` later on a line (`}:ENDREGION;`), cut
+  at its colon so the text before it stays payload (issue #304). A
+  mid-line `:ENDREGION` without its `;` is body text. A region with no closer consumes to EOF as
   raw text and still reports `unclosed_block` on the `:REGION`. The
   formatter emits bodies verbatim (no reindent, no semicolon enforcement).
 - A panic in any diagnostic check MUST NOT crash the server: it is

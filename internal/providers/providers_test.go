@@ -4678,17 +4678,18 @@ func TestGetDiagnostics_ZeroBasedArrayIndex(t *testing.T) {
 
 func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 	// [0] on a value reached through colon member access may be a 0-based
-	// .NET collection — `dataSet:Tables[0]` is the prescribed form there —
-	// so it is an info-tier advisory, not an error (issues #152/#255).
-	// Chained access behaves the same, and the default surface drops it.
+	// .NET collection, so it is an info-tier advisory, not an error
+	// (issues #152/#255). Chained access behaves the same, and the default
+	// surface drops it. A chain through `:Tables` (the DataSet API) is
+	// silent at every tier (issue #304), so these use other members.
 	infoOpts := DefaultDiagnosticOptions()
 	infoOpts.IncludeInfoDiagnostics = true
 	cases := []struct {
 		name string
 		code string
 	}{
-		{name: "member access", code: `oTable := dataSet:Tables[0];`},
-		{name: "chained member access", code: `oCol := dataSet:Tables:Columns[0];`},
+		{name: "member access", code: `oItem := oList:Items[0];`},
+		{name: "chained member access", code: `oCol := oGrid:Layout:Columns[0];`},
 	}
 
 	for _, tc := range cases {

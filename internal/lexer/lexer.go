@@ -664,10 +664,12 @@ func (l *Lexer) codeBlockStringEnd(prevSig rune) int {
 }
 
 // readRegionBody consumes the raw text of a :REGION body: everything from
-// the current position up to (but not including) the line that carries the
-// closing :ENDREGION. The terminator must be line-leading — only whitespace
-// may precede it on its line — matching how region bodies are captured for
-// GetRegion(). With no terminator the body runs to EOF (the unclosed-block
+// the current position up to (but not including) the closing :ENDREGION.
+// A line-leading :ENDREGION (only whitespace before it) closes the body at
+// the start of its line. Mid-line, the complete `:ENDREGION;` closes it at
+// the colon, so `}:ENDREGION;` ends a template whose last line carries the
+// closer (issue #304); a mid-line :ENDREGION without its `;` is body text.
+// With no terminator the body runs to EOF (the unclosed-block
 // check still fires on the missing :ENDREGION). Returns ok=false when the
 // body is empty (e.g. `:REGION X; :ENDREGION;` on one line).
 func (l *Lexer) readRegionBody() (Token, bool) {
@@ -689,6 +691,14 @@ func (l *Lexer) readRegionBody() (Token, bool) {
 			continue
 		}
 		if !atLineLead {
+			// Mid-line, only the complete `:ENDREGION;` closes the body,
+			// cut at the colon so the text before it stays payload
+			// (`}:ENDREGION;` after a JSON template, issue #304). A
+			// mid-line `:ENDREGION` without its `;` stays body text.
+			if c == ':' && l.matchesEndRegion(i) && l.endRegionTerminated(i) {
+				end = i
+				break
+			}
 			continue
 		}
 		if c == ' ' || c == '\t' || c == '\r' {
@@ -731,6 +741,23 @@ func (l *Lexer) matchesEndRegion(i int) bool {
 		return false
 	}
 	return true
+}
+
+// endRegionTerminated reports whether the `:ENDREGION` keyword at i is
+// followed, on the same line, by its terminating `;` (spaces and tabs
+// allowed in between).
+func (l *Lexer) endRegionTerminated(i int) bool {
+	for j := i + len(":ENDREGION"); j < len(l.input); j++ {
+		switch l.input[j] {
+		case ' ', '\t':
+			continue
+		case ';':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func (l *Lexer) readUnknown() Token {

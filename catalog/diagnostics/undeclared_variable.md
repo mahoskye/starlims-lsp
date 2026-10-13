@@ -19,6 +19,7 @@ tests:
   - internal/providers/predefined_globals_test.go
   - internal/providers/providers_test.go
   - internal/providers/undeclared_declarations_test.go
+  - internal/providers/fp_triage_304_test.go
 history:
   - date: 2025-11-XX
     ref: "commit a4df25b"
@@ -95,6 +96,19 @@ history:
       it is file-wide, and deliberately so. SSL's caller-scope lookup lets
       a procedure read its caller's variables, so per-procedure scoping
       would flag valid code.
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      Two false-positive classes from unmodified product code. A name
+      followed by `{` is class instantiation, not a variable read (the
+      product instantiates designer classes the published inventory does
+      not list). And a file with an :INCLUDE the caller could not read
+      gets no findings: the included script may declare any name, and
+      134 of the 210 --strict findings in including product files named
+      a variable the included script declares. With a workspace index
+      that resolves every include, the closure applies as before
+      (feature.cross_file_resolution A21). Corpus under --strict,
+      unmodified product code: 328 -> 115 findings.
 issues: []
 ---
 
@@ -140,8 +154,15 @@ A name the reference lists as **not** declared on a base installation
 the message adds the replacement, for example "use Chr(13) instead".
 An installation that does declare one adds it to `ssl.diagnostics.globals`.
 
-Without a workspace index (or when includes don't
-resolve) the check is single-file, exactly as before.
+A file with an `:INCLUDE` whose closure is incomplete — a target that
+does not resolve, or no workspace index at all, as in `--validate` — is
+not checked: the unread script may declare any of its names, and a
+finding there would assert a knowledge gap as a defect (DECISIONS.md
+D10, issue #304). A file without an `:INCLUDE` is checked single-file.
+
+A name immediately followed by `{` on its line is a class instantiation
+(`FormDto{}`), not a variable read, whether or not the published
+inventory lists the class (issue #304).
 
 ## Examples
 
@@ -247,6 +268,25 @@ resolve) the check is single-file, exactly as before.
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE oForm;
+	oForm := FormDto{"frmMain", 0, 0, 200, 200};
+	:RETURN oForm;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:INCLUDE Shared.ErrorCodes;
+:PROCEDURE Demo;
+	RaiseError(aErrNotFound[2], "Demo", aErrNotFound[1]);
+:ENDPROC;
+```
+
 ## Rationale
 
 Undeclared-variable detection is the highest-value and highest-noise check
@@ -261,3 +301,6 @@ The member-access fence pins DECISIONS.md D10 (issue #22): the member of
 a `:` access is never a variable reference, and built-in value types
 forward unmatched members to .NET at runtime, so flagging them would
 false-positive every legitimate passthrough.
+The include fence pins the same principle one step out (issue #304):
+the spec runner has no workspace index, so `Shared.ErrorCodes` is
+unread, and a finding for a name it may declare would be a guess.
