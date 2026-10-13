@@ -3,9 +3,15 @@
 // The names a base STARLIMS installation declares for every server script
 // come from the reference guide "Predefined Globals"
 // (starlims-ssl-reference content/guides/predefined-globals.md), vendored
-// verbatim at internal/constants/data/predefined-globals.md. The tables
-// are parsed at init instead of hand-copied, so a refresh is a file copy
-// (issue #270).
+// verbatim at internal/constants/data/predefined-globals.md (the reference
+// is CC BY 4.0). The tables are parsed at init instead of hand-copied, so
+// a refresh is a file copy (issue #270):
+//
+//	cp ../ssl-docs/content/guides/predefined-globals.md internal/constants/data/
+//	go test ./internal/constants/ ./internal/providers/
+//
+// TestPredefinedGlobalsMatchesReference compares the copy with a sibling
+// ssl-docs checkout when one is present (override with SSL_REFERENCE_DIR).
 package constants
 
 import (
