@@ -1,9 +1,11 @@
 package server
 
 import (
-	"net/url"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -134,12 +136,34 @@ type WorkspaceIndex struct {
 	stopCh   chan struct{}
 	doneCh   chan struct{}
 
+	// sem bounds the parsing goroutines shared by the startup walk and
+	// ReindexAsync; pending tracks ReindexAsync work so Stop and tests can
+	// wait for it.
+	sem     chan struct{}
+	pending sync.WaitGroup
+	// gen counts index mutations per URI, under mu. A parse commits only
+	// if its URI's generation is still the one it started with, so an
+	// in-flight parse cannot re-add a file removed (or re-queued) after it
+	// began (issue #258).
+	gen map[string]uint64
+
 	// Secondary lookups, all keyed lowercase, maintained alongside files
 	// under mu. Values are URI sets stored as sorted-on-read slices.
 	byScriptName map[string][]string            // script name -> URIs
 	byCategory   map[string]map[string][]string // category -> script -> URIs
 	byProcName   map[string][]string            // procedure name -> URIs
 }
+
+// indexWorkers bounds concurrent file parses.
+const indexWorkers = 4
+
+// indexFileHook, when set, runs at the start of every file parse. Tests
+// use it to inject a panic; it is nil in production.
+var indexFileHook func(uri string)
+
+// indexLog receives the background indexer's panic reports: stderr, which
+// is the editor's LSP output channel. Tests capture it.
+var indexLog io.Writer = os.Stderr
 
 // NewWorkspaceIndex creates a new workspace index for the given root URIs.
 func NewWorkspaceIndex(rootURIs []string) *WorkspaceIndex {
@@ -148,6 +172,8 @@ func NewWorkspaceIndex(rootURIs []string) *WorkspaceIndex {
 		rootURIs:     rootURIs,
 		stopCh:       make(chan struct{}),
 		doneCh:       make(chan struct{}),
+		sem:          make(chan struct{}, indexWorkers),
+		gen:          make(map[string]uint64),
 		byScriptName: make(map[string][]string),
 		byCategory:   make(map[string]map[string][]string),
 		byProcName:   make(map[string][]string),
@@ -161,7 +187,6 @@ func (wi *WorkspaceIndex) StartBackgroundIndex() {
 		defer close(wi.doneCh)
 		defer wi.indexing.Store(false)
 
-		sem := make(chan struct{}, 4) // bounded concurrency
 		var wg sync.WaitGroup
 
 		for _, rootURI := range wi.rootURIs {
@@ -197,11 +222,12 @@ func (wi *WorkspaceIndex) StartBackgroundIndex() {
 				}
 
 				uri := pathToURI(path)
+				gen := wi.nextGen(uri)
 				wg.Add(1)
-				sem <- struct{}{} // acquire
+				wi.sem <- struct{}{} // acquire
 				go func() {
 					defer wg.Done()
-					defer func() { <-sem }() // release
+					defer func() { <-wi.sem }() // release
 
 					// Check for cancellation before parsing
 					select {
@@ -210,7 +236,7 @@ func (wi *WorkspaceIndex) StartBackgroundIndex() {
 					default:
 					}
 
-					wi.IndexFile(uri)
+					wi.safeIndex(uri, gen)
 				}()
 
 				return nil
@@ -250,8 +276,64 @@ func (wi *WorkspaceIndex) InHiddenDir(uri string) bool {
 	return false
 }
 
-// IndexFile reads a file from disk and indexes its symbols.
+// ReindexAsync queues uri for indexing on the background worker and
+// returns at once, so a burst of file-watcher events (a large checkout)
+// never holds up request handling. A RemoveFile or a later ReindexAsync
+// for the same URI supersedes it, even mid-parse.
+func (wi *WorkspaceIndex) ReindexAsync(uri string) {
+	uri = canonicalURI(uri)
+	gen := wi.nextGen(uri)
+	wi.pending.Add(1)
+	go func() {
+		defer wi.pending.Done()
+		select {
+		case wi.sem <- struct{}{}:
+		case <-wi.stopCh:
+			return
+		}
+		defer func() { <-wi.sem }()
+		select {
+		case <-wi.stopCh:
+			return
+		default:
+		}
+		wi.safeIndex(uri, gen)
+	}()
+}
+
+// nextGen starts a new generation for uri and returns it.
+func (wi *WorkspaceIndex) nextGen(uri string) uint64 {
+	wi.mu.Lock()
+	defer wi.mu.Unlock()
+	wi.gen[uri]++
+	return wi.gen[uri]
+}
+
+// safeIndex indexes one file on a background goroutine. A panic while
+// parsing it is logged with its stack and the file is skipped: without
+// the recover, one file the parser cannot handle would end the server
+// process on every startup (issue #258).
+func (wi *WorkspaceIndex) safeIndex(uri string, gen uint64) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			fmt.Fprintf(indexLog, "ssl-lsp: panic indexing %s, file skipped: %v\n%s\n", uri, rec, debug.Stack())
+		}
+	}()
+	_ = wi.indexFile(uri, gen)
+}
+
+// IndexFile reads a file from disk and indexes its symbols, synchronously.
 func (wi *WorkspaceIndex) IndexFile(uri string) error {
+	uri = canonicalURI(uri)
+	return wi.indexFile(uri, wi.nextGen(uri))
+}
+
+// indexFile parses uri and commits the result only if gen is still the
+// URI's current generation.
+func (wi *WorkspaceIndex) indexFile(uri string, gen uint64) error {
+	if indexFileHook != nil {
+		indexFileHook(uri)
+	}
 	path := uriToPath(uri)
 	if path == "" {
 		return nil
@@ -308,12 +390,16 @@ func (wi *WorkspaceIndex) IndexFile(uri string) error {
 	}
 
 	wi.mu.Lock()
+	defer wi.mu.Unlock()
+	if wi.gen[uri] != gen {
+		// Removed or re-queued while this parse ran: the newer event wins.
+		return nil
+	}
 	if old, ok := wi.files[uri]; ok {
 		wi.removeFromLookupsLocked(old)
 	}
 	wi.files[uri] = fs
 	wi.addToLookupsLocked(fs)
-	wi.mu.Unlock()
 
 	return nil
 }
@@ -337,9 +423,12 @@ func dedupeVariableNames(vars []parser.VariableInfo) []string {
 	return names
 }
 
-// RemoveFile removes a file from the index.
+// RemoveFile removes a file from the index. It also supersedes any parse
+// of the file still in flight, so that parse cannot add it back.
 func (wi *WorkspaceIndex) RemoveFile(uri string) {
+	uri = canonicalURI(uri)
 	wi.mu.Lock()
+	wi.gen[uri]++
 	if old, ok := wi.files[uri]; ok {
 		wi.removeFromLookupsLocked(old)
 	}
@@ -451,10 +540,12 @@ func (wi *WorkspaceIndex) SearchSymbols(query string, openURIs map[string]struct
 	return results
 }
 
-// Stop signals the background indexer to stop and waits for it to finish.
+// Stop signals the background indexer to stop and waits for it, and for
+// any queued re-indexing, to finish.
 func (wi *WorkspaceIndex) Stop() {
 	close(wi.stopCh)
 	<-wi.doneCh
+	wi.pending.Wait()
 }
 
 // IsIndexing returns whether background indexing is in progress.
@@ -489,28 +580,6 @@ func isClassFileFromTokens(tokens []lexer.Token) bool {
 		return token.Type == lexer.TokenKeyword && strings.EqualFold(token.Text, ":CLASS")
 	}
 	return false
-}
-
-// uriToPath converts a file:// URI to a filesystem path.
-func uriToPath(uri string) string {
-	if strings.HasPrefix(uri, "file://") {
-		parsed, err := url.Parse(uri)
-		if err != nil {
-			return strings.TrimPrefix(uri, "file://")
-		}
-		return parsed.Path
-	}
-	// If it's already a path, return as-is
-	return uri
-}
-
-// pathToURI converts a filesystem path to a file:// URI.
-func pathToURI(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		abs = path
-	}
-	return "file://" + filepath.ToSlash(abs)
 }
 
 // --- Cross-file resolution (spec feature.cross_file_resolution) ---
@@ -848,6 +917,7 @@ func (wi *WorkspaceIndex) ScriptsNamed(name string) []*FileSymbols {
 // is replaced wholesale on re-index, never mutated in place, so it is safe
 // to read after the lock is released.
 func (wi *WorkspaceIndex) FileSymbolsFor(uri string) (*FileSymbols, bool) {
+	uri = canonicalURI(uri)
 	wi.mu.RLock()
 	defer wi.mu.RUnlock()
 	fs, ok := wi.files[uri]

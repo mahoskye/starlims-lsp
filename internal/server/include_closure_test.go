@@ -28,7 +28,7 @@ func undeclaredWithClosure(t *testing.T, s *SSLServer, source string, version in
 	return flagged
 }
 
-// [spec feature.cross_file_resolution/A21] — undeclared_variable checks a
+// [spec feature.cross_file_resolution/A23] — undeclared_variable checks a
 // document with an :INCLUDE only when the include closure is complete
 // (issue #304).
 func TestIncludeClosure_CompletenessGatesUndeclared(t *testing.T) {

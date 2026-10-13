@@ -557,3 +557,59 @@ func TestCLIContract_DsAppliesToFiles(t *testing.T) {
 		t.Errorf("--ds must classify a file argument as a data source: %v", r)
 	}
 }
+
+// [spec feature.cli_contract/A16] An unknown dash-prefixed first argument
+// is a usage error, never a server start; no arguments, --stdio, and the
+// --clientProcessId launcher argument start the server.
+func TestCLIContract_FirstArgument(t *testing.T) {
+	for _, args := range [][]string{
+		{"--valdiate", "x.ssl"}, // a mistyped mode
+		{"--formt"},
+		{"-x"},
+		{"--strict", "x.ssl"}, // a --validate flag without the mode
+	} {
+		var out, errOut bytes.Buffer
+		code, serve := cliMain(args, strings.NewReader(""), &out, &errOut)
+		if serve {
+			t.Errorf("%v: must not start the server", args)
+			continue
+		}
+		if code != exitUsage {
+			t.Errorf("%v: exit %d, want 2", args, code)
+		}
+		if out.Len() != 0 {
+			t.Errorf("%v: usage error must write nothing to stdout, got %q", args, out.String())
+		}
+		if !strings.Contains(errOut.String(), "unknown flag") || !strings.Contains(errOut.String(), args[0]) {
+			t.Errorf("%v: stderr must name the unknown flag, got %q", args, errOut.String())
+		}
+	}
+
+	for _, args := range [][]string{
+		nil,
+		{"--stdio"},
+		{"--stdio", "--anything-after"},
+		{"--clientProcessId=1234"},
+		{"--clientProcessId", "1234"},
+	} {
+		var out, errOut bytes.Buffer
+		code, serve := cliMain(args, strings.NewReader(""), &out, &errOut)
+		if !serve || code != exitOK || out.Len() != 0 || errOut.Len() != 0 {
+			t.Errorf("%v: must start the server quietly, got serve=%v code=%d stdout=%q stderr=%q", args, serve, code, out.String(), errOut.String())
+		}
+	}
+
+	// The existing modes still dispatch.
+	var out, errOut bytes.Buffer
+	if code, serve := cliMain([]string{"--version"}, strings.NewReader(""), &out, &errOut); serve || code != exitOK || !strings.HasPrefix(out.String(), "starlims-lsp version ") {
+		t.Errorf("--version: serve=%v code=%d stdout=%q", serve, code, out.String())
+	}
+	out.Reset()
+	if code, serve := cliMain([]string{"--help"}, strings.NewReader(""), &out, &errOut); serve || code != exitOK || !strings.Contains(out.String(), "Usage:") {
+		t.Errorf("--help: serve=%v code=%d stdout=%q", serve, code, out.String())
+	}
+	out.Reset()
+	if code, serve := cliMain([]string{"--validate", "--stdin"}, strings.NewReader(cleanSSL), &out, &errOut); serve || code != exitOK || !strings.Contains(out.String(), `"valid": true`) {
+		t.Errorf("--validate: serve=%v code=%d stdout=%q", serve, code, out.String())
+	}
+}

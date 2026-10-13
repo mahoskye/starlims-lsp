@@ -45,6 +45,14 @@ history:
       --format gained --ds, and its SQL-mode passthrough applies only to
       data sources (.ds/.ds.txt or --ds), as --validate's does; content
       alone no longer decides it.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      An unknown dash-prefixed first argument exits 2 instead of starting
+      the language server (A16). A mistyped mode such as `--valdiate`
+      used to start the server, which then waited on stdin and hung the
+      CI job that ran it. No arguments, `--stdio`, and
+      `--clientProcessId` still start the server.
 issues: []
 ---
 
@@ -68,8 +76,14 @@ starlims-lsp --format   [flags] --stdin
 ```
 
 - The mode flag (`--validate`, `--format`) must be the **first**
-  argument; the binary picks its mode from `argv[1]` alone. Anything else
-  in first position starts the language server.
+  argument; the binary picks its mode from `argv[1]` alone. The language
+  server starts when there is no argument, when the first is `--stdio`
+  (which LSP clients append) or `--clientProcessId[=<pid>]` (the other
+  launcher convention), or when the first does not start with a dash. Any
+  other dash-prefixed first argument (a mistyped mode such as
+  `--valdiate`, or a mode flag given without its mode) is a usage error:
+  exit 2, an `Error: unknown flag "<arg>"` line on stderr, and nothing on
+  stdout. It never starts a server that would wait on stdin.
 - Mode flags may appear anywhere after the mode, before, between, or
   after file arguments, with identical results. Repeating a flag is
   harmless, and the profile flags compose by union.
@@ -294,6 +308,7 @@ baseline whenever any of the three rules changes.
 - A13: Given the active catalog diagnostics whose default severity is `error`, when the conformance test runs, then their slugs equal the pinned list in `cmd/starlims-lsp/testdata/error_codes.txt` — adding, removing, or renaming one fails the build until the pin is updated together with a CHANGELOG `### Breaking` note (D16).
 - A14: Given the result and diagnostic JSON objects, when their field names are enumerated, then they equal exactly the field sets in this entry's tables — adding a field requires updating this entry; renaming or removing one is breaking (D16).
 - A15: Given `--ds` and a file argument without a data-source extension, when the file is validated, then it is classified as a data-source document exactly as a `.ds` file would be — `--ds` applies to every input in the run, not only stdin.
+- A16: Given a dash-prefixed first argument that is not a mode, `--help`/`-h`, `--version`/`-v`, `--stdio`, or `--clientProcessId[=<pid>]` (for example `--valdiate`, or `--strict` without `--validate`), when the binary starts, then it exits 2 with an error on stderr naming the argument and writes nothing to stdout — it never starts the language server; given no arguments, `--stdio`, or `--clientProcessId`, the language server starts.
 
 ## Rationale
 

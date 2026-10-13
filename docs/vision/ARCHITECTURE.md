@@ -64,15 +64,20 @@ all of them. `providers` never imports `server`.
 | `internal/lexer` | The SSL tokenizer and token-position helpers. |
 | `internal/constants` | The SSL inventory (functions, classes, keywords, operators, literals, types), mostly generated from vendored reference data, plus hand-curated lists. |
 | `internal/catalog` | Loads `catalog/`, renders the generated docs, and holds the conformance and spec tests. |
-| `dev/backfill-catalog`, `dev/exprcoverage` | One-off developer tools (catalog seeding; expression-AST coverage measurement). |
+| `dev/exprcoverage` | Developer tool: expression-AST coverage measurement over a corpus. The rest of `dev/` is ignored (local copies of sibling repos). |
 
 ---
 
 ## Document Lifecycle
 
 1. **Start.** `main` creates the server (`server.NewSSLServer`) and runs it
-   on stdio. Any argument that is not a CLI mode flag starts the server, so
-   `starlims-lsp --stdio` works.
+   on stdio. No argument, `--stdio`, `--clientProcessId`, or a first
+   argument without a dash starts the server; any other dash-prefixed first
+   argument that is not a CLI mode exits 2 (feature.cli_contract A16).
+   Every URI a client sends is canonicalized at the handler boundary
+   (`canonicalURI` in `uri.go`), and the workspace index builds its keys
+   with the same helpers, so a file has one URI in the document store and
+   the index (feature.cross_file_resolution A21).
 2. **`initialize`.** Records the workspace roots, applies
    `initializationOptions` as settings, and advertises capabilities:
    incremental sync, completion triggered on `:` only, signature help
@@ -88,7 +93,8 @@ all of them. `providers` never imports `server`.
 5. **`didSave`.** Re-validates.
 6. **`didClose`.** Drops the in-memory document and re-indexes the file
    from disk. **`didChangeWatchedFiles`** re-indexes or removes files that
-   are not open.
+   are not open. Re-indexing is queued on the index's background worker,
+   and a removal supersedes any parse of the same file still in flight.
 7. **Feature requests.** Handlers in `handler.go` get the parsed document
    from `DocumentManager.ParseDocument(uri, version)`, call into
    `providers`, and convert the providers' 1-based positions to LSP's
@@ -194,7 +200,8 @@ Normative contract: [feature.diagnostics_pipeline](../../catalog/features/diagno
   ([D13](../../catalog/DECISIONS.md)).
 - **Output.** Every diagnostic carries a stable `code` slug and
   `source: "ssl-lsp"` ([D1](../../catalog/DECISIONS.md)). The server caps
-  each publish at 100 diagnostics.
+  each publish at 100 diagnostics, after sorting errors first, then
+  warnings, info, and hints, each in position order.
 
 ### Formatting
 
@@ -220,7 +227,10 @@ class or data source, its script identity, its entry-point `:PARAMETERS`,
 declared variables, `:INCLUDE` targets, and its `DoProc` /
 `ExecFunction` / `RunDS` / `:INCLUDE` call sites. Lookups by script name,
 category and script, and procedure name are case-insensitive. Closing a
-file and file-watcher events keep the index current.
+file and file-watcher events keep the index current; they queue the
+re-parse on the same bounded worker, and a per-URI generation counter
+stops a parse that a later delete or re-index superseded from committing.
+A file whose parse panics is logged and skipped.
 
 ### Script identity (`internal/server/script_identity.go`)
 
