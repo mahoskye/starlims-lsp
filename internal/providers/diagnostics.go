@@ -3344,7 +3344,8 @@ func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 		var first, last *lexer.Token
-		qualified := false
+		qualified, colonForm := false, false
+		var written strings.Builder
 		for j := i + 1; j < len(tokens); j++ {
 			t := &tokens[j]
 			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
@@ -3361,6 +3362,12 @@ func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 			if strings.Contains(t.Text, ".") {
 				qualified = true
 			}
+			// `Category:ClassName` lexes the colon as member access or as a
+			// fused `:ClassName` keyword token.
+			if strings.Contains(t.Text, ":") {
+				colonForm = true
+			}
+			written.WriteString(t.Text)
 			if first == nil {
 				first = t
 			}
@@ -3371,10 +3378,14 @@ func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 		}
 		r := tokenToRange(*first)
 		r.End = tokenToRange(*last).End
+		message := fmt.Sprintf("':INHERIT' needs the parent's full 'Category.ClassName'; the plain name '%s' does not compile (Specify the full name of the class in :INHERIT)", first.Text)
+		if colonForm {
+			message = fmt.Sprintf("':INHERIT' separates category and class with '.', not ':'; write ':INHERIT %s;'", strings.ReplaceAll(written.String(), ":", "."))
+		}
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityError,
 			Range:    r,
-			Message:  fmt.Sprintf("':INHERIT' needs the parent's full 'Category.ClassName'; the plain name '%s' does not compile (Specify the full name of the class in :INHERIT)", first.Text),
+			Message:  message,
 			Source:   "ssl-lsp",
 			Code:     CodeInheritQualifiedName,
 		})

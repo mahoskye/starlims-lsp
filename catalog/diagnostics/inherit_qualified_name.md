@@ -42,7 +42,8 @@ issues: []
 Flags an `:INHERIT` whose parent is a plain class name with no category
 (`:INHERIT BaseCounter;`), at error severity. The range covers the name.
 A name containing a `.` (`:INHERIT Samples.BaseCounter;`) is qualified and
-never flagged.
+never flagged. The colon form `:INHERIT Samples:BaseCounter;` is a syntax
+error too; it is flagged with a message that gives the dotted form.
 
 It must NOT flag:
 
@@ -61,6 +62,14 @@ class that uses `Base:` with an unqualified parent is reported once, here.
 ```ssl
 :CLASS Counter;
 :INHERIT BaseCounter;
+:DECLARE nCount;
+```
+
+### Flags
+
+```ssl
+:CLASS Counter;
+:INHERIT Samples:BaseCounter;
 :DECLARE nCount;
 ```
 

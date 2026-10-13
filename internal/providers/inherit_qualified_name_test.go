@@ -35,6 +35,12 @@ func TestInheritQualifiedName(t *testing.T) {
 		}
 	}
 
+	for _, d := range GetDiagnostics(":CLASS A;\n:INHERIT Lab:Parent;\n", DefaultDiagnosticOptions()) {
+		if d.Code == CodeInheritQualifiedName && !strings.Contains(d.Message, "write ':INHERIT Lab.Parent;'") {
+			t.Errorf("colon form message = %q", d.Message)
+		}
+	}
+
 	withBase := ":CLASS A;\n:INHERIT BaseCounter;\n:PROCEDURE Go;\n\tBase:Go();\n:ENDPROC;\n"
 	for _, d := range GetDiagnostics(withBase, DefaultDiagnosticOptions()) {
 		if d.Code == CodeBaseRequiresInherit {
