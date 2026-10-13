@@ -308,8 +308,8 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkBareLogicalOperators(tokens)...)
 	diagnostics = append(diagnostics, checkInvalidOperatorSequences(tokens)...)
 	diagnostics = append(diagnostics, checkIncludePlacement(tokens)...)
-	diagnostics = append(diagnostics, checkInheritQualifiedName(tokens)...)
 	diagnostics = append(diagnostics, checkInlineCodeNaming(tokens)...)
+	diagnostics = append(diagnostics, checkInheritQualifiedName(tokens)...)
 	diagnostics = append(diagnostics, checkBeginCaseHasCase(tokens)...)
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
 	diagnostics = append(diagnostics, checkErrorHandlerStructure(tokens)...)
@@ -2918,57 +2918,6 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkInheritQualifiedName reports an :INHERIT whose parent is a plain
-// class name (issue #269). The parent must be written as the full
-// Category.ClassName; a plain name fails when the class compiles with
-// "Specify the full name of the class in :INHERIT". A quoted parent is not
-// checked: its compile behavior is not documented (DECISIONS.md D10).
-func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
-	var diagnostics []Diagnostic
-	for i, token := range tokens {
-		if token.Type != lexer.TokenKeyword ||
-			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INHERIT") {
-			continue
-		}
-		var first, last *lexer.Token
-		qualified := false
-		for j := i + 1; j < len(tokens); j++ {
-			t := &tokens[j]
-			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
-				continue
-			}
-			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
-				break
-			}
-			if first == nil && t.Type != lexer.TokenIdentifier {
-				break
-			}
-			// The lexer reads `.ClassName` after the category as one token,
-			// so look for the dot in the text, not as punctuation.
-			if strings.Contains(t.Text, ".") {
-				qualified = true
-			}
-			if first == nil {
-				first = t
-			}
-			last = t
-		}
-		if first == nil || qualified {
-			continue
-		}
-		r := tokenToRange(*first)
-		r.End = tokenToRange(*last).End
-		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityError,
-			Range:    r,
-			Message:  fmt.Sprintf("':INHERIT' needs the parent's full 'Category.ClassName'; the plain name '%s' does not compile (Specify the full name of the class in :INHERIT)", first.Text),
-			Source:   "ssl-lsp",
-			Code:     CodeInheritQualifiedName,
-		})
-	}
-	return diagnostics
-}
-
 // checkIncludePlacement reports :INCLUDE directives that appear after other
 // significant statements or inside procedure bodies.
 // Recommended conventional order: :PARAMETERS, :DEFAULT, :INCLUDE, :PUBLIC, :DECLARE.
@@ -3379,6 +3328,57 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 
+	return diagnostics
+}
+
+// checkInheritQualifiedName reports an :INHERIT whose parent is a plain
+// class name (issue #269). The parent must be written as the full
+// Category.ClassName; a plain name fails when the class compiles with
+// "Specify the full name of the class in :INHERIT". A quoted parent is not
+// checked: its compile behavior is not documented (DECISIONS.md D10).
+func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
+	var diagnostics []Diagnostic
+	for i, token := range tokens {
+		if token.Type != lexer.TokenKeyword ||
+			!strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "INHERIT") {
+			continue
+		}
+		var first, last *lexer.Token
+		qualified := false
+		for j := i + 1; j < len(tokens); j++ {
+			t := &tokens[j]
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+				continue
+			}
+			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+			if first == nil && t.Type != lexer.TokenIdentifier {
+				break
+			}
+			// The lexer reads `.ClassName` after the category as one token,
+			// so look for the dot in the text, not as punctuation.
+			if strings.Contains(t.Text, ".") {
+				qualified = true
+			}
+			if first == nil {
+				first = t
+			}
+			last = t
+		}
+		if first == nil || qualified {
+			continue
+		}
+		r := tokenToRange(*first)
+		r.End = tokenToRange(*last).End
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    r,
+			Message:  fmt.Sprintf("':INHERIT' needs the parent's full 'Category.ClassName'; the plain name '%s' does not compile (Specify the full name of the class in :INHERIT)", first.Text),
+			Source:   "ssl-lsp",
+			Code:     CodeInheritQualifiedName,
+		})
+	}
 	return diagnostics
 }
 
