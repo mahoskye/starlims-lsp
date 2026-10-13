@@ -7,105 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **`global_assignment` no longer flags qualified members.** A property or
-  class field whose name matches a predefined or configured global, such as
-  `oSummary:pending := 0;` (`Pending` is a status global) or
-  `oContext:MYUSERNAME := ...`, belongs to its object, not to the global.
-  It was reported as an error. Members after `:` are now skipped, including
-  nested access and comments or whitespace around the colon. A bare
-  assignment such as `Pending := 2;` is still reported, with the same range.
-- **`undeclared_variable` skips label and block names.** The name after
-  `:LABEL`, `:REGION` and `:BEGININLINECODE` is not a variable reference,
-  but `--strict` reported it as undeclared (#272).
-- **The predefined globals a base installation declares are recognized.**
-  `undeclared_variable` knew only `MYUSERNAME`, so reading `CRLF`,
-  `UserLang`, `sCC`, `Session` or `PublicConsts` warned under `--strict`.
-  The list is now read from a vendored copy of the reference's
-  predefined-globals guide. A name the guide says a base installation
-  does *not* declare (`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`,
-  `MYUSERID`, ...) still warns, and the message names the replacement,
-  such as `Chr(13)`. `global_assignment` still checks only `MYUSERNAME`
-  among them, because the application's own session code assigns the
-  others (#270).
-- **`unused_variable` counts `?name?` markers.** A parameter read only
-  through `SQLExecute` substitution was reported as never used (#270).
-
-### Changed
-- **`global_assignment` is a warning** (was an error), and its message no
-  longer says the assignment is impossible. The reference says nothing
-  makes a predefined global read-only: the assignment succeeds and changes
-  the value for every routine that reads it. That is a likely bug, not a
-  failure.
-- **`Request` and `Response` are never undeclared.** The reference says
-  they can be read in any script, so `undeclared_variable` no longer flags
-  them outside endpoint scripts (DECISIONS.md D4, amended). Completion
-  still offers them only in endpoint scripts.
-### Added
-- **`exitcase_last_in_branch` (error).** `:EXITCASE` is valid only as the
-  last statement directly in a `:CASE` or `:OTHERWISE` branch. A
-  statement after it, an `:EXITCASE` nested inside `:IF`, `:WHILE`, `:FOR`
-  or `:TRY` within the branch, and an `:EXITCASE` outside any `:BEGINCASE`
-  all fail to compile, and none was reported. `prefer_exitcase` still
-  counts a nested `:EXITCASE`, so a clause is reported once (#265, #273).
-### Added
-- **`include_quoted_target` (error).** A quoted `:INCLUDE` target, such as
-  `:INCLUDE "Common.Helpers";`, does not compile, and it validated clean.
-  The target must be an identifier or a qualified identifier. The range
-  covers the string, and the message gives the unquoted statement, so a
-  client quick fix can unquote it. Go-to-definition still resolves the
-  quoted form while it's being fixed (#266).
-### Added
-- **`datasource_default_required` is back (error), scoped to the data
-  source's own parameters.** On STARLIMS 12 a data source, in SSL or SQL
-  mode, fails when it runs if a script-level `:PARAMETERS` name has no
-  inline `:=` default ("No default value for one or more parameters."),
-  whatever the caller passes. The rule was removed in v0.16.0 because it
-  seemed to flag valid production files. Those were the `:PARAMETERS` of
-  procedures defined inside a data source, which are ordinary procedure
-  signatures, and they are now skipped (#263, #269).
-- **`inline_default_outside_datasource` (error).** `:PARAMETERS sName :=
-  "a";` is valid only in a data source. In a script or procedure the
-  statement takes names only and doesn't compile. This is the mirror of
-  `no_default_statements_in_datasource` (#264).
-### Added
-- **`inherit_qualified_name` (error).** `:INHERIT BaseCounter;` doesn't
-  compile: the parent must be named `Category.ClassName`. The rule was
-  reserved but never implemented, because the style guide used to accept
-  both forms. It no longer does (#269).
-- **`endclass_invalid` and `builder_directive_outside_datasource`
-  (errors).** `:ENDCLASS`, and `:DSN`/`:TABLENAME`/`:NULLASBLANK`/
-  `:INVARIANTDATECOLUMNS` outside a data source, are known invalid forms.
-  They were reported as `unknown_keyword` warnings, and now get their own
-  codes and messages (#269).
-
-### Changed
-- **`named_sql_param_unsupported` is an error** (was a warning). A
-  `?name?` marker in a positional SQL function fails or binds the wrong
-  values at run time. This raises an existing code to error, so a file
-  that only had this warning now validates as invalid (#269).
-
-### Fixed
-- **Catalog `schema_ref`s resolve again.** Thirteen entries pointed at
-  style-guide schema paths that had moved (`lints.compile_errors.*` now
-  sits under `.rules`, and similar). The style guide's catalog
-  cross-check now resolves every reference (#269).
-### Added
-- **`invalid_native_member` (warning).** A colon member that the reference
-  documents as raising on an SSL value is reported, such as `aItems:Count`
-  (`Invalid property: Count`; use `ALen()` or `:Length`), `aItems:Append()`,
-  a wrong-case native member such as `dToday:year`, or any member on a code
-  block. The receiver's type must be certain from structure (every
-  assignment in its scope agrees), never from its Hungarian prefix, because
-  real code labels .NET collections, where `:Count` is valid, with an `a`
-  prefix. `++`/`--` on a value that is certainly a string is reported too
-  (#267).
-- **`--strict`: `invalid_sql_param` agrees with `undeclared_variable`.** A
-  variable created by assignment (`sStatus := "A";` with no `:DECLARE`)
-  exists at run time, and `undeclared_variable` already treated that
-  assignment as a declaration, but `invalid_sql_param` reported every
-  `?sStatus?` marker for it. On the production corpus `--strict` reported
-  9,478 of these findings; 540 remain.
 ### Breaking
 - **`--validate` rejects unknown flags instead of reading them as file
   paths.** A dash-prefixed argument `--validate` does not know now exits
@@ -124,8 +25,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `--validate` usage error exits 2, not 1.** Calling it with no
   inputs exits 2, matching `--format`, so exit 1 always means "an input
   has errors or could not be read", never "the call was wrong" (#262).
+- **`code_block_structure` is an error, and `:INHERIT` placement is a new
+  error code.** `{|| expr}` (a code block with no bound variable) is a
+  compile-time error according to the reference, but it shipped at
+  warning. A `:INHERIT` that does not directly follow `:CLASS` is also a
+  compile error, and it reported only as an info-tier `class_member_order`
+  note, hidden by default. That case now reports as `inherit_position`, at
+  error. Neither appears anywhere in the 6,228-file private corpus, so no
+  document that validated before fails now (#255).
+- **`unknown_token` and `scientific_notation` are errors, so code that
+  cannot compile no longer validates as `valid: true`.** When a statement
+  does not parse, `unexpected_token` defers to a more specific rule that
+  already names the token, and these two were warnings. A backtick, a
+  `?`, or a glued `7e2` therefore produced only a warning, and
+  `--validate` returned `valid: true` and exit 0. Both are now errors. A
+  `--validate` consumer that gates on `valid` or the exit code sees
+  failures where it saw passes before.
+
+  Cost on a 6,228-file production corpus: `unknown_token` fires 70 times
+  in 7 files, all genuinely broken code; two more files now fail
+  validation. `scientific_notation` fires nowhere. `unknown_keyword` stays
+  a warning, because a gap in the keyword list must not fail validation.
+  `unexpected_token` no longer defers to it, so an unknown colon form in a
+  position the grammar cannot accept is also reported as the parse
+  failure it is (#291).
+
+- **New error-severity codes, and one existing code raised to error.**
+  Each reports code that does not compile or fails at run time, so a file
+  carrying one now validates as `valid: false`: `exitcase_last_in_branch`
+  (#265), `include_quoted_target` (#266), `datasource_default_required`
+  (reinstated, #263) and `inline_default_outside_datasource` (#264),
+  `inherit_qualified_name`, `endclass_invalid` and
+  `builder_directive_outside_datasource` (#269), `empty_parameters` and
+  `datasource_sql_question_placeholder` (#260), `stray_block_keyword`
+  (#292). `named_sql_param_unsupported` moved from warning to error
+  (#269). On the 6,228-file production corpus only
+  `named_sql_param_unsupported` fires (2 files, both real bugs).
+  `global_assignment` moved the other way, error to warning (#260).
+  `cmd/starlims-lsp/testdata/error_codes.txt` pins the set.
 
 ### Added
+- **`exitcase_last_in_branch` (error).** `:EXITCASE` is valid only as the
+  last statement directly in a `:CASE` or `:OTHERWISE` branch. A
+  statement after it, an `:EXITCASE` nested inside `:IF`, `:WHILE`, `:FOR`
+  or `:TRY` within the branch, and an `:EXITCASE` outside any `:BEGINCASE`
+  all fail to compile, and none was reported. `prefer_exitcase` still
+  counts a nested `:EXITCASE`, so a clause is reported once (#265, #273).
+- **`include_quoted_target` (error).** A quoted `:INCLUDE` target, such as
+  `:INCLUDE "Common.Helpers";`, does not compile, and it validated clean.
+  The target must be an identifier or a qualified identifier. The range
+  covers the string, and the message gives the unquoted statement, so a
+  client quick fix can unquote it. Go-to-definition still resolves the
+  quoted form while it's being fixed (#266).
+- **`datasource_default_required` is back (error), scoped to the data
+  source's own parameters.** On STARLIMS 12 a data source, in SSL or SQL
+  mode, fails when it runs if a script-level `:PARAMETERS` name has no
+  inline `:=` default ("No default value for one or more parameters."),
+  whatever the caller passes. The rule was removed in v0.16.0 because it
+  seemed to flag valid production files. Those were the `:PARAMETERS` of
+  procedures defined inside a data source, which are ordinary procedure
+  signatures, and they are now skipped (#263, #269).
+- **`inline_default_outside_datasource` (error).** `:PARAMETERS sName :=
+  "a";` is valid only in a data source. In a script or procedure the
+  statement takes names only and doesn't compile. This is the mirror of
+  `no_default_statements_in_datasource` (#264).
+- **`inherit_qualified_name` (error).** `:INHERIT BaseCounter;` doesn't
+  compile: the parent must be named `Category.ClassName`. The rule was
+  reserved but never implemented, because the style guide used to accept
+  both forms. It no longer does (#269).
+- **`endclass_invalid` and `builder_directive_outside_datasource`
+  (errors).** `:ENDCLASS`, and `:DSN`/`:TABLENAME`/`:NULLASBLANK`/
+  `:INVARIANTDATECOLUMNS` outside a data source, are known invalid forms.
+  They were reported as `unknown_keyword` warnings, and now get their own
+  codes and messages (#269).
+- **`invalid_native_member` (warning).** A colon member that the reference
+  documents as raising on an SSL value is reported, such as `aItems:Count`
+  (`Invalid property: Count`; use `ALen()` or `:Length`), `aItems:Append()`,
+  a wrong-case native member such as `dToday:year`, or any member on a code
+  block. The receiver's type must be certain from structure (every
+  assignment in its scope agrees), never from its Hungarian prefix, because
+  real code labels .NET collections, where `:Count` is valid, with an `a`
+  prefix. `++`/`--` on a value that is certainly a string is reported too
+  (#267).
+- **`--strict`: `invalid_sql_param` agrees with `undeclared_variable`.** A
+  variable created by assignment (`sStatus := "A";` with no `:DECLARE`)
+  exists at run time, and `undeclared_variable` already treated that
+  assignment as a declaration, but `invalid_sql_param` reported every
+  `?sStatus?` marker for it. On the production corpus `--strict` reported
+  9,478 of these findings; 540 remain.
 - **The `--validate` / `--format` CLI contract is written down.**
   `catalog/features/cli_contract.md` specifies the JSON schema, `valid`
   semantics, exit codes, `--stdin`, batching order, every flag, and what
@@ -179,15 +166,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had become `ELSE - 1`, which reads as a subtraction. SQL-mode data
   sources are still passed through by `--format` unchanged — that is
   intended, and `fmt.sql_in_strings` now says so (#271).
-### Added
 - **`--version` names the SSL reference data it was built with.** A
   second line reads `SSL reference data: <repo>@<commit> (<date>)`, from
   a new `internal/constants/data/provenance.json` that every data refresh
   updates. `go test -v ./internal/constants/` logs the same commit and
   how many days old it is. Until now nothing showed the vendored data was
   behind until someone noticed wrong hover text (#254).
+- **Four rules from the reference's data-sources guide (#260).**
+  - `empty_parameters` (error): `:PARAMETERS;` with no names. A parameter
+    list must name at least one parameter, in any file.
+  - `datasource_sql_question_placeholder` (error): a `?name?` marker in a
+    SQL-mode data source. Parameters there are referenced as `@name`.
+  - `nullasblank_value` (warning): `:NULLASBLANK` takes the word `true` or
+    `false`. A value such as `.F.` is silently ignored.
+  - `invariant_date_columns_quoted` (warning): a quoted
+    `:INVARIANTDATECOLUMNS` name keeps its quotes and matches no column.
+- **SQL-content checks run on SQL-mode data-source bodies (#294).** A data
+  source whose body is plain SQL got only the semicolon and placeholder
+  checks. It now also gets `unicode_literal_prefix`, `unjustified_collate`
+  (a SQL comment before the statement is the justification) and the
+  info-tier advisories that read only SQL text: `sql_comma_join`,
+  `sql_legacy_outer_join`, `sql_inconsistent_alias`, `sql_dialect_mix`
+  and `sql_select_star`.
+- **`equals_empty_string` reports `x = ""`, a comparison that is always
+  true.** For strings, `=` is a prefix match that is true whenever the
+  right operand is empty, so `:IF sStatus = "";` takes its branch for every
+  string value. It was reported only by `equals_vs_strict_equals` at info,
+  which is hidden by default. It is now a warning. `"" = x` is a correct
+  emptiness test and stays silent, and so does a bare `x = "";` statement,
+  which is a mistyped assignment. There are two findings in the private
+  corpus, both in conditions (#255).
+- **`stray_block_keyword` reports a middle clause keyword outside its
+  block.** `:ELSE` outside an `:IF`, `:CATCH` or `:FINALLY` outside a
+  `:TRY`, and `:CASE` or `:OTHERWISE` outside a `:BEGINCASE` validated
+  clean. Three catalog entries said the placement was "owned by the
+  block-structure checks", but no such check existed. It is an error, and
+  the owner search stops at the enclosing procedure (#292).
+- **`unqualified_field_read` reports a bare read of a class field inside
+  a method.** A bare name in a method never reaches the field: it raises
+  `Variable [name] is undefined!` or silently reads a caller's or a
+  public variable. The existing assignment rule claimed the opposite for
+  reads. This is a warning and skips a read that the assignment rule
+  already covers. On the production corpus: 26 findings in 5 files, each
+  a field read with no local of that name (#260).
+- **`--format --ds` treats input as a data source.** It mirrors
+  `--validate --ds` for extensionless input such as stdin. `.ds` and
+  `.ds.txt` paths imply it (#255).
+- **`:REGION`/`:ENDREGION` and `:BEGININLINECODE`/`:ENDINLINECODE` fold.**
+  Both are current SSL with multi-line bodies, but neither produced a
+  folding range (#255).
+- **Go native fuzz targets** for the lexer (`FuzzTokenize`, which also
+  checks the token stream is lossless), the structural and expression
+  parsers (`FuzzParse`, `FuzzStatementExpressions`), the diagnostics
+  pipeline (`FuzzGetDiagnostics`, which checks every range is well-formed)
+  and the formatter (`FuzzFormat`, which checks format-twice stability,
+  and `FuzzFormatRange`). They are seeded from the idempotence corpus;
+  minimized findings live under `testdata/fuzz/` and run with
+  `go test ./...` (#256).
+- **`ssl.diagnostics.rules` accepts `"hint"`.** A rule can now be remapped
+  to Hint severity, alongside `off`, `info`, `warn`/`warning` and
+  `error` (#258).
+- **The server advertises its position encoding.** The initialize result
+  states `positionEncoding: "utf-16"` — the LSP default, now explicit
+  (#258).
 
 ### Changed
+- **`global_assignment` is a warning** (was an error), and its message no
+  longer says the assignment is impossible. The reference says nothing
+  makes a predefined global read-only: the assignment succeeds and changes
+  the value for every routine that reads it. That is a likely bug, not a
+  failure.
+- **`Request` and `Response` are never undeclared.** The reference says
+  they can be read in any script, so `undeclared_variable` no longer flags
+  them outside endpoint scripts (DECISIONS.md D4, amended). Completion
+  still offers them only in endpoint scripts.
+- **`named_sql_param_unsupported` is an error** (was a warning). A
+  `?name?` marker in a positional SQL function fails or binds the wrong
+  values at run time. This raises an existing code to error, so a file
+  that only had this warning now validates as invalid (#269).
 - **Function hover, signature help, and completion now come from the SSL
   reference instead of a hand-maintained copy.** The roughly 2,700 lines
   of curated signatures in `signatures.go` had drifted from the
@@ -268,52 +324,6 @@ shim, alias, fallback, and setting was traced to its origin and its
 consumers, and given a decision. The full record is in
 `docs/reviews/legacy-inventory.md`. No setting, CLI flag, diagnostic
 code, or output format changes for either distribution.
-
-### Fixed
-- **Docs no longer call `:REGION` and `:BEGININLINECODE` "legacy".** Both
-  are current, supported SSL (bodies stored for `GetRegion()` /
-  `GetInlineCode()`). #28 settled that when it removed `region_legacy`,
-  but several docs still said otherwise, including one that claimed the
-  LSP emits an info diagnostic for `:REGION`. The keyword hover text is
-  replaced by the reference's own in #287.
-- **CONFIGURATION.md matches the server.** `builtinFunctionCase` defaults
-  to `"PascalCase"`, not `"preserve"`. `endpointPatterns` are
-  case-insensitive substrings, not globs (the old example could never
-  match). `max_block_depth` is info-tier, not a warning. `unusedVariables`
-  is a client setting. `signatureHelp.autoTrigger` applies only at
-  startup. Section 10 now maps the VS Code extension's setting names to
-  server keys instead of presenting server keys as VS Code settings, and
-  Appendix A lists all settings.
-- `diag.deprecated_keyword` catalog frontmatter: `authority: style_only`,
-  `schema_ref: lints.deprecated_keywords`. The style guide owns the rule
-  now. Behavior and warning severity are unchanged.
-
-### Removed
-- **Dead internals, no behavior change.** Removed: the unread `root`
-  argument of `Parser.ExtractVariables`, and `style != "compact"` guards
-  that could no longer be false after `compact` became an alias. (The
-  unread `procedures` argument of `GetSignatureHelpWithProcedures` and the
-  unreachable curated signatures are left to #287, which replaces the
-  curated signature data with the reference's.)
-
-### Deprecated
-- **`ssl.format.sql.style: "compact"`** was already a deprecated alias
-  for `canonicalCompact` (#219). It now has a removal plan. First the VS
-  Code extension drops it from its enum and migrates stored values. Then
-  the next LSP minor release removes the alias. Nothing changes in this
-  release. `--format` callers are unaffected: the CLI cannot select a SQL
-  style.
-### Added
-- **Four rules from the reference's data-sources guide (#260).**
-  - `empty_parameters` (error): `:PARAMETERS;` with no names. A parameter
-    list must name at least one parameter, in any file.
-  - `datasource_sql_question_placeholder` (error): a `?name?` marker in a
-    SQL-mode data source. Parameters there are referenced as `@name`.
-  - `nullasblank_value` (warning): `:NULLASBLANK` takes the word `true` or
-    `false`. A value such as `.F.` is silently ignored.
-  - `invariant_date_columns_quoted` (warning): a quoted
-    `:INVARIANTDATECOLUMNS` name keeps its quotes and matches no column.
-### Changed
 - **Two severities move to match the kind of finding (breaking for CLI
   consumers that key on severity).** `trailing_skip_commas` goes from
   hint to info, joining the opt-in advisory tier. Its catalog entry said
@@ -335,8 +345,197 @@ code, or output format changes for either distribution.
   and `trailing_skip_commas` now cite `lints.parameter_skipping_style`.
   The two stay separate rules: they transcribe different clauses of that
   lint and have different fixes (#255).
+- **`sql_injection` now judges the whole first argument, not its first
+  token.** The rule reads the argument's expression tree. It flattens the
+  `+` chain and reports the call when a string literal (SQL text) meets a
+  runtime value. Concatenating constants only (`"SELECT …" + " WHERE …"`)
+  no longer warns, because no runtime value reaches the SQL. A leading
+  `BuildStringForIn(...)` no longer hides a value spliced in later in the
+  same chain. A leading call (`Upper(sSql) + "…"`) or a parenthesized
+  argument is no longer missed. On a production corpus the default
+  surface drops by 50 warnings, all of them constant-only concatenations,
+  and 2 real splices are newly caught (#255).
+- **`sql_select_star` no longer flags `EXISTS (select * …)`.** An
+  existence probe never reads its columns, so the coupling concern does
+  not apply. The catalog entry already listed it as a non-goal while the
+  code flagged it. These probes were 301 of the corpus's 447 hits. The
+  rule is now linked to the schema's `lints.performance.avoid_select_star`
+  (#255).
+- **Catalog authorities now mirror the style guide.**
+  `udobject_array_in_clause` is `authoritative`, as its style-guide
+  record says. `sql_literal_splice` is `advisory` (the
+  `prevent_sql_injection` record's Bad example is exactly this idiom).
+  `sql_comma_join`, `sql_dialect_mix`, `sql_legacy_outer_join`,
+  `sql_inconsistent_alias` and `sql_suspect_placeholder` are `tool`,
+  because no style-guide record covers them (#255).
+- **Catalog authority now mirrors the style guide record for ten
+  diagnostics**, and stale severity prose left over from the info-tier
+  move is corrected: `me_outside_class` and `mixed_type_operator` are
+  authoritative, `missing_otherwise` and `max_params_warning` advisory,
+  `max_block_depth`, `mixed_error_handling_families`, `negative_logic`,
+  and `nested_iif` style_only, and `nil_in_operations` and
+  `nil_not_empty_string` authoritative. No severity changed (#255).
+- **The operator type checks run on the expression tree.**
+  `arithmetic_type_mismatch`, `dollar_string_only`,
+  `code_block_comparison` and `for_numeric_values` used to compare adjacent
+  tokens. Their type heuristic read loop-counter names (`i`, `x`, ...) and
+  UPPER_SNAKE constants as numbers, so `"A" $ ALLOWED_CODES` flagged. It
+  also missed date arithmetic, so `dDue - 1` and `dEnd - dStart` flagged as
+  well. Each operand is now a whole subtree, and the pair is judged against
+  the reference's operator type tables. The rules newly cover `%`, `^`,
+  `**`, same-type pairs the operator rejects (`.T. - .F.`), and the
+  `!=` / `<>` / `#` comparisons of a code block, which raise at runtime
+  like `==`. Real precedence also surfaces a real bug: `.NOT. "a" $ sList`
+  is `(.NOT. "a") $ sList`. In the private corpus, `arithmetic_type_mismatch`
+  goes from 26 findings to 10 and `dollar_string_only` from 4 to 5. The `+`
+  path (`mixed_type_operator`) is unchanged (#255).
+- **`default_on_declare_line` flags a `:DEFAULT` on a name that is not a
+  parameter, on any line.** It used to flag only a `:DECLARE` and a
+  `:DEFAULT` sharing one line. That always co-fired with
+  `default_after_parameters`, misreported a default on a real parameter
+  that merely shared the line, and missed the defect everywhere else. The
+  slug is unchanged. Corpus: 35 findings, all in one script that already
+  fails `default_after_parameters` (#255).
+- **`branch_target_label` checks a literal target against the labels in its
+  procedure.** A typo such as `Branch("LABEL SKP")` now flags, and so does a
+  lowercase `"labelskip"`, because the keyword is uppercase and the match is
+  exact. A scope that uses `:INCLUDE` is not judged (#255).
+- **`error_handler_structure` checks handler placement.** It now reports an
+  `:ERROR;` with nothing before it to protect, a `:RESUME;` with no
+  `:ERROR;` in its procedure (which does not compile), and an `:ERROR`
+  followed directly by any block boundary. None of these appear in the
+  corpus (#255).
+- **`invalid_limstypeex_comparison` follows the documented comparison
+  semantics.** String comparison is case-sensitive and `=` is a prefix
+  match, so `== "numeric"` and `= "String"` now flag, while `= "NUM"` and
+  `"STRINGS" = LimsTypeEx(x)` no longer do. `<>` and `#` are checked, and
+  inequality findings say "always true". One corpus document gains a
+  finding and stops validating: its guard compares against `"String"` and
+  can never pass (#255).
+- **`base_outside_class` warns rather than errors in a procedure-only
+  file**, the include-library tier `me_outside_class` has had since #171
+  (#255).
+- **`zero_based_array_index` on a .NET collection is an info-tier
+  advisory, not a warning.** The style guide prescribes
+  `dataSet:Tables[0]`, and every one of the 245 production findings was
+  that path, so the default surface was warning on the prescribed form.
+  A bare SSL array indexed with `[0]` is still an error. Detection now
+  reads the expression tree and checks every dimension: `aRows[1][0]` and
+  `aRows[0, 1]` used to be missed (#255).
+- **Visibility annotations are judged the way the runtime reads them.**
+  Only the exact lowercase `/*@private;` or `/*@protected;` on the line
+  immediately before `:PROCEDURE` takes effect. A near-miss spelling, a
+  blank line, or another comment in between leaves the procedure public.
+  These cases are now `visibility_annotation` warnings, where before they
+  got the info-tier "annotation in use" note. `ProcedureInfo.IsPrivate`,
+  which hides private procedures from cross-file completion, uses the
+  same verdict (#255).
+- **`unqualified_field_assignment` sees every write form.** It now reads
+  the expression tree instead of scanning for `name :=`. That adds
+  `nTotal++`, element writes (`aItems[1] := x`) and the inner targets of
+  a chained assignment. A method-local `:PUBLIC` now shadows the field.
+  Production: 14 to 15 findings (#255).
+- **Rule overrides match keys case-insensitively, and an unrecognized
+  value is ignored.** `"Unknown_Token": "OFF"` now configures
+  `unknown_token`, as suppression slugs already did. An entry whose value
+  is not a recognized severity (a typo such as `"wraning"`) is treated as
+  absent: before, it left the severity alone but still exempted an
+  info-tier rule from the info gate, so a typo silently turned the rule
+  on (#258).
+- **`internal_error` is a cataloged diagnostic.** It gained a code
+  constant and a `catalog/diagnostics/internal_error.md` entry; until now
+  it was a string literal outside the catalog's code-to-entry rule (#258).
+
+### Deprecated
+- **`ssl.format.sql.style: "compact"`** was already a deprecated alias
+  for `canonicalCompact` (#219). It now has a removal plan. First the VS
+  Code extension drops it from its enum and migrates stored values. Then
+  the next LSP minor release removes the alias. Nothing changes in this
+  release. `--format` callers are unaffected: the CLI cannot select a SQL
+  style.
+
+### Removed
+- **Dead internals, no behavior change.** Removed: the unread `root`
+  argument of `Parser.ExtractVariables`, and `style != "compact"` guards
+  that could no longer be false after `compact` became an alias. (The
+  unread `procedures` argument of `GetSignatureHelpWithProcedures` and the
+  unreachable curated signatures are left to #287, which replaces the
+  curated signature data with the reference's.)
+- **Dead code with no callers:** `lexer.GetTokenAtPosition`, a dead
+  first pass in `GetContextAtPosition`, `isIdentifierPattern`,
+  `hasSpecificHungarianPrefix`, `isAssignOp`, and the tracked root scratch
+  files `count.go` and `.codex-counts.go` (#258).
+- **The formatter no longer changes string, comment or region contents.**
+  The blank-line-between-blocks pass (default on) inserted a blank line
+  inside multi-line strings, comments and `:REGION` bodies, which changed a
+  string's runtime value; the blank-line cap collapsed blank lines there
+  too. Both line-oriented passes now skip lines that start inside a
+  literal (DECISIONS.md D7).
+- **Range formatting reads the whole document.** Formatting a selection
+  inside a multi-line comment or `[...]` string could add a `;` that ended
+  the comment early. The range now widens to whole tokens.
+- **No `;` after a keyword whose operand is on the next line.**
+  `:IF` / `bReady;` became `:IF;`, and `:RETURN` / `nX;` changed meaning.
+- **Built-in casing leaves member calls alone.** `oS:replace(...)` was
+  re-cased to `oS:Replace(...)`; .NET members are case-sensitive.
+- **Code-block literals:** a brace inside a string in the body no longer
+  opens or closes the literal (`{|x| x + "}"}` ended early, `"{"` swallowed
+  the file); `commaSpacing: false` applies inside the body.
+- **Wrapping keeps the source's separators** (`commaSpacing` and
+  `operatorSpacing` off are honored on wrapped lines), never breaks before
+  an end-of-line comment, and stays stable on chained continuations.
+- **Idempotence:** a comma before a same-line comment no longer gains a
+  space on every other pass, and an unterminated nested bracket string
+  (`[[a]`) is left unformatted instead of getting a `;` inside it.
+- **Formatting always reaches a fixed point (#311).** A document is
+  formatted until its output formats to itself (at most three passes);
+  malformed input that never settles is left unchanged rather than
+  rewritten differently on every save. Well-formed code is unaffected.
 
 ### Fixed
+- **`global_assignment` no longer flags qualified members.** A property or
+  class field whose name matches a predefined or configured global, such as
+  `oSummary:pending := 0;` (`Pending` is a status global) or
+  `oContext:MYUSERNAME := ...`, belongs to its object, not to the global.
+  It was reported as an error. Members after `:` are now skipped, including
+  nested access and comments or whitespace around the colon. A bare
+  assignment such as `Pending := 2;` is still reported, with the same range.
+- **`undeclared_variable` skips label and block names.** The name after
+  `:LABEL`, `:REGION` and `:BEGININLINECODE` is not a variable reference,
+  but `--strict` reported it as undeclared (#272).
+- **The predefined globals a base installation declares are recognized.**
+  `undeclared_variable` knew only `MYUSERNAME`, so reading `CRLF`,
+  `UserLang`, `sCC`, `Session` or `PublicConsts` warned under `--strict`.
+  The list is now read from a vendored copy of the reference's
+  predefined-globals guide. A name the guide says a base installation
+  does *not* declare (`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`,
+  `MYUSERID`, ...) still warns, and the message names the replacement,
+  such as `Chr(13)`. `global_assignment` still checks only `MYUSERNAME`
+  among them, because the application's own session code assigns the
+  others (#270).
+- **`unused_variable` counts `?name?` markers.** A parameter read only
+  through `SQLExecute` substitution was reported as never used (#270).
+- **Catalog `schema_ref`s resolve again.** Thirteen entries pointed at
+  style-guide schema paths that had moved (`lints.compile_errors.*` now
+  sits under `.rules`, and similar). The style guide's catalog
+  cross-check now resolves every reference (#269).
+- **Docs no longer call `:REGION` and `:BEGININLINECODE` "legacy".** Both
+  are current, supported SSL (bodies stored for `GetRegion()` /
+  `GetInlineCode()`). #28 settled that when it removed `region_legacy`,
+  but several docs still said otherwise, including one that claimed the
+  LSP emits an info diagnostic for `:REGION`. The keyword hover text is
+  replaced by the reference's own in #287.
+- **CONFIGURATION.md matches the server.** `builtinFunctionCase` defaults
+  to `"PascalCase"`, not `"preserve"`. `endpointPatterns` are
+  case-insensitive substrings, not globs (the old example could never
+  match). `max_block_depth` is info-tier, not a warning. `unusedVariables`
+  is a client setting. `signatureHelp.autoTrigger` applies only at
+  startup. Section 10 now maps the VS Code extension's setting names to
+  server keys instead of presenting server keys as VS Code settings, and
+  Appendix A lists all settings.
+- `diag.deprecated_keyword` catalog frontmatter: `authority: style_only`,
+  `schema_ref: lints.deprecated_keywords`. The style guide owns the rule
+  now. Behavior and warning severity are unchanged.
 - **Member calls no longer trip built-in rules (D10).**
   `raiseerror_in_catch`, `runsql_non_dml`, and `trailing_skip_commas`
   found calls by scanning for an identifier followed by `(`, so
@@ -386,41 +585,6 @@ Two follow-ups were filed rather than changed here. #291: rules that
 `unknown_keyword`, `unknown_token`) let a statement that does not parse
 validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 `:FINALLY`, or `:ELSE` outside its block.
-### Added
-- **SQL-content checks run on SQL-mode data-source bodies (#294).** A data
-  source whose body is plain SQL got only the semicolon and placeholder
-  checks. It now also gets `unicode_literal_prefix`, `unjustified_collate`
-  (a SQL comment before the statement is the justification) and the
-  info-tier advisories that read only SQL text: `sql_comma_join`,
-  `sql_legacy_outer_join`, `sql_inconsistent_alias`, `sql_dialect_mix`
-  and `sql_select_star`.
-
-### Changed
-- **`sql_injection` now judges the whole first argument, not its first
-  token.** The rule reads the argument's expression tree. It flattens the
-  `+` chain and reports the call when a string literal (SQL text) meets a
-  runtime value. Concatenating constants only (`"SELECT …" + " WHERE …"`)
-  no longer warns, because no runtime value reaches the SQL. A leading
-  `BuildStringForIn(...)` no longer hides a value spliced in later in the
-  same chain. A leading call (`Upper(sSql) + "…"`) or a parenthesized
-  argument is no longer missed. On a production corpus the default
-  surface drops by 50 warnings, all of them constant-only concatenations,
-  and 2 real splices are newly caught (#255).
-- **`sql_select_star` no longer flags `EXISTS (select * …)`.** An
-  existence probe never reads its columns, so the coupling concern does
-  not apply. The catalog entry already listed it as a non-goal while the
-  code flagged it. These probes were 301 of the corpus's 447 hits. The
-  rule is now linked to the schema's `lints.performance.avoid_select_star`
-  (#255).
-- **Catalog authorities now mirror the style guide.**
-  `udobject_array_in_clause` is `authoritative`, as its style-guide
-  record says. `sql_literal_splice` is `advisory` (the
-  `prevent_sql_injection` record's Bad example is exactly this idiom).
-  `sql_comma_join`, `sql_dialect_mix`, `sql_legacy_outer_join`,
-  `sql_inconsistent_alias` and `sql_suspect_placeholder` are `tool`,
-  because no style-guide record covers them (#255).
-
-### Fixed
 - **A non-ASCII character in a SQL string could wipe out a file's
   diagnostics.** `udobject_array_in_clause` upper-cased the string and
   then sliced the copy by offsets into the original. Case mapping can
@@ -504,78 +668,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   identical diagnostics on one range (#255).
 - **`max_params_warning` is ranged on the procedure name**, not on the
   start of the `:PROCEDURE` line (#255).
-
-### Changed
-- **Catalog authority now mirrors the style guide record for ten
-  diagnostics**, and stale severity prose left over from the info-tier
-  move is corrected: `me_outside_class` and `mixed_type_operator` are
-  authoritative, `missing_otherwise` and `max_params_warning` advisory,
-  `max_block_depth`, `mixed_error_handling_families`, `negative_logic`,
-  and `nested_iif` style_only, and `nil_in_operations` and
-  `nil_not_empty_string` authoritative. No severity changed (#255).
-### Breaking
-- **`code_block_structure` is an error, and `:INHERIT` placement is a new
-  error code.** `{|| expr}` (a code block with no bound variable) is a
-  compile-time error according to the reference, but it shipped at
-  warning. A `:INHERIT` that does not directly follow `:CLASS` is also a
-  compile error, and it reported only as an info-tier `class_member_order`
-  note, hidden by default. That case now reports as `inherit_position`, at
-  error. Neither appears anywhere in the 6,228-file private corpus, so no
-  document that validated before fails now (#255).
-
-### Added
-- **`equals_empty_string` reports `x = ""`, a comparison that is always
-  true.** For strings, `=` is a prefix match that is true whenever the
-  right operand is empty, so `:IF sStatus = "";` takes its branch for every
-  string value. It was reported only by `equals_vs_strict_equals` at info,
-  which is hidden by default. It is now a warning. `"" = x` is a correct
-  emptiness test and stays silent, and so does a bare `x = "";` statement,
-  which is a mistyped assignment. There are two findings in the private
-  corpus, both in conditions (#255).
-
-### Changed
-- **The operator type checks run on the expression tree.**
-  `arithmetic_type_mismatch`, `dollar_string_only`,
-  `code_block_comparison` and `for_numeric_values` used to compare adjacent
-  tokens. Their type heuristic read loop-counter names (`i`, `x`, ...) and
-  UPPER_SNAKE constants as numbers, so `"A" $ ALLOWED_CODES` flagged. It
-  also missed date arithmetic, so `dDue - 1` and `dEnd - dStart` flagged as
-  well. Each operand is now a whole subtree, and the pair is judged against
-  the reference's operator type tables. The rules newly cover `%`, `^`,
-  `**`, same-type pairs the operator rejects (`.T. - .F.`), and the
-  `!=` / `<>` / `#` comparisons of a code block, which raise at runtime
-  like `==`. Real precedence also surfaces a real bug: `.NOT. "a" $ sList`
-  is `(.NOT. "a") $ sList`. In the private corpus, `arithmetic_type_mismatch`
-  goes from 26 findings to 10 and `dollar_string_only` from 4 to 5. The `+`
-  path (`mixed_type_operator`) is unchanged (#255).
-- **`default_on_declare_line` flags a `:DEFAULT` on a name that is not a
-  parameter, on any line.** It used to flag only a `:DECLARE` and a
-  `:DEFAULT` sharing one line. That always co-fired with
-  `default_after_parameters`, misreported a default on a real parameter
-  that merely shared the line, and missed the defect everywhere else. The
-  slug is unchanged. Corpus: 35 findings, all in one script that already
-  fails `default_after_parameters` (#255).
-- **`branch_target_label` checks a literal target against the labels in its
-  procedure.** A typo such as `Branch("LABEL SKP")` now flags, and so does a
-  lowercase `"labelskip"`, because the keyword is uppercase and the match is
-  exact. A scope that uses `:INCLUDE` is not judged (#255).
-- **`error_handler_structure` checks handler placement.** It now reports an
-  `:ERROR;` with nothing before it to protect, a `:RESUME;` with no
-  `:ERROR;` in its procedure (which does not compile), and an `:ERROR`
-  followed directly by any block boundary. None of these appear in the
-  corpus (#255).
-- **`invalid_limstypeex_comparison` follows the documented comparison
-  semantics.** String comparison is case-sensitive and `=` is a prefix
-  match, so `== "numeric"` and `= "String"` now flag, while `= "NUM"` and
-  `"STRINGS" = LimsTypeEx(x)` no longer do. `<>` and `#` are checked, and
-  inequality findings say "always true". One corpus document gains a
-  finding and stops validating: its guard compares against `"String"` and
-  can never pass (#255).
-- **`base_outside_class` warns rather than errors in a procedure-only
-  file**, the include-library tier `me_outside_class` has had since #171
-  (#255).
-
-### Fixed
 - **Member access no longer trips `base_standalone` or
   `createudobject_builtin_misuse`.** `oUri:Base` and
   `oFactory:CreateUdObject("Email")` are members of some other object and
@@ -599,62 +691,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   rewritten. That includes `datasource_sql_semicolon`'s, which argued for a
   warning the rule does not report. Data-source fences now carry the inline
   `:PARAMETERS` defaults a data source requires (#255).
-### Breaking
-- **`unknown_token` and `scientific_notation` are errors, so code that
-  cannot compile no longer validates as `valid: true`.** When a statement
-  does not parse, `unexpected_token` defers to a more specific rule that
-  already names the token, and these two were warnings. A backtick, a
-  `?`, or a glued `7e2` therefore produced only a warning, and
-  `--validate` returned `valid: true` and exit 0. Both are now errors. A
-  `--validate` consumer that gates on `valid` or the exit code sees
-  failures where it saw passes before.
-
-  Cost on a 6,228-file production corpus: `unknown_token` fires 70 times
-  in 7 files, all genuinely broken code; two more files now fail
-  validation. `scientific_notation` fires nowhere. `unknown_keyword` stays
-  a warning, because a gap in the keyword list must not fail validation.
-  `unexpected_token` no longer defers to it, so an unknown colon form in a
-  position the grammar cannot accept is also reported as the parse
-  failure it is (#291).
-
-### Added
-- **`stray_block_keyword` reports a middle clause keyword outside its
-  block.** `:ELSE` outside an `:IF`, `:CATCH` or `:FINALLY` outside a
-  `:TRY`, and `:CASE` or `:OTHERWISE` outside a `:BEGINCASE` validated
-  clean. Three catalog entries said the placement was "owned by the
-  block-structure checks", but no such check existed. It is an error, and
-  the owner search stops at the enclosing procedure (#292).
-- **`unqualified_field_read` reports a bare read of a class field inside
-  a method.** A bare name in a method never reaches the field: it raises
-  `Variable [name] is undefined!` or silently reads a caller's or a
-  public variable. The existing assignment rule claimed the opposite for
-  reads. This is a warning and skips a read that the assignment rule
-  already covers. On the production corpus: 26 findings in 5 files, each
-  a field read with no local of that name (#260).
-
-### Changed
-- **`zero_based_array_index` on a .NET collection is an info-tier
-  advisory, not a warning.** The style guide prescribes
-  `dataSet:Tables[0]`, and every one of the 245 production findings was
-  that path, so the default surface was warning on the prescribed form.
-  A bare SSL array indexed with `[0]` is still an error. Detection now
-  reads the expression tree and checks every dimension: `aRows[1][0]` and
-  `aRows[0, 1]` used to be missed (#255).
-- **Visibility annotations are judged the way the runtime reads them.**
-  Only the exact lowercase `/*@private;` or `/*@protected;` on the line
-  immediately before `:PROCEDURE` takes effect. A near-miss spelling, a
-  blank line, or another comment in between leaves the procedure public.
-  These cases are now `visibility_annotation` warnings, where before they
-  got the info-tier "annotation in use" note. `ProcedureInfo.IsPrivate`,
-  which hides private procedures from cross-file completion, uses the
-  same verdict (#255).
-- **`unqualified_field_assignment` sees every write form.** It now reads
-  the expression tree instead of scanning for `name :=`. That adds
-  `nTotal++`, element writes (`aItems[1] := x`) and the inner targets of
-  a chained assignment. A method-local `:PUBLIC` now shadows the field.
-  Production: 14 to 15 findings (#255).
-
-### Fixed
 - **One mistake, one finding, across the structural rules (#255).**
   - An empty `:TRY` body is reported once, not twice.
   - `:ENDFOR` no longer also reports its `:FOR` as unclosed.
@@ -671,15 +707,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 - **Dot-style access after a call or a subscript is named as such.**
   `oObj:Get().Value` and `aRows[1].Value` are `dot_property_access` with
   its colon fix-it, not a generic `unknown_token` (#255).
-### Added
-- **`--format --ds` treats input as a data source.** It mirrors
-  `--validate --ds` for extensionless input such as stdin. `.ds` and
-  `.ds.txt` paths imply it (#255).
-- **`:REGION`/`:ENDREGION` and `:BEGININLINECODE`/`:ENDINLINECODE` fold.**
-  Both are current SSL with multi-line bodies, but neither produced a
-  folding range (#255).
-
-### Fixed
 - **Rename and references no longer cross into a different symbol of
   the same name.** With a workspace open, the server chose the
   procedure's cross-file path from the spelling alone. Renaming the
@@ -747,17 +774,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   symbols listed every procedure twice and cross-file resolution saw
   phantom duplicates. The background walk and watcher events now ignore
   them (#255).
-### Added
-- **Go native fuzz targets** for the lexer (`FuzzTokenize`, which also
-  checks the token stream is lossless), the structural and expression
-  parsers (`FuzzParse`, `FuzzStatementExpressions`), the diagnostics
-  pipeline (`FuzzGetDiagnostics`, which checks every range is well-formed)
-  and the formatter (`FuzzFormat`, which checks format-twice stability,
-  and `FuzzFormatRange`). They are seeded from the idempotence corpus;
-  minimized findings live under `testdata/fuzz/` and run with
-  `go test ./...` (#256).
-
-### Fixed
 - **Embedded SQL formatting no longer corrupts non-ASCII text.** The SQL
   lexer classified and copied its input one byte at a time, so any
   non-ASCII character outside a quoted literal — an accented identifier,
@@ -806,27 +822,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
   server's copy of the document drifted from the editor's until the file
   was reopened. Out-of-range positions now clamp as the specification
   directs (#256).
-### Added
-- **`ssl.diagnostics.rules` accepts `"hint"`.** A rule can now be remapped
-  to Hint severity, alongside `off`, `info`, `warn`/`warning` and
-  `error` (#258).
-- **The server advertises its position encoding.** The initialize result
-  states `positionEncoding: "utf-16"` — the LSP default, now explicit
-  (#258).
-
-### Changed
-- **Rule overrides match keys case-insensitively, and an unrecognized
-  value is ignored.** `"Unknown_Token": "OFF"` now configures
-  `unknown_token`, as suppression slugs already did. An entry whose value
-  is not a recognized severity (a typo such as `"wraning"`) is treated as
-  absent: before, it left the severity alone but still exempted an
-  info-tier rule from the info gate, so a typo silently turned the rule
-  on (#258).
-- **`internal_error` is a cataloged diagnostic.** It gained a code
-  constant and a `catalog/diagnostics/internal_error.md` entry; until now
-  it was a string literal outside the catalog's code-to-entry rule (#258).
-
-### Fixed
 - **Hover, definition and rename no longer crash the server on a line
   with an emoji.** Word lookup bounded the column by the line's byte
   length but indexed its characters, so on `😀x`, or at the end of a line
@@ -897,38 +892,6 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 - **Procedure extraction is linear in the document.** Each procedure's
   docblock and visibility lookup scanned every token; a 500-procedure
   document now extracts about three times faster (#258).
-
-### Removed
-- **Dead code with no callers:** `lexer.GetTokenAtPosition`, a dead
-  first pass in `GetContextAtPosition`, `isIdentifierPattern`,
-  `hasSpecificHungarianPrefix`, `isAssignOp`, and the tracked root scratch
-  files `count.go` and `.codex-counts.go` (#258).
-- **The formatter no longer changes string, comment or region contents.**
-  The blank-line-between-blocks pass (default on) inserted a blank line
-  inside multi-line strings, comments and `:REGION` bodies, which changed a
-  string's runtime value; the blank-line cap collapsed blank lines there
-  too. Both line-oriented passes now skip lines that start inside a
-  literal (DECISIONS.md D7).
-- **Range formatting reads the whole document.** Formatting a selection
-  inside a multi-line comment or `[...]` string could add a `;` that ended
-  the comment early. The range now widens to whole tokens.
-- **No `;` after a keyword whose operand is on the next line.**
-  `:IF` / `bReady;` became `:IF;`, and `:RETURN` / `nX;` changed meaning.
-- **Built-in casing leaves member calls alone.** `oS:replace(...)` was
-  re-cased to `oS:Replace(...)`; .NET members are case-sensitive.
-- **Code-block literals:** a brace inside a string in the body no longer
-  opens or closes the literal (`{|x| x + "}"}` ended early, `"{"` swallowed
-  the file); `commaSpacing: false` applies inside the body.
-- **Wrapping keeps the source's separators** (`commaSpacing` and
-  `operatorSpacing` off are honored on wrapped lines), never breaks before
-  an end-of-line comment, and stays stable on chained continuations.
-- **Idempotence:** a comma before a same-line comment no longer gains a
-  space on every other pass, and an unterminated nested bracket string
-  (`[[a]`) is left unformatted instead of getting a `;` inside it.
-- **Formatting always reaches a fixed point (#311).** A document is
-  formatted until its output formats to itself (at most three passes);
-  malformed input that never settles is left unchanged rather than
-  rewritten differently on every save. Well-formed code is unaffected.
 
 ## [0.24.0] - 2026-09-21
 
