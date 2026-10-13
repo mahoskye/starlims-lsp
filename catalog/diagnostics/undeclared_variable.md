@@ -16,6 +16,7 @@ spec_options:
   is_endpoint_file: true
   global_variables: ["gSystemContext"]
 tests:
+  - internal/providers/predefined_globals_test.go
   - internal/providers/providers_test.go
   - internal/providers/undeclared_declarations_test.go
 history:
@@ -72,14 +73,41 @@ history:
       terminating `;`. Corpus: 241 of 2,060 hits (11.7%) were this
       false positive; after the fix, zero flagged name appears on a
       declaration line anywhere in its own file.
+  - date: 2026-10-13
+    ref: "issues #272, #270"
+    note: >-
+      Label and block names are not variable uses: the name after
+      :LABEL, :REGION and :BEGININLINECODE is skipped like an :INCLUDE
+      path (#272). The base-installation predefined globals are now
+      declared — vendored from the reference guide (Session,
+      PublicConsts, CRLF, UserLang, sCC, ...), where only MYUSERNAME
+      was before. A name the guide lists as not declared on a base
+      installation (CR, LF, TAB, sTab, sSQ, sDQ, MYUSERID, ...) still
+      flags, and its message names the replacement (#270). Request and
+      Response are declared in every script too: the reference says
+      reading them outside an endpoint does not raise, so D4's
+      endpoint-only scoping was amended. Corpus under --strict:
+      1,811 -> 829 findings.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      Behavior text corrected: the check was described as per-scope, but
+      it is file-wide, and deliberately so. SSL's caller-scope lookup lets
+      a procedure read its caller's variables, so per-procedure scoping
+      would flag valid code.
 issues: []
 ---
 
 ## Behavior
 
 Opt-in check (default off, per DECISIONS.md D5): flags an identifier used as
-a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration in
-scope, reported once per scope.
+a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration, and
+is not created by assignment, anywhere in the file; each name is reported
+once per file. The check is file-wide, not per procedure, on purpose: SSL
+resolves a name through the scopes of the routines on the call stack
+(reference guides/variable-scope.md), so a procedure can read a variable
+its caller declared, and which procedure calls which is not known
+statically (DECISIONS.md D10).
 
 Declarations are read as statements — keyword through the terminating
 `;` — so layout never hides one: `:DECLARE sA, sB;`, a comma list broken
@@ -90,14 +118,29 @@ site rather than a use.
 Treated as declared, never flagged: built-in function and class names,
 `Me`/`Base` forms, identifiers inside `:INCLUDE` paths, `:INHERIT`
 qualified base names (issue #149), the `:CLASS` name itself
-(issue #155), names listed in
+(issue #155), the name after `:LABEL` (spaced form; the joined
+`:LABELName` form is a single keyword token), `:REGION` and
+`:BEGININLINECODE` (issue #272), the predefined globals a base
+installation declares (issue #270; the platform's `Session` and
+`PublicConsts` and the application's publics such as `MYUSERNAME`,
+`CRLF`, `UserLang`, `sCC`, read from the vendored reference guide
+`internal/constants/data/predefined-globals.md`), STARLIMS status names
+(`Released`, `Draft`, ...), names listed in
 `ssl.diagnostics.globals`, names declared by the file's resolved
 `:INCLUDE` targets (the include declaration closure,
 `feature.cross_file_resolution` A18-A19 — `:INCLUDE` splices the included
-script's text, so its declarations are in scope), and — in endpoint
-scripts only — the runtime ambients `Request` and `Response`. In
-non-endpoint files `Request` and `Response` flag like any other
-undeclared name. Without a workspace index (or when includes don't
+script's text, so its declarations are in scope), and the platform objects
+`Request`, `Response`, `Session` and `PublicConsts` in every script: the
+reference says referencing `Request` or `Response` outside an endpoint
+does not raise (DECISIONS.md D4, amended 2026-10-13).
+
+A name the reference lists as **not** declared on a base installation
+(`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`, `MYUSERID`, `MYLANGID`,
+`MYDEPT`, `MYSITE`) is not treated as declared. When one is undeclared,
+the message adds the replacement, for example "use Chr(13) instead".
+An installation that does declare one adds it to `ssl.diagnostics.globals`.
+
+Without a workspace index (or when includes don't
 resolve) the check is single-file, exactly as before.
 
 ## Examples
@@ -169,15 +212,51 @@ resolve) the check is single-file, exactly as before.
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE nX;
+	nX := 1;
+	:LABEL SKIP;
+	:REGION Body;
+	SELECT 1
+	:ENDREGION;
+	:RETURN nX;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sOut;
+	sOut := MYUSERNAME + CRLF + UserLang + sCC + GlbImpExpPath;
+	sOut += Session:SessionID + LimsString(glb_In_Batch);
+	:RETURN sOut;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE sOut;
+	sOut := "a" + CR + LF;
+	:RETURN sOut;
+:ENDPROC;
+```
+
 ## Rationale
 
 Undeclared-variable detection is the highest-value and highest-noise check
 in the pipeline — its history is a list of contexts that had to be exempted
 one false positive at a time. Each Does-not-flag fence pins one of those
 exemptions permanently. The endpoint-ambient fence runs with
-`is_endpoint_file: true` (spec_options); the inverse case — `Request`
-flagging in a non-endpoint file — is covered by PR #23's tests in
-providers_test.go, since spec fences share one option set per entry.
+`is_endpoint_file: true` (spec_options); that `Request` is also declared
+outside an endpoint is pinned in providers_test.go
+(TestEndpointAmbients_RequestNotUndeclaredOutsideEndpoint), since spec
+fences share one option set per entry.
 The member-access fence pins DECISIONS.md D10 (issue #22): the member of
 a `:` access is never a variable reference, and built-in value types
 forward unmatched members to .NET at runtime, so flagging them would

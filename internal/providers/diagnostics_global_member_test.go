@@ -52,7 +52,7 @@ Pending := 2;`
 	if len(findings) != 1 {
 		t.Fatalf("expected one bare-global finding, got %+v", findings)
 	}
-	if findings[0].Severity != SeverityError || findings[0].Range.Start.Line != 2 ||
+	if findings[0].Severity != SeverityWarning || findings[0].Range.Start.Line != 2 ||
 		findings[0].Range.Start.Character != 0 {
 		t.Errorf("wrong severity or range for bare global: %+v", findings[0])
 	}

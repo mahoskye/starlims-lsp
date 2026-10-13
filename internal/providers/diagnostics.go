@@ -5119,7 +5119,7 @@ func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {
 
 // checkGlobalAssignment checks for assignment to global variables.
 // Global variables are pre-declared and should not be assigned to.
-// Always checks SSLPredefinedGlobals (e.g. MYUSERNAME); also checks user-configured globals.
+// Always checks SSLWriteCheckedGlobals (MYUSERNAME); also checks user-configured globals.
 // An in-file declaration (:DECLARE/:PARAMETERS/:PUBLIC) suppresses the check
 // for that name (issue #169): a declared local that happens to collide with a
 // status keyword (loop variable iS vs IS) is the author's own variable, and a
@@ -5136,7 +5136,7 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 	// Build a case-insensitive set of global variable names.
 	// Always include built-in predefined globals and status keywords.
 	globalSet := make(map[string]bool)
-	for _, g := range constants.SSLPredefinedGlobals {
+	for _, g := range constants.SSLWriteCheckedGlobals {
 		globalSet[strings.ToUpper(g)] = true
 	}
 	for _, g := range constants.SSLStatusKeywords {
@@ -5181,9 +5181,9 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 
 		if j < len(tokens) && tokens[j].Type == lexer.TokenOperator && tokens[j].Text == ":=" {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
+				Severity: SeverityWarning,
 				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Cannot assign to global variable '%s'", token.Text),
+				Message:  fmt.Sprintf("Assignment to global variable '%s' changes it for every routine that reads it", token.Text),
 				Source:   "ssl-lsp",
 				Code:     CodeGlobalAssignment,
 			})
@@ -5255,14 +5255,15 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 		}
 
 		// Detect :INCLUDE (issue #56) / :INHERIT (issue #149) / :CLASS
-		// (issue #155) keywords and skip until semicolon — the identifiers
-		// that follow are module references (:INCLUDE, :INHERIT) or the
-		// class-name declaration (:CLASS), not variable uses.
+		// (issue #155) / :LABEL, :REGION, :BEGININLINECODE (issue #272)
+		// keywords and skip until semicolon — the identifiers that follow
+		// are module references (:INCLUDE, :INHERIT), the class-name
+		// declaration (:CLASS), or a label or block name, not variable uses.
 		if token.Type == lexer.TokenKeyword {
 			normalized := strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
-			if normalized == "INCLUDE" || normalized == "INHERIT" || normalized == "CLASS" {
+			switch normalized {
+			case "INCLUDE", "INHERIT", "CLASS", "LABEL", "REGION", "BEGININLINECODE":
 				inInclude = true
-				continue
 			}
 			// Other keywords are not variables
 			continue
@@ -5338,10 +5339,14 @@ func checkUndeclaredVariables(tokens []lexer.Token, ast *parser.Node, p *parser.
 		// Report undeclared variable (once per name)
 		if !reported[upperName] {
 			reported[upperName] = true
+			message := fmt.Sprintf("Variable '%s' is not declared", token.Text)
+			if use, ok := constants.SSLNonBaseGlobals[upperName]; ok {
+				message += fmt.Sprintf("; a base installation does not declare it as a global, use %s instead", use)
+			}
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityWarning,
 				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Variable '%s' is not declared", token.Text),
+				Message:  message,
 				Source:   "ssl-lsp",
 				Code:     CodeUndeclaredVariable,
 			})
@@ -5375,7 +5380,7 @@ func buildBuiltinSet() map[string]bool {
 		builtins[strings.ToUpper(op)] = true
 	}
 
-	// Add predefined read-only globals (always recognized, never flagged as undeclared)
+	// Add base-installation predefined globals (always recognized, never flagged as undeclared)
 	for _, g := range constants.SSLPredefinedGlobals {
 		builtins[strings.ToUpper(g)] = true
 	}
@@ -5446,6 +5451,18 @@ func countVariableUsages(tokens []lexer.Token, v parser.VariableInfo, procedures
 	}
 
 	for _, token := range tokens {
+		// A ?name? marker in a SQL string reads the variable at run time
+		// (SQLExecute substitution), so it counts as a use (issue #270).
+		// Same string scan as invalid_sql_param, so the two rules agree on
+		// which markers name a variable.
+		if token.Type == lexer.TokenString {
+			if scopeProc != nil && (token.Line < scopeProc.StartLine || token.Line > scopeProc.EndLine) {
+				continue
+			}
+			usageCount += countSQLMarkerUsages(token.Text, varNameUpper)
+			continue
+		}
+
 		// Only check identifiers
 		if token.Type != lexer.TokenIdentifier {
 			continue
@@ -5479,6 +5496,24 @@ func countVariableUsages(tokens []lexer.Token, v parser.VariableInfo, procedures
 	}
 
 	return usageCount
+}
+
+// countSQLMarkerUsages counts the named ?name? placeholders in a string
+// literal whose base variable is varNameUpper.
+func countSQLMarkerUsages(text, varNameUpper string) int {
+	if len(text) < 2 || !strings.Contains(text, "?") {
+		return 0
+	}
+	n := 0
+	for _, ph := range ParseSQLPlaceholders(text[1 : len(text)-1]) {
+		if !ph.IsNamed || !isSimpleNamedPlaceholder(ph.Name) || strings.Contains(ph.Name, "(") {
+			continue
+		}
+		if strings.ToUpper(extractBaseVarName(ph.Name)) == varNameUpper {
+			n++
+		}
+	}
+	return n
 }
 
 // checkSQLParameterValidation checks that SQL parameters (?param?) match declared variables.

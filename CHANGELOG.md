@@ -14,7 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `oContext:MYUSERNAME := ...`, belongs to its object, not to the global.
   It was reported as an error. Members after `:` are now skipped, including
   nested access and comments or whitespace around the colon. A bare
-  assignment such as `Pending := 2;` is still an error, with the same range.
+  assignment such as `Pending := 2;` is still reported, with the same range.
+- **`undeclared_variable` skips label and block names.** The name after
+  `:LABEL`, `:REGION` and `:BEGININLINECODE` is not a variable reference,
+  but `--strict` reported it as undeclared (#272).
+- **The predefined globals a base installation declares are recognized.**
+  `undeclared_variable` knew only `MYUSERNAME`, so reading `CRLF`,
+  `UserLang`, `sCC`, `Session` or `PublicConsts` warned under `--strict`.
+  The list is now read from a vendored copy of the reference's
+  predefined-globals guide. A name the guide says a base installation
+  does *not* declare (`CR`, `LF`, `TAB`, `sTab`, `sSQ`, `sDQ`,
+  `MYUSERID`, ...) still warns, and the message names the replacement,
+  such as `Chr(13)`. `global_assignment` still checks only `MYUSERNAME`
+  among them, because the application's own session code assigns the
+  others (#270).
+- **`unused_variable` counts `?name?` markers.** A parameter read only
+  through `SQLExecute` substitution was reported as never used (#270).
+
+### Changed
+- **`global_assignment` is a warning** (was an error), and its message no
+  longer says the assignment is impossible. The reference says nothing
+  makes a predefined global read-only: the assignment succeeds and changes
+  the value for every routine that reads it. That is a likely bug, not a
+  failure.
+- **`Request` and `Response` are never undeclared.** The reference says
+  they can be read in any script, so `undeclared_variable` no longer flags
+  them outside endpoint scripts (DECISIONS.md D4, amended). Completion
+  still offers them only in endpoint scripts.
 
 ## [0.24.0] - 2026-09-21
 

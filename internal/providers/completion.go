@@ -312,11 +312,16 @@ func GetStatusKeywordCompletions() []CompletionItem {
 func GetPredefinedGlobalCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, g := range constants.SSLPredefinedGlobals {
+		// Request and Response are offered with their own documentation
+		// in endpoint scripts only (GetEndpointAmbientCompletions).
+		if strings.EqualFold(g, "Request") || strings.EqualFold(g, "Response") {
+			continue
+		}
 		items = append(items, CompletionItem{
 			Label:            g,
 			Kind:             CompletionKindVariable,
 			Detail:           "Predefined Global",
-			Documentation:    "Runtime-provided read-only global variable.",
+			Documentation:    "Declared by a base STARLIMS installation; an installation may declare more or fewer. A local with the same name hides it.",
 			InsertText:       g,
 			InsertTextFormat: InsertTextFormatPlainText,
 		})
