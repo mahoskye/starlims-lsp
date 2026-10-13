@@ -43,6 +43,13 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 		if terminatorAcceptable(expected) && lineLeading(tokens, idx) {
 			msg += " (is the previous statement missing its ';'?)"
 		}
+		if se.Kind == parser.StmtFor && len(se.Exprs) == 3 && endsInStepMember(se.Exprs[2]) {
+			// `:TO nMax:STEP 2` — with no space, `:STEP` reads as a member
+			// of the limit expression (diag.step_spacing names the layout
+			// rule; a numeric limit still lexes the keyword and is that
+			// rule's to report).
+			msg += " (missing space before ':STEP'?)"
+		}
 
 		r := tokenToRange(tok)
 		if tok.Type == lexer.TokenEOF {
@@ -222,6 +229,17 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		if bareLogicalOperatorPosition(tokens, idx) {
 			return true
 		}
+		// procedure_declaration_syntax: a C-style `PROCEDURE Name(` with no
+		// leading colon stops the parser at the name; that rule names the
+		// declaration typo. Only the shape it reports — the name followed
+		// by `(` — is its; a bare `PROCEDURE Name;` stays here.
+		if prev := previousSignificantTokenIndex(tokens, idx-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[prev].Text, "PROCEDURE") {
+			if next := nextSignificantTokenIndex(tokens, idx+1); next >= 0 &&
+				tokens[next].Type == lexer.TokenPunctuation && tokens[next].Text == "(" {
+				return true
+			}
+		}
 		// scientific_notation: `7e2` lexes as number `7` glued to
 		// identifier `e2`, and `.5e1` as `.5` glued to `e1`; the number is
 		// what that rule reports. Only those shapes — a number with no
@@ -284,4 +302,24 @@ func bareLogicalOperatorPosition(tokens []lexer.Token, i int) bool {
 		return nextIdx >= 0 && operandStart(next) && !(prevIdx >= 0 && operandEnd(prev))
 	}
 	return prevIdx >= 0 && operandEnd(prev) && nextIdx >= 0 && operandStart(next)
+}
+
+// endsInStepMember reports whether a `:FOR` limit expression ends in a
+// member access named STEP — the parse of `:TO nMax:STEP 2`, where the
+// missing space glues the keyword to the limit as `nMax:STEP`.
+func endsInStepMember(e *parser.Expr) bool {
+	for e != nil {
+		switch e.Kind {
+		case parser.ExprMember:
+			return strings.EqualFold(e.Name, "STEP")
+		case parser.ExprBinary:
+			if len(e.Children) < 2 {
+				return false
+			}
+			e = e.Children[1]
+		default:
+			return false
+		}
+	}
+	return false
 }

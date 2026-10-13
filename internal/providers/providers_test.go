@@ -3530,13 +3530,32 @@ func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
 	for _, d := range diagnostics {
 		if d.Code == CodeRegionEndMismatch {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity, got %v", d.Severity)
+			if d.Severity != SeverityHint {
+				t.Errorf("expected hint severity, got %v", d.Severity)
 			}
 		}
 	}
 	if !found {
 		t.Errorf("expected region_end_mismatch for endregion with no open region, got: %+v", diagnostics)
+	}
+}
+
+// [spec feature.folding/A8]
+func TestGetDiagnostics_RegionEndMismatch_WordBoundary(t *testing.T) {
+	// A comment that merely starts with the letters "region" opens
+	// nothing, so it cannot hide an orphan endregion — and it does not
+	// fold as a region either.
+	text := `/* Regional settings follow;
+:DECLARE nCount;
+/* endregion;`
+
+	if got := codeCount(GetDiagnostics(text, DefaultDiagnosticOptions()), CodeRegionEndMismatch); got != 1 {
+		t.Errorf("expected one region_end_mismatch, got %d", got)
+	}
+	for _, r := range GetFoldingRanges(text) {
+		if r.Kind == "region" {
+			t.Errorf("'/* Regional ...' must not open a region, got %+v", r)
+		}
 	}
 }
 
@@ -9380,7 +9399,12 @@ x := DoProc("Helper", {1},,);
 CallMe(1,);
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	// Info tier: dropped by default.
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeTrailingSkipCommas); got != 0 {
+		t.Fatalf("trailing_skip_commas fired with the info tier off: %d", got)
+	}
+
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	var lines []int
 	for _, d := range diagnostics {
@@ -9401,9 +9425,10 @@ func TestGetDiagnostics_TrailingSkipCommasNotFlagged(t *testing.T) {
 CallMe(1,, 3);
 x := DoProc("Helper", {1});
 aList := {1, 2,};
+x := x:Substring(1,);
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if d.Code == CodeTrailingSkipCommas {
@@ -9420,6 +9445,7 @@ func TestGetDiagnostics_SpacedSkipCommasOptIn(t *testing.T) {
 CallMe(1, , 3);
 CallMe(1,, 3);
 CallMe(1, 2, 3);
+CallMe(1, , );
 :ENDPROC;`
 
 	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
@@ -9832,5 +9858,153 @@ func TestStrictChecksExemptDataSources(t *testing.T) {
 	}
 	if !found {
 		t.Error("the data-source exemption leaked into ordinary SSL documents")
+	}
+}
+
+// ==================== Diagnostics audit, batch B (issue #255) ====================
+
+func TestGetDiagnostics_RaiseErrorInCatch_MemberCallNotFlagged(t *testing.T) {
+	// D10: a qualified recv:RaiseError(...) is a member call, never the
+	// built-in.
+	code := `:PROCEDURE Demo;
+:DECLARE oLog;
+:TRY;
+	oLog := 1;
+:CATCH;
+	oLog:RaiseError("logged, not raised");
+:ENDTRY;
+:ENDPROC;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeRaiseErrorInCatch); got != 0 {
+		t.Errorf("member RaiseError must not flag, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_RunSQLNonDML_ASTEdges(t *testing.T) {
+	// D10: member calls are out of scope. A SELECT continuing an INSERT
+	// across a concatenation is not the statement's leading keyword, and
+	// a query that does not begin with a literal is not provable. A
+	// parenthesized literal still is.
+	code := `:PROCEDURE Main;
+:DECLARE oSql, sPrefix;
+oSql:RunSql("SELECT ID FROM SAMPLES");
+RunSQL("INSERT INTO ARCHIVE " + "SELECT * FROM SAMPLES");
+RunSQL(sPrefix + "SELECT 1 FROM DUAL");
+RunSQL(("SELECT 1 FROM DUAL"));
+:ENDPROC;`
+
+	var lines []int
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeRunSQLNonDML {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 5 {
+		t.Fatalf("expected runsql_non_dml on line 5 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_StepZeroLiteral_WholeExpression(t *testing.T) {
+	// The whole step expression must be the zero literal; a literal zero
+	// that only starts a larger expression proves nothing.
+	code := `:PROCEDURE Demo;
+:DECLARE i, nInc;
+nInc := 2;
+:FOR i := 1 :TO 10 :STEP 0 + nInc;
+:NEXT;
+:ENDPROC;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeStepZeroLiteral); got != 0 {
+		t.Errorf("':STEP 0 + nInc' must not flag, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_SingleFinally_ExtraClauseDoesNotFillFirst(t *testing.T) {
+	// Statements after a duplicate :FINALLY belong to no clause, so an
+	// empty first :FINALLY is still reported.
+	code := `:PROCEDURE Demo;
+:DECLARE nCount;
+:TRY;
+nCount := 1;
+:FINALLY;
+:FINALLY;
+nCount := 3;
+:ENDTRY;
+:ENDPROC;`
+
+	diags := GetDiagnostics(code, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeSingleFinally); got != 1 {
+		t.Errorf("expected one single_finally, got %d", got)
+	}
+	if got := codeCount(diags, CodeFinallyEmpty); got != 1 {
+		t.Errorf("expected finally_empty on the empty first :FINALLY, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_ParametersFirst_SecondScriptLevel(t *testing.T) {
+	code := `:PARAMETERS a;
+:PARAMETERS b;
+:RETURN a;`
+
+	var lines []int
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 1 {
+		t.Fatalf("expected parameters_first on line 1 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_ProcedureDeclarationSyntax_OneFinding(t *testing.T) {
+	// The C-style bare form is one defect: procedure_declaration_syntax
+	// names it and unexpected_token defers. Without the paren the shape
+	// is not that rule's, and unexpected_token keeps it.
+	withParen := `PROCEDURE Demo(nValue);
+:RETURN .T.;`
+	diags := GetDiagnostics(withParen, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeProcedureDeclarationSyntax); got != 1 {
+		t.Errorf("expected one procedure_declaration_syntax, got %d", got)
+	}
+	if got := codeCount(diags, CodeUnexpectedToken); got != 0 {
+		t.Errorf("unexpected_token must defer to procedure_declaration_syntax, got %d", got)
+	}
+
+	bare := `PROCEDURE Demo;
+:RETURN .T.;`
+	diags = GetDiagnostics(bare, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeProcedureDeclarationSyntax); got != 0 {
+		t.Errorf("bare PROCEDURE Name; is not procedure_declaration_syntax's, got %d", got)
+	}
+	if got := codeCount(diags, CodeUnexpectedToken); got != 1 {
+		t.Errorf("expected unexpected_token for bare PROCEDURE Name;, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_UnexpectedToken_GluedStepHint(t *testing.T) {
+	// `:TO nMax:STEP 2` parses as member access on the limit; the parse
+	// failure is unexpected_token's, with a pointer at the missing space.
+	// step_spacing only sees a numeric limit, where :STEP still lexes as
+	// the keyword.
+	code := `:PROCEDURE Demo;
+:DECLARE i, nMax;
+nMax := 10;
+:FOR i := 1 :TO nMax:STEP 2;
+:NEXT;
+:ENDPROC;`
+
+	diags := GetDiagnostics(code, DefaultDiagnosticOptions())
+	found := false
+	for _, d := range diags {
+		if d.Code == CodeUnexpectedToken && strings.Contains(d.Message, "missing space before ':STEP'") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected unexpected_token with the ':STEP' spacing hint, got %+v", diags)
+	}
+	if got := codeCount(diags, CodeStepSpacing); got != 0 {
+		t.Errorf("step_spacing must not also fire, got %d", got)
 	}
 }

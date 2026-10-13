@@ -271,7 +271,7 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 
 	// Match region comments, handling optional trailing semicolon and whitespace.
 	// SSL comments are: /* comment text ;
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\b\s*(.*?)(?:\s*;?\s*)?$`)
 	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
 
 	for _, token := range tokens {

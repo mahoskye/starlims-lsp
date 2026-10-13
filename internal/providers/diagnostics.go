@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -321,7 +322,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkTryStructure(tokens)...)
 	diagnostics = append(diagnostics, checkErrorHandlerStructure(tokens)...)
 	diagnostics = append(diagnostics, checkCatchClauseForm(tokens)...)
-	diagnostics = append(diagnostics, checkRaiseErrorInCatch(tokens)...)
+	diagnostics = append(diagnostics, checkRaiseErrorInCatch(tokens, calls)...)
 	diagnostics = append(diagnostics, checkMixedErrorHandlingFamilies(tokens)...)
 	diagnostics = append(diagnostics, checkExitCaseAfterReturn(tokens)...)
 	diagnostics = append(diagnostics, checkExecFunctionClassTargets(tokens, opts.ClassFileDispatchTargets)...)
@@ -331,8 +332,9 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNotPreferredOperators(tokens)...)
 	diagnostics = append(diagnostics, checkLiteralTypeSafety(tokens, typeInfo)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
-	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens)...)
-	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens)...)
+	trailingRuns := trailingSkipCommaRuns(tokens, calls)
+	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens, trailingRuns)...)
+	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens, calls)...)
 	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens, calls)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
@@ -375,7 +377,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkNamedSQLParamsWithWrongFunction(tokens)...)
 	diagnostics = append(diagnostics, checkComplexSQLPlaceholders(tokens)...)
 	diagnostics = append(diagnostics, checkUDObjectArrayInClause(tokens)...)
-	diagnostics = append(diagnostics, checkRunSQLNonDML(tokens)...)
+	diagnostics = append(diagnostics, checkRunSQLNonDML(tokens, calls)...)
 	diagnostics = append(diagnostics, checkSQLAdvisories(tokens, opts)...)
 	diagnostics = append(diagnostics, checkUnicodeLiteralPrefix(tokens)...)
 	diagnostics = append(diagnostics, checkCollateJustification(tokens)...)
@@ -388,7 +390,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkClassReferenceForms(tokens)...)
 	diagnostics = append(diagnostics, checkScientificNotation(tokens)...)
 	diagnostics = append(diagnostics, checkStepSpacing(tokens)...)
-	diagnostics = append(diagnostics, checkStepZeroLiteral(tokens)...)
+	diagnostics = append(diagnostics, checkStepZeroLiteral(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkInvalidLimsTypeExComparison(tokens)...)
 	diagnostics = append(diagnostics, checkRegionEndMismatch(tokens)...)
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
@@ -3213,33 +3215,24 @@ func checkDeclareInitializer(tokens []lexer.Token) []Diagnostic {
 // the RaiseError placement doctrine (ssl-style-guide schema
 // error_handling.raise_error_doctrine): the error handler must not become
 // the thing that crashes. A RaiseError inside a deeper :TRY body nested
-// within the handler is fine; its own :CATCH contains it.
-func checkRaiseErrorInCatch(tokens []lexer.Token) []Diagnostic {
+// within the handler is fine; its own :CATCH contains it. Call sites come
+// from the expression AST; a qualified `recv:RaiseError(...)` is a member
+// call, never the built-in, and is not reported (D10).
+func checkRaiseErrorInCatch(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	// Stack of the section we are in for each open :TRY structure.
+	// Section of the innermost open :TRY structure at each token index.
 	const (
-		sectionTry = iota
+		sectionNone = iota
+		sectionTry
 		sectionCatch
 		sectionFinally
 	)
+	sectionAt := make([]int, len(tokens))
 	var stack []int
-
-	nextSignificant := func(from int) *lexer.Token {
-		for j := from; j < len(tokens); j++ {
-			switch tokens[j].Type {
-			case lexer.TokenWhitespace, lexer.TokenComment:
-				continue
-			}
-			return &tokens[j]
-		}
-		return nil
-	}
-
 	for i := range tokens {
 		token := &tokens[i]
-		switch token.Type {
-		case lexer.TokenKeyword:
+		if token.Type == lexer.TokenKeyword {
 			switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
 			case "TRY":
 				stack = append(stack, sectionTry)
@@ -3256,24 +3249,27 @@ func checkRaiseErrorInCatch(tokens []lexer.Token) []Diagnostic {
 					stack = stack[:len(stack)-1]
 				}
 			}
-		case lexer.TokenIdentifier:
-			if len(stack) == 0 || stack[len(stack)-1] != sectionCatch {
-				continue
-			}
-			if !strings.EqualFold(token.Text, "RaiseError") {
-				continue
-			}
-			if next := nextSignificant(i + 1); next == nil || next.Type != lexer.TokenPunctuation || next.Text != "(" {
-				continue
-			}
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(*token),
-				Message:  "'RaiseError' inside ':CATCH' - the error handler should not raise; move the raise into the ':TRY' block it belongs to",
-				Source:   "ssl-lsp",
-				Code:     CodeRaiseErrorInCatch,
-			})
 		}
+		if len(stack) > 0 {
+			sectionAt[i] = stack[len(stack)-1]
+		}
+	}
+
+	for _, site := range calls {
+		if site.Qualified() || !strings.EqualFold(site.Name, "RaiseError") {
+			continue
+		}
+		idx := site.Call.Children[0].Start
+		if idx < 0 || idx >= len(tokens) || sectionAt[idx] != sectionCatch {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityWarning,
+			Range:    tokenToRange(tokens[idx]),
+			Message:  "'RaiseError' inside ':CATCH' - the error handler should not raise; move the raise into the ':TRY' block it belongs to",
+			Source:   "ssl-lsp",
+			Code:     CodeRaiseErrorInCatch,
+		})
 	}
 
 	return diagnostics
@@ -3408,6 +3404,10 @@ func checkParameterPlacement(tokens []lexer.Token) []Diagnostic {
 					Source:   "ssl-lsp",
 					Code:     CodeParametersFirst,
 				})
+			} else {
+				// A script-level :PARAMETERS is itself a statement: a
+				// second one is judged against it, as at block level.
+				seenTopLevelStatement = true
 			}
 		default:
 			markStatement()
@@ -3649,11 +3649,19 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 		inFinally         bool
 		finallyToken      lexer.Token
 		finallyHasBody    bool
+		// inExtraFinally: inside a duplicate :FINALLY (diag.single_finally).
+		// Its statements belong to no clause, so they must not stand in
+		// for the body the first :FINALLY lacks (diag.finally_empty).
+		inExtraFinally bool
 	}
 	var stack []tryState
 
 	markStatement := func() {
 		if len(stack) == 0 {
+			return
+		}
+
+		if stack[len(stack)-1].inExtraFinally {
 			return
 		}
 
@@ -3738,6 +3746,7 @@ func checkTryStructure(tokens []lexer.Token) []Diagnostic {
 					Source:   "ssl-lsp",
 					Code:     CodeSingleFinally,
 				})
+				stack[len(stack)-1].inExtraFinally = true
 				continue
 			}
 			stack[len(stack)-1].hasFinally = true
@@ -6108,7 +6117,7 @@ func checkStepSpacing(tokens []lexer.Token) []Diagnostic {
 func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*`)
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\b`)
 	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
 
 	openRegions := 0
@@ -6121,7 +6130,7 @@ func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
 		if regionEndPattern.MatchString(text) {
 			if openRegions == 0 {
 				diagnostics = append(diagnostics, Diagnostic{
-					Severity: SeverityWarning,
+					Severity: SeverityHint,
 					Range:    tokenToRange(token),
 					Message:  "'endregion' has no open '/* region' to close",
 					Source:   "ssl-lsp",
@@ -6583,37 +6592,34 @@ func checkClassNameCollision(tokens []lexer.Token) []Diagnostic {
 // checkStepZeroLiteral flags a :FOR loop whose :STEP is a literal zero
 // (diag.step_zero_literal, issue #199): a zero step never advances the loop
 // variable, so the loop cannot terminate once entered. Only provable
-// literals flag — an optional +/- sign followed by a numeric literal whose
-// value is zero; a variable or expression step is left alone.
-func checkStepZeroLiteral(tokens []lexer.Token) []Diagnostic {
+// literals flag: the whole step expression, read from the expression AST,
+// must be a numeric literal whose value is zero, optionally negated. A
+// variable or a larger expression (`:STEP 0 + nInc`) is left alone.
+func checkStepZeroLiteral(tokens []lexer.Token, stmts []parser.StatementExprs) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	for i, token := range tokens {
-		if token.Type != lexer.TokenKeyword {
+	for _, se := range stmts {
+		if se.Kind != parser.StmtFor || len(se.Exprs) < 4 {
 			continue
 		}
-		if !strings.EqualFold(strings.TrimPrefix(token.Text, ":"), "STEP") {
+		step := se.Exprs[3]
+		for step != nil && step.Kind == parser.ExprUnary && step.Op == "-" && len(step.Children) == 1 {
+			step = step.Children[0]
+		}
+		if step == nil || step.Kind != parser.ExprLiteral || step.Start != step.End ||
+			step.Start < 0 || step.Start >= len(tokens) {
 			continue
 		}
-		idx := nextSignificantTokenIndex(tokens, i+1)
-		if idx < 0 {
+		num := tokens[step.Start]
+		if num.Type != lexer.TokenNumber {
 			continue
 		}
-		if tokens[idx].Type == lexer.TokenOperator && (tokens[idx].Text == "-" || tokens[idx].Text == "+") {
-			idx = nextSignificantTokenIndex(tokens, idx+1)
-			if idx < 0 {
-				continue
-			}
-		}
-		if tokens[idx].Type != lexer.TokenNumber {
-			continue
-		}
-		if strings.Trim(strings.ReplaceAll(tokens[idx].Text, ".", ""), "0") != "" {
+		if strings.Trim(strings.ReplaceAll(num.Text, ".", ""), "0") != "" {
 			continue
 		}
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
-			Range:    tokenToRange(tokens[idx]),
+			Range:    tokenToRange(num),
 			Message:  "':STEP 0' never advances the loop variable - the ':FOR' loop cannot terminate once entered",
 			Source:   "ssl-lsp",
 			Code:     CodeStepZeroLiteral,
@@ -6920,38 +6926,49 @@ var (
 // statement (diag.runsql_non_dml, issue #195): RunSQL is for DML; a query
 // whose first keyword is SELECT or WITH should use a result-returning API
 // (LSearch/LSelect/GetDataSet/...) instead. SELECT ... INTO and WITH-wrapped
-// DML are left alone — those write.
-func checkRunSQLNonDML(tokens []lexer.Token) []Diagnostic {
+// DML are left alone — those write. Call sites come from the expression
+// AST: the first argument must begin with a string literal (its leading
+// keyword decides), every string piece of that argument feeds the write
+// guards, and a qualified `recv:RunSQL(...)` is a member call — never the
+// built-in — and is not reported (D10).
+func checkRunSQLNonDML(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	sqlCallFirstArgStrings(tokens, func(name string) bool { return name == "RUNSQL" }, func(callIdx, strIdx int) {
-		// Only the first string piece of the argument decides — the
-		// statement's leading keyword lives there.
-		if prev := previousSignificantTokenIndex(tokens, strIdx-1); prev >= 0 && tokens[prev].Type == lexer.TokenString {
-			return
+	for _, site := range calls {
+		if site.Qualified() || !strings.EqualFold(site.Name, "RunSQL") || len(site.Args) == 0 {
+			continue
 		}
+		arg := site.Args[0]
+		// The leftmost operand of the argument holds the statement's
+		// leading keyword; only a string literal there is provable.
+		lead := arg
+		for lead != nil && (lead.Kind == parser.ExprBinary || lead.Kind == parser.ExprGroup) && len(lead.Children) > 0 {
+			lead = lead.Children[0]
+		}
+		if lead == nil || lead.Kind != parser.ExprLiteral || lead.Start < 0 || lead.Start >= len(tokens) ||
+			tokens[lead.Start].Type != lexer.TokenString {
+			continue
+		}
+		strIdx := lead.Start
 		content := stripLeadingSQLComments(unquoteSSLString(tokens[strIdx].Text))
 		word := strings.ToUpper(leadingSQLWordExtractor.FindString(content))
 		if word != "SELECT" && word != "WITH" {
-			return
+			continue
 		}
 		// A SELECT ... INTO writes; a WITH wrapping INSERT/UPDATE/DELETE/
-		// MERGE writes. Both are legitimate RunSQL statements. The full
-		// argument (all concatenated pieces) is consulted for the guard.
+		// MERGE writes. Both are legitimate RunSQL statements. Every string
+		// piece of the argument is consulted for the guard.
 		full := content
-		for j := strIdx + 1; j < len(tokens); j++ {
+		for j := strIdx + 1; j <= arg.End && j < len(tokens); j++ {
 			if tokens[j].Type == lexer.TokenString {
 				full += " " + unquoteSSLString(tokens[j].Text)
 			}
-			if tokens[j].Type == lexer.TokenPunctuation && (tokens[j].Text == "," || tokens[j].Text == ")") {
-				break
-			}
 		}
 		if word == "SELECT" && sqlSelectIntoPattern.MatchString(full) {
-			return
+			continue
 		}
 		if word == "WITH" && sqlDMLVerbPattern.MatchString(full) {
-			return
+			continue
 		}
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
@@ -6960,7 +6977,7 @@ func checkRunSQLNonDML(tokens []lexer.Token) []Diagnostic {
 			Source:   "ssl-lsp",
 			Code:     CodeRunSQLNonDML,
 		})
-	})
+	}
 
 	return diagnostics
 }
@@ -7028,63 +7045,63 @@ func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
+// skipCommaRun is an inclusive token-index span from the first to the last
+// comma of a run of skip-commas.
+type skipCommaRun struct{ first, last int }
+
+// trailingSkipCommaRuns returns, in source order, the run of commas that
+// follows the last real argument of each call whose argument list ends in
+// skipped slots (`Foo(a,,)`, `Foo(a,)`). Call sites come from the
+// expression AST; qualified `recv:Name(...)` member calls are excluded —
+// the runtime's NIL padding of missing trailing arguments is a property of
+// SSL calls, not of whatever a member call dispatches to (D10).
+func trailingSkipCommaRuns(tokens []lexer.Token, calls []parser.CallSite) []skipCommaRun {
+	var runs []skipCommaRun
+	for _, site := range calls {
+		n := len(site.Args)
+		if site.Qualified() || n == 0 || site.Args[n-1].Kind != parser.ExprSkipped {
+			continue
+		}
+		from := site.Call.Children[0].End + 1
+		for k := n - 1; k >= 0; k-- {
+			if site.Args[k].Kind != parser.ExprSkipped {
+				from = site.Args[k].End + 1
+				break
+			}
+		}
+		run := skipCommaRun{first: -1, last: -1}
+		for j := from; j < site.Call.End && j < len(tokens); j++ {
+			if tokens[j].Type == lexer.TokenPunctuation && tokens[j].Text == "," {
+				if run.first < 0 {
+					run.first = j
+				}
+				run.last = j
+			}
+		}
+		if run.first >= 0 {
+			runs = append(runs, run)
+		}
+	}
+	sort.Slice(runs, func(a, b int) bool { return runs[a].first < runs[b].first })
+	return runs
+}
+
 // checkTrailingSkipCommas flags skip-commas immediately preceding a call's
 // closing parenthesis (diag.trailing_skip_commas, issue #193): trailing
 // skipped arguments are unnecessary — the runtime pads missing trailing
 // arguments with NIL, so `Foo(a,,)` is `Foo(a)`. The range covers the
-// comma run.
-func checkTrailingSkipCommas(tokens []lexer.Token) []Diagnostic {
+// comma run. Info tier: it is the comma form of the style guide's
+// "omit trailing optional parameters" clause, whose `{}` form is
+// diag.empty_optional_param_array.
+func checkTrailingSkipCommas(tokens []lexer.Token, runs []skipCommaRun) []Diagnostic {
 	var diagnostics []Diagnostic
 
-	for i, token := range tokens {
-		if token.Type != lexer.TokenIdentifier {
-			continue
-		}
-		openIdx := nextSignificantTokenIndex(tokens, i+1)
-		if openIdx < 0 || tokens[openIdx].Type != lexer.TokenPunctuation || tokens[openIdx].Text != "(" {
-			continue
-		}
-		depth := 0
-		closeIdx := -1
-		for j := openIdx; j < len(tokens); j++ {
-			if tokens[j].Type != lexer.TokenPunctuation {
-				continue
-			}
-			switch tokens[j].Text {
-			case "(":
-				depth++
-			case ")":
-				depth--
-				if depth == 0 {
-					closeIdx = j
-				}
-			}
-			if closeIdx >= 0 {
-				break
-			}
-		}
-		if closeIdx < 0 {
-			continue
-		}
-		// Collect the run of commas directly before the close paren.
-		firstComma, lastComma := -1, -1
-		for j := previousSignificantTokenIndex(tokens, closeIdx-1); j > openIdx; j = previousSignificantTokenIndex(tokens, j-1) {
-			if tokens[j].Type != lexer.TokenPunctuation || tokens[j].Text != "," {
-				break
-			}
-			if lastComma < 0 {
-				lastComma = j
-			}
-			firstComma = j
-		}
-		if firstComma < 0 {
-			continue
-		}
+	for _, run := range runs {
 		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityHint,
+			Severity: SeverityInfo,
 			Range: Range{
-				Start: tokenToRange(tokens[firstComma]).Start,
-				End:   tokenToRange(tokens[lastComma]).End,
+				Start: tokenToRange(tokens[run.first]).Start,
+				End:   tokenToRange(tokens[run.last]).End,
 			},
 			Message: "Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them",
 			Source:  "ssl-lsp",
@@ -7098,9 +7115,16 @@ func checkTrailingSkipCommas(tokens []lexer.Token) []Diagnostic {
 // checkSpacedSkipCommas flags skip-comma pairs written with whitespace
 // between them (diag.spaced_skip_commas, issue #193). Info-tier style
 // note: `, ,` is valid syntax, but the adjacent form `,,` makes the
-// skipped argument visually deliberate. One diagnostic per run.
-func checkSpacedSkipCommas(tokens []lexer.Token) []Diagnostic {
+// skipped argument visually deliberate. One diagnostic per run. A run that
+// diag.trailing_skip_commas already reports is left to it: deleting the
+// run fixes both, so one finding per cause.
+func checkSpacedSkipCommas(tokens []lexer.Token, trailing []skipCommaRun) []Diagnostic {
 	var diagnostics []Diagnostic
+
+	ownedByTrailing := make(map[int]bool, len(trailing))
+	for _, run := range trailing {
+		ownedByTrailing[run.last] = true
+	}
 
 	for i := 0; i < len(tokens); i++ {
 		if tokens[i].Type != lexer.TokenPunctuation || tokens[i].Text != "," {
@@ -7123,7 +7147,7 @@ func checkSpacedSkipCommas(tokens []lexer.Token) []Diagnostic {
 			}
 			break
 		}
-		if !spaced {
+		if !spaced || ownedByTrailing[last] {
 			i = last
 			continue
 		}
