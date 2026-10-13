@@ -1,0 +1,99 @@
+Every block opener indents its body one level, middle keywords dedent
+themselves, and keyword casing is normalized (fmt.indent_style,
+fmt.keyword_case).
+-- input.ssl --
+:procedure Demo;
+:parameters nValue;
+:declare sLabel, i;
+:if nValue > 0;
+:for i := 1 :to nValue;
+:begincase;
+:case i == 1;
+sLabel := "one";
+:exitcase;
+:otherwise;
+sLabel := "many";
+:exitcase;
+:endcase;
+:next;
+:else;
+sLabel := "none";
+:endif;
+:return sLabel;
+:endproc;
+-- format [--indent-style space] --
+:PROCEDURE Demo;
+    :PARAMETERS nValue;
+    :DECLARE sLabel, i;
+    :IF nValue > 0;
+        :FOR i := 1 :TO nValue;
+            :BEGINCASE;
+            :CASE i == 1;
+                sLabel := "one";
+                :EXITCASE;
+            :OTHERWISE;
+                sLabel := "many";
+                :EXITCASE;
+            :ENDCASE;
+        :NEXT;
+    :ELSE;
+        sLabel := "none";
+    :ENDIF;
+    :RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE Demo;
+	:PARAMETERS nValue;
+	:DECLARE sLabel, i;
+	:IF nValue > 0;
+		:FOR i := 1 :TO nValue;
+			:BEGINCASE;
+			:CASE i == 1;
+				sLabel := "one";
+				:EXITCASE;
+			:OTHERWISE;
+				sLabel := "many";
+				:EXITCASE;
+			:ENDCASE;
+		:NEXT;
+	:ELSE;
+		sLabel := "none";
+	:ENDIF;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:1-4:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+5:1-5:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+5:13-5:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+6:1-6:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+7:1-7:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+9:1-9:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+10:1-10:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':OTHERWISE'
+12:1-12:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+13:1-13:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+14:1-14:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+15:1-15:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+17:1-17:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+18:1-18:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+19:1-19:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- diagnostics [--strict --info] --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:1-4:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+5:1-5:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+5:13-5:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+6:1-6:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+7:1-7:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+9:1-9:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+10:1-10:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':OTHERWISE'
+12:1-12:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+13:1-13:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+14:1-14:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+15:1-15:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+17:1-17:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+18:1-18:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+19:1-19:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

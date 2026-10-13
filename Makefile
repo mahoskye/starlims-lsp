@@ -3,7 +3,7 @@ VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}"
 
-.PHONY: all build clean test catalog-check generate-docs install build-all build-linux build-darwin build-windows
+.PHONY: all build clean test catalog-check scenarios scenarios-update generate-docs install build-all build-linux build-darwin build-windows
 
 all: build
 
@@ -34,6 +34,13 @@ test:
 # Catalog conformance + executable specs only (subset of `make test`).
 catalog-check:
 	go test ./internal/catalog/
+
+# Scenario suite (scenarios/README.md): check, or rewrite expected sections.
+scenarios:
+	go test ./cmd/starlims-lsp -run TestScenario
+
+scenarios-update:
+	go test ./cmd/starlims-lsp -run TestScenario -update
 
 # Regenerate catalog-derived docs (docs/reference/DIAGNOSTICS.md, docs/STATUS.md).
 generate-docs:
