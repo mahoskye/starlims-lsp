@@ -29,7 +29,16 @@ history:
       accepts :PARAMETERS without inline defaults. This rule stays active,
       but whether hand-written :DEFAULT statements are truly an error in
       data source files is an open question on ssl-style-guide#48.
-issues: ["ssl-style-guide#48"]
+  - date: 2026-10-13
+    ref: "issues #263, #269"
+    note: >-
+      Companion rule datasource_default_required reinstated (data sources
+      need an inline default for every script-level parameter). The open
+      question on ssl-style-guide#48 is closed: the style guide keeps
+      no_default_statements_in_datasource at error, and
+      inline_default_outside_datasource now covers the opposite direction
+      in ordinary scripts.
+issues: []
 ---
 
 ## Behavior
@@ -47,9 +56,10 @@ It must NOT flag:
 
 - the inline `:=` default form inside `:PARAMETERS` — that is the correct
   way to express a default in a data source (a parameter without one is
-  also valid; the former complementary rule `datasource_default_required`
-  was removed, issue #147);
-- a `:PARAMETERS` statement whose parameters carry no defaults at all;
+  reported by the companion rule `datasource_default_required`, not by
+  this one);
+- a `:PARAMETERS` statement whose parameters carry no defaults at all
+  (again `datasource_default_required`'s finding, not this rule's);
 - anything in ordinary (non-data-source) SSL files, where `:DEFAULT`
   statements are the normal way to set parameter defaults — the check
   simply does not run outside data source files.
@@ -79,11 +89,11 @@ The style guide defines this rule verbatim at error level
 (data_source_modules.lint_rules.no_default_statements_in_datasource):
 data source files are preprocessed by server-side builders that expect
 inline `:PARAMETERS` defaults and generate the `:DEFAULT` form themselves,
-so a hand-written `:DEFAULT` breaks the data source. (The former
-companion rule `datasource_default_required`, which additionally made the
-inline default mandatory, was removed in issue #147 — the builder accepts
-defaultless parameters; whether this rule's own premise fully holds is an
-open question tracked on ssl-style-guide#48.) The non-data-source
+so a hand-written `:DEFAULT` breaks the data source. The companion rule
+`datasource_default_required` makes the inline default mandatory (removed
+in issue #147, reinstated in #263/#269), and
+`inline_default_outside_datasource` reports the inline form where it does
+not belong. The non-data-source
 exemption is structural — the check is
 only wired into the data-source diagnostic path (f6e78ef) — which is why
 no fence can demonstrate it; providers_test.go

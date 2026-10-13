@@ -46,6 +46,8 @@ const (
 
 	// Schema lints — datasource.
 	CodeNoDefaultStatementsInDatasource = "no_default_statements_in_datasource"
+	CodeDatasourceDefaultRequired       = "datasource_default_required"
+	CodeInlineDefaultOutsideDatasource  = "inline_default_outside_datasource"
 	CodeDatasourceSQLSemicolon          = "datasource_sql_semicolon"
 	CodeDatasourceUndeclaredPlaceholder = "datasource_undeclared_placeholder"
 

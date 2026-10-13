@@ -78,7 +78,7 @@ ORDER BY v.VISITDATE`
 
 	// Hybrid shape: a :PARAMETERS header declares the placeholder, so the
 	// implicit-alias body draws no diagnostic at all.
-	hybrid := `:PARAMETERS patOrigRec;
+	hybrid := `:PARAMETERS patOrigRec := 0;
 
 SELECT p.ORIGREC PatientId
 FROM PATIENTS p
@@ -319,7 +319,7 @@ func TestGetDiagnostics_BannerBeforeHeaderKeepsHybridDetection(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 
-	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus;\n\nSELECT s.sample_id FROM samples s WHERE s.sample_status = @sStatus\n"
+	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT s.sample_id FROM samples s WHERE s.sample_status = @sStatus\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected no diagnostics for banner+header+SQL data source, got %+v", diags)
 	}
@@ -345,7 +345,7 @@ func TestGetDiagnostics_HeaderOnlyDataSource(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 
-	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus;\n"
+	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus := \"A\";\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected no diagnostics for banner+header-only data source, got %+v", diags)
 	}
@@ -437,7 +437,7 @@ func TestGetDiagnostics_SQLDataSource_FunctionNameColumnsAndInertSemicolons(t *t
 		"function_name_table":  "delete from FORMAT where ORIGREC = 1\n",
 		"block_comment":        "/* examples: 'all;msoffice->pdf' and 'doc->pdf'; keep in sync */\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf'\nwhere ORIGREC = 1\n",
 		"line_comment":         "update DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' -- default is 'all;msoffice->pdf'; keep\nwhere ORIGREC = 1\n",
-		"hybrid":               ":DSN := \"LimsDB\";\n:PARAMETERS pDocType;\n\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' /* e.g. 'a;b'; note */\nwhere DOCTYPE = @pDocType\n",
+		"hybrid":               ":DSN := \"LimsDB\";\n:PARAMETERS pDocType := \"\";\n\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' /* e.g. 'a;b'; note */\nwhere DOCTYPE = @pDocType\n",
 	} {
 		if diags := GetDiagnostics(content, opts); len(diags) != 0 {
 			t.Errorf("%s: expected no diagnostics, got %+v", name, diags)
@@ -609,7 +609,7 @@ func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T)
 	onlySemicolon("banner-*/;", clean)
 
 	// Spaces before the `;` are the same idiom, and the same error.
-	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus;\n\n" + sql
+	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus := \"Done\";\n\n" + sql
 	onlySemicolon("banner-*/ ;", spaced)
 
 	// Dropping the `;` is the fix, and leaves the document clean.

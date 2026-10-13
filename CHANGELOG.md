@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`datasource_default_required` is back (error), scoped to the data
+  source's own parameters.** On STARLIMS 12 a data source, in SSL or SQL
+  mode, fails when it runs if a script-level `:PARAMETERS` name has no
+  inline `:=` default ("No default value for one or more parameters."),
+  whatever the caller passes. The rule was removed in v0.16.0 because it
+  seemed to flag valid production files. Those were the `:PARAMETERS` of
+  procedures defined inside a data source, which are ordinary procedure
+  signatures, and they are now skipped (#263, #269).
+- **`inline_default_outside_datasource` (error).** `:PARAMETERS sName :=
+  "a";` is valid only in a data source. In a script or procedure the
+  statement takes names only and doesn't compile. This is the mirror of
+  `no_default_statements_in_datasource` (#264).
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an
