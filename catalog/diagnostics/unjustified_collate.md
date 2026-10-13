@@ -29,14 +29,23 @@ history:
       subsumed by the tier. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
-issues: []
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      COLLATE is now matched on the SQL lexer's stream instead of a raw regex,
+      so literal or commented-out COLLATE text no longer flags. The fences
+      used LSelect with a "" aFieldList, a call the function reference says
+      raises at runtime; they now use SQLExecute. Data-source coverage gap
+      recorded (issue #294). Corpus count unchanged.
+issues: ["#294"]
 ---
 
 ## Behavior
 
 Info tier (`ssl.diagnostics.infoDiagnostics`, default off). Flags a
-string token containing the SQL keyword `COLLATE` (case-insensitive,
-word-bounded) when the token is part of the first argument of a
+string token whose SQL holds the word `COLLATE` (case-insensitive,
+matched on the SQL lexer's token stream, so never inside a SQL character
+literal or comment) when the token is part of the first argument of a
 recognized embedded-SQL function call and no comment precedes the
 containing statement: scanning backwards from the call's function name,
 a `/* ...;` comment must appear before the previous statement's `;`
@@ -49,6 +58,7 @@ It must NOT flag:
   trailing the previous statement's line) — the justification;
 - words containing collate as a substring (`COLLATERAL`) — word
   boundary;
+- `COLLATE` inside a SQL character literal or a SQL comment;
 - `COLLATE` in strings that are not SQL-function arguments.
 
 ## Examples
@@ -58,7 +68,7 @@ It must NOT flag:
 ```ssl
 :PROCEDURE Main;
 	:DECLARE aRows;
-	aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 :ENDPROC;
 ```
 
@@ -68,7 +78,7 @@ It must NOT flag:
 :PROCEDURE Main;
 	:DECLARE aRows;
 	/* server default is case-sensitive so the report must sort case-insensitively;
-	aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 :ENDPROC;
 ```
 
@@ -77,9 +87,27 @@ It must NOT flag:
 ```ssl
 :PROCEDURE Main;
 	:DECLARE aRows;
-	aRows := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'");
 :ENDPROC;
 ```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATE' -- collate not needed here
+");
+:ENDPROC;
+```
+
+## Known gaps
+
+- Not evaluated on a SQL-mode data-source body (D15). That path runs only
+  `datasource_sql_semicolon` and `datasource_undeclared_placeholder`,
+  although the style-guide record lists `sql_data_source` in
+  `applies_to`. An SSL-mode data source is checked like any script.
+  Tracked in issue #294.
 
 ## Rationale
 

@@ -9323,10 +9323,10 @@ func TestGetDiagnostics_UnjustifiedCollateOptIn(t *testing.T) {
 	// COLLATERAL does not match.
 	code := `:PROCEDURE Main;
 :DECLARE aRows, aOk, aSub;
-aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 /* server default is case-sensitive so the report must sort case-insensitively;
-aOk := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
-aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN");
+aOk := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
+aSub := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'");
 :ENDPROC;`
 
 	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {

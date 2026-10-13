@@ -29,17 +29,27 @@ history:
       subsumed by the tier. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
-issues: []
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Moved from a raw `\bN'` regex onto the SQL lexer. The regex matched
+      the very common 'N' flag literal (the quote before N is a word
+      boundary), ?'N'? placeholders, and N' text in SQL comments. Production
+      corpus: 691 -> 0; none of the 691 was a real N'…' literal. Data-source
+      coverage gap recorded (issue #294).
+issues: ["#294"]
 ---
 
 ## Behavior
 
 Info tier (`ssl.diagnostics.infoDiagnostics`, default off). Flags a
-string token containing an `N'` Unicode literal prefix (case-insensitive,
-word boundary before the `N`) when the token is part of the first
-argument of a recognized embedded-SQL function call (`SQLExecute` plus
-the positional family). One diagnostic per string token; the range covers
-the token.
+string token in the first argument of a recognized embedded-SQL function
+call (`SQLExecute` plus the positional family) whose SQL holds an `N'…'`
+Unicode literal. Detection runs on the SQL lexer's token stream: an `N`
+word (either case) directly followed, with no whitespace, by a
+single-quoted literal. Literal state carries across concatenated pieces,
+so the tail of a spliced literal lexes in step. One diagnostic per string
+token; the range covers the token.
 
 It must NOT flag:
 
@@ -47,7 +57,9 @@ It must NOT flag:
 - `N'` sequences in strings that are not SQL arguments (the word-boundary
   and call-site guards keep prose strings out);
 - words merely ending in N followed by a quote (`COLUMN'...'` does not
-  match — the `N` must start its word);
+  match — the `N` must be a whole word);
+- an `'N'` literal, a `?'N'?` placeholder, or `N'` text inside a SQL
+  comment — none is an `N` word before a literal;
 - SQL without the prefix — plain `'...'` literals.
 
 ## Examples
@@ -72,10 +84,27 @@ It must NOT flag:
 
 ```ssl
 :PROCEDURE Main;
+	SQLExecute("UPDATE SAMPLES SET FLAG = 'N' WHERE ACTIVE = ?'N'? -- no N'x' needed
+");
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Main;
 	:DECLARE sMsg;
 	sMsg := "PLAN'N'GO";
 :ENDPROC;
 ```
+
+## Known gaps
+
+- Not evaluated on a SQL-mode data-source body (D15). That path runs only
+  `datasource_sql_semicolon` and `datasource_undeclared_placeholder`,
+  although the style-guide record lists `sql_data_source` in
+  `applies_to`. An SSL-mode data source is checked like any script.
+  Tracked in issue #294.
 
 ## Rationale
 
@@ -83,6 +112,8 @@ Whether `N'...'` is needed is a schema property (NVARCHAR columns and
 genuinely non-ASCII data) the LSP cannot see, so this cannot be an
 always-on rule — hence the opt-in info tier, per the issue #196
 proposal. Teams whose schemas are plain VARCHAR enable the tier (or
-promote this rule) to catch copy-paste imports. Info severity: the
-prefix is harmless at worst (minor implicit-conversion cost), so the
-rule only observes.
+promote this rule) to catch copy-paste imports. Info severity: an
+`N'…'` literal changes the literal's type, which can change how a
+comparison against a non-Unicode column is evaluated (the style guide's
+`unicode_literal_prefix` record). The rule observes; whether the prefix
+is needed is the author's call.

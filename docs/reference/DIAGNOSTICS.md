@@ -109,20 +109,20 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
-| `sql_comma_join` | Pre-ANSI comma join in a FROM clause | info | style_only | active | [diag.sql_comma_join](../../catalog/diagnostics/sql_comma_join.md) |
-| `sql_dialect_mix` | Oracle-only and SQL Server-only idioms in one statement | info | style_only | active | [diag.sql_dialect_mix](../../catalog/diagnostics/sql_dialect_mix.md) |
-| `sql_inconsistent_alias` | SELECT list mixing AS and bare aliases | info | style_only | active | [diag.sql_inconsistent_alias](../../catalog/diagnostics/sql_inconsistent_alias.md) |
+| `sql_comma_join` | Pre-ANSI comma join in a FROM clause | info | tool | active | [diag.sql_comma_join](../../catalog/diagnostics/sql_comma_join.md) |
+| `sql_dialect_mix` | Oracle-only and SQL Server-only idioms in one statement | info | tool | active | [diag.sql_dialect_mix](../../catalog/diagnostics/sql_dialect_mix.md) |
+| `sql_inconsistent_alias` | SELECT list mixing AS and bare aliases | info | tool | active | [diag.sql_inconsistent_alias](../../catalog/diagnostics/sql_inconsistent_alias.md) |
 | `sql_injection` | String concatenation in a SQL call argument | warning | advisory | active | [diag.sql_injection](../../catalog/diagnostics/sql_injection.md) |
-| `sql_legacy_outer_join` | Oracle (+) outer-join marker | info | style_only | active | [diag.sql_legacy_outer_join](../../catalog/diagnostics/sql_legacy_outer_join.md) |
-| `sql_literal_splice` | SQL character literal spliced across concatenation | info | style_only | active | [diag.sql_literal_splice](../../catalog/diagnostics/sql_literal_splice.md) |
-| `sql_select_star` | SELECT * in embedded SQL | info | style_only | active | [diag.sql_select_star](../../catalog/diagnostics/sql_select_star.md) |
-| `sql_suspect_placeholder` | Template marker stacked inside a placeholder | info | style_only | active | [diag.sql_suspect_placeholder](../../catalog/diagnostics/sql_suspect_placeholder.md) |
+| `sql_legacy_outer_join` | Oracle (+) outer-join marker | info | tool | active | [diag.sql_legacy_outer_join](../../catalog/diagnostics/sql_legacy_outer_join.md) |
+| `sql_literal_splice` | SQL character literal spliced across concatenation | info | advisory | active | [diag.sql_literal_splice](../../catalog/diagnostics/sql_literal_splice.md) |
+| `sql_select_star` | SELECT * in embedded SQL | info | advisory | active | [diag.sql_select_star](../../catalog/diagnostics/sql_select_star.md) |
+| `sql_suspect_placeholder` | Template marker stacked inside a placeholder | info | tool | active | [diag.sql_suspect_placeholder](../../catalog/diagnostics/sql_suspect_placeholder.md) |
 | `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
 | `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
 | `trailing_skip_commas` | Trailing skip-commas before a call's closing parenthesis | hint | tool | active | [diag.trailing_skip_commas](../../catalog/diagnostics/trailing_skip_commas.md) |
 | `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
 | `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
-| `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | tool | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
+| `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | authoritative | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |
 | `unclosed_block` | Block opened but never closed | error | tool | active | [diag.unclosed_block](../../catalog/diagnostics/unclosed_block.md) |
 | `unclosed_delimiter` | Opening delimiter never closed | error | tool | active | [diag.unclosed_delimiter](../../catalog/diagnostics/unclosed_delimiter.md) |
 | `undeclared_variable` | Use of an undeclared variable | warning | tool | active | [diag.undeclared_variable](../../catalog/diagnostics/undeclared_variable.md) |

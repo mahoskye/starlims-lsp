@@ -32,6 +32,11 @@ history:
       Names declared by resolved :INCLUDE targets count as declared
       (feature.cross_file_resolution A18-A19), closing the
       included-script false-positive noted in the Rationale.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Range fixed for multi-line SQL strings: it stayed on the string's
+      first line, past its end. Shared helper with udobject_array_in_clause.
 issues: []
 ---
 
@@ -42,7 +47,8 @@ LSP client settings): scans every string literal in the file for named SQL
 placeholders (`?name?`) and flags one whose base variable name is not
 declared. The base name is the placeholder text up to the first `:`, `[`, or
 `(` — so `?oUser:ID?` is checked as `oUser`. Reported once per parameter
-name per line; the range covers the placeholder including both `?` marks.
+name per line; the range covers the placeholder including both `?` marks,
+on the placeholder's own line when the string spans several lines.
 
 Treated as declared: names from `:DECLARE`/`:PUBLIC`/`:PARAMETERS`
 statements, procedure parameters, built-in predefined globals and status
