@@ -13,6 +13,7 @@ suppressible: true
 spec_options:
   include_info_diagnostics: true
 tests:
+  - internal/providers/datasource_sql_content_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-08-26
@@ -37,7 +38,15 @@ history:
       used LSelect with a "" aFieldList, a call the function reference says
       raises at runtime; they now use SQLExecute. Data-source coverage gap
       recorded (issue #294). Corpus count unchanged.
-issues: ["#294"]
+  - date: 2026-10-13
+    ref: "issue #294"
+    note: >-
+      Also runs on SQL-mode data-source bodies, which previously got only
+      the semicolon and placeholder checks. Corpus (--info, 6,228 files):
+      +86 sql_comma_join, +164 sql_select_star, +16
+      sql_inconsistent_alias, +1 sql_dialect_mix; no unicode or collate
+      findings.
+issues: []
 ---
 
 ## Behavior
@@ -60,6 +69,10 @@ It must NOT flag:
   boundary;
 - `COLLATE` inside a SQL character literal or a SQL comment;
 - `COLLATE` in strings that are not SQL-function arguments.
+
+It also runs on the body of a SQL-mode data source (D15), which is one
+statement ranged on its first word; there, a SQL comment (`--` or
+`/* */`) before the statement is the justification (issue #294).
 
 ## Examples
 
@@ -100,14 +113,6 @@ It must NOT flag:
 ");
 :ENDPROC;
 ```
-
-## Known gaps
-
-- Not evaluated on a SQL-mode data-source body (D15). That path runs only
-  `datasource_sql_semicolon` and `datasource_undeclared_placeholder`,
-  although the style-guide record lists `sql_data_source` in
-  `applies_to`. An SSL-mode data source is checked like any script.
-  Tracked in issue #294.
 
 ## Rationale
 

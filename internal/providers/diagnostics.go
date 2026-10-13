@@ -181,6 +181,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				offset := strings.Count(header, "\n")
 				sqlBodyDiagnostics = applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(body, offset),
+					checkDataSourceBodySQLContent(body, offset),
 					checkDataSourceUndeclaredPlaceholders(body, dataSourceParameterNames(header), offset),
 					// The header region, unmasked. The split blanks its
 					// comments and swallows a banner's trailing `;`, so
@@ -194,6 +195,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) []Diagnostic {
 				// @name placeholders are declared.
 				return applyInfoGate(applyRuleOverrides(concatDiagnostics(
 					checkDataSourceSQLSemicolons(text, 0),
+					checkDataSourceBodySQLContent(text, 0),
 					checkDataSourceUndeclaredPlaceholders(text, nil, 0),
 				), opts.RuleOverrides), opts)
 			}

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SQL-content checks run on SQL-mode data-source bodies (#294).** A data
+  source whose body is plain SQL got only the semicolon and placeholder
+  checks. It now also gets `unicode_literal_prefix`, `unjustified_collate`
+  (a SQL comment before the statement is the justification) and the
+  info-tier advisories that read only SQL text: `sql_comma_join`,
+  `sql_legacy_outer_join`, `sql_inconsistent_alias`, `sql_dialect_mix`
+  and `sql_select_star`.
+
 ### Changed
 - **`sql_injection` now judges the whole first argument, not its first
   token.** The rule reads the argument's expression tree. It flattens the
