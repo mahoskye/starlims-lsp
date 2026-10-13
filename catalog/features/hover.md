@@ -72,6 +72,16 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "#254"
+    note: >-
+      Vendored reference data re-synced. The reference now documents
+      `:` calls on array, boolean, codeblock, date, netobject, number,
+      and string values as runtime errors, and replaces their member
+      tables with a Task | Use table. Core-type hover follows: it no
+      longer lists members those types do not have, and names the
+      functions to use instead (A20). The object type keeps its member
+      table.
 issues: []
 ---
 
@@ -86,6 +96,10 @@ issues: []
   element metadata MUST be included when present.
 - Built-in class hover MUST enumerate published constructors, properties,
   and methods; binary-operator hover MUST include the type-behavior table.
+- Core-type hover MUST list only the `:` members the reference publishes
+  for that type. For a type the reference documents as having no
+  SSL-defined `:` members, the hover says so and shows the reference's
+  task table (the function or operator to use instead).
 - User-procedure hover MUST show the procedure name, its `:PARAMETERS` list,
   and the declaration location, weaving in a leading docblock
   (`Description:`/`Parameters:`/`Returns:`) when one precedes the procedure.
@@ -148,6 +162,7 @@ issues: []
 - A17: Given `oResult := DoProc("BuildShell", {oContext});` and a same-file `:PROCEDURE BuildShell;` preceded by a docblock, when the user hovers inside the target string, then the hover shows the procedure's docblock hover (description, parameters, returns, declaration location), matching the name case-insensitively.
 - A18: Given `DoProc("NoSuchProc", {})` naming no procedure in the current file, when the user hovers inside the string, then the response is null — 1-part targets never resolve cross-file, and the string suppression (A7) holds.
 - A19: Given the cursor on the member name of `oRec:sName` with a local variable `sName` declared in the same procedure, when hover is requested, then the local variable's hover is NOT shown.
+- A20: Given a hover on the core type name `array`, when hover is requested, then the hover states that the type has no SSL-defined `:` members and lists the functions to use instead (such as `ALen`), and does NOT list `Append` or any other member as callable; a hover on `object` still lists its member table.
 
 ## Rationale
 

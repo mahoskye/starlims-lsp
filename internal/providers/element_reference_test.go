@@ -34,6 +34,7 @@ func TestOperatorHoverIncludesTypeBehavior(t *testing.T) {
 }
 
 func TestTypeHoverNew(t *testing.T) {
+	// [spec feature.hover/A20]
 	hover := getTypeHover("array")
 	if hover == nil {
 		t.Fatal("expected hover for array type, got nil")
@@ -41,8 +42,23 @@ func TestTypeHoverNew(t *testing.T) {
 	if !strings.Contains(hover.Contents, "runtime type") {
 		t.Errorf("expected array type hover to mention runtime type, got:\n%s", hover.Contents)
 	}
-	if !strings.Contains(hover.Contents, "Append") {
-		t.Errorf("expected array type hover to list members like Append, got:\n%s", hover.Contents)
+	// Arrays have no SSL-defined `:` members (the reference documents
+	// aValues:Append(x) and friends as runtime errors); the hover must say
+	// so and point at the array functions instead of listing members.
+	if strings.Contains(hover.Contents, "`Append`") {
+		t.Errorf("array type hover must not list Append as a member, got:\n%s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "No SSL-defined `:` members") || !strings.Contains(hover.Contents, "ALen") {
+		t.Errorf("expected array type hover to name the functions to use instead, got:\n%s", hover.Contents)
+	}
+	if strings.Contains(hover.Contents, "see below") {
+		t.Errorf("type hover must not reference page sections it does not carry, got:\n%s", hover.Contents)
+	}
+
+	// The object type keeps a real member table.
+	obj := getTypeHover("object")
+	if obj == nil || !strings.Contains(obj.Contents, "**Members:**") || !strings.Contains(obj.Contents, "XmlType") {
+		t.Errorf("expected object type hover to list its members, got:\n%v", obj)
 	}
 }
 

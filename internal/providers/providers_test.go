@@ -138,9 +138,8 @@ func TestGetHover_BuiltinFunction(t *testing.T) {
 
 // TestGetHover_FunctionExceptions confirms that documented exceptions from
 // ssl-element-meta.json are appended to the function-hover output. The
-// canary is ExecFunction — its docs page lists two exception triggers
-// ("Called with no arguments at all." and "aParameters is provided but
-// is not an array.").
+// canary is ExecFunction — its docs page lists a runtime exception for a
+// one-segment name that matches no script.
 func TestGetHover_FunctionExceptions(t *testing.T) {
 	// [spec feature.hover/A2]
 	text := `result := ExecFunction("Foo", {});`
@@ -152,7 +151,7 @@ func TestGetHover_FunctionExceptions(t *testing.T) {
 	if !strings.Contains(hover.Contents, "Documented exceptions") {
 		t.Errorf("expected hover to include exceptions section; got:\n%s", hover.Contents)
 	}
-	if !strings.Contains(hover.Contents, "Please provide at least one parameter for ExecFunction") {
+	if !strings.Contains(hover.Contents, "There is no script with name: <sName> among default categories.") {
 		t.Errorf("expected hover to quote canonical exception message; got:\n%s", hover.Contents)
 	}
 }
@@ -3195,8 +3194,8 @@ x := NIL;
 // Test that SSL classes are not flagged as undeclared
 func TestGetDiagnostics_UndeclaredVariable_ClassesNotFlagged(t *testing.T) {
 	text := `:PROCEDURE Test;
-:DECLARE oExpando, oDataset;
-oExpando := SSLExpando{};
+:DECLARE oEmail, oDataset;
+oEmail := Email{};
 oDataset := SSLDataset{};
 :ENDPROC;`
 
@@ -3204,9 +3203,9 @@ oDataset := SSLDataset{};
 	opts.CheckUndeclaredVars = true
 	diagnostics := GetDiagnostics(text, opts)
 
-	// Should NOT find undeclared warnings for SSLExpando or SSLDataset
+	// Should NOT find undeclared warnings for Email or SSLDataset
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "SSLExpando") || strings.Contains(d.Message, "SSLDataset") {
+		if strings.Contains(d.Message, "Email") || strings.Contains(d.Message, "SSLDataset") {
 			t.Errorf("SSL built-in classes should not be flagged as undeclared: %s", d.Message)
 		}
 	}

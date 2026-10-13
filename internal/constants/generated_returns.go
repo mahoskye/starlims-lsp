@@ -89,7 +89,7 @@ var GeneratedReturnsObjectDetails = map[string]ReturnsObjectDetails{
 			{Name: "AcceptCookies", Type: "boolean", Access: "read-write", Description: "When .T. (the default), the client retains cookies set by the service across calls."},
 			{Name: "UseDefaultCredentials", Type: "boolean", Access: "read-write", Description: "When .T., calls authenticate with the calling process's default credentials. Falls back to GlobalUseDefaultCredentials when not set explicitly on the client."},
 			{Name: "GlobalUseDefaultCredentials", Type: "boolean", Access: "read-write", Description: "Class-wide default for UseDefaultCredentials. Affects every SoapClient that has not set the property locally."},
-			{Name: "WsAssembly", Type: "object", Access: "read-only", Description: "Advanced — a handle to the generated proxy types for the configured WSDL. Used internally by Parameters:CreateCustomType and GetWSType; rarely needed directly."},
+			{Name: "WsAssembly", Type: "object", Access: "read-only", Description: "Advanced; rarely needed directly."},
 		},
 		Methods: []ClassMethod{
 			{Name: "UseWebService", Returns: "boolean", Description: "Configures the client from a WSDL location, with no credentials."},

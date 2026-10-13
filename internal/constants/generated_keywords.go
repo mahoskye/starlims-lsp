@@ -126,8 +126,8 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	},
 	"ERROR": {
 		Title:   "ERROR",
-		Summary: "Defines a legacy error handler for the statements that follow it in the current procedure or method.",
-		Syntax:  ":ERROR;",
+		Summary: "Starts a legacy error handler at the end of a procedure that handles failures in the statements before it.",
+		Syntax:  ":PROCEDURE ProcName;\n    protected_statements;\n:ERROR;\n    handler_statements;\n:ENDPROC;",
 	},
 	"EXITCASE": {
 		Title:   "EXITCASE",
@@ -167,7 +167,7 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	"INHERIT": {
 		Title:   "INHERIT",
 		Summary: "Specifies the parent class for an SSL class.",
-		Syntax:  ":INHERIT ClassName;",
+		Syntax:  ":INHERIT Category.ClassName;",
 	},
 	"LABEL": {
 		Title:   "LABEL",
@@ -201,7 +201,7 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	},
 	"PUBLIC": {
 		Title:   "PUBLIC",
-		Summary: "Declares public variables shared down the call stack — visible to the declaring scope and every scope it calls.",
+		Summary: "Declares public variables shared across the running program — reachable from any procedure until the program context clears them.",
 		Syntax:  ":PUBLIC variable1[, variable2, ...];",
 	},
 	"REGION": {
@@ -212,7 +212,7 @@ var GeneratedKeywordDetails = map[string]KeywordDetails{
 	"RESUME": {
 		Title:   "RESUME",
 		Summary: "Continues execution after a legacy :ERROR handler, starting with the statement after the one that failed.",
-		Syntax:  ":RESUME;",
+		Syntax:  ":PROCEDURE ProcName;\n    protected_statements;\n:ERROR;\n    handler_statements;\n:RESUME;\n:ENDPROC;",
 	},
 	"RETURN": {
 		Title:   "RETURN",

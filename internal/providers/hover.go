@@ -562,6 +562,18 @@ func getTypeHover(word string) *Hover {
 		}
 	}
 
+	// Value types with no SSL-defined `:` members publish a Task | Use
+	// table instead; say so, so the hover never implies members exist.
+	if len(det.Tasks) > 0 {
+		b.WriteString("\n**No SSL-defined `:` members.** Use instead:\n\n")
+		for _, t := range det.Tasks {
+			// "see below" points at a section of the reference page that
+			// the hover does not carry.
+			use := strings.TrimSuffix(t.Use, "; see below")
+			fmt.Fprintf(&b, "- %s: %s\n", t.Task, use)
+		}
+	}
+
 	return &Hover{Contents: strings.TrimRight(b.String(), "\n")}
 }
 

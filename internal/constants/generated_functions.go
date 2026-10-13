@@ -787,7 +787,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"doccreateacl": {
 		Title:     "DocCreateACL",
-		Summary:   "Creates a Documentum ACL and returns the backend result string.",
+		Summary:   "Creates a Documentum ACL and returns a result string.",
 		Signature: "DocCreateACL(sAclName, [sDescription], [aGroups])",
 		Returns:   "string",
 	},
@@ -811,7 +811,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"doccreateuser": {
 		Title:     "DocCreateUser",
-		Summary:   "Creates a new user account and returns its identifier.",
+		Summary:   "Creates a Documentum user and returns its identifier.",
 		Signature: "DocCreateUser(",
 		Returns:   "string",
 	},
@@ -955,7 +955,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"docpauseworkflow": {
 		Title:     "DocPauseWorkflow",
-		Summary:   "Temporarily halts workflow processing to prevent further steps until manual intervention or review.",
+		Summary:   "Pauses a Documentum workflow and returns whether the pause succeeded.",
 		Signature: "DocPauseWorkflow(sWorkflowId)",
 		Returns:   "boolean",
 	},
@@ -1021,7 +1021,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"docupdateuser": {
 		Title:     "DocUpdateUser",
-		Summary:   "Updates a Documentum user and returns the backend result message.",
+		Summary:   "Updates a Documentum user and returns the Documentum result message.",
 		Signature: "DocUpdateUser(sLoginName, sPassword, [sUserName], [sEMail], [sDefaultFolder], [sGroupName], [sPermissionSet], [nUserPrivileges])",
 		Returns:   "string",
 	},
@@ -1087,8 +1087,8 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"errormes": {
 		Title:     "ErrorMes",
-		Summary:   "Logs an error message and returns the resulting message string.",
-		Signature: "ErrorMes(vCaption, vMessage)",
+		Summary:   "Writes an error message to the server log, even when user-message logging is disabled, and returns the formatted log entry.",
+		Signature: "ErrorMes(vCaption, [vMessage])",
 		Returns:   "string",
 	},
 	"eval": {
@@ -1171,14 +1171,14 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"getbyname": {
 		Title:     "GetByName",
-		Summary:   "Retrieves the value of a variable by name from local or public storage.",
+		Summary:   "Retrieves the value of a variable by name from the current scope, a caller scope, or public storage.",
 		Signature: "GetByName(sName)",
 		Returns:   "any",
 	},
 	"getconnectionbyname": {
 		Title:     "GetConnectionByName",
 		Summary:   "Retrieves a database connection object using a specified connection name.",
-		Signature: "GetConnectionByName(sConnectionName)",
+		Signature: "GetConnectionByName([sConnectionName])",
 		Returns:   "SQLConnection",
 	},
 	"getconnectionstrings": {
@@ -1232,13 +1232,13 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"getdbmsname": {
 		Title:     "GetDBMSName",
 		Summary:   "Returns the DBMS platform name for a configured database connection.",
-		Signature: "GetDBMSName(sConnectionName)",
+		Signature: "GetDBMSName([sConnectionName])",
 		Returns:   "string",
 	},
 	"getdbmsprovidername": {
 		Title:     "GetDBMSProviderName",
 		Summary:   "Returns the uppercase DBMS provider identifier for a named database connection.",
-		Signature: "GetDBMSProviderName(sConnectionName)",
+		Signature: "GetDBMSProviderName([sConnectionName])",
 		Returns:   "string",
 	},
 	"getdecimalsep": {
@@ -1351,7 +1351,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"getprinters": {
 		Title:     "GetPrinters",
-		Summary:   "Returns a list of printer names currently installed on the system.",
+		Summary:   "Returns a list of printer names installed on the STARLIMS application server.",
 		Signature: "GetPrinters()",
 		Returns:   "array",
 	},
@@ -1550,7 +1550,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"ldapauth": {
 		Title:     "LDAPAuth",
 		Summary:   "Authenticates a user by binding directly to an LDAP server.",
-		Signature: "LDAPAuth(sLdapHost, [nLdapPort], sLdapUserName, [sLdapPassword], [sLdapDistinctiveName], [bSecure])",
+		Signature: "LDAPAuth(sLdapHost, [nLdapPort], sLdapUserName, sLdapPassword, [sLdapDistinctiveName], [bSecure])",
 		Returns:   "string",
 	},
 	"ldapauthex": {
@@ -1609,7 +1609,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"limsgetdateformat": {
 		Title:     "LimsGetDateFormat",
-		Summary:   "Returns the current global date format string used for date parsing and formatting.",
+		Summary:   "Returns the current session date format string used for date parsing and formatting.",
 		Signature: "LimsGetDateFormat()",
 		Returns:   "string",
 	},
@@ -1645,7 +1645,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"limssetcounter": {
 		Title:     "LimsSetCounter",
-		Summary:   "Generates the next counter value and, when given matching field and value arrays, inserts a new row with that key.",
+		Summary:   "Generates the next counter value and inserts a new row with that key into the target table.",
 		Signature: "LimsSetCounter(sTableName, sFieldName, [sPrefix], [aFields], [aValues], [nIncrementWith])",
 		Returns:   "number",
 	},
@@ -1657,8 +1657,8 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"limssqldisconnect": {
 		Title:     "LimsSqlDisconnect",
-		Summary:   "Closes an active database connection by name and removes it from the internal registry.",
-		Signature: "LimsSqlDisconnect([sConnectionName])",
+		Summary:   "Closes an active database connection by name and removes it from the session's connection list.",
+		Signature: "LimsSqlDisconnect(sConnectionName)",
 		Returns:   "boolean",
 	},
 	"limsstring": {
@@ -1675,7 +1675,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"limstype": {
 		Title:     "LimsType",
-		Summary:   "Returns the single-character SSL type code for a variable name or expression.",
+		Summary:   "Returns the SSL type code for a variable name or expression.",
 		Signature: "LimsType(sParam)",
 		Returns:   "string",
 	},
@@ -1712,7 +1712,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"lsearch": {
 		Title:     "LSearch",
 		Summary:   "Returns a single value from a SQL query, or a caller-supplied fallback when the query produces no scalar result.",
-		Signature: "LSearch(sCommandString, vDefaultValue, [sConnectionName], [aArrayOfValues])",
+		Signature: "LSearch(sCommandString, [vDefaultValue], [sConnectionName], [aArrayOfValues])",
 		Returns:   "any",
 	},
 	"lselect": {
@@ -1861,7 +1861,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"prmcount": {
 		Title:     "PrmCount",
-		Summary:   "Returns how many arguments were passed to the currently executing procedure.",
+		Summary:   "Returns how many arguments the caller passed to the current server script; only valid in script-level code.",
 		Signature: "PrmCount()",
 		Returns:   "number",
 	},
@@ -1880,7 +1880,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"rat": {
 		Title:     "Rat",
 		Summary:   "Finds the last occurrence of a substring in a string and returns its one-based position.",
-		Signature: "Rat(subStr, source)",
+		Signature: "Rat(sSubString, sSource)",
 		Returns:   "number",
 	},
 	"readbytesbase64": {
@@ -1897,7 +1897,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"readtext": {
 		Title:     "ReadText",
-		Summary:   "Retrieves text content from a file in memory, allowing partial reads and encoding selection.",
+		Summary:   "Reads a text file and returns its contents, or the first n characters, as a string, with an optional encoding.",
 		Signature: "ReadText(sFileName, [nCharsToRead], [sEncoding])",
 		Returns:   "string",
 	},
@@ -1916,7 +1916,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"replicate": {
 		Title:     "Replicate",
 		Summary:   "Creates a string by repeating the source string a specified number of times.",
-		Signature: "Replicate(source, count)",
+		Signature: "Replicate(sSource, nCount)",
 		Returns:   "string",
 	},
 	"retrievelong": {
@@ -1963,7 +1963,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"runsql": {
 		Title:     "RunSQL",
-		Summary:   "Executes a SQL statement and returns whether execution completed without an uncaught SQL error.",
+		Summary:   "Executes a non-query SQL statement and returns .T. on success. Under default settings, a failed statement raises an error.",
 		Signature: "RunSQL(sCommandString, [sConnectionName], [aValues])",
 		Returns:   "boolean",
 	},
@@ -2059,7 +2059,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"setgroupseparator": {
 		Title:     "SetGroupSeparator",
-		Summary:   "Changes the group (thousands) separator character used when numbers are formatted as strings across the application.",
+		Summary:   "Changes the group (thousands) separator character used when numbers are formatted as strings.",
 		Signature: "SetGroupSeparator(sGroupSep)",
 		Returns:   "string",
 	},
@@ -2095,7 +2095,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	},
 	"showsqlerrors": {
 		Title:     "ShowSqlErrors",
-		Summary:   "Sets the SQL error display flag and returns the previous setting.",
+		Summary:   "Sets the SQL error display flag, which decides whether a failing RunSQL raises, and returns the previous setting.",
 		Signature: "ShowSqlErrors(bEnable)",
 		Returns:   "boolean",
 	},
@@ -2156,7 +2156,7 @@ var GeneratedFunctionSummaries = map[string]struct {
 	"strtran": {
 		Title:     "StrTran",
 		Summary:   "Replaces all occurrences of a specified substring with another substring in a source string.",
-		Signature: "StrTran(source, searchFor, replaceWith)",
+		Signature: "StrTran(source, searchFor, [replaceWith])",
 		Returns:   "string",
 	},
 	"strzero": {

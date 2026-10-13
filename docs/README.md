@@ -24,7 +24,7 @@ This project follows a **document-driven development** approach:
 1. **Specification First:** Each feature is fully specified before implementation
 2. **Test Scenarios:** Every spec includes test cases for validation
 3. **Living Documents:** Documentation evolves with the codebase
-4. **Clear Authority Boundaries:** `dev/ssl-style-guide/` is authoritative for SSL language rules; `docs/` is authoritative for LSP behavior and configuration
+4. **Clear Authority Boundaries:** the upstream [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) is authoritative for SSL language rules and the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) for element behavior; `docs/` is authoritative for LSP behavior and configuration
 
 ---
 
