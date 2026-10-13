@@ -57,6 +57,13 @@ func PrepareRename(text string, line, column int, uri string, procedures []parse
 		return nil
 	}
 
+	// A member name belongs to its receiver's type, which is not resolved
+	// here: renaming it would edit every like-spelled member in the file,
+	// built-in .NET properties included (D10, issue #255).
+	if cursorOnMember(text, line, column) {
+		return nil
+	}
+
 	// Check if this is a renameable symbol
 	if !isRenameableSymbol(word, line, column, text, procedures, variables) {
 		return nil
@@ -83,6 +90,16 @@ func Rename(text string, line, column int, newName string, uri string, procedure
 
 	word := lexer.GetWordAtPosition(text, line, column)
 	if word == "" {
+		return nil
+	}
+
+	// Rename repeats PrepareRename's guards — a client may skip prepare
+	// (issue #258): no edits from inside a comment or a string, and member
+	// names are never renamed.
+	if ctx := lexer.GetContextAtPosition(lexer.NewLexer(text).Tokenize(), line, column); ctx == lexer.ContextString || ctx == lexer.ContextComment {
+		return nil
+	}
+	if cursorOnMember(text, line, column) {
 		return nil
 	}
 
@@ -225,6 +242,17 @@ func isValidIdentifier(name string) bool {
 		return false
 	}
 
+	// Cannot be a literal (NIL) or a built-in class name (issue #258): the
+	// result would no longer be a user identifier.
+	if nameLower == "nil" {
+		return false
+	}
+	for _, cls := range constants.SSLClassNames {
+		if strings.ToLower(cls) == nameLower {
+			return false
+		}
+	}
+
 	// Must start with letter or underscore
 	first := name[0]
 	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
@@ -241,48 +269,48 @@ func isValidIdentifier(name string) bool {
 	return true
 }
 
-// getWordRange finds the range of the word at the given position.
+// getWordRange finds the range of the word at the given position. Columns
+// are runes, matching the lexer and every other range the server emits —
+// a byte column skews the range after any non-ASCII character on the line
+// (issue #258).
 func getWordRange(text string, line, column int, word string) *Range {
 	lines := strings.Split(text, "\n")
 	if line < 1 || line > len(lines) {
 		return nil
 	}
 
-	lineText := lines[line-1]
-	wordLower := strings.ToLower(word)
+	runes := []rune(lines[line-1])
+	wordRunes := []rune(strings.ToLower(word))
+	n := len(wordRunes)
+	if n == 0 {
+		return nil
+	}
 
-	// Find the word in the line, accounting for the cursor position
-	pos := 0
-	for {
-		idx := strings.Index(strings.ToLower(lineText[pos:]), wordLower)
-		if idx == -1 {
-			break
+	for start := 0; start+n <= len(runes); start++ {
+		if strings.ToLower(string(runes[start:start+n])) != string(wordRunes) {
+			continue
 		}
-
-		startCol := pos + idx + 1 // 1-based column
-		endCol := startCol + len(word)
-
-		// Check if cursor is within this occurrence
-		if column >= startCol && column <= endCol {
-			// Verify it's a whole word (not part of a larger identifier)
-			isWordStart := startCol == 1 || !isIdentifierChar(lineText[startCol-2])
-			isWordEnd := endCol > len(lineText) || !isIdentifierChar(lineText[endCol-1])
-
-			if isWordStart && isWordEnd {
-				return &Range{
-					Start: Position{Line: line - 1, Character: startCol - 1},
-					End:   Position{Line: line - 1, Character: endCol - 1},
-				}
+		startCol := start + 1 // 1-based
+		endCol := startCol + n
+		if column < startCol || column > endCol {
+			continue
+		}
+		isWordStart := start == 0 || !isIdentifierRune(runes[start-1])
+		isWordEnd := start+n >= len(runes) || !isIdentifierRune(runes[start+n])
+		if isWordStart && isWordEnd {
+			return &Range{
+				Start: Position{Line: line - 1, Character: start},
+				End:   Position{Line: line - 1, Character: start + n},
 			}
-		}
-
-		pos += idx + 1
-		if pos >= len(lineText) {
-			break
 		}
 	}
 
 	return nil
+}
+
+// isIdentifierRune checks if a rune can be part of an identifier.
+func isIdentifierRune(r rune) bool {
+	return r < 128 && isIdentifierChar(byte(r))
 }
 
 // isIdentifierChar checks if a character can be part of an identifier.

@@ -20,6 +20,7 @@ config:
   - ssl.format.sql.enabled
   - ssl.format.sql.style
   - ssl.format.sql.keywordCase
+  - ssl.format.sql.identifierCase
   - ssl.format.sql.indentSize
   - ssl.format.sql.maxLineLength
   - ssl.format.sql.detectSQLStrings
@@ -28,6 +29,8 @@ tests:
   - internal/providers/sql_formatter_test.go
   - internal/server/server_test.go
   - internal/server/handler_test.go
+  - cmd/starlims-lsp/format_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "442fa69 (v0.1.0)"
@@ -63,6 +66,37 @@ history:
       semicolons into SQL and re-cased bind variables. Formatting them
       with the SQL engine is deferred until the SQL lexer understands
       Oracle-style :bind variables.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      The CLI's SQL-mode passthrough is gated to data sources (.ds/.ds.txt
+      paths, or the new --format --ds flag), matching D15: the classifier
+      defaults marker-free content to SQL, so an ordinary script with no
+      colon keyword and no `:=` used to pass through unformatted (A11).
+      ssl.format.sql.identifierCase added to config.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      The full-document edit ends at the last line's length in UTF-16
+      code units (A12). It used the byte length, an overshoot
+      clients clamped to the line end.
+  - date: 2026-10-13
+    ref: "issues #255/#258"
+    note: >-
+      Range formatting lexes the whole document and widens the range so
+      no multi-line string, comment, code block or region body is cut by
+      a boundary (A11): formatting one line from inside a multi-line
+      comment appended a ';' that ended the comment early. The pass
+      subset range formatting applies is now stated.
+  - date: 2026-10-13
+    ref: "issue #311"
+    note: >-
+      A6 is now guaranteed by construction: a document is formatted until
+      its output formats to itself (at most three passes), and when no
+      fixed point is reached the formatter declines, leaving the text
+      unchanged. Fuzzing had found malformed shapes the formatter kept
+      rewriting; well-formed input is unaffected (corpus output
+      byte-identical).
 issues: []
 ---
 
@@ -80,7 +114,16 @@ not restate them.
 - Range formatting expands the request to whole lines, reformats only those
   lines, and MUST leave text outside the requested lines untouched,
   re-applying the surrounding base indentation so the block stays anchored
-  in context.
+  in context. The range is first widened so that no multi-line token — a
+  string, comment, code block or `:REGION` body — crosses either boundary
+  (issue #258): a line from inside such a token, lexed on its own, reads as
+  code, and formatting it rewrites literal text. A range runs the token
+  formatter (spacing, casing of keywords, semicolons, indentation, SQL
+  hand-off, trailing-whitespace trim) and the line-wrap pass only; the
+  whole-document post-passes — built-in function casing outside code-block
+  bodies (fmt.builtin_function_case), sibling-block blank lines
+  (fmt.blank_line_between_blocks) and the blank-line cap
+  (fmt.max_consecutive_blank_lines) — are not applied to a range.
 - Formatting is driven by the server's `ssl.format.*` settings (applied via
   initializationOptions or didChangeConfiguration); the LSP request's
   `options` field (tabSize/insertSpaces) is not consulted.
@@ -105,19 +148,28 @@ not restate them.
   cannot proceed it leaves the text unchanged. A document ending in an
   unterminated string literal is one such case: the string has swallowed
   the rest of the file, so both formatting requests return no edits
-  (issue #87 — enforcement used to append a semicolon per pass).
+  (issue #87 — enforcement used to append a semicolon per pass). The
+  lexer's own unterminated flag decides this, so a nested bracket string
+  such as `[[a]` — which ends in `]` without being closed — is caught too
+  (issue #258).
 - Data-source documents whose content is in SQL mode — plain SQL, or a
   builder-directive / inline-defaults `:PARAMETERS` header followed by SQL
   (the classifier shared with feature.diagnostics_pipeline A10/A13) — get
   no edits from either formatting request: the SSL formatter would inject
-  statement semicolons into SQL and re-case `:bind` variables. The CLI,
-  which has no file-type context, applies the same content classifier to
-  every input. SSL-mode data sources format normally.
+  statement semicolons into SQL and re-case `:bind` variables. The CLI
+  applies the same content classifier only to data sources — `.ds`/`.ds.txt`
+  paths, or any input under `--format --ds` — because the classifier
+  defaults marker-free content to SQL (D15); every other input is
+  formatted as SSL. SSL-mode data sources format normally.
+- Edit ranges count characters in UTF-16 code units, the encoding the
+  server advertises: the full-document edit ends at the last line's
+  UTF-16 length, and a range edit ends at the UTF-16 length of its last
+  line (issue #307).
 
 ## Acceptance
 
 - A1: Given an unformatted SSL document, when `textDocument/formatting` is requested, then exactly one TextEdit spanning the full document is returned.
-- A2: Given a document where only lines N..M are requested, when range formatting runs, then the returned edit covers only those lines and the block's base indentation is preserved so text outside the range is unaffected.
+- A2: Given a document where only lines N..M are requested, when range formatting runs, then the returned edit covers only those lines (widened only as A11 requires) and the block's base indentation is preserved so text outside the range is unaffected.
 - A3: Given a document containing comments and non-SQL string literals, when formatted, then the comment text and string contents are byte-identical to the input — and every comment survives: a line carrying several consecutive end-of-line comments keeps all of them in order (issue #215; the pending-EOL-comment slot merged by clobbering, deleting all but the last).
 - A4: Given `SQLExecute("select ... from ...")` or an overflowing standalone SQL string with detection on, when formatted, then the string is reformatted by the SQL formatter per `ssl.format.sql.*`; and given a plain-English string, it MUST NOT be treated as SQL.
 - A5: Given `ssl.format.sql.enabled: false`, when a document with SQL strings is formatted, then no string literal content changes.
@@ -126,6 +178,9 @@ not restate them.
 - A8: Given different `ssl.format.*` option values (e.g. indentStyle tab vs space), when the same document is formatted under each, then the outputs differ accordingly — the configured options are honored.
 - A9: Given a data-source document whose content is SQL-mode (plain SQL or directives-then-SQL), when document or range formatting is requested, then no edits are returned; given an SSL-mode data source, formatting proceeds normally.
 - A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
+- A11: Given CLI `--format` input that is not a data source (no `.ds`/`.ds.txt` path, no `--ds`) whose content has no colon keyword and no `:=`, when formatted, then it is formatted as SSL; given SQL-mode content from a data-source path or under `--ds`, then it passes through unchanged.
+- A12: Given a document whose last line holds an emoji (one character, two UTF-16 code units), when `textDocument/formatting` is requested, then the full-document edit ends at that line's UTF-16 length (issue #307).
+- A13: Given a range whose first or last line lies inside a multi-line comment or string literal, when range formatting runs, then the edit is widened to cover the whole token and the token's text is byte-identical in the result — no `;` or spacing change is ever written inside it (issue #258).
 
 ## Rationale
 

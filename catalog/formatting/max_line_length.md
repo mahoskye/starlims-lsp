@@ -45,6 +45,21 @@ history:
       the next line, and the stream treats a trailing comma as statement
       continuation so wrapped declaration lists (:DECLARE a, b, / c;)
       keep their indent.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Fragments that stay on one line rejoin with the whitespace the
+      source line had between them; the engine used to rejoin with a
+      single space, which inserted spaces that commaSpacing: false or
+      operatorSpacing: false had left out. Behavior text now states that
+      source breaks are never moved or joined and that end-of-line
+      comments count toward the width.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      A comment after a comma is no longer a break candidate: breaking
+      there moved the end-of-line comment onto its own line, and two
+      production files oscillated at narrow widths.
 issues: ["#85"]
 ---
 
@@ -54,11 +69,13 @@ Wrapping is a post-format pass over whole physical lines (issue #89): a
 line wider than `ssl.format.maxLineLength` (default 90; 0 disables; a tab
 counts as `indentSize` columns) is re-flowed at its legal break points:
 
-- after a comma (the comma trails its line);
+- after a comma (the comma trails its line) — but never directly before
+  an end-of-line comment, which would detach the comment onto a line of
+  its own (issue #258);
 - after `:=`;
-- before a binary operator — `.AND.` / `.OR.` / `.NOT.`, arithmetic,
-  compound assignments, and `$` — the operator leads its continuation
-  line.
+- before a binary operator — `.AND.` / `.OR.`, arithmetic, compound
+  assignments, and `$` — the operator leads its continuation line
+  (`.NOT.` is unary, so a break never lands before it).
 
 Packing is greedy latest-fitting: each output line keeps as much as fits,
 and continuation lines sit exactly one indent level past the original line
@@ -76,6 +93,18 @@ fmt.sql_in_strings, and multi-line comments manage their own layout.
 
 Guarantee: a line stays over the limit only when a single atomic token
 exceeds the budget — never because a legal break sequence was missed.
+
+The pass only splits. It never moves or joins a line break the source
+already has, so an operator the author left trailing at a line end stays
+trailing; the leading-operator, trailing-comma layout applies to every
+break the wrapper itself introduces. Fragments that stay on one line keep
+the whitespace they had between them, so the wrap never inserts spacing
+that `ssl.format.commaSpacing` / `ssl.format.operatorSpacing` set to false
+would not.
+
+An end-of-line comment counts toward the line's width and is never split:
+when the line is over the limit, the code before the comment may wrap so
+that the comment fits, and the comment travels with the last fragment.
 
 ## Examples
 
@@ -96,7 +125,7 @@ DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
 ```
 
 A single long string argument has no legal wrap point and is left over-long
-(98 columns) rather than split:
+(93 columns) rather than split:
 
 ### Idempotent
 
@@ -145,6 +174,22 @@ oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyN
 ```ssl
 oTargetObjectReference:SomePropertyName := oSourceObjectReference:OtherPropertyName
 	+ nAdjustmentValue;
+```
+
+An end-of-line comment counts toward the width, so the code before it
+wraps to make room:
+
+### Before
+
+```ssl
+nTotalAmount := nBaseAmount + nTaxAmount;  /* adds the tax computed by the caller to the base;
+```
+
+### After
+
+```ssl
+nTotalAmount := nBaseAmount
+	+ nTaxAmount;  /* adds the tax computed by the caller to the base;
 ```
 
 ## Rationale

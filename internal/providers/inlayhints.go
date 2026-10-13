@@ -85,8 +85,10 @@ func GetInlayHints(tokens []lexer.Token, procedures []parser.ProcedureInfo, star
 		return nil
 	}
 
-	// Find all function calls in the range
-	calls := findFunctionCalls(tokens, startLine, endLine)
+	// Find all function calls in the range. Member calls are skipped: the
+	// callee belongs to the receiver (a .NET passthrough, a class method),
+	// not to the like-named built-in (D10, issue #255).
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), startLine, endLine)
 	if len(calls) == 0 {
 		return nil
 	}
@@ -102,7 +104,7 @@ func GetInlayHints(tokens []lexer.Token, procedures []parser.ProcedureInfo, star
 }
 
 // findFunctionCalls scans tokens to find function calls within the specified range.
-func findFunctionCalls(tokens []lexer.Token, startLine, endLine int) []FunctionCall {
+func findFunctionCalls(tokens []lexer.Token, roles []parser.IdentifierRole, startLine, endLine int) []FunctionCall {
 	var calls []FunctionCall
 
 	for i := 0; i < len(tokens); i++ {
@@ -115,6 +117,11 @@ func findFunctionCalls(tokens []lexer.Token, startLine, endLine int) []FunctionC
 
 		// Look for identifier followed by (
 		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+
+		// The member name of a `:` access is never a built-in call.
+		if (i < len(roles) && roles[i] == parser.RoleMember) || followsMemberColon(tokens, i) {
 			continue
 		}
 
@@ -154,6 +161,17 @@ func findFunctionCalls(tokens []lexer.Token, startLine, endLine int) []FunctionC
 	}
 
 	return calls
+}
+
+// followsMemberColon reports whether the identifier at i directly follows a
+// `:` member-access colon (the fallback when the expression tree leaves the
+// position unclassified).
+func followsMemberColon(tokens []lexer.Token, i int) bool {
+	prev := i - 1
+	for prev >= 0 && (tokens[prev].Type == lexer.TokenWhitespace || tokens[prev].Type == lexer.TokenComment) {
+		prev--
+	}
+	return prev >= 0 && tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":"
 }
 
 // parseArguments extracts argument positions from tokens starting after the opening parenthesis.
@@ -258,21 +276,22 @@ func generateHintsForCall(tokens []lexer.Token, call FunctionCall, procedures []
 		return nil
 	}
 
+	names := hintParameterNames(sig, len(call.Arguments))
+
 	// Check minimum parameter threshold
-	if len(sig.Parameters) < opts.MinParameterCount {
+	if len(names) < opts.MinParameterCount {
 		return nil
 	}
 
 	// Generate hints for each argument
 	for i, arg := range call.Arguments {
-		if i >= len(sig.Parameters) {
+		if i >= len(names) {
 			break
 		}
-		param := sig.Parameters[i]
 		hints = append(hints, InlayHint{
 			Line:      arg.Line,
 			Character: arg.Column,
-			Label:     param.Name,
+			Label:     names[i],
 			Kind:      InlayHintKindParameter,
 		})
 	}
@@ -280,13 +299,45 @@ func generateHintsForCall(tokens []lexer.Token, call FunctionCall, procedures []
 	return hints
 }
 
+// hintParameterNames returns the positional parameter names to hint for a
+// call with argCount arguments. A function with alternative call forms
+// (CreateUdObject) is hinted only when exactly one form can take that many
+// arguments; otherwise the form is ambiguous and no hint is better than a
+// wrong one.
+func hintParameterNames(sig constants.FunctionSignature, argCount int) []string {
+	if len(sig.Forms) == 0 {
+		names := make([]string, 0, len(sig.Parameters))
+		for _, p := range sig.Parameters {
+			names = append(names, p.Name)
+		}
+		return names
+	}
+	var match []string
+	matches := 0
+	for _, f := range sig.Forms {
+		if argCount <= len(f.Parameters) && argCount > 0 {
+			match = f.Parameters
+			matches++
+		}
+	}
+	if matches != 1 {
+		return nil
+	}
+	return match
+}
+
 // generateDoProcHints creates hints for DoProc/ExecFunction calls.
 func generateDoProcHints(tokens []lexer.Token, call FunctionCall, procedures []parser.ProcedureInfo, opts InlayHintOptions) []InlayHint {
 	var hints []InlayHint
 
-	// DoProc always has at least sProcName parameter hint
-	// DoProc(sProcName, aParams)
-	doProcParams := []string{"sProcName", "aParams"}
+	// The outer hints are the dispatcher's own published parameter names:
+	// DoProc(sProcedureName, [aArguments]), ExecFunction(sName, [aParameters]).
+	var doProcParams []string
+	if sig, ok := constants.GetFunctionSignature(call.Name); ok {
+		for _, p := range sig.Parameters {
+			doProcParams = append(doProcParams, p.Name)
+		}
+	}
 
 	// Add hints for DoProc's own parameters
 	for i, arg := range call.Arguments {

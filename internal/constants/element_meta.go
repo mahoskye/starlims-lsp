@@ -66,6 +66,7 @@ type metaFile struct {
 var (
 	metaIndexOnce sync.Once
 	metaIndex     map[string]ElementMeta
+	metaByID      map[string]ElementMeta
 )
 
 // LookupMeta returns the metadata for an element by canonical short name
@@ -80,6 +81,19 @@ func LookupMeta(name string) (ElementMeta, bool) {
 	return m, ok
 }
 
+// LookupMetaByID returns the metadata for an element by its reference ID
+// (`ssl.keyword.if`, `ssl.operator.equals`, `ssl.special_form.me`, ...).
+// Keywords, operators, literals, and special forms carry display titles
+// ("= (equals)", "Me:") that make poor lookup keys, so they look up by ID.
+func LookupMetaByID(id string) (ElementMeta, bool) {
+	loadMetaIndex()
+	if metaByID == nil {
+		return ElementMeta{}, false
+	}
+	m, ok := metaByID[strings.ToLower(id)]
+	return m, ok
+}
+
 func loadMetaIndex() {
 	metaIndexOnce.Do(func() {
 		var raw metaFile
@@ -90,12 +104,9 @@ func loadMetaIndex() {
 			return
 		}
 		metaIndex = make(map[string]ElementMeta, len(raw.Elements))
+		metaByID = make(map[string]ElementMeta, len(raw.Elements))
 		for _, e := range raw.Elements {
-			short := elementShortName(e.ID, e.Title)
-			if short == "" {
-				continue
-			}
-			metaIndex[strings.ToLower(short)] = ElementMeta{
+			m := ElementMeta{
 				DocID:         e.ID,
 				DocStatus:     e.DocStatus,
 				DocSource:     e.SourcePath,
@@ -103,6 +114,14 @@ func loadMetaIndex() {
 				Caveats:       e.Caveats,
 				BestPractices: e.BestPractices,
 			}
+			if e.ID != "" {
+				metaByID[strings.ToLower(e.ID)] = m
+			}
+			short := elementShortName(e.ID, e.Title)
+			if short == "" {
+				continue
+			}
+			metaIndex[strings.ToLower(short)] = m
 		}
 	})
 }

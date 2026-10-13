@@ -13,6 +13,7 @@ suppressible: true
 spec_options:
   include_info_diagnostics: true
 tests:
+  - internal/providers/datasource_sql_content_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-08-26
@@ -29,14 +30,31 @@ history:
       subsumed by the tier. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      COLLATE is now matched on the SQL lexer's stream instead of a raw regex,
+      so literal or commented-out COLLATE text no longer flags. The fences
+      used LSelect with a "" aFieldList, a call the function reference says
+      raises at runtime; they now use SQLExecute. Data-source coverage gap
+      recorded (issue #294). Corpus count unchanged.
+  - date: 2026-10-13
+    ref: "issue #294"
+    note: >-
+      Also runs on SQL-mode data-source bodies, which previously got only
+      the semicolon and placeholder checks. Corpus (--info, 6,228 files):
+      +86 sql_comma_join, +164 sql_select_star, +16
+      sql_inconsistent_alias, +1 sql_dialect_mix; no unicode or collate
+      findings.
 issues: []
 ---
 
 ## Behavior
 
 Info tier (`ssl.diagnostics.infoDiagnostics`, default off). Flags a
-string token containing the SQL keyword `COLLATE` (case-insensitive,
-word-bounded) when the token is part of the first argument of a
+string token whose SQL holds the word `COLLATE` (case-insensitive,
+matched on the SQL lexer's token stream, so never inside a SQL character
+literal or comment) when the token is part of the first argument of a
 recognized embedded-SQL function call and no comment precedes the
 containing statement: scanning backwards from the call's function name,
 a `/* ...;` comment must appear before the previous statement's `;`
@@ -49,7 +67,12 @@ It must NOT flag:
   trailing the previous statement's line) — the justification;
 - words containing collate as a substring (`COLLATERAL`) — word
   boundary;
+- `COLLATE` inside a SQL character literal or a SQL comment;
 - `COLLATE` in strings that are not SQL-function arguments.
+
+It also runs on the body of a SQL-mode data source (D15), which is one
+statement ranged on its first word; there, a SQL comment (`--` or
+`/* */`) before the statement is the justification (issue #294).
 
 ## Examples
 
@@ -58,7 +81,7 @@ It must NOT flag:
 ```ssl
 :PROCEDURE Main;
 	:DECLARE aRows;
-	aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 :ENDPROC;
 ```
 
@@ -68,7 +91,7 @@ It must NOT flag:
 :PROCEDURE Main;
 	:DECLARE aRows;
 	/* server default is case-sensitive so the report must sort case-insensitively;
-	aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 :ENDPROC;
 ```
 
@@ -77,7 +100,17 @@ It must NOT flag:
 ```ssl
 :PROCEDURE Main;
 	:DECLARE aRows;
-	aRows := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN");
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'");
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATE' -- collate not needed here
+");
 :ENDPROC;
 ```
 

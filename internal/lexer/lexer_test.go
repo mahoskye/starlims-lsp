@@ -806,50 +806,6 @@ func TestLexer_EdgeCase_OnlyComments(t *testing.T) {
 
 // ==================== Helper Function Tests ====================
 
-func TestGetTokenAtPosition(t *testing.T) {
-	input := "abc def ghi"
-	lex := NewLexer(input)
-	tokens := lex.Tokenize()
-
-	// Token positions: abc at col 1-3, space at col 4, def at col 5-7, space at col 8, ghi at col 9-11
-	// GetTokenAtPosition uses <= for tokenEnd, so boundary columns match the previous token
-	// We use columns that are clearly inside each token (not at boundaries)
-	tests := []struct {
-		name   string
-		line   int
-		column int
-		want   string
-	}{
-		{"start_of_abc", 1, 1, "abc"},
-		{"middle_of_abc", 1, 2, "abc"},
-		{"inside_def", 1, 6, "def"},  // column 6 is clearly inside "def"
-		{"inside_ghi", 1, 10, "ghi"}, // column 10 is clearly inside "ghi"
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tok := GetTokenAtPosition(tokens, tc.line, tc.column)
-			if tok == nil {
-				t.Fatalf("expected token at line %d col %d, got nil", tc.line, tc.column)
-			}
-			if tok.Text != tc.want {
-				t.Errorf("expected %q at line %d col %d, got %q", tc.want, tc.line, tc.column, tok.Text)
-			}
-		})
-	}
-}
-
-func TestGetTokenAtPosition_NoMatch(t *testing.T) {
-	input := "abc"
-	lex := NewLexer(input)
-	tokens := lex.Tokenize()
-
-	tok := GetTokenAtPosition(tokens, 2, 1) // Line 2 doesn't exist
-	if tok != nil {
-		t.Errorf("expected nil for non-existent line, got %v", tok)
-	}
-}
-
 func TestGetWordAtPosition(t *testing.T) {
 	input := "hello world test"
 
@@ -905,6 +861,34 @@ func TestGetWordAtPosition_InvalidPosition(t *testing.T) {
 	word = GetWordAtPosition(input, 1, 0)
 	if word != "" {
 		t.Errorf("expected empty string for invalid column, got %q", word)
+	}
+}
+
+// TestGetWordAtPosition_NonASCIILine pins the crash fixed in issue #258:
+// the bounds check used the line's byte length while indexing its runes,
+// so a column inside the byte length but past the rune count indexed out
+// of range. A column past the line end yields no word.
+func TestGetWordAtPosition_NonASCIILine(t *testing.T) {
+	tests := []struct {
+		name   string
+		text   string
+		line   int
+		column int
+		want   string
+	}{
+		{"astral then word, column in byte length", "\U0001F600x", 1, 4, ""},
+		{"astral then word, line end", "\U0001F600x", 1, 3, "x"},
+		{"after string with astral", "sX := \"\U0001F600\";", 1, 13, ""},
+		{"word after astral", "\U0001F600 sName", 1, 4, "sName"},
+		{"column far past end", "sName", 1, 99, ""},
+		{"accented identifier neighbour", "sCaf\u00e9 := 1;", 1, 2, "sCaf"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := GetWordAtPosition(tc.text, tc.line, tc.column); got != tc.want {
+				t.Errorf("GetWordAtPosition(%q, %d, %d) = %q, want %q", tc.text, tc.line, tc.column, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -1409,8 +1393,9 @@ func TestLexer_BracketString_DeeperNesting(t *testing.T) {
 
 func TestLexer_ScientificNotation_IncompleteExponent(t *testing.T) {
 	// 1.5e with no digits after 'e' should NOT consume the 'e'.
-	// EBNF: Exponent ::= ("e" | "E") ["-"] Digit {Digit}
-	// Without a following digit or minus sign, the 'e' is not part of the number.
+	// EBNF: Exponent ::= ("e" | "E") ["+"|"-"] Digit {Digit}
+	// Without a following digit (or sign then digit), the 'e' is not part of
+	// the number.
 	input := `1.5e`
 	lex := NewLexer(input)
 	tokens := lex.Tokenize()
@@ -1427,20 +1412,18 @@ func TestLexer_ScientificNotation_IncompleteExponent(t *testing.T) {
 }
 
 func TestLexer_ScientificNotation_ExponentMinusOnly(t *testing.T) {
-	// 1.5e- with minus but no digits should NOT consume 'e-'.
-	// The condition requires peek(1) to be '-' or digit, but then '-' must be
-	// followed by at least one digit. However the lexer currently consumes the
-	// minus sign eagerly. This test documents the actual behavior.
+	// 1.5e- with a sign but no digits should NOT consume 'e-'.
+	// exponentFollows requires a digit after an optional sign (issue #246),
+	// so the number stops at "1.5" and 'e' / '-' lex as separate tokens.
 	input := `1.5e-`
 	lex := NewLexer(input)
 	tokens := lex.Tokenize()
 
-	// The lexer sees 'e' followed by '-' and enters the exponent branch,
-	// consuming "1.5e-" as a number. This is technically incomplete per EBNF
-	// (exponent requires at least one digit after optional minus), but the
-	// lexer is lenient here — the diagnostic layer can catch malformed numbers.
 	if tokens[0].Type != TokenNumber {
 		t.Fatalf("expected TokenNumber, got %s", tokens[0].Type)
+	}
+	if tokens[0].Text != "1.5" {
+		t.Errorf("expected '1.5' (stops before 'e-' with no exponent digit), got %q", tokens[0].Text)
 	}
 }
 
@@ -1604,6 +1587,40 @@ func TestLexer_RegionBodyMidLineEndRegionIsText(t *testing.T) {
 	}
 }
 
+// Issue #304: a mid-line `:ENDREGION;` with its semicolon closes the body
+// at the colon — a template whose last line carries the closer
+// (`}:ENDREGION;`) keeps the `}` as payload and the region is closed.
+func TestLexer_RegionBodyMidLineTerminatedEndRegionCloses(t *testing.T) {
+	input := ":REGION Payload;{\n\t\"total\": $nTotal$\n}:ENDREGION;\nnAfter := 1;\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var body *Token
+	var sawEndRegion, sawAfter bool
+	for i := range tokens {
+		tk := &tokens[i]
+		switch {
+		case tk.Type == TokenRegionBody:
+			body = tk
+		case tk.Type == TokenKeyword && strings.EqualFold(tk.Text, ":ENDREGION"):
+			sawEndRegion = true
+		case tk.Type == TokenIdentifier && tk.Text == "nAfter":
+			sawAfter = true
+		}
+	}
+	if body == nil {
+		t.Fatal("expected a TokenRegionBody token")
+	}
+	if want := "{\n\t\"total\": $nTotal$\n}"; body.Text != want {
+		t.Errorf("region body text: want %q got %q", want, body.Text)
+	}
+	if !sawEndRegion {
+		t.Error("expected the mid-line :ENDREGION to lex as a keyword")
+	}
+	if !sawAfter {
+		t.Error("expected code after the region to lex as SSL")
+	}
+}
+
 // Issue #164: an unterminated region consumes to EOF as raw text — the
 // unclosed_block diagnostic (not the lexer) reports the missing closer.
 func TestLexer_RegionBodyUnterminatedRunsToEOF(t *testing.T) {
@@ -1753,5 +1770,54 @@ func TestLexer_MemberAccessAcrossLineBreak(t *testing.T) {
 				t.Errorf("%q: %q lexed as a keyword", src, tok.Text)
 			}
 		}
+	}
+}
+
+// A leading UTF-8 byte-order mark is an encoding marker, kept as one
+// zero-width whitespace token so nothing reads it as an unknown character
+// and the formatter can write it back (issue #255).
+func TestLexer_LeadingByteOrderMark(t *testing.T) {
+	tokens := NewLexer("\xef\xbb\xbf:DECLARE n;").Tokenize()
+	if tokens[0].Type != TokenWhitespace || tokens[0].Text != "\uFEFF" {
+		t.Fatalf("first token = %v %q, want BOM whitespace", tokens[0].Type, tokens[0].Text)
+	}
+	if tokens[1].Type != TokenKeyword || tokens[1].Line != 1 || tokens[1].Column != 1 {
+		t.Errorf("keyword after BOM = %v at %d:%d, want keyword at 1:1", tokens[1].Type, tokens[1].Line, tokens[1].Column)
+	}
+	for _, tok := range tokens {
+		if tok.Type == TokenUnknown {
+			t.Errorf("unknown token %q", tok.Text)
+		}
+	}
+}
+
+// Issue #255: braces inside a string literal in a code-block body are
+// string content — they must neither open nor close the literal.
+func TestLexer_CodeBlockBracesInsideStrings(t *testing.T) {
+	cases := []struct{ input, want string }{
+		{`{|x| x + "{"}`, `{|x| x + "{"}`},
+		{`{|x| x + "}"}`, `{|x| x + "}"}`},
+		{`{|x| x + '}{'}`, `{|x| x + '}{'}`},
+		{`{|x| x + [}]}`, `{|x| x + [}]}`},
+		{`{|a| a[1] + {a}[1]}`, `{|a| a[1] + {a}[1]}`},
+		{`{|x| x + "{|"}`, `{|x| x + "{|"}`},
+	}
+	for _, c := range cases {
+		tokens := NewLexer(c.input + "; aArr := {1, 2};").Tokenize()
+		if tokens[0].Type != TokenCodeBlock {
+			t.Fatalf("%s: expected TokenCodeBlock, got %s", c.input, tokens[0].Type)
+		}
+		if tokens[0].Text != c.want {
+			t.Errorf("%s: code block text = %q, want %q", c.input, tokens[0].Text, c.want)
+		}
+	}
+}
+
+// An unterminated quote inside a code block is not treated as a string, so
+// the brace scan still closes the literal at its matching brace.
+func TestLexer_CodeBlockUnterminatedQuoteFallsBack(t *testing.T) {
+	tokens := NewLexer(`{|x| x + "}`).Tokenize()
+	if tokens[0].Type != TokenCodeBlock || tokens[0].Text != `{|x| x + "}` {
+		t.Fatalf("got %s %q", tokens[0].Type, tokens[0].Text)
 	}
 }

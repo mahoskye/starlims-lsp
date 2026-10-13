@@ -4,6 +4,7 @@ package providers
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 )
@@ -131,7 +132,7 @@ func checkDataSourceUndeclaredPlaceholders(body string, declared []string, lineO
 	}
 
 	adjacent := func(a, b SQLToken) bool {
-		return a.Line == b.Line && a.Column+len(a.Text) == b.Column
+		return a.Line == b.Line && a.Column+utf8.RuneCountInString(a.Text) == b.Column
 	}
 	isAt := func(t SQLToken) bool {
 		return t.Type == SQLTokenUnknown && t.Text == "@"
@@ -167,12 +168,95 @@ func checkDataSourceUndeclaredPlaceholders(body string, declared []string, lineO
 			Severity: SeverityWarning,
 			Range: Range{
 				Start: Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1},
-				End:   Position{Line: lineOffset + name.Line - 1, Character: name.Column - 1 + len(name.Text)},
+				End:   Position{Line: lineOffset + name.Line - 1, Character: name.Column - 1 + utf8.RuneCountInString(name.Text)},
 			},
 			Message: fmt.Sprintf("SQL data-source placeholder '@%s' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.", name.Text),
 			Source:  "ssl-lsp",
 			Code:    CodeDatasourceUndeclaredPlaceholder,
 		})
+	}
+	return diagnostics
+}
+
+// checkDataSourceQuestionPlaceholders reports a `?name?` marker in the
+// body of a SQL-mode data source (issue #260). There, parameters are
+// referenced as `@name`; the `?name?` substitution belongs to SQLExecute
+// in SSL code and does not happen in a SQL-mode body.
+func checkDataSourceQuestionPlaceholders(body string, lineOffset int) []Diagnostic {
+	var diagnostics []Diagnostic
+	for _, t := range NewSQLLexer(body).Tokenize() {
+		if t.Type != SQLTokenPlaceholder || len(t.Text) < 3 || !strings.HasPrefix(t.Text, "?") || !strings.HasSuffix(t.Text, "?") {
+			continue
+		}
+		name := t.Text[1 : len(t.Text)-1]
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range: Range{
+				Start: Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1},
+				End:   Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1 + len(t.Text)},
+			},
+			Message: fmt.Sprintf("A SQL data source references parameters as '@%s'; the '?%s?' marker is SQLExecute's and is not substituted here", name, name),
+			Source:  "ssl-lsp",
+			Code:    CodeDatasourceSQLQuestionPlaceholder,
+		})
+	}
+	return diagnostics
+}
+
+// checkDataSourceBodySQLContent runs the SQL-content checks that read only
+// SQL text on the body of a SQL-mode data source (issue #294): the
+// info-tier advisories (comma join, legacy outer join, inconsistent alias,
+// dialect mix, SELECT *), unicode_literal_prefix and unjustified_collate.
+// The same checks run on SQL embedded in SSL strings; the ones about SSL
+// concatenation or ?name? markers do not apply to a SQL body. A SQL-mode
+// body runs as one command, so it is one statement; findings are ranged on
+// its first word. A SQL comment before that word justifies a COLLATE.
+// Every finding is info severity, so the pipeline's info gate decides
+// whether it is shown.
+func checkDataSourceBodySQLContent(body string, lineOffset int) []Diagnostic {
+	all := NewSQLLexer(body).Tokenize()
+	sqlToks := significantSQLTokens(all)
+	if len(sqlToks) == 0 {
+		return nil
+	}
+	first := sqlToks[0]
+	anchor := lexer.Token{Type: lexer.TokenString, Text: first.Text, Line: lineOffset + first.Line, Column: first.Column}
+
+	var diagnostics []Diagnostic
+	add := func(tok lexer.Token, code, message string) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityInfo,
+			Range:    tokenToRange(tok),
+			Message:  strings.Replace(message, "embedded SQL", "this SQL data source", 1),
+			Source:   "ssl-lsp",
+			Code:     code,
+		})
+	}
+	checkCommaJoin(anchor, sqlToks, add)
+	checkLegacyOuterJoin(anchor, sqlToks, add)
+	checkInconsistentAlias(anchor, sqlToks, add)
+	checkDialectMix(anchor, sqlToks, add)
+	checkSelectStar(anchor, sqlToks, add)
+
+	if hasUnicodeLiteralPrefix(all) {
+		add(anchor, CodeUnicodeLiteralPrefix,
+			"Unicode literal prefix N'...' in embedded SQL - drop the prefix unless the target column genuinely requires it")
+	}
+	if hasSQLWord(all, "COLLATE") {
+		justified := false
+		for _, t := range all {
+			if t.Type == SQLTokenComment {
+				justified = true
+				break
+			}
+			if t.Type != SQLTokenWhitespace {
+				break
+			}
+		}
+		if !justified {
+			add(anchor, CodeUnjustifiedCollate,
+				"COLLATE in embedded SQL without a justification comment - document why the forced collation is needed in a SQL comment directly above the statement")
+		}
 	}
 	return diagnostics
 }

@@ -92,6 +92,24 @@ history:
       multi-line form, never in-place padding; and the SELECT item after
       a multi-line group starts a fresh continuation line so aliases
       stay with their block (C3).
+  - date: 2026-10-13
+    ref: "issue #271"
+    note: >-
+      CASE lays out the same way in every clause, as the compact SQL
+      reference shows it: outside the SELECT list CASE used to move to
+      its own line at the clause column with WHEN/ELSE only 2 under it
+      (in UPDATE SET, left of its own assignment), a nested CASE in a
+      THEN lost its indent, and THEN values never broke. CASE now stays
+      where it is written, WHEN/ELSE sit 4 past it, END aligns with it,
+      and THEN values break 4 past WHEN as a set. A sign after a keyword
+      such as ELSE stays attached ('ELSE -1' had become 'ELSE - 1').
+  - date: 2026-10-13
+    ref: "issue #286"
+    note: >-
+      A WHEN predicate that fits on its WHEN line keeps its AND/OR inline,
+      as the style guide's §5.2 example does; only an overflowing
+      predicate breaks before each AND/OR (Rule B). Corpus: 30 of 6,228
+      files format differently, all idempotent.
 issues: ["#81", "#82"]
 ---
 
@@ -164,6 +182,38 @@ are considered. Within the exception:
   canonical result as the one-line form (inline when it fits, rule F
   when it doesn't). Non-SQL strings keep their user line breaks, and
   blank lines (two or more newlines) at those seams are never joined.
+
+- CASE expressions lay out the same way in every clause (issue #271,
+  reference §2.3, §2.10, §5.1–5.3). A multi-line CASE stays where it is
+  written — `WHERE CASE`, `ORDER BY CASE`, `SET col = CASE`, after
+  `AND` or an operator — with three exceptions: a CASE item following a
+  comma in the SELECT list starts its own line at the SELECT-list
+  column; a CASE that is a THEN/ELSE value starts its own line 4 past
+  its WHEN/ELSE; and a CASE written too far right for its WHEN lines
+  (or whose THEN values fit only once moved) continues on the next
+  line like any other wrap. WHEN/ELSE sit 4 columns past CASE, END
+  aligns with CASE. A WHEN predicate stays on its WHEN line when
+  `WHEN <predicate> THEN` fits there; otherwise it breaks before each
+  top-level AND/OR, which sit one indent past WHEN (Rule B). A predicate
+  holding a subquery always breaks. THEN values are inline or broken as a set: when
+  any branch would overflow with its value inline, or any value is
+  itself a CASE, every THEN value of that CASE starts its own line 4
+  past its WHEN (a value opening a subquery stays on the THEN line —
+  subqueries open on their parent line). An ELSE value stays inline
+  unless it overflows or is a CASE. A predicate that leaves no room for
+  THEN wraps THEN to the WHEN column with the value following it. A
+  CASE that fits on its line inside a function's argument list or
+  other parenthesized expression (`SUM(CASE WHEN … END)`), or inside
+  an `OVER (…)` spec, stays inline whole. Layout never alters a token:
+  a sign after an operand-introducing keyword stays attached
+  (`ELSE -1`, `THEN -x`), while `END - 1` remains a subtraction.
+- Scope: this entry covers SQL inside SSL string literals. A data
+  source whose whole body is SQL (SQL mode, DECISIONS.md D15) is not
+  reformatted at all — not by the editor's formatting requests and not
+  by `--format`, which applies the same content classifier. That
+  pass-through is intended and is specified by feature.formatting A9:
+  formatting such bodies with the SQL engine is deferred until the SQL
+  lexer understands Oracle-style `:bind` variables.
 
 ## Examples
 
@@ -363,6 +413,177 @@ sSql := "
     FROM samples
     WHERE sample_status = ?status?
 ";
+```
+
+CASE keeps its place after the clause keyword in `WHERE`, with WHEN/ELSE
+4 past CASE and END aligned with it — the reference's own "CASE in WHERE"
+example (issue #271; CASE used to drop to the clause column with WHEN 2
+under it):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT ordno, testcode, result_value FROM ordresult r INNER JOIN specifications s ON s.testcode = r.testcode WHERE CASE WHEN r.result_value IS NULL THEN 'Missing' WHEN r.result_value < s.low_limit THEN 'Below' ELSE 'Pass' END != 'Pass'");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT ordno, testcode, result_value
+    FROM ordresult r
+    INNER JOIN specifications s
+      ON s.testcode = r.testcode
+    WHERE CASE
+              WHEN r.result_value IS NULL THEN 'Missing'
+              WHEN r.result_value < s.low_limit THEN 'Below'
+              ELSE 'Pass'
+          END != 'Pass'
+");
+```
+
+The same shape in `ORDER BY`:
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT ordno, testcode FROM ordtask ORDER BY CASE WHEN status = 'L' THEN 1 WHEN status = 'C' THEN 2 ELSE 3 END, ordno");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT ordno, testcode
+    FROM ordtask
+    ORDER BY CASE
+                 WHEN status = 'L' THEN 1
+                 WHEN status = 'C' THEN 2
+                 ELSE 3
+             END, ordno
+");
+```
+
+And in an `UPDATE ... SET` assignment, where WHEN used to land left of
+the assignment it belongs to:
+
+### Before
+
+```ssl
+RunSQL("UPDATE ordtask SET status = CASE WHEN result_value > high_limit THEN 'High' WHEN result_value < low_limit THEN 'Low' ELSE 'Normal' END WHERE ordno = ?", "", {sOrdNo});
+```
+
+### After
+
+```ssl
+RunSQL("
+    UPDATE ordtask SET
+        status = CASE
+                     WHEN result_value > high_limit THEN 'High'
+                     WHEN result_value < low_limit THEN 'Low'
+                     ELSE 'Normal'
+                 END
+    WHERE ordno = ?
+", "", {sOrdNo});
+```
+
+A CASE that is a THEN value starts its own line 4 past its WHEN, with its
+own branches 4 past it (reference §5.3; it used to collapse back to the
+outer CASE's column):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT ordno, CASE WHEN status = 'Complete' THEN CASE WHEN result_value IS NULL THEN 'No Result' WHEN result_value > threshold THEN 'OOS' ELSE 'Within Spec' END ELSE 'Incomplete' END AS evaluation FROM ordresult");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT ordno,
+           CASE
+               WHEN status = 'Complete' THEN
+                   CASE
+                       WHEN result_value IS NULL THEN 'No Result'
+                       WHEN result_value > threshold THEN 'OOS'
+                       ELSE 'Within Spec'
+                   END
+               ELSE 'Incomplete'
+           END AS evaluation
+    FROM ordresult
+");
+```
+
+When a branch would overflow with its value inline, every THEN value of
+that CASE goes 4 past its WHEN; a short ELSE stays inline, and its sign
+stays attached (reference §5.2; `ELSE -1` used to become `ELSE - 1`):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT ordno, testcode, CASE WHEN status = 'Complete' THEN ROUND(result_value / baseline_value * 100, 2) + bias_adjustment WHEN status = 'Pending' THEN 0 ELSE -1 END AS pct_of_baseline FROM ordresult");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT ordno, testcode,
+           CASE
+               WHEN status = 'Complete' THEN
+                   ROUND(result_value / baseline_value * 100, 2) + bias_adjustment
+               WHEN status = 'Pending' THEN
+                   0
+               ELSE -1
+           END AS pct_of_baseline
+    FROM ordresult
+");
+```
+
+A CASE that fits inside an aggregate's argument list stays inline
+(reference §2.7):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT customer_id, COUNT(*) AS total_tasks, SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done FROM order_tasks GROUP BY customer_id");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT customer_id, COUNT(*) AS total_tasks,
+           SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done
+    FROM order_tasks
+    GROUP BY customer_id
+");
+```
+
+A short WHEN predicate keeps its AND/OR on the WHEN line; a long one
+breaks before each AND/OR, one step past WHEN (issue #286):
+
+### Before
+
+```ssl
+aRows := SQLExecute("SELECT s.sample_id, CASE WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent' WHEN s.status_code_for_the_sample = 'B' AND s.priority_level_of_the_sample = 2 AND s.department_code = 'QC' THEN 'review' ELSE 'normal' END AS label FROM samples s");
+```
+
+### After
+
+```ssl
+aRows := SQLExecute("
+    SELECT s.sample_id,
+           CASE
+               WHEN s.status = 'A' AND s.priority = 1 THEN 'urgent'
+               WHEN s.status_code_for_the_sample = 'B'
+                   AND s.priority_level_of_the_sample = 2
+                   AND s.department_code = 'QC' THEN 'review'
+               ELSE 'normal'
+           END AS label
+    FROM samples s
+");
 ```
 
 ## Rationale

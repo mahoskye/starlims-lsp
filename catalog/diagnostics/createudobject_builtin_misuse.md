@@ -3,7 +3,7 @@ id: diag.createudobject_builtin_misuse
 title: CreateUdObject used to construct a built-in SSL class
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -20,6 +20,14 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      no_createudobject_for_builtins (level authoritative) names this
+      rule in enforced_by, so the guide is not silent. A member method
+      that shares the name (`oFactory:CreateUdObject("Email")`) no
+      longer flags (D10, issue #258).
 issues: []
 ---
 
@@ -39,7 +47,10 @@ It must NOT flag:
   a single string-literal token is inspected;
 - anonymous UDObject construction (`CreateUdObject()` or
   `CreateUdObject({...})`);
-- curly-brace construction of built-in classes.
+- curly-brace construction of built-in classes;
+- a member method that shares the name (`oFactory:CreateUdObject("Email")`)
+  — the preceding `:` makes it a call on some receiver, and member access
+  never warns (DECISIONS.md D10, issue #258).
 
 ## Examples
 
@@ -70,10 +81,20 @@ It must NOT flag:
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS oFactory;
+	:DECLARE oMail;
+	oMail := oFactory:CreateUdObject("Email");
+:ENDPROC;
+```
+
 ## Rationale
 
-The source guide reserves CreateUdObject string dispatch for user-defined
-`:CLASS` objects; passing a built-in class name does not construct the
-built-in and fails or misbehaves at runtime, which justifies error severity
+The reference (functions/CreateUdObject) reserves CreateUdObject string
+dispatch for user-defined `:CLASS` objects; a built-in class name passed
+to it is not found (style-guide record no_createudobject_for_builtins), which justifies error severity
 (cdbfee6). Precision is kept high by only matching a lone string literal
 against the published class inventory — dynamic names are never guessed at.

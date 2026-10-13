@@ -36,7 +36,7 @@ By implementing the Language Server Protocol, we support any LSP-compatible edit
 
 ### 3. Correctness Through Specification
 
-Every feature is thoroughly documented before implementation. This ensures:
+Every behavior is specified in the [behavior catalog](../../catalog/README.md) before implementation. This ensures:
 
 - Consistent behavior
 - Complete test coverage
@@ -47,7 +47,7 @@ Every feature is thoroughly documented before implementation. This ensures:
 
 Deep understanding of SSL's unique characteristics:
 
-- Case-insensitive syntax
+- Case-insensitive identifiers and function names, but UPPERCASE keywords
 - Colon-prefixed keywords (`:IF`, `:PROCEDURE`)
 - Period-wrapped operators (`.AND.`, `.OR.`)
 - Semicolon-terminated comments (`/* comment ;`)
@@ -63,24 +63,30 @@ This project follows a **document-driven approach** where documentation is not a
 ### Principles
 
 1. **Spec First, Code Second**
-   - Every feature has a specification document
-   - The spec defines expected behavior, edge cases, and test scenarios
-   - Implementation follows the specification
+   - Every diagnostic, feature, and formatter rule has one entry in the
+     [behavior catalog](../../catalog/README.md)
+   - The entry defines expected behavior, edge cases, and examples
+   - Implementation follows the entry
 
-2. **Documentation as Contract**
-   - Feature documents serve as contracts between the code and users
-   - If behavior differs from documentation, it's a bug
-   - Documentation updates require conscious decision-making
+2. **The Catalog as Contract**
+   - The catalog is normative ([D9](../../catalog/DECISIONS.md)): if the
+     code and its entry disagree, one of them has a bug
+   - Changing behavior means changing the entry in the same PR
+   - Prose docs (this one, `docs/features/`, the READMEs) explain the
+     catalog; they never override it
 
-3. **Test Scenarios in Specs**
-   - Each feature document includes executable test scenarios
-   - Tests validate that implementation matches specification
-   - Edge cases are documented and tested
+3. **Executable Specs**
+   - Catalog examples run against the real pipeline
+     ([D8](../../catalog/DECISIONS.md))
+   - Feature acceptance criteria must be cited by tests
+   - False positives, once found, become permanent "Does not flag"
+     examples
 
 4. **Living Documentation**
    - Documents evolve with the codebase
-   - Version history tracks significant changes
-   - Deprecated features are marked, not silently removed
+   - Each catalog entry's `history` records why its behavior changed
+   - Removed behavior keeps its entry with `status: removed`, never
+     silently dropped
 
 ### Benefits
 
@@ -132,7 +138,7 @@ When formatting or transforming code:
 
 Honor SSL's unique characteristics:
 
-- Case-insensitivity in comparisons
+- Case-insensitive identifiers, case-sensitive string comparison
 - Block comments ending with semicolons
 - Property access syntax (`:PropertyName`)
 - Dynamic variable creation via assignment
@@ -148,6 +154,7 @@ Honor SSL's unique characteristics:
 | Text Document Features | Completion, hover, signature help, formatting, diagnostics |
 | Navigation | Go to definition, find references, document symbols |
 | Single-File Analysis | Full analysis within open documents |
+| Cross-File Analysis | Definition, references, rename, and hover across the workspace through a background index |
 | SSL Syntax | Complete SSL language support |
 | Embedded SQL | Formatting and basic analysis of SQL in strings |
 
@@ -155,7 +162,6 @@ Honor SSL's unique characteristics:
 
 | Capability | Reason |
 |------------|--------|
-| Cross-File Analysis | Requires workspace indexing infrastructure |
 | STARLIMS Runtime | No connection to STARLIMS server |
 | Database Schema | No access to database structure |
 | Debugging | Separate concern from language server |
@@ -219,5 +225,5 @@ Teams building STARLIMS development tools:
 ## Related Documents
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical architecture overview
-- [ROADMAP.md](./ROADMAP.md) - Prioritized feature roadmap
+- [ROADMAP.md](./ROADMAP.md) - What has shipped and the current direction
 - [../STATUS.md](../STATUS.md) - Current implementation status

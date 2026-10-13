@@ -31,6 +31,13 @@ history:
       following closing delimiter or ';' on the no-whitespace path,
       matching the whitespace-suppression path — the two disagreed and
       `,,)` <-> `,, )` oscillated between passes.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      No space is written between a comma and a same-line comment glued
+      to it: the end-of-line comment flush writes its own two-space
+      separator, so `},/*note;` printed three spaces on the first pass
+      and two on the second.
 issues: ["#35"]
 ---
 
@@ -43,7 +50,10 @@ adjacent commas (skipped parameters) no space is inserted, so the commas
 themselves stay tight; the last comma of the run still gets its space
 before the next value (`{a,, b}`). Because before-comma space removal makes
 `{a, ,b}` collapse to adjacent commas, it too normalizes to the tight
-`{a,, b}` form. Commas inside string literals and comments are untouched.
+`{a,, b}` form. A comma followed by an end-of-line comment takes no space
+of its own — the comment is separated by the canonical two spaces
+(fmt.indent_style). Commas inside string literals and comments are
+untouched.
 
 With the option off, comma spacing is left entirely as written (neither the
 after-comma space insertion nor the before-comma space removal runs).
@@ -83,6 +93,23 @@ aValues := {nFirst ,nSecond};
 
 ```ssl
 aValues := {nFirst, nSecond};
+```
+
+A comment glued to a comma gets the standard two-space separator, and the
+result is stable (issue #258):
+
+### Before
+
+```ssl
+aX := {{"M", sA},/*note;
+};
+```
+
+### After
+
+```ssl
+aX := {{"M", sA},  /*note;
+};
 ```
 
 ## Rationale

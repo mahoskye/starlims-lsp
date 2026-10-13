@@ -76,7 +76,44 @@ history:
       with the point, glued to an `e` identifier). A well-formed number
       glued to a stray `E` — `2.0E+nVar`, which used to defer to a rule
       that then stayed silent — is now reported here.
-issues: ["#240", "#244", "#246"]
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12. Three
+      behaviors already matched and are now pinned by fences: `**=` is
+      not an SSL compound assignment (operators/index.md lists only
+      `:=`, `+=`, `-=`, `*=`, `/=`, `%=`, `^=`), so its `=` is
+      unexpected; a `*****` banner line left outside a comment is code
+      and does not parse; and `++`/`--` on a variable, an array element,
+      or an object property, prefix or postfix, are complete statements
+      (operators/increment.md, operators/decrement.md).
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Two refinements from the diagnostics audit: the name in a C-style
+      `PROCEDURE Name(` declaration is deferred to procedure_declaration_syntax
+      (it was reported by both), and a `:FOR` limit glued to `:STEP` gets a
+      hint naming the missing space.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Defers the operand after a prefix bare `Not` (`:IF Not bReady;`)
+      to bare_logical_operator, which already reports the cause; the old
+      deferral looked only at the unexpected token itself.
+  - date: 2026-10-13
+    ref: "issues #255, #291"
+    note: >-
+      Deferral list corrected in both directions. Added: an unterminated
+      string (unterminated_string names its opener; `s := 1 "abc;` used to
+      be reported by both rules). Removed: unknown_keyword, which stays a
+      warning because a gap in the keyword list must not fail validation —
+      deferring to it let an unknown colon form the grammar cannot place
+      validate as `valid: true`. 0 new findings over 6,228 production
+      files. The rules still deferred to (unknown_token,
+      scientific_notation, and the delimiter, operator, and endfor rules)
+      are all errors, so no parse failure is reported at warning severity
+      alone.
+issues: ["#240", "#244", "#246", "#291"]
 ---
 
 ## Behavior
@@ -102,7 +139,11 @@ The statements in scope are the ones the parser models:
   that departs from that shape is flagged and the message names the
   expected piece (`Unexpected identifier 'nItem' in ':FOR' header -
   expected ':='`). When the loop-variable position holds the word `EACH`
-  the message also says SSL has no `:FOR EACH` form. Block pairing is
+  the message also says SSL has no `:FOR EACH` form. When the limit is
+  glued to `:STEP` (`:TO nMax:STEP 2`), the keyword parses as a member of
+  the limit and the step value is unexpected; the message then asks
+  `(missing space before ':STEP'?)` (`diag.step_spacing` covers the
+  numeric-limit form, where `:STEP` still lexes as the keyword). Block pairing is
   independent of header validity: a malformed header still opens its
   `:FOR` block, so `unclosed_block` and `mismatched_block_end` are
   unaffected.
@@ -113,6 +154,13 @@ operand is optional the terminator is expected: `:RETURN;` is complete.
 SSL has no unary plus — its unary operators are `-`, `!`, and `.NOT.`, and
 a numeric literal never carries a leading sign — so in `x := +5;` the `+`
 is unexpected where an expression was due (issue #244).
+
+`++` and `--` take a variable, an array element, or an object property
+(`nHits++`, `aCounts[1]++`, `oStats:nHits++`), in prefix or postfix
+position; each is a complete statement. The compound assignments are
+`+=`, `-=`, `*=`, `/=`, `%=` and `^=` only: `**` is a power operator but
+`**=` is not an assignment, so in `nX **= 3;` the `=` is unexpected
+where the right operand of `**` was due (issue #260).
 
 Assignment is an expression wherever an operand can stand. `a := b := c;`,
 `oObj:Prop := oObj:Items[1] := x;`, `:RETURN x := .T.;`, `{ .T., n += 1 }`,
@@ -146,14 +194,24 @@ It must NOT flag:
   including the `.identifier` shape that `dot_property_access` owns), a
   C-style operator or glued `===`/`!==` pair
   (`invalid_operator_sequence`), a bare `AND`/`OR`/`NOT` word in operator
-  position (`bare_logical_operator`), a colon form that is not an SSL
-  keyword (`unknown_keyword` / `endfor_invalid`), the exponent shapes
+  position (`bare_logical_operator`) — including the operand after a
+  prefix bare `Not`, where the parser read `Not` as a value and stopped
+  on what followed (issue #255) — a colon form that is `:ENDFOR`
+  (`endfor_invalid`), the exponent shapes
   `scientific_notation` owns — an identifier glued to a number that has
-  no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — a
+  no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — the
+  name after a bare `PROCEDURE` when a `(` follows it
+  (`procedure_declaration_syntax`), a
   closer with no matching opener (`unmatched_delimiter` /
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file
-  into that statement). One finding per cause. A closer that does match
+  into that statement), or an unterminated string literal
+  (`unterminated_string`, which names its opener). One finding per cause,
+  and every rule deferred to is an error, so a parse failure is never
+  reported at warning severity alone. An unknown colon form is *not*
+  deferred: `unknown_keyword` is a warning (a gap in its list must not
+  fail validation), so where such a form stands in a position the grammar
+  cannot accept, this rule reports the parse failure as well. A closer that does match
   but arrives where an operand was due (`x := (1 + );`) is this rule's. A
   `:=` inside a condition is an assignment expression, complete and
   `assignment_in_condition`'s to warn about;
@@ -168,8 +226,9 @@ It must NOT flag:
   lexer never reads as SSL.
 
 An unterminated string literal swallows the rest of the file and hides
-everything this rule would otherwise see. That is a lexer condition and
-wants its own entry.
+everything this rule would otherwise see. That is `unterminated_string`'s
+to report; when consumption stops on the unterminated string itself, this
+rule defers.
 
 ## Examples
 
@@ -205,6 +264,20 @@ nCount := 2;
 :DECLARE nCount;
 nCount := 1
 nCount := 2;
+```
+
+### Does not flag
+
+A prefix bare `Not` is `bare_logical_operator`'s finding; the operand
+after it is not reported again.
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS bReady;
+:IF Not bReady;
+	bReady := .T.;
+:ENDIF;
+:ENDPROC;
 ```
 
 ### Does not flag
@@ -295,6 +368,59 @@ x := +5;
 ```ssl
 :DECLARE nX, nVar;
 nX := 2.0E+nVar;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX;
+nX := 2;
+nX **= 3;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX;
+/* Totals for the day;
+**********************
+nX := 1;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE nHits, aCounts, oStats;
+nHits := 0;
+aCounts := {0, 0};
+oStats := CreateUdObject();
+oStats:nHits := 0;
+nHits++;
+nHits--;
+++nHits;
+--nHits;
+aCounts[1]++;
+aCounts[2]--;
+++aCounts[1];
+--aCounts[2];
+oStats:nHits++;
+oStats:nHits--;
+++oStats:nHits;
+--oStats:nHits;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE sText;
+sText := 1 "never closed;
+```
+
+### Flags
+
+```ssl
+:DECLARE nCount;
+nCount := 1 :FOOBAR 2;
 ```
 
 ## Rationale

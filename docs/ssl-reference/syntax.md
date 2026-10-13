@@ -552,7 +552,7 @@ Branch("SKIP");
 
 ```ssl
 :CLASS MyClass;
-:INHERIT BaseClass;  /* Optional inheritance;
+:INHERIT Category.BaseClass;  /* Optional inheritance, parent must be category-qualified;
 
 :DECLARE sProperty, nValue;
 
@@ -577,8 +577,8 @@ oEmail := Email{};
 oRegex := SSLRegex{'\d+'};
 
 /* User-defined classes use CreateUdObject;
-oCustom := CreateUdObject("MyClass");
-oCustom := CreateUdObject("MyClass", {param1, param2});
+oCustom := CreateUdObject("Category.MyClass");
+oCustom := CreateUdObject("Category.MyClass", {param1, param2});
 
 /* Empty dynamic object;
 oAnon := CreateUdObject();

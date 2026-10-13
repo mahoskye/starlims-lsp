@@ -12,6 +12,7 @@ tests:
   - internal/providers/crossfile_test.go
   - internal/server/handler_test.go
   - internal/server/cross_file_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-01-10
     ref: "f27f727 (v0.2.0)"
@@ -50,6 +51,24 @@ history:
       procedure, so this behavior acted on occurrences of a different
       symbol. Positions the tree cannot resolve stay unclassified and
       keep the prior word-match behavior.
+  - date: 2026-10-13
+    ref: "issues #255, #258"
+    note: >-
+      The server's procedure-subject choice consults the identifier role:
+      a member access or a variable spelled like a procedure no longer
+      pulls in that procedure's cross-file dispatch sites (A17). Dispatch
+      strings count as procedure occurrences, so a variable's or member's
+      references never include `DoProc("Calc")`. File-wide subjects skip
+      procedures that shadow them with a local or parameter, and ranges
+      are character columns after non-ASCII text (A18).
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Locations count UTF-16 code units (A19). The word-match search
+      reported byte columns, so any non-ASCII text before a match
+      on the same line shifted it; each location is now converted
+      against its own document's text, including closed files
+      reached cross-file.
 issues: ["#42", "#43", "#125"]
 ---
 
@@ -72,8 +91,20 @@ issues: ["#42", "#43", "#125"]
   as a fallback when no parsed symbol info is available.
 - References MUST respect scope: a procedure-local variable's references are
   confined to its declaring procedure; a same-named local in another
-  procedure MUST NOT appear in the results. `:PUBLIC` variables and
-  procedure names are file-global.
+  procedure MUST NOT appear in the results. `:PUBLIC` variables,
+  script-level variables, and procedure names are file-global — except
+  inside a procedure that declares its own local or parameter of that
+  name, whose occurrences belong to that local.
+- Occurrences are classified by identifier role from the expression tree:
+  a variable and its declarations are one symbol; a procedure, its call
+  sites, and its `DoProc`/`ExecFunction` dispatch strings another; a
+  member name and a class name are neither. Only occurrences of the
+  subject's own role family are returned; positions the tree cannot
+  classify keep word matching. The cross-file procedure extension below
+  applies only when the cursor's role is a procedure header, a call
+  callee, or unclassified (a dispatch string).
+- Ranges are character columns: a non-ASCII character earlier on the line
+  never shifts a location.
 - Procedure subjects extend cross-file: when the cursor names a procedure
   (its declaration, an identifier use, or a dotted dispatch-target string
   that resolves to it), dotted `DoProc`/`ExecFunction` call sites across
@@ -104,6 +135,11 @@ issues: ["#42", "#43", "#125"]
   (case-insensitive) and the match spans the entire string content — the
   dispatch-target case. Code-context matches (including code blocks) are
   kept.
+- Locations count characters in UTF-16 code units, the encoding the
+  server advertises. Each location is converted against its own
+  document's current text (the open buffer, or the file on disk for a
+  closed file), so a character outside the Basic Multilingual Plane
+  earlier on the line cannot shift it (issue #307).
 
 ## Acceptance
 
@@ -123,6 +159,9 @@ issues: ["#42", "#43", "#125"]
 - A14: Given a dotted dispatch self-site inside the definition file, when references are requested on the procedure, then that site appears exactly once in the results.
 - A15: Given a variable `sName` and a member access `oRec:sName`, when references are requested on the variable, then the member-access occurrence is NOT returned.
 - A16: Given a variable and a procedure sharing a name, when references are requested from one of them, then only that symbol's own occurrences are returned.
+- A17: Given a workspace index and the cursor on a member access (`oRec:CalcTotal`) spelled like a procedure of the file, when references are requested, then no procedure occurrence and no dispatch site in any file is returned; given the cursor inside a 1-part `DoProc("CalcTotal")` string, then the procedure's cross-file dispatch sites are still returned.
+- A18: Given a file-level `:DECLARE sX;` used as `sX := "é" + sX;` and a procedure declaring its own `:PARAMETERS sX;`, when references are requested on the file-level variable, then the procedure's occurrences are NOT returned and each location's column counts characters, not bytes.
+- A19: Given an emoji (one character, two UTF-16 code units) or an accented letter before an occurrence on the same line — in the current document, or in a closed caller file reached cross-file — when references are requested, then the location starts and ends at the occurrence's UTF-16 offsets (issue #307).
 
 ## Rationale
 

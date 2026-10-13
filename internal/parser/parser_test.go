@@ -383,8 +383,8 @@ func TestFindProcedureAtLine(t *testing.T) {
 func TestParser_ExtractVariables_Declare(t *testing.T) {
 	input := `:DECLARE alpha, beta;`
 
-	p, root := parseInput(t, input)
-	variables := p.ExtractVariables(root)
+	p, _ := parseInput(t, input)
+	variables := p.ExtractVariables()
 
 	if len(variables) != 2 {
 		t.Fatalf("expected 2 variables, got %d", len(variables))
@@ -411,8 +411,8 @@ func TestParser_ExtractVariables_PublicAndParameters(t *testing.T) {
 	input := `:PUBLIC gamma;
 :PARAMETERS delta;`
 
-	p, root := parseInput(t, input)
-	variables := p.ExtractVariables(root)
+	p, _ := parseInput(t, input)
+	variables := p.ExtractVariables()
 
 	gamma := findVariable(variables, "gamma")
 	delta := findVariable(variables, "delta")
@@ -765,7 +765,10 @@ func TestParser_ExtractProcedures_IsPrivate(t *testing.T) {
 	}{
 		{"private annotation", "/*@private;\n:PROCEDURE Hidden;\n:ENDPROC;", true},
 		{"protected annotation", "/*@protected;\n:PROCEDURE Guarded;\n:ENDPROC;", true},
-		{"case-insensitive content", "/*@PRIVATE;\n:PROCEDURE Hidden;\n:ENDPROC;", true},
+		{"uppercase content is not the exact form", "/*@PRIVATE;\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"interior space is not the exact form", "/*@ private;\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"blank line breaks the association", "/*@private;\n\n:PROCEDURE Open;\n:ENDPROC;", false},
+		{"intervening comment breaks the association", "/*@private;\n/* helper;\n:PROCEDURE Open;\n:ENDPROC;", false},
 		{"no annotation", ":PROCEDURE Open;\n:ENDPROC;", false},
 		{"space after /* rejected", "/* @private;\n:PROCEDURE Open;\n:ENDPROC;", false},
 		{"other annotation rejected", "/*@deprecated;\n:PROCEDURE Open;\n:ENDPROC;", false},

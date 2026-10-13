@@ -93,7 +93,7 @@ The SSL formatter provides consistent code formatting for STARLIMS Scripting Lan
 
 `:CLASS` is intentionally excluded. Because SSL classes have no `:ENDCLASS` and extend to EOF, the formatter does not add an extra indentation level for the class body itself.
 
-Comment-based `/* region ...;` / `/* endregion;` markers remain the preferred organization aid. The formatter still indents legacy functional `:REGION` / `:ENDREGION` blocks correctly because they are part of the language grammar, not because they are the recommended style for editor grouping.
+Comment-based `/* region ...;` / `/* endregion;` markers remain the preferred organization aid. The formatter still indents functional `:REGION` / `:ENDREGION` blocks correctly because they are part of the language grammar, not because they are the recommended style for editor grouping.
 
 The source guide's preferred indentation model is tab-based SSL indentation. The exposed default `indentSize: 4` is only the fallback width used when callers switch the formatter to space indentation.
 
@@ -228,7 +228,7 @@ sSQL := "
 
 This feature is controlled by `ssl.format.sql.detectSQLStrings` (default: `true`).
 
-The default SQL style is `canonicalCompact`, which matches the compact reference in `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md`:
+The default SQL style is `canonicalCompact`, which matches the compact reference in the upstream style guide, [`sql-canonical-compact-reference.md`](https://github.com/mahoskye/ssl-style-guide/blob/main/ssl-style-guide/sql-canonical-compact-reference.md):
 
 - **Major clauses** (`SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `ORDER BY`, etc.) at column 0 relative to the 4-space SQL indent
 - **SELECT continuations** aligned to first column (col 7 from clause start)

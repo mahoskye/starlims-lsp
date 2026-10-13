@@ -3,7 +3,7 @@ id: diag.try_requires_handler
 title: TRY block with neither CATCH nor FINALLY
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,6 +19,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Catalog audit: authority corrected to authoritative to mirror the
+      style-guide rule try_requires_handler (level authoritative, severity
+      error), which names this slug in enforced_by. Behavior unchanged.
 issues: []
 ---
 
@@ -90,11 +96,9 @@ nCount := 1;
 
 ## Rationale
 
-The schema records this as a hard language constraint in two places
-(`blocks.try.constraint: at_least_one_of_catch_or_finally`; the
-error-handling structure's "at least one is required; bare TRY...ENDTRY is
-rejected") but defines no lints slug for it, so the transcription is
-`authority: tool` like its sibling TRY-structure rules. Error severity
+The style-guide rule `try_requires_handler` (authoritative, error) states
+the constraint — a bare `:TRY ... :ENDTRY` is rejected — and names this
+check as its enforcement, so the authority mirrors it. Error severity
 matches the runtime rejecting the construct. Emitting at `:ENDTRY` (rather
 than at `:TRY`) is what keeps unclosed blocks single-reported — the fourth
 fence pins that.

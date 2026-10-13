@@ -2,8 +2,8 @@
 
 This document specifies all configuration options available in the starlims-lsp language server. It serves as the authoritative reference for client configuration.
 
-**Version:** 1.4  
-**Last Updated:** 2026-08-28  
+**Version:** 1.5  
+**Last Updated:** 2026-10-13  
 **Status:** Current
 
 ---
@@ -27,7 +27,7 @@ This document specifies all configuration options available in the starlims-lsp 
 
 ### 1.1 Configuration Delivery
 
-Configuration is sent to the language server via the LSP `workspace/didChangeConfiguration` notification.
+Configuration is sent to the language server as `initializationOptions` in the `initialize` request, via the LSP `workspace/didChangeConfiguration` notification, or both. Both routes accept the same `ssl` object and apply only the fields present; a configuration change re-validates every open document.
 
 ### 1.2 Configuration Namespace
 
@@ -94,7 +94,7 @@ interface FormattingOptions {
 
 interface SQLFormattingOptions {
   enabled: boolean;
-  style: "standard" | "canonicalCompact" | "expanded"; // "compact" = deprecated alias
+  style: "standard" | "canonicalCompact" | "expanded"; // "compact" = deprecated alias (removal planned, see 4.2)
   keywordCase: "upper" | "lower" | "preserve";
   identifierCase: "preserve" | "lower" | "upper";
   indentSize: number;
@@ -110,7 +110,7 @@ interface DiagnosticOptions {
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
-  rules: { [slug: string]: "off" | "info" | "warn" | "warning" | "error" };
+  rules: { [slug: string]: "off" | "hint" | "info" | "warn" | "warning" | "error" };
   endpointPatterns: string[];
 }
 
@@ -131,7 +131,7 @@ interface InlayHintOptions {
 | **Type** | `string` |
 | **Default** | `"tab"` |
 | **Values** | `"tab"`, `"space"` |
-| **File** | `internal/providers/formatting.go:13,26` |
+| **File** | `internal/providers/formatting.go` |
 
 Specifies whether to use tabs or spaces for indentation.
 
@@ -146,9 +146,9 @@ Specifies whether to use tabs or spaces for indentation.
 | **Type** | `number` |
 | **Default** | `4` |
 | **Range** | `1` - `8` |
-| **File** | `internal/providers/formatting.go:14,27` |
+| **File** | `internal/providers/formatting.go` |
 
-Number of spaces per indentation level. Only applies when `indentStyle` is `"space"`. The source guide's preferred default is tab indentation; the bundled value `4` is the fallback width for space-indented formatting, not the width of a tab-indented SSL block.
+Number of spaces per indentation level when `indentStyle` is `"space"`. In tab mode it is the width a tab counts as for line-length accounting (`maxLineLength`), so it affects where long lines wrap either way. The source guide's preferred default is tab indentation; the bundled value `4` is the fallback width for space-indented formatting. The configured style is applied whatever indentation a file already uses — an existing space-indented file is not detected and preserved. See catalog entry `fmt.indent_style`.
 
 ```json
 { "ssl.format.indentSize": 4 }
@@ -161,7 +161,7 @@ Number of spaces per indentation level. Only applies when `indentStyle` is `"spa
 | **Type** | `number` |
 | **Default** | `90` |
 | **Range** | `0` (unlimited) - `200` |
-| **File** | `internal/providers/formatting.go:15,28` |
+| **File** | `internal/providers/formatting.go` |
 
 Maximum line length before wrapping. Set to `0` to disable line length enforcement.
 
@@ -175,7 +175,7 @@ Maximum line length before wrapping. Set to `0` to disable line length enforceme
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/providers/formatting.go:16,29` |
+| **File** | `internal/providers/formatting.go` |
 
 When enabled, adds spaces around operators (`=`, `<>`, `+`, `-`, `*`, `/`, `:=`, etc.).
 
@@ -195,7 +195,7 @@ x := a + b * c;
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/providers/formatting.go:17,30` |
+| **File** | `internal/providers/formatting.go` |
 
 When enabled, ensures a space after each comma in parameter lists.
 
@@ -215,14 +215,18 @@ DoProc("CallProc", {a, b, c});
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/providers/formatting.go:18,31` |
+| **File** | `internal/providers/formatting.go` |
 
 When enabled, ensures statements end with semicolons.
 
 **Note:** Does NOT add semicolons after:
-- Opening delimiters (`(`, `[`, `{`)
-- Incomplete expressions
-- Continuation keywords (`:TO`, `:STEP`)
+- Opening delimiters (`(`, `[`, `{`), operators, `:=`, or a trailing comma
+- A line inside an unclosed `(` / `{` / `[`
+- Continuation keywords (`:TO`, `:STEP`), or before one (`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`, `:FINALLY`)
+- Declaration keywords whose operand list starts on the next line (`:PARAMETERS`, `:DECLARE`, `:PUBLIC`, `:DEFAULT`, `:INCLUDE`, `:INHERIT`)
+- A keyword whose operand starts on the next line (`:IF ⏎ bReady;`, `:RETURN ⏎ nValue;`)
+
+See catalog entry `fmt.semicolon_enforcement`.
 
 ### 3.7 ssl.format.blankLinesBetweenProcs
 
@@ -231,9 +235,9 @@ When enabled, ensures statements end with semicolons.
 | **Type** | `number` |
 | **Default** | `1` |
 | **Range** | `0` - `3` |
-| **File** | `internal/providers/formatting.go:19,32` |
+| **File** | `internal/providers/formatting.go` |
 
-Number of blank lines to insert between procedure definitions.
+Exact number of blank lines between procedure (and `:REGION`) definitions. The count is normalized, not added: whatever blank lines the source has at an `:ENDPROC;`/`:ENDREGION;` → `:PROCEDURE`/`:REGION` boundary are replaced with this many. `0` leaves the boundary as written. See catalog entry `fmt.blank_lines_between_procs`.
 
 ```json
 { "ssl.format.blankLinesBetweenProcs": 1 }
@@ -265,7 +269,9 @@ blocks read as distinct units. See catalog entry
 | **File** | `internal/providers/formatting.go` |
 
 Remove trailing space/tab characters from every formatted line (post-pass,
-added in v0.5.0). See catalog entry `fmt.trim_trailing_whitespace`.
+added in v0.5.0). Line ends inside a multi-line string literal, code block
+or `:REGION` body are user content and are never trimmed. See catalog entry
+`fmt.trim_trailing_whitespace`.
 
 ```json
 { "ssl.format.trimTrailingWhitespace": true }
@@ -292,29 +298,29 @@ existing vertical whitespace. See catalog entry
 | Property | Value |
 |----------|-------|
 | **Type** | `"preserve"` \| `"PascalCase"` |
-| **Default** | `"preserve"` |
+| **Default** | `"PascalCase"` |
 | **File** | `internal/providers/formatting.go` |
 
-`"preserve"` keeps the author's casing of built-in function names;
-`"PascalCase"` rewrites call sites to the canonical inventory casing
-(e.g. `sqlexecute(` → `SQLExecute(`). See catalog entry
-`fmt.builtin_function_case`.
+`"PascalCase"` (default) rewrites built-in call sites to the canonical
+inventory casing (e.g. `sqlexecute(` → `SQLExecute(`); member calls such as
+`oVar:upper(...)` are never re-cased. `"preserve"` keeps the author's
+casing. See catalog entry `fmt.builtin_function_case`.
 
 ```json
-{ "ssl.format.builtinFunctionCase": "preserve" }
+{ "ssl.format.builtinFunctionCase": "PascalCase" }
 ```
 
 ---
 
 ## 4. SQL Formatting Options
 
-### 4.1 sql.format.sql.enabled
+### 4.1 ssl.format.sql.enabled
 
 | Property | Value |
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/providers/sql_formatter.go:10,27` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 When enabled, SQL strings passed to SQL functions are automatically formatted.
 
@@ -338,11 +344,19 @@ When enabled, SQL strings passed to SQL functions are automatically formatted.
 | **Type** | `string` |
 | **Default** | `"canonicalCompact"` |
 | **Values** | `"standard"`, `"canonicalCompact"`, `"expanded"` (`"compact"` is a deprecated alias for `canonicalCompact`) |
-| **File** | `internal/providers/sql_formatter.go:11,28` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 SQL formatting style to apply. `"compact"` was retired in the 2026-08-28
 style review (its half-multiline output was internally inconsistent) and
 is accepted as an alias for `canonicalCompact`.
+
+**Deprecation and removal plan for `"compact"`** (issue #257): the alias
+stays while the VS Code extension still lists `compact` in its
+`ssl.format.sql.style` enum. Removal order: (1) the extension drops the
+enum value and migrates a stored `compact` to `canonicalCompact`; (2) the
+next LSP minor release after that extension release drops the alias, at
+which point an unrecognized style formats as `standard`. Both steps are
+called out in each distribution's release notes.
 
 #### Style Comparison
 
@@ -424,7 +438,7 @@ are always preserved regardless of this setting.
 | **Type** | `string` |
 | **Default** | `"upper"` |
 | **Values** | `"upper"`, `"lower"`, `"preserve"` |
-| **File** | `internal/providers/sql_formatter.go:12,29` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 Case transformation for SQL keywords.
 
@@ -441,7 +455,7 @@ Case transformation for SQL keywords.
 | **Type** | `number` |
 | **Default** | `4` |
 | **Range** | `1` - `8` |
-| **File** | `internal/providers/sql_formatter.go:13,30` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 Number of spaces per indentation level within SQL statements.
 
@@ -452,7 +466,7 @@ Number of spaces per indentation level within SQL statements.
 | **Type** | `number` |
 | **Default** | `90` |
 | **Range** | `0` (unlimited) - `200` |
-| **File** | `internal/providers/sql_formatter.go:14,31` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 Maximum line length for SQL before wrapping. Used with `canonicalCompact` and `expanded` styles.
 
@@ -462,7 +476,7 @@ Maximum line length for SQL before wrapping. Used with `canonicalCompact` and `e
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/providers/sql_formatter.go:15,32` |
+| **File** | `internal/providers/sql_formatter.go` |
 
 When enabled, SQL strings are automatically detected and formatted in any string literal, not just those passed to SQL functions. Detection uses structural patterns to distinguish SQL from English sentences.
 
@@ -501,7 +515,7 @@ sSQL := "select * from users";
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `false` |
-| **File** | `internal/providers/diagnostics.go:49,62` |
+| **File** | `internal/providers/diagnostics.go` |
 
 When enabled, warns on declared variables that do not use an allowed Hungarian notation prefix.
 
@@ -520,7 +534,7 @@ When enabled, warns on declared variables that do not use an allowed Hungarian n
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `false` |
-| **File** | `internal/providers/diagnostics.go:59,84` |
+| **File** | `internal/providers/diagnostics.go` |
 
 When enabled, reports declared variables that are never used (hint severity, code `unused_variable`). Opt-in per DECISIONS.md D5: usage counting is name-based and deliberately conservative, so the check is off unless requested.
 
@@ -534,7 +548,7 @@ When enabled, reports declared variables that are never used (hint severity, cod
 |----------|-------|
 | **Type** | `string[]` |
 | **Default** | `["a", "b", "d", "fn", "n", "o", "s", "v"]` |
-| **File** | `internal/providers/diagnostics.go:50,63` |
+| **File** | `internal/providers/diagnostics.go` |
 
 List of allowed Hungarian prefixes.
 
@@ -566,7 +580,7 @@ List of allowed Hungarian prefixes.
 |----------|-------|
 | **Type** | `string[]` |
 | **Default** | `[]` |
-| **File** | `internal/providers/diagnostics.go:51` |
+| **File** | `internal/providers/diagnostics.go` |
 
 List of global variable names. Assignment to these variables triggers an error.
 
@@ -602,7 +616,7 @@ When provider-level undeclared-variable or SQL-parameter validation is enabled, 
 | **Range** | `0` (disabled) or greater |
 | **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
 
-Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `0` to disable the check.
+Maximum allowed block nesting depth. Exceeding it reports `max_block_depth`, an info-tier diagnostic: it is visible only with `ssl.diagnostics.infoDiagnostics` (or `--validate --info`) or an explicit `ssl.diagnostics.rules` entry. Set to `0` to disable the check.
 
 ```json
 { "ssl.diagnostics.maxBlockDepth": 4 }
@@ -619,9 +633,13 @@ Maximum allowed block nesting depth. Exceeding this triggers a warning. Set to `
 Per-rule severity overrides, keyed by the diagnostic's stable code slug
 (the `Code` value shown with each diagnostic; canonical list in
 `internal/providers/diagnostic_codes.go` and `catalog/diagnostics/`).
-Recognized values: `"off"` (drop the diagnostic), `"info"`, `"warn"`,
-`"warning"`, `"error"`. Slugs not present in the map pass through with
-their default severity; unknown slugs are ignored. Added in v0.5.0
+Recognized values: `"off"` (drop the diagnostic), `"hint"`, `"info"`,
+`"warn"`, `"warning"`, `"error"`. Slugs and values are matched
+case-insensitively. Slugs not present in the map pass through with
+their default severity; unknown slugs are ignored, and so is an entry
+with any other value — it changes nothing, and does not exempt the rule
+from the info gate (`ssl.diagnostics.infoDiagnostics`). Added in v0.5.0;
+`"hint"` and case-insensitive matching added in the release after v0.24.0
 (catalog: DECISIONS.md D2).
 
 ```json
@@ -637,17 +655,18 @@ their default severity; unknown slugs are ignored. Added in v0.5.0
 
 | Property | Value |
 |----------|-------|
-| **Type** | `string[]` (glob patterns) |
+| **Type** | `string[]` (case-insensitive path substrings) |
 | **Default** | `[]` |
 | **File** | `internal/server/server.go`, `internal/providers/diagnostics.go` |
 
-Files whose path matches any pattern are treated as SSL endpoint scripts:
+Files whose lowercased URI contains any pattern as a plain substring
+(not a glob — `*` has no special meaning) are treated as SSL endpoint scripts:
 the runtime-injected ambients `Request` and `Response` count as declared
 and are not flagged by `undeclared_variable`. A file can also opt in with
 an `Endpoint:` docblock. Added in v0.7.7 (catalog: DECISIONS.md D4).
 
 ```json
-{ "ssl.diagnostics.endpointPatterns": ["**/endpoints/**", "**/*.srvscr"] }
+{ "ssl.diagnostics.endpointPatterns": ["/endpoints/", "_api.srvscr"] }
 ```
 
 ### 5.8 ssl.diagnostics.infoDiagnostics
@@ -733,7 +752,7 @@ catalog: DECISIONS.md D3).
 |----------|-------|
 | **Type** | `boolean` |
 | **Default** | `true` |
-| **File** | `internal/server/server.go:31-36,324-326` |
+| **File** | `internal/server/server.go` |
 
 Enables or disables inlay hints for built-in SSL functions and dispatch helpers
 such as `DoProc` and `ExecFunction`.
@@ -755,7 +774,7 @@ such as `DoProc` and `ExecFunction`.
 | **Type** | `number` |
 | **Default** | `2` |
 | **Range** | `1` - `20` |
-| **File** | `internal/server/server.go:31-36,324-326` |
+| **File** | `internal/server/server.go` |
 
 Minimum number of parameters required before the server emits inlay hints for a
 call site.
@@ -792,6 +811,11 @@ The default was changed from `true` to `false` because the auto-popup
 obscured the line being typed and reappeared on every keystroke after
 being dismissed. See issue #9.
 
+Trigger characters are advertised once, in the `initialize` response, so
+this setting is read from `initializationOptions` at startup. Changing it
+later through `workspace/didChangeConfiguration` takes effect only after
+the server restarts.
+
 ```json
 {
   "ssl": {
@@ -808,7 +832,7 @@ being dismissed. See issue #9.
 
 ## 8. Internal Options
 
-These options are hardcoded and cannot be changed via client configuration.
+These are provider-level options. Most are fixed; where one is reachable from a client setting or a CLI flag, its section says so.
 
 ### 8.1 CheckUnclosedBlocks
 
@@ -816,7 +840,7 @@ These options are hardcoded and cannot be changed via client configuration.
 |----------|-------|
 | **Type** | `boolean` |
 | **Value** | `true` (always on) |
-| **File** | `internal/providers/diagnostics.go:45,57` |
+| **File** | `internal/providers/diagnostics.go` |
 
 Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 
@@ -826,7 +850,7 @@ Always checks for unclosed block statements (`:IF` without `:ENDIF`, etc.).
 |----------|-------|
 | **Type** | `boolean` |
 | **Value** | `true` (always on) |
-| **File** | `internal/providers/diagnostics.go:46,58` |
+| **File** | `internal/providers/diagnostics.go` |
 
 Always checks for unmatched parentheses, brackets, and braces.
 
@@ -837,9 +861,9 @@ Always checks for unmatched parentheses, brackets, and braces.
 | **Type** | `boolean` |
 | **Value** | `false` |
 | **Status** | IMPLEMENTED (provider option only) |
-| **File** | `internal/providers/diagnostics.go:47,59` |
+| **File** | `internal/providers/diagnostics.go` |
 
-Checks for usage of undeclared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks for usage of undeclared variables (`undeclared_variable`). Not exposed as an LSP client setting; the `--validate --strict` CLI profile enables it.
 
 ### 8.4 CheckUnusedVars
 
@@ -847,10 +871,10 @@ Checks for usage of undeclared variables when enabled directly through `provider
 |----------|-------|
 | **Type** | `boolean` |
 | **Value** | `false` |
-| **Status** | IMPLEMENTED (provider option only) |
-| **File** | `internal/providers/diagnostics.go:48,60` |
+| **Status** | IMPLEMENTED (client setting `ssl.diagnostics.unusedVariables`) |
+| **File** | `internal/providers/diagnostics.go` |
 
-Checks for declared but unused variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks for declared but unused variables (`unused_variable`). Exposed to LSP clients as [`ssl.diagnostics.unusedVariables`](#52-ssldiagnosticsunusedvariables); the `--validate --strict` CLI profile also enables it.
 
 ### 8.5 CheckSQLParams
 
@@ -859,9 +883,9 @@ Checks for declared but unused variables when enabled directly through `provider
 | **Type** | `boolean` |
 | **Value** | `false` |
 | **Status** | IMPLEMENTED (provider option only) |
-| **File** | `internal/providers/diagnostics.go:50,64` |
+| **File** | `internal/providers/diagnostics.go` |
 
-Checks named SQL placeholders against declared variables when enabled directly through `providers.DiagnosticOptions`. This option is not exposed via LSP client settings.
+Checks named SQL placeholders against declared variables (`invalid_sql_param`). Not exposed as an LSP client setting; the `--validate --strict` CLI profile enables it.
 
 ### 8.6 MaxNumberOfProblems
 
@@ -869,9 +893,13 @@ Checks named SQL placeholders against declared variables when enabled directly t
 |----------|-------|
 | **Type** | `number` |
 | **Value** | `100` |
-| **File** | `internal/server/server.go:66,74` |
+| **File** | `internal/server/server.go` |
 
-Maximum number of diagnostics to report per document.
+Maximum number of diagnostics the server publishes per document. Not
+client-configurable: the VS Code extension's own `ssl.maxNumberOfProblems`
+setting is not forwarded to the server and only caps the extension's
+built-in fallback diagnostics (used when the language server is disabled).
+`--validate` applies no cap.
 
 ---
 
@@ -954,7 +982,7 @@ Uses all defaults.
 }
 ```
 
-### 9.4 Compact SQL Configuration
+### 9.4 Expanded SQL Configuration
 
 ```json
 {
@@ -993,32 +1021,72 @@ Uses all defaults.
 - **User:** `~/.config/Code/User/settings.json` (Linux/Mac) or `%APPDATA%\Code\User\settings.json` (Windows)
 - **Workspace:** `.vscode/settings.json`
 
-### 10.2 VS Code Settings Example
+### 10.2 Setting Names in VS Code
+
+The VS Code extension (`vs-code-ssl-formatter`) exposes its own setting
+names and rebuilds the `ssl.*` tree above from them; it sends that tree in
+`initializationOptions` at startup and again on every relevant
+configuration change. The server keys in sections 3–7 are therefore **not**
+the names a VS Code user writes in `settings.json`. Mapping as of extension
+1.23.0:
+
+| VS Code setting | Server key | Notes |
+|-----------------|------------|-------|
+| `ssl.format.indentStyle` | `ssl.format.indentStyle` | |
+| `editor.tabSize` (tab mode) / `ssl.format.indentWidth` (space mode) | `ssl.format.indentSize` | |
+| `ssl.format.wrapLength` | `ssl.format.maxLineLength` **and** `ssl.format.sql.maxLineLength` | one setting drives both |
+| `ssl.format.operatorSpacing`, `commaSpacing`, `semicolonEnforcement`, `blankLinesBetweenProcs`, `trimTrailingWhitespace`, `maxConsecutiveBlankLines`, `builtinFunctionCase` | same name under `ssl.format` | |
+| `ssl.format.sql.enabled`, `style`, `keywordCase`, `identifierCase` | same name under `ssl.format.sql` | `style` still offers the deprecated `compact` (see 4.2) |
+| `ssl.format.sql.indentSpaces` | `ssl.format.sql.indentSize` | |
+| `ssl.naming.hungarianNotation.enabled` | `ssl.diagnostics.hungarianNotation` | extension default `true`; server default `false` |
+| `ssl.naming.hungarianNotation.checkTypes` | `ssl.diagnostics.hungarianTypes` | extension default `true`; server default `false` |
+| `ssl.naming.hungarianNotation.prefixes` | `ssl.diagnostics.hungarianPrefixes` | |
+| `ssl.globals` | `ssl.diagnostics.globals` | |
+| `ssl.styleGuide.limitBlockDepth` | `ssl.diagnostics.maxBlockDepth` | |
+| `ssl.diagnostics.rules`, `endpointPatterns`, `unusedVariables`, `infoDiagnostics` | same name | the extension also re-applies `rules` client-side |
+| `ssl.intellisense.inlayHints.enabled`, `minParameterCount` | `ssl.inlayHints.enabled`, `minParameterCount` | |
+| `ssl.intellisense.signatureHelp.autoTrigger` | `ssl.intellisense.signatureHelp.autoTrigger` | restart to apply (see 7.1) |
+
+Not settable from VS Code (server defaults always apply):
+`ssl.format.blankLineBetweenBlocks` (`true`) and
+`ssl.format.sql.detectSQLStrings` (`true`).
+
+The two Hungarian defaults differ deliberately: the server keeps noisy
+checks opt-in for every client (DECISIONS.md D5), and the extension, whose
+audience is authors writing new SSL, turns them on.
 
 ```json
 {
   "ssl.format.indentStyle": "tab",
-  "ssl.format.indentSize": 4,
-  "ssl.format.maxLineLength": 90,
+  "ssl.format.wrapLength": 90,
   "ssl.format.operatorSpacing": true,
   "ssl.format.commaSpacing": true,
   "ssl.format.semicolonEnforcement": true,
   "ssl.format.blankLinesBetweenProcs": 1,
+  "ssl.format.trimTrailingWhitespace": true,
+  "ssl.format.maxConsecutiveBlankLines": 0,
+  "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.format.sql.enabled": true,
   "ssl.format.sql.style": "canonicalCompact",
-  "ssl.format.sql.keywordCase": "upper",
-  "ssl.format.sql.indentSize": 4,
-  "ssl.format.sql.maxLineLength": 90,
-  "ssl.format.sql.detectSQLStrings": true,
-  "ssl.diagnostics.hungarianNotation": false,
-  "ssl.diagnostics.hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
-  "ssl.diagnostics.globals": ["gCurrentUser", "gAppName"]
+  "ssl.format.sql.indentSpaces": 4,
+  "ssl.naming.hungarianNotation.enabled": false,
+  "ssl.globals": ["gCurrentUser", "gAppName"]
 }
 ```
 
 ### 10.3 Configuration via Extension
 
-The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuration changes to the LSP. Settings changed in VS Code are immediately applied.
+Settings changed in VS Code are sent to the server immediately, except
+`ssl.intellisense.signatureHelp.autoTrigger` (see 7.1).
+
+### 10.4 CLI Consumers
+
+`--validate` and `--format` read no settings file. `--validate` starts
+from the server defaults and takes flags instead (`--info`, `--hungarian`,
+`--hungarian-types`, `--strict`, `--ds`); `--format` starts from the
+formatting defaults and takes `--indent-style`, `--indent-size`,
+`--max-line-length`, `--no-sql`, and `--ds`. See `starlims-lsp --validate --help`
+and `starlims-lsp --format --help`.
 
 ---
 
@@ -1027,12 +1095,16 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | Option | Default |
 |--------|---------|
 | `ssl.format.indentStyle` | `"tab"` |
-| `ssl.format.indentSize` | `4` (space mode only) |
+| `ssl.format.indentSize` | `4` (spaces per level; tab width for line length) |
 | `ssl.format.maxLineLength` | `90` |
 | `ssl.format.operatorSpacing` | `true` |
 | `ssl.format.commaSpacing` | `true` |
 | `ssl.format.semicolonEnforcement` | `true` |
 | `ssl.format.blankLinesBetweenProcs` | `1` |
+| `ssl.format.blankLineBetweenBlocks` | `true` |
+| `ssl.format.trimTrailingWhitespace` | `true` |
+| `ssl.format.maxConsecutiveBlankLines` | `0` (disabled) |
+| `ssl.format.builtinFunctionCase` | `"PascalCase"` |
 | `ssl.format.sql.enabled` | `true` |
 | `ssl.format.sql.style` | `"canonicalCompact"` |
 | `ssl.format.sql.keywordCase` | `"upper"` |
@@ -1041,9 +1113,14 @@ The VS Code extension (`vs-code-ssl-formatter`) automatically sends configuratio
 | `ssl.format.sql.maxLineLength` | `90` |
 | `ssl.format.sql.detectSQLStrings` | `true` |
 | `ssl.diagnostics.hungarianNotation` | `false` |
+| `ssl.diagnostics.hungarianTypes` | `false` |
+| `ssl.diagnostics.unusedVariables` | `false` |
 | `ssl.diagnostics.infoDiagnostics` | `false` |
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
+| `ssl.diagnostics.maxBlockDepth` | `4` |
+| `ssl.diagnostics.rules` | `{}` |
+| `ssl.diagnostics.endpointPatterns` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |
 | `ssl.inlayHints.minParameterCount` | `2` |
 | `ssl.intellisense.signatureHelp.autoTrigger` | `false` |

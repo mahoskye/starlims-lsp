@@ -10,6 +10,7 @@ config:
   - ssl.inlayHints.minParameterCount
 tests:
   - internal/providers/inlayhints_test.go
+  - internal/server/utf16_output_test.go
 history:
   - date: 2026-02-02
     ref: "b44eaf9"
@@ -25,6 +26,29 @@ history:
       string-literal first argument resolves to a same-file procedure and
       the array elements are hinted with its parameter names. Dynamic
       targets stay unhinted.
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Hint labels are the reference parameter names (`SubStr` hints
+      `sSource:`, `nStartPos:`, `nLength:`; `DoProc` hints
+      `sProcedureName:`/`aArguments:`, `ExecFunction` `sName:`/
+      `aParameters:`), now that the signature database is generated from
+      the reference. A function with alternative call forms is hinted
+      only when the argument count selects one form (A9).
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Member calls get no built-in hints (A10): `sName:Replace(...)` is a
+      .NET passthrough and `Me:Left(...)` a class method, yet both were
+      labelled with the like-named SSL built-in's parameters (D10). Stale
+      "inner-array hints not implemented" text removed; minParameterCount
+      wording now matches what it gates.
+  - date: 2026-10-13
+    ref: "issue #307"
+    note: >-
+      Hint positions count UTF-16 code units (A11): they carried rune
+      columns, one unit early per emoji before the argument on its
+      line.
 issues: ["#46"]
 ---
 
@@ -37,32 +61,47 @@ Serves `textDocument/inlayHint` with parameter-name hints:
   applied by the server handler).
 - Built-in function calls get hints from the canonical signature database.
   Functions not in that database get no hints — the server MUST NOT guess.
+  The member name of a `:` access (`sName:Replace(...)`, `Me:Left(...)`)
+  is never a built-in call: it belongs to the receiver, so it gets no
+  hints even when it shares a built-in's name (D10).
 - `DoProc(...)` and `ExecFunction(...)` calls (case-insensitive) get
-  `sProcName:` / `aParams:` hints on their own two arguments.
+  hints on their own two arguments from their reference signatures:
+  `sProcedureName:` / `aArguments:` and `sName:` / `aParameters:`.
+- A function with alternative call forms (`CreateUdObject`) is hinted only
+  when exactly one form can take the call's argument count; otherwise the
+  form is ambiguous and the call gets no hints.
 - When the first DoProc/ExecFunction argument is a string literal naming a
   `:PROCEDURE` in the current document and the second is an array literal
   `{...}`, the procedure's own parameter names are additionally hinted
   inside the array; when the name is a variable, only the outer hints are
-  shown. (Inner-array hints are not implemented yet — see Known gaps / A4.)
+  shown.
 - Hints are emitted only for arguments that are actually present, and for
   every call in nested expressions independently.
 - No hints may be produced for function-like text inside string literals
   (including SQL strings) or comments.
 - `ssl.inlayHints.enabled: false` disables the feature entirely;
-  `ssl.inlayHints.minParameterCount` (default 2) suppresses hints for
-  functions whose signature has fewer parameters than the threshold.
+  `ssl.inlayHints.minParameterCount` (default 2) suppresses built-in hints
+  for signatures with fewer parameters than the threshold, and inner
+  DoProc/ExecFunction array hints for target procedures with fewer
+  parameters. The `sProcName:`/`aParams:` outer hints are always shown.
 - Only calls within the client-requested line range are processed.
+- Hint positions count characters in UTF-16 code units, the encoding
+  the server advertises, so a character outside the Basic Multilingual
+  Plane earlier on the line cannot shift a hint (issue #307).
 
 ## Acceptance
 
 - A1: Given `x := Substr("Hello", 1, 5);`, when hints are requested, then parameter-name hints of kind Parameter appear before each of the three arguments.
-- A2: Given `x := Len(sValue);` with `minParameterCount` at its default of 2, when hints are requested, then no hint is produced for the call; with `minParameterCount: 1` the `source` hint appears.
-- A3: Given `DoProc("MyProc", {100, 200});` or `ExecFunction(...)` in any casing, when hints are requested, then `sProcName:` and `aParams:` hints are produced for the two outer arguments.
+- A2: Given `x := Len(sValue);` with `minParameterCount` at its default of 2, when hints are requested, then no hint is produced for the call; with `minParameterCount: 1` the `vSource` hint appears.
+- A3: Given `DoProc("MyProc", {100, 200});` or `ExecFunction(...)` in any casing, when hints are requested, then the dispatcher's own reference parameter names are hinted on the two outer arguments (`sProcedureName:`/`aArguments:` for DoProc, `sName:`/`aParameters:` for ExecFunction).
 - A4: Given a document defining `:PROCEDURE Calc;` with `:PARAMETERS nQty, nPrice;` and a call `DoProc("Calc", {100, 25.50});`, when hints are requested, then `nQty:` and `nPrice:` hints are additionally produced inside the array literal.
 - A5: Given `s := "Substr(a, 1, 2)";` or the same text inside a comment, when hints are requested, then no hint is produced for the call-shaped text in string or comment context.
 - A6: Given `ssl.inlayHints.enabled: false`, when hints are requested, then the result is empty.
 - A7: Given calls on several lines, when hints are requested for a narrower line range, then hints are produced only for calls inside that range.
 - A8: Given `x := UnknownFunc(a, b, c);` where the callee is neither a built-in nor DoProc/ExecFunction, when hints are requested, then no hints are produced.
+- A9: Given `o := CreateUdObject("Cat.Cls", {1});`, when hints are requested, then `sClassName:` and `aArgs:` are hinted; given the one-argument `CreateUdObject(vDefs)` (property-definition or class-name form), then no hint is produced.
+- A10: Given `sOut := sName:Replace("a", "b");` or `x := Me:Left("abc", 2);`, when hints are requested, then no hints are produced for the member call, while a plain `Left("abc", 2)` call keeps its hints.
+- A11: Given `sX := "<emoji>" + Left(sX, 1);` with an emoji (one character, two UTF-16 code units) in the string, when hints are requested, then each hint sits at its argument's UTF-16 offset (issue #307).
 
 ## Rationale
 

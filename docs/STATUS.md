@@ -12,6 +12,7 @@ dropped (entry retains the history).
 
 | Entry | Title | Status |
 |-------|-------|--------|
+| [feature.cli_contract](../catalog/features/cli_contract.md) | CLI contract for --validate and --format (gating and scoring consumers) | active |
 | [feature.completion](../catalog/features/completion.md) | Completion | active |
 | [feature.cross_file_resolution](../catalog/features/cross_file_resolution.md) | Cross-file target resolution | active |
 | [feature.definition](../catalog/features/definition.md) | Go to definition | active |
@@ -48,5 +49,5 @@ dropped (entry retains the history).
 
 ## Diagnostics
 
-129 rules cataloged: 124 active, 0 draft, 0 planned, 5 removed.
+144 rules cataloged: 141 active, 0 draft, 0 planned, 3 removed.
 Full table: [docs/reference/DIAGNOSTICS.md](reference/DIAGNOSTICS.md).

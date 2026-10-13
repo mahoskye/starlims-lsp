@@ -5,7 +5,7 @@ behavior is normatively recorded in the behavior catalog (`catalog/`) and
 release history in [CHANGELOG.md](../../CHANGELOG.md) — this page is the
 narrative view.
 
-**Last Updated:** 2026-08-28
+**Last Updated:** 2026-10-13
 
 > Historical note: earlier revisions of this roadmap used aspirational
 > v1.x/v2.0 milestone numbers that never matched the released versions.
@@ -16,48 +16,74 @@ narrative view.
 
 ---
 
-## Shipped (through v0.17.0, 2026-08-12)
+## Current direction: the drift audit (epic #253)
+
+The LSP shipped steadily, mostly one issue at a time, while the SSL
+reference, the style guide, and the experience of writing real SSL all
+moved on. Epic [#253](https://github.com/mahoskye/starlims-lsp/issues/253)
+steps back to re-examine the project as a whole. Its workstreams:
+
+| Issue | Workstream |
+|-------|------------|
+| #254 | Upstream sync: vendored reference data and the stale style-guide checkout |
+| #255 | Spec audit: re-verify catalog entries and DECISIONS.md (includes checking each entry's `authority` against [D17](../../catalog/DECISIONS.md)) |
+| #256 | Test suite audit: coverage, stale assertions, corpus baseline |
+| #257 | Inherited/legacy features and settings: keep, deprecate, or remove |
+| #258 | Area-by-area code review of `main` |
+| #259 | Prose docs refresh |
+| #252 | Hover content review |
+| #260 | Reconcile diagnostics with language rules the reference verified on STARLIMS 12 |
+| #261 | Decide which STARLIMS version the LSP models — decided: STARLIMS 12 as verified by the reference ([D17](../../catalog/DECISIONS.md)) |
+| #262 | Specify the `--validate`/`--format` CLI contract for gating and scoring consumers |
+
+The suggested order is upstream sync first, then the spec, legacy, and
+language-rule audits (which decide what behavior *should* be), then tests
+and code review against the settled specs, and docs last. Findings
+become their own issues; see the
+[open issues](https://github.com/mahoskye/starlims-lsp/issues) for the
+current list.
+
+## Shipped (through v0.24.0, 2026-09-21)
 
 All core LSP surfaces are active and spec-backed by the catalog:
 completion, hover, signature help, definition/references/rename
-(cross-file, including `DoProc`/`ExecFunction` dispatch targets),
-document/workspace symbols, folding, inlay hints, snippets, formatting
-(SSL + embedded SQL), and a ~110-rule diagnostics suite with stable rule
-codes, per-rule severity overrides, and in-file suppression. The
-`--validate` and `--format` CLI modes serve CI and agent tooling.
+(cross-file, including `DoProc`/`ExecFunction` dispatch targets, `RunDS`,
+and `:INCLUDE`), document/workspace symbols, folding, inlay hints,
+snippets, and formatting (SSL and embedded SQL). The diagnostics suite
+has stable rule codes, per-rule severity overrides, in-file suppression,
+and an opt-in info tier; [docs/reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md)
+lists every rule. The `--validate` and `--format` CLI modes serve CI and
+agent tooling.
 
-## Unreleased (next release)
+Milestones since the previous revision of this page:
 
-The 2026-08-26→28 arc, fully merged and CHANGELOG'd:
+- **v0.18.0 — the production-corpus release.** Twelve diagnostics from
+  the runtime-verification batch (#185–#200); the opt-in info tier
+  ([D13](../../catalog/DECISIONS.md)) with seven SQL advisories; formatter
+  hardening from the production-corpus review (full-corpus idempotence);
+  dialect-aware SQL conventions ([D14](../../catalog/DECISIONS.md));
+  the expression AST itself (#184, milestone 1).
+- **v0.19.0 — the expression-AST release.** The tree's consumers:
+  `format_arg_not_array` and `builtin_excess_arguments` moved to real call
+  analysis, the new opt-in `hungarian_type_mismatch`, statement-based
+  declaration resolution, and identifier roles for references, rename,
+  and hover. Issue #184 closed.
+- **v0.20.0 / v0.21.0 — Hungarian gates.** `--hungarian` on the CLI;
+  `hungarian_type_mismatch` split onto its own switch
+  (`ssl.diagnostics.hungarianTypes`, `--hungarian-types`).
+- **v0.22.0 / v0.23.0 — no more silent failures.** `unexpected_token`
+  and `unterminated_string` (#240); signed exponents in scientific
+  notation (#244, #246).
+- **v0.24.0 — the strict profile.** `--validate --strict` turns on the
+  undeclared-variable, unused-variable, and SQL-parameter checks for
+  non-interactive consumers, plus eight fixes it surfaced
+  (#249, [D15](../../catalog/DECISIONS.md)).
 
-- **Twelve new diagnostics** from the runtime-verification issue batch
-  (#185–#200), each corpus-validated against ~6,200 production files.
-- **The opt-in info tier** (`ssl.diagnostics.infoDiagnostics`): info
-  severity repositioned as advisory detail for assistant/LLM consumers;
-  18 rules in the tier plus seven new SQL advisories (comma joins,
-  `(+)`, literal splices, dialect mixes, `SELECT *`, alias consistency,
-  suspect placeholders).
-- **Formatter hardening** from the production-corpus review
-  (docs/reviews/2026-08-28): all H-series correctness findings fixed —
-  comment preservation, concatenation-continued literal byte-preservation,
-  ODBC escape/placeholder atomicity, full-corpus idempotence (1,008
-  unstable files → 0), and the data-source routing fixes.
-- **SQL convention decisions** (#219): `identifierCase` with `preserve`
-  default, `compact` style retired, `standard` style reworked to respect
-  line length, rewrites always in rule-F form.
-- **Expression-level AST, milestone 1** (#184): lazy Pratt parser over
-  the token stream, 98.8% statement coverage on the corpus; no consumers
-  wired yet.
-
-## Active tracks
-
-| Track | Where it stands |
-|-------|-----------------|
-| Release cut | `[Unreleased]` is fully written; cut + tag when ready |
-| Downstream bumps | vs-code-ssl-formatter#95 (settings: `infoDiagnostics`, `sql.identifierCase`, `compact` deprecation; info tier for LLM-facing surface) and ssl-style-guide#59 (MCP validate `--info`) carry the full scope |
-| #184 expression AST | Milestone 1 shipped. Next consumers, each opt-in: signature-driven arity/type checks (graduating `format_arg_not_array` and `builtin_excess_arguments` from heuristics), the Hungarian type cross-check, resolution-based `CheckUndeclaredVars`, expression-aware hover/definition |
-| #210 arity verification | 15 builtins' inventory max-arity vs production usage — blocked on live LIMS environment access; upstream table at ssl-style-guide#60 |
-| Type inference & class members | Class-member metadata for the 29 built-in classes → typed member completion; partial inference exists for diagnostics (`Email{}`, `CreateUdObject`, return types). Unblocks after the AST consumers |
+Resolved threads from the previous revision: the downstream setting
+bumps (vs-code-ssl-formatter#95, ssl-style-guide#59) shipped; the arity
+verification (#210) closed with a runtime-probe verdict; typed-receiver
+member completion and hover shipped in v0.14.0 (#123). Member checks on
+scalar and array receivers remain open as #267.
 
 ## Working discipline
 
@@ -69,3 +95,6 @@ The 2026-08-26→28 arc, fully merged and CHANGELOG'd:
 - **Info tier for advice:** advisory findings ship as info severity
   (auto-gated), never as new warning noise; explicit
   `ssl.diagnostics.rules` entries promote per team taste.
+- **One target version:** diagnostics judge compile and run-time claims
+  against STARLIMS 12 as verified by the SSL reference
+  ([D17](../../catalog/DECISIONS.md)).

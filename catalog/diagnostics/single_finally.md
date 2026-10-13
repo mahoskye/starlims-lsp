@@ -19,7 +19,20 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
-issues: []
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      The "statements after the extra :FINALLY are not counted" contract was
+      not implemented: they filled the first clause's body and hid
+      diag.finally_empty. Fixed. The stray-:FINALLY bullet no longer claims an
+      owner that does not exist (issue #292).
+  - date: 2026-10-13
+    ref: "issue #292"
+    note: >-
+      The stray-placement bullet named "the block-structure checks" as
+      owner, but no check reported it. It now points at
+      stray_block_keyword, added for exactly that case.
+issues: ["#292"]
 ---
 
 ## Behavior
@@ -27,7 +40,9 @@ issues: []
 Flags a second (or later) `:FINALLY` within the same `:TRY` block — a
 `:TRY` allows at most one `:FINALLY`. The range covers the extra `:FINALLY`
 token, one diagnostic per extra clause. Statements after the extra
-`:FINALLY` are not counted toward the first `:FINALLY`'s body.
+`:FINALLY` belong to no clause: they are not counted toward the first
+`:FINALLY`'s body, so an empty first `:FINALLY` is still reported as
+`diag.finally_empty`.
 
 Nested `:TRY` blocks are tracked on a stack, so each `:FINALLY` is counted
 only against its own innermost block.
@@ -38,8 +53,8 @@ It must NOT flag:
   each of several nested blocks;
 - a `:FINALLY` in a block that also has a `:CATCH` — one of each is the
   normal full form;
-- a stray `:FINALLY` outside any `:TRY` block (owned by the
-  block-structure checks).
+- a stray `:FINALLY` outside any `:TRY` block — that is
+  `stray_block_keyword`.
 
 ## Examples
 

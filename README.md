@@ -2,7 +2,9 @@
 
 A Language Server Protocol (LSP) implementation for STARLIMS Scripting Language (SSL).
 
-This LSP server provides intelligent code editing features for SSL files across any editor that supports the Language Server Protocol.
+This LSP server provides intelligent code editing features for SSL files across any editor that supports the Language Server Protocol, and a command-line validator and formatter for CI and agent tooling.
+
+The LSP models **STARLIMS 12** SSL as verified by the published [SSL reference](https://github.com/mahoskye/starlims-ssl-reference) (written for STARLIMS 11, verified on STARLIMS 12). Where the two versions are known to differ, diagnostics report what fails on either one; see [D17](catalog/DECISIONS.md).
 
 ## Disclaimer
 
@@ -14,10 +16,12 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 
 | Document | Description |
 |----------|-------------|
-| [Documentation Hub](docs/README.md) | Complete documentation index |
-| [Feature Status](docs/STATUS.md) | Current implementation status |
+| [Documentation Hub](docs/README.md) | Complete documentation index, and which source wins when two disagree |
+| [Behavior Catalog](catalog/README.md) | The normative definition of every diagnostic, feature, and formatter rule |
+| [Feature Status](docs/STATUS.md) | Current implementation status (generated from the catalog) |
+| [Diagnostic Rules](docs/reference/DIAGNOSTICS.md) | Every diagnostic code with its default severity (generated from the catalog) |
 | [Configuration Reference](docs/configuration/CONFIGURATION.md) | All configuration options |
-| [Roadmap](docs/vision/ROADMAP.md) | Prioritized development plan |
+| [Roadmap](docs/vision/ROADMAP.md) | What has shipped and the current direction |
 
 ## Features
 
@@ -26,23 +30,13 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 - **Hover information** for keywords, functions, classes, and user-defined symbols
 - **Signature help** for built-in functions, including dispatch helpers such as `DoProc` and `ExecFunction`
 - **Go to Definition** for procedures and variables, including cross-file navigation for dotted `DoProc`/`ExecFunction` targets, `RunDS` data sources, and `:INCLUDE` paths
-- **Find References** for all symbols, including workspace-wide dispatch call sites for procedures
-- **Document Symbols** (outline) for procedures, variables, and comment regions
-- **Workspace Symbols** backed by a background workspace index
-- **Diagnostics** including:
-  - Core block/keyword validation (`:IF`, `:TRY`, `:CLASS`, `:DEFAULT`, keyword form, loop control)
-  - Style-guide enforcement for `DoProc`/`ExecFunction`, SQL placeholder usage, class layout, `Me`/`Base` class-context forms, `:PUBLIC`, `:INCLUDE`, and legacy keyword handling
-  - Conservative inferred-type checks for `:FOR`, `NIL`, `$`, string `=`, and code-block comparison mistakes
-  - SSL gotcha detection for direct procedure calls, dot-property access, zero-based arrays, assignment in conditions, and comment-semicolon hazards
-  - Opt-in Hungarian notation warnings (configurable prefixes)
-  - An **opt-in info tier** (`ssl.diagnostics.infoDiagnostics`) of advisory
-    detail — style observations and SQL idiom notes (comma joins, `SELECT *`,
-    spliced literals, dialect mixes, …) aimed at assistant/LLM consumers and
-    teams that want the full picture; the default surface stays
-    errors/warnings/hints
+- **Find References** for procedures, variables, and parameters; procedure references include workspace-wide dispatch call sites
 - **Rename Symbol** — variables within the document (scope-aware), procedures workspace-wide including their dispatch call sites
+- **Document Symbols** (outline) for procedures and their parameters, `:PUBLIC` variables, and comment regions
+- **Workspace Symbols** backed by a background workspace index
+- **Diagnostics** with stable rule codes, per-rule severity overrides, and in-file suppression comments. Always-on rules cover code that does not compile or fails at run time, plus high-confidence style-guide rules. Checks prone to false positives (Hungarian notation, undeclared and unused variables, SQL parameters) are opt-in, and an opt-in **info tier** adds advisory detail aimed at assistant/LLM consumers. See [Diagnostic Rules](docs/reference/DIAGNOSTICS.md) for the full list.
 - **Inlay Hints** for parameter names at call sites (configurable minimum parameter count)
-- **Document formatting** for SSL and embedded SQL
+- **Document and range formatting** for SSL and embedded SQL
 - **Folding Ranges** for procedures, comment regions, control-flow blocks, and comments
 - **Code Snippets** for common SSL patterns
 
@@ -54,32 +48,31 @@ Download the appropriate binary for your platform from the [releases page](https
 
 The binaries statically link third-party Go modules; their license texts are
 collected in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md), which is also
-attached to each release. Regenerate it with `make notices` when `go.mod`
-changes.
+attached to each release.
 
 ### Build from Source
 
-Requires Go 1.21 or later.
+Requires the Go version named in [`go.mod`](go.mod) (currently 1.25) or later.
 
 ```bash
 # Clone the repository
 git clone https://github.com/mahoskye/starlims-lsp.git
 cd starlims-lsp
 
-# Build
+# Build for the current platform (into bin/)
 make build
 
-# Or build for all platforms
+# Or install into your Go bin directory
+make install
+
+# Or build for all platforms, or one
 make build-all
+make build-linux
+make build-darwin
+make build-windows
 ```
 
-The binary will be created in the `bin/` directory.
-
-### Install with Go
-
-```bash
-go install github.com/mahoskye/starlims-lsp/cmd/starlims-lsp@latest
-```
+`go install github.com/mahoskye/starlims-lsp/...@latest` does not work, because the module path in `go.mod` is `starlims-lsp`. Build from a clone instead.
 
 ## Usage
 
@@ -97,6 +90,8 @@ Or if built locally:
 ./bin/starlims-lsp --stdio
 ```
 
+`starlims-lsp --version` prints the version and the SSL reference data the binary was built with. `starlims-lsp --export-signatures` prints the built-in function, class, operator, and keyword inventory as JSON.
+
 ### Validation Mode
 
 Validate SSL files from the command line with structured JSON output. Designed for agent skills, CI pipelines, and programmatic use:
@@ -106,11 +101,18 @@ Validate SSL files from the command line with structured JSON output. Designed f
 starlims-lsp --validate script.ssl
 starlims-lsp --validate file1.ssl file2.ssl
 
-# Pipe content via stdin
+# Pipe content via stdin (add --ds for a data source)
 echo ':PROCEDURE Test;:ENDPROC;' | starlims-lsp --validate --stdin
 
 # Include the opt-in info tier (advisory detail; see CONFIGURATION.md §5.8)
 starlims-lsp --validate --info script.ssl
+
+# Strict profile for finished code: adds the undeclared-variable,
+# unused-variable, and SQL-parameter checks the editor leaves off
+starlims-lsp --validate --strict script.ssl
+
+# Hungarian checks: both (--hungarian) or only the type check (--hungarian-types)
+starlims-lsp --validate --hungarian-types script.ssl
 
 # Get validation-specific help
 starlims-lsp --validate --help
@@ -131,88 +133,81 @@ starlims-lsp --format --write script.ssl
 # CI gate: exit non-zero when any file is not already formatted
 starlims-lsp --format --check *.ssl
 
+# Format stdin; layout flags: --indent-style, --indent-size,
+# --max-line-length, --no-sql
+cat script.ssl | starlims-lsp --format --stdin
+
 # Get format-specific help
 starlims-lsp --format --help
 ```
 
-Output is a JSON array with diagnostics per file:
+`--validate` output is a JSON array with diagnostics per file:
 
 ```json
 [
   {
     "file": "script.ssl",
+    "version": "v0.25.0",
     "valid": true,
     "diagnostics": []
   }
 ]
 ```
 
-Exit code `0` means all inputs pass; `1` means errors were found.
+Exit code `0` means all inputs pass; `1` means errors were found; `2` is a
+usage error such as an unknown flag. The full contract for programmatic
+consumers — JSON schema, `valid` semantics, exit codes, every flag and
+profile, and what counts as a breaking change — is
+[`catalog/features/cli_contract.md`](catalog/features/cli_contract.md).
 
 ### VS Code Integration
 
-To use with VS Code, you need a client extension that launches this server. The companion extension [vs-code-ssl-formatter](https://github.com/mahoskye/vs-code-ssl-formatter) can be configured to use this LSP.
+The companion extension [vs-code-ssl-formatter](https://github.com/mahoskye/vs-code-ssl-formatter) launches this server and is the supported way to use it in VS Code.
 
 ### Neovim Integration
 
-Add to your `init.lua`:
+With Neovim 0.11 or later, add to your `init.lua`:
 
 ```lua
--- Register the .ssl filetype
-vim.filetype.add({ extension = { ssl = 'ssl' } })
+-- Register the SSL file types
+vim.filetype.add({
+  extension = { ssl = 'ssl', srvscr = 'ssl', ds = 'ssl' },
+  pattern = { ['.*%.ssl%.txt'] = 'ssl', ['.*%.ds%.txt'] = 'ssl' },
+})
 
-local lspconfig = require('lspconfig')
-local configs = require('lspconfig.configs')
-
-if not configs.starlims_lsp then
-  configs.starlims_lsp = {
-    default_config = {
-      cmd = { 'starlims-lsp', '--stdio' },
-      filetypes = { 'ssl' },
-      root_dir = function(fname)
-        return lspconfig.util.find_git_ancestor(fname) or vim.fn.getcwd()
-      end,
-      settings = {},
-    },
-  }
-end
-
-lspconfig.starlims_lsp.setup{}
+vim.lsp.config('starlims_lsp', {
+  cmd = { 'starlims-lsp', '--stdio' },
+  filetypes = { 'ssl' },
+  root_markers = { '.git' },
+})
+vim.lsp.enable('starlims_lsp')
 ```
 
 ### Other Editors
 
 Any editor supporting LSP can use this server. Configure it to:
 1. Run `starlims-lsp --stdio`
-2. Associate it with `.ssl` files
+2. Associate it with SSL files: `.srvscr`, `.ssl`, `.ssl.txt`, and data sources `.ds`, `.ds.txt`
 
 ## Configuration
 
-The server accepts formatter settings via `workspace/didChangeConfiguration`:
+The server accepts settings under the `ssl` key, both as `initializationOptions` and via `workspace/didChangeConfiguration`. Every field is optional; omitted fields keep their defaults. For example (`rules` here promotes one rule from the hidden info tier to a warning):
 
 ```json
 {
   "ssl": {
     "format": {
       "indentStyle": "tab",
-      "indentSize": 4,
       "maxLineLength": 90,
-      "operatorSpacing": true,
-      "commaSpacing": true,
-      "semicolonEnforcement": true,
-      "blankLinesBetweenProcs": 1,
       "sql": {
-        "enabled": true,
         "style": "canonicalCompact",
-        "keywordCase": "upper",
-        "indentSize": 4,
-        "maxLineLength": 90
+        "keywordCase": "upper"
       }
     },
     "diagnostics": {
-      "hungarianNotation": false,
-      "hungarianPrefixes": ["a", "b", "d", "fn", "n", "o", "s", "v"],
-      "globals": ["gCurrentUser", "gAppName"]
+      "hungarianTypes": true,
+      "infoDiagnostics": false,
+      "rules": { "negative_logic": "warning" }
     },
     "inlayHints": {
       "enabled": true,
@@ -222,42 +217,28 @@ The server accepts formatter settings via `workspace/didChangeConfiguration`:
 }
 ```
 
-`indentStyle: "tab"` is the style-guide default. `indentSize` is only used when `indentStyle` is `"space"`; the bundled value `4` is the fallback space width, not the width of a tab-indented SSL block.
-
-Diagnostics settings default to server defaults. When `hungarianNotation` is enabled, the LSP warns on declared variables that do not use an allowed Hungarian prefix. Global variables can be declared via `globals` array; assignments to these variables will trigger an error. Always-on diagnostics enforce major rules from the authoritative material under `dev/ssl-style-guide/`; [`docs/ssl-reference/style-guide.md`](docs/ssl-reference/style-guide.md) is the bundled public summary.
+[CONFIGURATION.md](docs/configuration/CONFIGURATION.md) documents every setting and its default.
 
 ## SSL Language Overview
 
-SSL (STARLIMS Scripting Language) is a procedural scripting language used in STARLIMS LIMS (Laboratory Information Management System).
-
-### Key Features
-
-- Keywords prefixed with `:` (e.g., `:IF`, `:PROCEDURE`)
-- Comments: `/* comment text;`
-- Strings: `"double"`, `'single'`, or `[bracket]` notation
-- Boolean literals: `.T.`, `.F.`
-- Null literal: `NIL`
-- Logical operators: `.AND.`, `.OR.`, `.NOT.`
-- Assignment: `:=`
-- Built-in classes use curly braces (`Email{}`); `CreateUdObject(...)` is for user-defined classes, empty dynamic objects, or anonymous property bags
-- Custom procedures are invoked through `DoProc(...)` / `ExecFunction(...)`
-
-### Example
+SSL (STARLIMS Scripting Language) is a procedural scripting language used in STARLIMS LIMS (Laboratory Information Management System). Keywords are colon-prefixed and UPPERCASE (`:IF`, `:PROCEDURE`), every statement and comment ends with `;`, logical operators are period-wrapped (`.AND.`), and script procedures are called through `DoProc(...)` / `ExecFunction(...)` (inside a `:CLASS`, through `Me:` / `Base:`).
 
 ```ssl
 :PROCEDURE CalculateTotal;
-:PARAMETERS nItems, nPrice;
-:DECLARE nTotal, i;
+	:PARAMETERS nItems, nPrice;
+	:DECLARE nTotal, i;
 
-nTotal := 0;
+	nTotal := 0;
 
-:FOR i := 1 :TO nItems;
-    nTotal := nTotal + nPrice;
-:NEXT;
+	:FOR i := 1 :TO nItems;
+		nTotal := nTotal + nPrice;
+	:NEXT;
 
-:RETURN nTotal;
+	:RETURN nTotal;
 :ENDPROC;
 ```
+
+For the language itself, see [AGENTS.md](AGENTS.md) (conventions), [`docs/ssl-reference/`](docs/ssl-reference/) (a bundled summary), and the upstream sources they summarize: [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) for language and style rules and [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) for element behavior.
 
 ## Development
 
@@ -265,86 +246,55 @@ nTotal := 0;
 # Build
 make build
 
-# Run tests
+# Run tests (includes the catalog conformance and spec tests)
 make test
+
+# Run only the catalog conformance and spec tests
+make catalog-check
+
+# Regenerate docs/STATUS.md and docs/reference/DIAGNOSTICS.md after a catalog edit
+make generate-docs
 
 # Run with coverage
 make test-coverage
 
-# Format code
+# Format code (requires goimports)
 make fmt
 
 # Lint (requires golangci-lint)
 make lint
 
+# Regenerate THIRD-PARTY-NOTICES.md when go.mod changes
+make notices
+
 # Clean build artifacts
 make clean
 ```
 
+Behavior changes start in the catalog: write or update the entry under [`catalog/`](catalog/README.md), then the code. [ARCHITECTURE.md](docs/vision/ARCHITECTURE.md) describes the packages and how a request flows through them.
+
 ## Project Structure
 
-```
-starlims-lsp/
-├── cmd/
-│   └── starlims-lsp/
-│       ├── main.go           # Entry point
-│       └── validate.go       # --validate CLI mode
-├── internal/
-│   ├── lexer/
-│   │   └── lexer.go          # Tokenizer
-│   ├── parser/
-│   │   └── parser.go         # AST parser
-│   ├── constants/
-│   │   ├── constants.go      # Keywords, literals, operators, legacy inventories
-│   │   ├── canonical.go      # Canonical public function/class inventories
-│   │   └── signatures.go     # Legacy signature corpus
-│   ├── providers/
-│   │   ├── completion.go     # Auto-completion
-│   │   ├── hover.go          # Hover information
-│   │   ├── diagnostics.go    # Error detection
-│   │   ├── definition.go     # Go to definition
-│   │   ├── symbols.go        # Document symbols
-│   │   ├── signaturehelp.go  # Signature help
-│   │   ├── inlayhints.go     # Inlay hints
-│   │   ├── rename.go         # Rename symbol
-│   │   ├── formatting.go     # Document formatting
-│   │   ├── sql_formatter.go  # Embedded SQL formatter
-│   │   ├── sql_lexer.go      # SQL tokenizer
-│   │   └── function_docs.go  # Built-in function documentation
-│   └── server/
-│       ├── server.go         # LSP server setup
-│       ├── handler.go        # LSP request handlers
-│       ├── wrapper_handler.go # Request/response wrappers
-│       ├── cache.go          # Document caching
-│       ├── workspace_index.go # Workspace symbol index
-│       ├── inlayhints_types.go # Inlay hint LSP types
-│       └── conversions.go    # LSP type conversions
-├── go.mod
-├── go.sum
-├── Makefile
-└── README.md
-```
+| Path | Contents |
+|------|----------|
+| `cmd/starlims-lsp/` | The binary: LSP server and the `--validate` / `--format` / `--export-signatures` CLI modes |
+| `cmd/gen-inventory/`, `cmd/gen-catalog-docs/` | Code and doc generators |
+| `dev/exprcoverage/` | Expression-AST coverage harness, run after grammar work: `go run ./dev/exprcoverage <files>`. The rest of `dev/` is ignored, for local copies of sibling repos |
+| `internal/server/` | LSP handlers, document cache, settings, workspace index, cross-file references and rename |
+| `internal/providers/` | Feature logic: diagnostics, completion, hover, navigation, formatting |
+| `internal/parser/`, `internal/lexer/` | Tokenizer, statement tree, and expression AST |
+| `internal/constants/` | The SSL inventory, generated from vendored reference data in `data/` |
+| `internal/catalog/` | Catalog loader, conformance tests, and executable spec tests |
+| `catalog/` | The behavior catalog |
+| `docs/` | Documentation |
 
-## Cross-Platform Builds
-
-The Makefile supports building for multiple platforms:
-
-```bash
-# Build for current platform
-make build
-
-# Build for all platforms
-make build-all
-
-# Build for specific platforms
-make build-linux
-make build-darwin
-make build-windows
-```
+See [ARCHITECTURE.md](docs/vision/ARCHITECTURE.md) for details.
 
 ## Related Projects
 
 - [vs-code-ssl-formatter](https://github.com/mahoskye/vs-code-ssl-formatter) - VS Code extension for SSL
+- [ssl-style-guide](https://github.com/mahoskye/ssl-style-guide) - SSL language and style rules
+- [starlims-ssl-reference](https://github.com/mahoskye/starlims-ssl-reference) - SSL reference (functions, classes, keywords, operators)
 
 ## License
 

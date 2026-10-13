@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
@@ -42,6 +41,13 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 		}
 		if terminatorAcceptable(expected) && lineLeading(tokens, idx) {
 			msg += " (is the previous statement missing its ';'?)"
+		}
+		if se.Kind == parser.StmtFor && len(se.Exprs) == 3 && endsInStepMember(se.Exprs[2]) {
+			// `:TO nMax:STEP 2` — with no space, `:STEP` reads as a member
+			// of the limit expression (diag.step_spacing names the layout
+			// rule; a numeric limit still lexes the keyword and is that
+			// rule's to report).
+			msg += " (missing space before ':STEP'?)"
 		}
 
 		r := tokenToRange(tok)
@@ -175,6 +181,22 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		return true
 	}
 
+	// bare_logical_operator, prefix form: in `:IF Not bA;` the parser reads
+	// `Not` as an operand and stops on `bA`, but the cause is the bare
+	// `Not` that rule already reports (issue #255).
+	if prev := previousSignificantTokenIndex(tokens, idx-1); prev >= 0 &&
+		tokens[prev].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[prev].Text, "NOT") &&
+		bareLogicalOperatorPosition(tokens, prev) {
+		return true
+	}
+
+	// unterminated_string: a string with no closer runs to end of file, so
+	// whatever stands around it is a symptom; that rule names the opener
+	// (issue #255).
+	if tok.Type == lexer.TokenString && tok.Unterminated {
+		return true
+	}
+
 	// unclosed_delimiter: an opener never closed swallows the rest of the
 	// file into this statement, so whatever the parser stopped on is a
 	// symptom of that.
@@ -198,11 +220,14 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		}
 	}
 
-	// unknown_keyword (and endfor_invalid) own a colon form that is not an
-	// SSL keyword — including the lexer's reading of a line-leading member
-	// call (`:Replace(...)` continuing a chain) as one.
-	if tok.Type == lexer.TokenKeyword && strings.HasPrefix(tok.Text, ":") && !isLegacyLabelKeywordForm(tok.Text) &&
-		!constants.IsKeyword(strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))) {
+	// An unknown colon form is not deferred to unknown_keyword: that rule
+	// stays a warning, because a gap in the keyword list must not fail
+	// validation, while a token the statement grammar cannot place is a
+	// parse failure whatever its spelling (issue #291). A statement that
+	// is only an unknown keyword (`:FOOBAR;`) is not a parse failure here
+	// and stays unknown_keyword's alone. endfor_invalid is already an
+	// error and owns `:ENDFOR`.
+	if tok.Type == lexer.TokenKeyword && strings.EqualFold(tok.Text, ":ENDFOR") {
 		return true
 	}
 
@@ -221,6 +246,17 @@ func deferredToOtherRule(tokens []lexer.Token, se *parser.StatementExprs, idx in
 		// operator position.
 		if bareLogicalOperatorPosition(tokens, idx) {
 			return true
+		}
+		// procedure_declaration_syntax: a C-style `PROCEDURE Name(` with no
+		// leading colon stops the parser at the name; that rule names the
+		// declaration typo. Only the shape it reports — the name followed
+		// by `(` — is its; a bare `PROCEDURE Name;` stays here.
+		if prev := previousSignificantTokenIndex(tokens, idx-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenIdentifier && strings.EqualFold(tokens[prev].Text, "PROCEDURE") {
+			if next := nextSignificantTokenIndex(tokens, idx+1); next >= 0 &&
+				tokens[next].Type == lexer.TokenPunctuation && tokens[next].Text == "(" {
+				return true
+			}
 		}
 		// scientific_notation: `7e2` lexes as number `7` glued to
 		// identifier `e2`, and `.5e1` as `.5` glued to `e1`; the number is
@@ -284,4 +320,24 @@ func bareLogicalOperatorPosition(tokens []lexer.Token, i int) bool {
 		return nextIdx >= 0 && operandStart(next) && !(prevIdx >= 0 && operandEnd(prev))
 	}
 	return prevIdx >= 0 && operandEnd(prev) && nextIdx >= 0 && operandStart(next)
+}
+
+// endsInStepMember reports whether a `:FOR` limit expression ends in a
+// member access named STEP — the parse of `:TO nMax:STEP 2`, where the
+// missing space glues the keyword to the limit as `nMax:STEP`.
+func endsInStepMember(e *parser.Expr) bool {
+	for e != nil {
+		switch e.Kind {
+		case parser.ExprMember:
+			return strings.EqualFold(e.Name, "STEP")
+		case parser.ExprBinary:
+			if len(e.Children) < 2 {
+				return false
+			}
+			e = e.Children[1]
+		default:
+			return false
+		}
+	}
+	return false
 }

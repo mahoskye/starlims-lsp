@@ -3,7 +3,7 @@ id: diag.constructor_outside_class
 title: Constructor procedure outside a :CLASS definition
 kind: diagnostic
 status: active
-authority: style_only
+authority: authoritative
 schema_ref: lints.coding_standards.constructor_outside_class
 default_severity: warning
 severity_overridable: true
@@ -17,6 +17,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when every diagnostic gained a Code.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      constructor_outside_class (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. The stale 'schema
+      warnings map to style_only' sentence is removed.
 issues: []
 ---
 
@@ -56,8 +63,7 @@ It must NOT flag:
 
 The schema rule (`lints.coding_standards.constructor_outside_class`,
 severity `warning`) records that Constructor syntax is only meaningful
-inside a `:CLASS` definition; the catalog maps schema warnings to
-`style_only` authority and the emit site uses warning severity to match.
-It is a warning rather than an error because the code still runs — the
+inside a `:CLASS` definition (style-guide record constructor_outside_class,
+authoritative). It is a warning rather than an error because the code still runs — the
 procedure simply never fires as a constructor, which is exactly the silent
 surprise worth flagging.

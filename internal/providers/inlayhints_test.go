@@ -16,21 +16,21 @@ func TestGetInlayHints_BuiltinFunction(t *testing.T) {
 
 	hints := GetInlayHints(tokens, nil, 1, 1, opts)
 
-	// Substr has 3 parameters: source, startPos, length
+	// SubStr has 3 parameters: sSource, nStartPos, nLength (reference names)
 	if len(hints) != 3 {
 		t.Errorf("Expected 3 hints, got %d", len(hints))
 		return
 	}
 
 	// Check first hint
-	if hints[0].Label != "source" {
-		t.Errorf("Expected first hint label 'source', got '%s'", hints[0].Label)
+	if hints[0].Label != "sSource" {
+		t.Errorf("Expected first hint label 'sSource', got '%s'", hints[0].Label)
 	}
-	if hints[1].Label != "startPos" {
-		t.Errorf("Expected second hint label 'startPos', got '%s'", hints[1].Label)
+	if hints[1].Label != "nStartPos" {
+		t.Errorf("Expected second hint label 'nStartPos', got '%s'", hints[1].Label)
 	}
-	if hints[2].Label != "length" {
-		t.Errorf("Expected third hint label 'length', got '%s'", hints[2].Label)
+	if hints[2].Label != "nLength" {
+		t.Errorf("Expected third hint label 'nLength', got '%s'", hints[2].Label)
 	}
 }
 
@@ -64,8 +64,8 @@ func TestGetInlayHints_SingleParameter_ThresholdOne(t *testing.T) {
 		t.Errorf("Expected 1 hint with threshold=1, got %d", len(hints))
 		return
 	}
-	if hints[0].Label != "source" {
-		t.Errorf("Expected hint label 'source', got '%s'", hints[0].Label)
+	if hints[0].Label != "vSource" {
+		t.Errorf("Expected hint label 'vSource', got '%s'", hints[0].Label)
 	}
 }
 
@@ -118,17 +118,17 @@ func TestGetInlayHints_DoProc(t *testing.T) {
 
 	hints := GetInlayHints(tokens, nil, 1, 1, opts)
 
-	// DoProc has 2 parameters: sProcName, aParams
+	// DoProc's published parameters: sProcedureName, aArguments
 	if len(hints) != 2 {
 		t.Errorf("Expected 2 hints for DoProc, got %d", len(hints))
 		return
 	}
 
-	if hints[0].Label != "sProcName" {
-		t.Errorf("Expected first hint 'sProcName', got '%s'", hints[0].Label)
+	if hints[0].Label != "sProcedureName" {
+		t.Errorf("Expected first hint 'sProcedureName', got '%s'", hints[0].Label)
 	}
-	if hints[1].Label != "aParams" {
-		t.Errorf("Expected second hint 'aParams', got '%s'", hints[1].Label)
+	if hints[1].Label != "aArguments" {
+		t.Errorf("Expected second hint 'aArguments', got '%s'", hints[1].Label)
 	}
 }
 
@@ -144,13 +144,13 @@ func TestGetInlayHints_DoProcArrayParamHints(t *testing.T) {
 
 	hints := GetInlayHints(tokens, procs, 1, 1, opts)
 
-	// Outer DoProc hints (sProcName, aParams) plus the two inner
+	// Outer DoProc hints (sProcedureName, aArguments) plus the two inner
 	// array-element hints (nQty, nPrice).
 	var labels []string
 	for _, h := range hints {
 		labels = append(labels, h.Label)
 	}
-	want := map[string]bool{"sProcName": false, "aParams": false, "nQty": false, "nPrice": false}
+	want := map[string]bool{"sProcedureName": false, "aArguments": false, "nQty": false, "nPrice": false}
 	for _, l := range labels {
 		if _, ok := want[l]; ok {
 			want[l] = true
@@ -189,14 +189,14 @@ func TestGetInlayHints_ExecFunction(t *testing.T) {
 
 	hints := GetInlayHints(tokens, nil, 1, 1, opts)
 
-	// ExecFunction has same parameters as DoProc
+	// ExecFunction's published parameters: sName, aParameters
 	if len(hints) != 2 {
 		t.Errorf("Expected 2 hints for ExecFunction, got %d", len(hints))
 		return
 	}
 
-	if hints[0].Label != "sProcName" {
-		t.Errorf("Expected first hint 'sProcName', got '%s'", hints[0].Label)
+	if hints[0].Label != "sName" || hints[1].Label != "aParameters" {
+		t.Errorf("Expected hints 'sName', 'aParameters', got '%s', '%s'", hints[0].Label, hints[1].Label)
 	}
 }
 
@@ -214,7 +214,7 @@ func TestGetInlayHints_NestedCalls(t *testing.T) {
 	}
 
 	// Verify they are Substr hints
-	expectedLabels := []string{"source", "startPos", "length"}
+	expectedLabels := []string{"sSource", "nStartPos", "nLength"}
 	for i, h := range hints {
 		if h.Label != expectedLabels[i] {
 			t.Errorf("Expected hint %d to be '%s', got '%s'", i, expectedLabels[i], h.Label)
@@ -320,7 +320,7 @@ func TestFindFunctionCalls(t *testing.T) {
 	code := `x := Substr(s, 1, 5);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 1 {
 		t.Errorf("Expected 1 function call, got %d", len(calls))
@@ -340,7 +340,7 @@ func TestFindFunctionCalls_NestedParens(t *testing.T) {
 	code := `x := Outer(Inner(a, b), c);`
 	tokens := lexer.NewLexer(code).Tokenize()
 
-	calls := findFunctionCalls(tokens, 1, 1)
+	calls := findFunctionCalls(tokens, parser.IdentifierRoles(tokens), 1, 1)
 
 	if len(calls) != 2 {
 		t.Errorf("Expected 2 function calls, got %d", len(calls))
@@ -476,5 +476,38 @@ func TestGetInlayHints_CaseInsensitiveDoProc(t *testing.T) {
 		if len(hints) != 2 {
 			t.Errorf("Expected 2 hints for '%s', got %d", code, len(hints))
 		}
+	}
+}
+
+// A function with alternative call forms is hinted only when the argument
+// count picks out exactly one form: CreateUdObject("Cat.Cls", {x}) can only
+// be the class-name form, while a lone argument could be either the
+// property-definition form or the class-name form, so it gets no hint.
+func TestGetInlayHints_CallFormsHintOnlyWhenUnambiguous(t *testing.T) {
+	// [spec feature.inlay_hints/A9]
+	two := GetInlayHints(lexer.NewLexer(`o := CreateUdObject("Cat.Cls", {1});`).Tokenize(), nil, 1, 1, DefaultInlayHintOptions())
+	if len(two) != 2 || two[0].Label != "sClassName" || two[1].Label != "aArgs" {
+		t.Errorf("expected sClassName/aArgs hints for the two-argument form, got %+v", two)
+	}
+	one := GetInlayHints(lexer.NewLexer(`o := CreateUdObject(vDefs);`).Tokenize(), nil, 1, 1, InlayHintOptions{Enabled: true, MinParameterCount: 1})
+	if len(one) != 0 {
+		t.Errorf("a one-argument CreateUdObject call is ambiguous and must not be hinted, got %+v", one)
+	}
+}
+
+// [spec feature.inlay_hints/A10] — a member call is not the like-named
+// built-in: `sName:Replace(...)` (a .NET passthrough) and `Me:Left(...)`
+// (a class method) get no built-in parameter-name hints (issue #255).
+func TestGetInlayHints_MemberCallsGetNoBuiltinHints(t *testing.T) {
+	text := "sOut := sName:Replace(\"a\", \"b\");\nx := Me:Left(\"abc\", 2);\ny := Left(\"abc\", 2);"
+	tokens := lexer.NewLexer(text).Tokenize()
+	hints := GetInlayHints(tokens, nil, 1, 3, DefaultInlayHintOptions())
+	for _, h := range hints {
+		if h.Line != 3 {
+			t.Errorf("member calls must get no hints, got %q on line %d", h.Label, h.Line)
+		}
+	}
+	if len(hints) != 2 {
+		t.Errorf("expected the plain Left(...) call on line 3 to keep its two hints, got %+v", hints)
 	}
 }

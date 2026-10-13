@@ -3,6 +3,7 @@ package providers
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
@@ -96,13 +97,10 @@ func maskLeadingSQLComments(content string) string {
 // Callers must already know the document is a SQL-mode data source.
 func checkDataSourceHeaderSemicolons(region string) []Diagnostic {
 	var diagnostics []Diagnostic
+	// col counts runes, the unit every provider position counts in
+	// (issue #307).
 	line, col := 1, 1
 	sawContent := false
-	step := func(n int) {
-		for k := 0; k < n; k++ {
-			col++
-		}
-	}
 	for i := 0; i < len(region); {
 		c := region[i]
 		switch {
@@ -111,7 +109,7 @@ func checkDataSourceHeaderSemicolons(region string) []Diagnostic {
 			col = 1
 			i++
 		case c == ' ' || c == '\t' || c == '\r':
-			step(1)
+			col++
 			i++
 		case strings.HasPrefix(region[i:], "/*"):
 			end := strings.Index(region[i+2:], "*/")
@@ -132,7 +130,7 @@ func checkDataSourceHeaderSemicolons(region string) []Diagnostic {
 			if end < 0 {
 				return diagnostics
 			}
-			step(end)
+			col += utf8.RuneCountInString(region[i : i+end])
 			i += end
 		case c == '\'':
 			j := i + 1
@@ -171,12 +169,13 @@ func checkDataSourceHeaderSemicolons(region string) []Diagnostic {
 				})
 			}
 			sawContent = false
-			step(1)
+			col++
 			i++
 		default:
 			sawContent = true
-			step(1)
-			i++
+			_, size := utf8.DecodeRuneInString(region[i:])
+			col++
+			i += size
 		}
 	}
 	return diagnostics
@@ -252,18 +251,6 @@ func maskRange(content string, end int) string {
 		}
 	}
 	return string(masked) + content[end:]
-}
-
-// IsSQLCommentOnly reports whether data-source content consists solely of
-// terminated SQL comments and whitespace, with at least one comment — the
-// canonical header_comment-only stub (a banner and nothing else). The
-// unterminated SSL comment form never qualifies
-// (feature.diagnostics_pipeline A16, issue #148).
-func IsSQLCommentOnly(content string) bool {
-	if strings.TrimSpace(content) == "" {
-		return false
-	}
-	return strings.TrimSpace(maskLeadingSQLComments(content)) == ""
 }
 
 // SplitDataSourceHeader splits data-source content into a leading header of

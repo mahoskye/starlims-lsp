@@ -196,6 +196,7 @@ type exprParser struct {
 // at `start`, it returns an ExprUnknown covering nothing and next == start.
 // The parser never panics and always advances past what it consumed;
 // unresolvable regions come back as ExprUnknown subtrees.
+// API (no production caller): the public entry point of the expression parser, exercised by the parser tests and fuzz targets.
 func ParseExpression(tokens []lexer.Token, start int) (*Expr, int) {
 	e, next, _ := parseExpressionAt(tokens, start)
 	return e, next

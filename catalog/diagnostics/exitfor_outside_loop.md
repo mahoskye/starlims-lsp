@@ -4,7 +4,7 @@ title: EXITFOR outside a FOR loop
 kind: diagnostic
 status: active
 authority: authoritative
-schema_ref: lints.compile_errors.exitfor_outside_loop
+schema_ref: lints.compile_errors.rules.exitfor_outside_loop
 default_severity: error
 config:
   - ssl.diagnostics.rules
@@ -21,6 +21,11 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned when Code was populated on every diagnostic.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      schema_ref corrected to lints.compile_errors.rules.exitfor_outside_loop; the old path stopped resolving
+      when the style guide moved these lints under a rules list.
 issues: []
 ---
 

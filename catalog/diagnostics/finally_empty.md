@@ -3,7 +3,7 @@ id: diag.finally_empty
 title: Empty :FINALLY block
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,6 +19,26 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code finally_empty assigned.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12
+      (keywords/FINALLY.md: a :FINALLY block must contain at least one
+      statement). Behavior already matches; a fence pins an empty
+      :FINALLY that follows a :CATCH.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      An empty first :FINALLY followed by a duplicate :FINALLY now flags:
+      the duplicate's statements were counted as the first clause's body,
+      hiding this finding behind diag.single_finally.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      try_and_finally_bodies_not_empty (level authoritative) names this
+      rule in enforced_by, so the guide is not silent. Rationale cites
+      the compile-time rejection (reference keywords/TRY, FINALLY).
 issues: []
 ---
 
@@ -29,7 +49,9 @@ Always-on structural check (part of the `:TRY` structure family): when a
 clause contains no statement. The diagnostic range is the `:FINALLY` token
 itself. Any significant token between `:FINALLY` and `:ENDTRY` other than
 `;` counts as a statement; comments and whitespace do NOT count, so a
-`:FINALLY` holding only a comment still flags.
+`:FINALLY` holding only a comment still flags. Statements after a
+duplicate `:FINALLY` (reported by `diag.single_finally`) belong to no
+clause and do not count toward the first `:FINALLY`'s body.
 
 It must NOT flag when:
 
@@ -60,6 +82,28 @@ It must NOT flag when:
 :ENDTRY;
 ```
 
+### Flags
+
+```ssl
+:TRY;
+	nCount := 1;
+:CATCH;
+	nCount := -1;
+:FINALLY;
+:ENDTRY;
+```
+
+### Flags
+
+```ssl
+:TRY;
+	nCount := 1;
+:FINALLY;
+:FINALLY;
+	nCount := 3;
+:ENDTRY;
+```
+
 ### Does not flag
 
 ```ssl
@@ -82,8 +126,11 @@ It must NOT flag when:
 
 ## Rationale
 
-An empty `:FINALLY` is always a leftover — either cleanup code was removed
-without removing the clause, or the author stubbed it and forgot. Introduced
+The reference (keywords/TRY, FINALLY) requires a `:FINALLY` body to hold
+at least one statement, and the language rejects an empty one
+(style-guide record try_and_finally_bodies_not_empty). In practice it is
+always a leftover — either cleanup code was removed without removing the
+clause, or the author stubbed it and forgot. Introduced
 with the TRY-structure family (commit cdbfee6) at error severity to match
 the sibling structural rules (`try_structure`, `single_finally`), which
 treat a malformed handler skeleton as a real defect rather than style.

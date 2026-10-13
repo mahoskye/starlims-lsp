@@ -211,7 +211,7 @@ sResult := LSearch("SELECT Name FROM T WHERE ID = ?", "",, {nID});
 ```ssl
 /* WRONG - dot notation doesn't work;
 oEmail.Subject := "Test";
-nCount := oDataset.RowCount;
+sXml := oDataset.ToXml();
 ```
 
 **Solution:** Use colon notation.
@@ -219,8 +219,8 @@ nCount := oDataset.RowCount;
 ```ssl
 /* CORRECT;
 oEmail:Subject := "Test";
-nCount := oDataset:RowCount;
-sValue := oDataset:GetValue(1, "FieldName");
+sXml := oDataset:ToXml();
+aRows := oDataset:ToArray();
 ```
 
 **LSP Support:** Yes — detects dot notation and suggests colon notation.
@@ -387,7 +387,7 @@ oEmail := Email{};
 oRegex := SSLRegex{'\d+'};
 
 /* User-defined classes use CreateUdObject;
-oCustom := CreateUdObject("MyClass", {params});
+oCustom := CreateUdObject("Category.MyClass", {params});
 ```
 
 **LSP Support:** Yes — detects `ClassName()` patterns for built-in classes.
@@ -558,7 +558,7 @@ aResult := SQLExecute("SELECT * FROM T WHERE Code = ?sCode?");
 nRegionContent := GetRegion("ReportTemplate");
 ```
 
-**LSP Support:** Yes — the LSP emits an Info diagnostic when `:REGION` or `:ENDREGION` is used, noting it is a legacy functional construct and recommending `/* region` / `/* endregion` comments for code organization.
+**LSP Support:** No diagnostic. `:REGION`/`:ENDREGION` are current, supported SSL, so the LSP does not flag them; it folds, indents, and outlines them, and reports only structural problems (`region_end_mismatch`). An earlier info-level `region_legacy` rule was removed in v0.8.0 because its premise was wrong (issue #28, catalog `diag.region_legacy`). Choosing comment markers for pure editor grouping is a review concern (style guide `comment_regions_for_grouping`).
 
 ---
 

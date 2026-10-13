@@ -1,5 +1,10 @@
 # Formatter conformance review — 2026-07-22
 
+> **Status (2026-10-13): resolved — historical record.** Every finding was
+> carved into issues #81–#103, all closed; the fixes shipped in v0.13.0
+> (2026-07-22). Current formatter behavior is specified by the
+> [`catalog/formatting/`](../../catalog/formatting/) entries.
+
 > Carved into issues #81–#103 (2026-07-22): F1→#81, F2→#82, F3→#83, G15→#84,
 > F4→#85, F5→#86, F6→#87, F7→#88, wrap-engine→#89, F8/G1→#90, G2→#91, G3→#92,
 > G7/G8→#93, G9→#94, G10/G11→#95, G12→#96, G13→#97, F10→#98, F12→#99, F13→#100,

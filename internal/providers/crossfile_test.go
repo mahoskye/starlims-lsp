@@ -271,7 +271,7 @@ x := oObj:Unknown;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Augmented property: use on line 5 -> assignment on line 4 (0-based 3).
 	locs := FindDefinitionCrossFile(text, tokens, 5, 15, "file:///self.ssl", procedures, variables, nil)
@@ -289,6 +289,52 @@ x := oObj:Unknown;
 	// Unknown is declared in the file (no word fallback).
 	if locs := FindDefinitionCrossFile(text, tokens, 7, 12, "file:///self.ssl", procedures, variables, nil); locs != nil {
 		t.Errorf("expected null for unknown member on shaped receiver, got %+v", locs)
+	}
+}
+
+// [spec feature.definition/A17] — a 1-part dispatch target whose string sits
+// on the line after `DoProc(` resolves same-file, landing on exactly the
+// procedure name; a call-shaped comment navigates nowhere (issue #255).
+func TestFindDefinitionCrossFile_MultiLineOnePartDispatch(t *testing.T) {
+	text := ":PROCEDURE   Helper;\n:ENDPROC;\n:PROCEDURE Main;\nDoProc(\n  \"Helper\");\n/* see DoProc(\"Helper\") ;\n:ENDPROC;"
+	tokens := lexer.NewLexer(text).Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables()
+
+	locs := FindDefinitionCrossFile(text, tokens, 5, 5, "file:///self.ssl", procedures, variables, nil)
+	if len(locs) != 1 {
+		t.Fatalf("expected the same-file procedure, got %+v", locs)
+	}
+	r := locs[0].Range
+	if r.Start.Line != 0 || r.Start.Character != 13 || r.End.Character != 13+len("Helper") {
+		t.Errorf("expected the range to cover exactly the name (0:13-19), got %+v", r)
+	}
+
+	if locs := FindDefinitionCrossFile(text, tokens, 6, 17, "file:///self.ssl", procedures, variables, nil); locs != nil {
+		t.Errorf("a DoProc-shaped comment must not navigate, got %+v", locs)
+	}
+}
+
+// [spec feature.definition/A18] — a receiver holding a built-in class
+// instance is never shaped: its member has no definition in this file, even
+// after `oMail:Subject := ...`.
+func TestFindDefinitionCrossFile_BuiltinInstanceReceiverNotShaped(t *testing.T) {
+	text := `:PROCEDURE Main;
+:DECLARE oMail, sSubject;
+oMail := Email{};
+oMail:Subject := "x";
+sSubject := oMail:Subject;
+:ENDPROC;`
+	tokens := lexer.NewLexer(text).Tokenize()
+	p := parser.NewParser(tokens)
+	ast := p.Parse()
+	procedures := p.ExtractProcedures(ast)
+	variables := p.ExtractVariables()
+
+	if locs := FindDefinitionCrossFile(text, tokens, 5, 20, "file:///self.ssl", procedures, variables, nil); locs != nil {
+		t.Errorf("expected null for a built-in instance member, got %+v", locs)
 	}
 }
 

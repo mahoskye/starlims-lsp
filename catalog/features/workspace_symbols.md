@@ -31,6 +31,14 @@ history:
       (category/script/anchor), entry-point :PARAMETERS, procedure
       docblocks (Raw dropped) and visibility flags. Symbol search
       behavior is unchanged; memory grows by the docblock prose.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Dot-directories below a workspace root (.git, .claude, .history)
+      are skipped by the background walk and by watcher events: copies of
+      scripts in them (history snapshots, agent worktrees) listed every
+      procedure twice (A8). Stale "open-document results are always
+      Function" text removed.
 issues: ["#45"]
 ---
 
@@ -42,12 +50,15 @@ Serves `workspace/symbol` across the entire workspace:
   query returns all known procedures. Fuzzy matching is NOT provided.
 - Only procedures are returned; variables and regions MUST NOT appear.
   Index results use kind Function (12) for script files and kind Method (6)
-  for files whose first significant token is `:CLASS`. (Open-document
-  results are currently always Function — see Known gaps.)
+  for files whose first significant token is `:CLASS`, whether the file
+  is open or only indexed.
 - On initialization the server MUST index all workspace files with SSL
   extensions (`.srvscr`, `.ssl`, `.ssl.txt`, `.ds`, `.ds.txt`,
   case-insensitive) in the background, and register file watchers for those
   globs so the index tracks creates, changes, and deletes without a restart.
+  Dot-directories below a root (`.git`, `.claude`, `.history`, ...) are
+  never indexed, by the walk or from watcher events — they hold copies of
+  scripts that would list every procedure twice.
 - Open documents are authoritative: when a file is both open and indexed,
   results come from the open document and the index entry is skipped — the
   same procedure MUST NOT appear twice.
@@ -69,6 +80,7 @@ Serves `workspace/symbol` across the entire workspace:
 - A5: Given a query matching nothing, when searching, then an empty result is returned and no error is raised.
 - A6: Given an indexed file that is removed from the index (deletion event), when the query is repeated, then its procedures MUST NOT appear.
 - A7: Given a client that supplies no workspace root, when searching, then only open documents are consulted and the server does not error.
+- A8: Given copies of an SSL file under `.history/`, `.git/`, or `.claude/worktrees/…` below a workspace root, when the background index scans or a watcher event reports one, then the copies are not indexed and the procedure is listed once.
 
 ## Rationale
 

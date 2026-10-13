@@ -1,8 +1,11 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"starlims-lsp/internal/providers"
@@ -115,6 +118,11 @@ type ExtendedServerCapabilities struct {
 	protocol.ServerCapabilities
 	// InlayHintProvider indicates inlay hint support (LSP 3.17).
 	InlayHintProvider bool `json:"inlayHintProvider,omitempty"`
+	// PositionEncoding names the encoding of every position's Character
+	// (LSP 3.17). Always "utf-16": it is the LSP default every client
+	// must support, so stating it explicitly changes nothing for a 3.16
+	// client and tells a 3.17 client not to expect any other encoding.
+	PositionEncoding string `json:"positionEncoding,omitempty"`
 }
 
 // ExtendedInitializeResult is the initialize result with extended capabilities.
@@ -204,10 +212,10 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	// Capture workspace roots for indexing
 	if len(params.WorkspaceFolders) > 0 {
 		for _, folder := range params.WorkspaceFolders {
-			s.rootURIs = append(s.rootURIs, folder.URI)
+			s.rootURIs = append(s.rootURIs, canonicalURI(folder.URI))
 		}
 	} else if params.RootURI != nil {
-		s.rootURIs = []string{*params.RootURI}
+		s.rootURIs = []string{canonicalURI(*params.RootURI)}
 	} else if params.RootPath != nil {
 		s.rootURIs = []string{pathToURI(*params.RootPath)}
 	}
@@ -264,6 +272,7 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 		Capabilities: ExtendedServerCapabilities{
 			ServerCapabilities: capabilities,
 			InlayHintProvider:  true,
+			PositionEncoding:   positionEncodingUTF16,
 		},
 		ServerInfo: &protocol.InitializeResultServerInfo{
 			Name:    serverName,
@@ -319,7 +328,7 @@ func (s *SSLServer) handleShutdown(context *glsp.Context) error {
 
 // handleDidOpen handles document open.
 func (s *SSLServer) handleDidOpen(context *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	version := int(params.TextDocument.Version)
 	content := params.TextDocument.Text
 
@@ -334,7 +343,7 @@ func (s *SSLServer) handleDidOpen(context *glsp.Context, params *protocol.DidOpe
 
 // handleDidChange handles document changes.
 func (s *SSLServer) handleDidChange(context *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	version := int(params.TextDocument.Version)
 
 	// Get current content
@@ -363,13 +372,13 @@ func (s *SSLServer) handleDidChange(context *glsp.Context, params *protocol.DidC
 
 // handleDidClose handles document close.
 func (s *SSLServer) handleDidClose(context *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	s.documents.RemoveDocument(uri)
 	delete(s.documentVersion, uri)
 
 	// Re-index from disk so the workspace index has the latest saved content
 	if s.workspaceIndex != nil {
-		go s.workspaceIndex.IndexFile(uri)
+		s.workspaceIndex.ReindexAsync(uri)
 	}
 
 	return nil
@@ -378,7 +387,7 @@ func (s *SSLServer) handleDidClose(context *glsp.Context, params *protocol.DidCl
 // handleDidSave handles document save.
 func (s *SSLServer) handleDidSave(context *glsp.Context, params *protocol.DidSaveTextDocumentParams) error {
 	// Re-validate on save
-	s.validateDocument(context, params.TextDocument.URI)
+	s.validateDocument(context, canonicalURI(params.TextDocument.URI))
 	return nil
 }
 
@@ -388,12 +397,19 @@ func (s *SSLServer) handleDidChangeWatchedFiles(context *glsp.Context, params *p
 		return nil
 	}
 	for _, event := range params.Changes {
-		uri := event.URI
+		uri := canonicalURI(event.URI)
 		switch event.Type {
 		case protocol.FileChangeTypeCreated, protocol.FileChangeTypeChanged:
-			// Skip if file is currently open (open document is more up-to-date)
+			// Copies under dot-directories are never indexed (issue #255).
+			if s.workspaceIndex.InHiddenDir(uri) {
+				continue
+			}
+			// Skip if file is currently open (open document is more
+			// up-to-date). Parsing runs on the background worker: a large
+			// checkout delivers thousands of events, and indexing them
+			// here would hold up every request behind them (issue #258).
 			if _, open := s.documents.GetDocument(uri); !open {
-				s.workspaceIndex.IndexFile(uri)
+				s.workspaceIndex.ReindexAsync(uri)
 			}
 		case protocol.FileChangeTypeDeleted:
 			s.workspaceIndex.RemoveFile(uri)
@@ -521,12 +537,17 @@ func isDataSourceURI(uri string) bool {
 // out of the box: users opt in either via the marker in their files or
 // the workspace setting.
 func isEndpointFile(uri string, content string, patterns []string) bool {
+	// URIs are percent-escaped (canonicalURI), so a pattern is matched
+	// against the URI and against its path: "Server Scripts/API" matches
+	// as written.
 	lowerURI := strings.ToLower(uri)
+	lowerPath := strings.ToLower(filepath.ToSlash(uriToPath(uri)))
 	for _, p := range patterns {
 		if p == "" {
 			continue
 		}
-		if strings.Contains(lowerURI, strings.ToLower(p)) {
+		lp := strings.ToLower(p)
+		if strings.Contains(lowerURI, lp) || strings.Contains(lowerPath, lp) {
 			return true
 		}
 	}
@@ -575,7 +596,7 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	opts := s.settings.Diagnostics
 	opts.IsDataSourceFile = isDataSourceURI(uri)
 	opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
-	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
+	opts.IncludeDeclaredVariables, opts.IncludesResolved = (liveResolver{s}).includeClosure(cache.Tokens, uri)
 	if !opts.IsDataSourceFile {
 		opts.ClassFileDispatchTargets = (liveResolver{s}).classFileDispatchTargets(cache.Tokens)
 	}
@@ -593,14 +614,14 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 		diagnostics = providers.GetDiagnosticsFromTokens(cache.Tokens, cache.AST, opts)
 	}
 
-	// Convert to protocol diagnostics
+	diagnostics = capDiagnostics(diagnostics, s.settings.MaxNumberOfProblems)
+
+	// Convert to protocol diagnostics, ranges in UTF-16 units (issue #307).
+	m := newUTF16Mapper(content)
 	protocolDiags := make([]protocol.Diagnostic, 0, len(diagnostics))
-	for i, d := range diagnostics {
-		if i >= s.settings.MaxNumberOfProblems {
-			break
-		}
+	for _, d := range diagnostics {
 		pd := protocol.Diagnostic{
-			Range:    toProtocolRange(d.Range),
+			Range:    m.rng(d.Range),
 			Severity: ptrTo(protocol.DiagnosticSeverity(d.Severity)),
 			Source:   &d.Source,
 			Message:  d.Message,
@@ -617,68 +638,82 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	})
 }
 
+// capDiagnostics orders diagnostics most severe first — errors, then
+// warnings, info, and hints — and by position within a severity, then
+// keeps the first limit. Checks emit in rule order, so capping that order
+// could publish 100 warnings and drop the error below them (issue #258).
+// A limit of zero or less means no cap.
+func capDiagnostics(diags []providers.Diagnostic, limit int) []providers.Diagnostic {
+	slices.SortStableFunc(diags, func(a, b providers.Diagnostic) int {
+		if c := cmp.Compare(severityRank(a.Severity), severityRank(b.Severity)); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Range.Start.Line, b.Range.Start.Line); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Range.Start.Character, b.Range.Start.Character)
+	})
+	if limit > 0 && len(diags) > limit {
+		diags = diags[:limit]
+	}
+	return diags
+}
+
+// severityRank orders severities error < warning < info < hint; an
+// unknown value sorts last.
+func severityRank(s providers.DiagnosticSeverity) int {
+	if s >= providers.SeverityError && s <= providers.SeverityHint {
+		return int(s)
+	}
+	return int(providers.SeverityHint) + 1
+}
+
 // applyChange applies an incremental change to content.
+//
+// LSP positions count UTF-16 code units (protocol 3.16 has no other
+// encoding), so a character outside the Basic Multilingual Plane occupies
+// two columns. The offset arithmetic used to count runes, which put every
+// edit after such a character one column late per character and left the
+// server's copy of the document permanently out of step with the editor's
+// (issue #256).
 func applyChange(content string, change protocol.TextDocumentContentChangeEvent) string {
 	if change.Range == nil {
 		return change.Text
 	}
 
-	runes := []rune(content)
-	lines := splitLines(string(runes))
-
-	startLine := int(change.Range.Start.Line)
-	startChar := int(change.Range.Start.Character)
-	endLine := int(change.Range.End.Line)
-	endChar := int(change.Range.End.Character)
-
-	// Calculate byte offsets
-	startOffset := 0
-	for i := 0; i < startLine && i < len(lines); i++ {
-		startOffset += len(lines[i]) + 1 // +1 for newline
+	startOffset := positionOffset(content, int(change.Range.Start.Line), int(change.Range.Start.Character))
+	endOffset := positionOffset(content, int(change.Range.End.Line), int(change.Range.End.Character))
+	if endOffset < startOffset {
+		endOffset = startOffset
 	}
-	if startLine < len(lines) {
-		lineRunes := []rune(lines[startLine])
-		if startChar <= len(lineRunes) {
-			startOffset += len(string(lineRunes[:startChar]))
-		}
-	}
-
-	endOffset := 0
-	for i := 0; i < endLine && i < len(lines); i++ {
-		endOffset += len(lines[i]) + 1
-	}
-	if endLine < len(lines) {
-		lineRunes := []rune(lines[endLine])
-		if endChar <= len(lineRunes) {
-			endOffset += len(string(lineRunes[:endChar]))
-		}
-	}
-
-	// Apply change
-	if startOffset > len(content) {
-		startOffset = len(content)
-	}
-	if endOffset > len(content) {
-		endOffset = len(content)
-	}
-
 	return content[:startOffset] + change.Text + content[endOffset:]
 }
 
-// splitLines splits content into lines.
-func splitLines(content string) []string {
-	var lines []string
-	start := 0
-	for i, r := range content {
-		if r == '\n' {
-			lines = append(lines, content[start:i])
-			start = i + 1
+// positionOffset converts an LSP position (0-based line, UTF-16 column) to
+// a byte offset into content. A line past the end clamps to the end of
+// content; a column past the end of its line clamps to the line end (before
+// the newline), as the LSP specification directs.
+func positionOffset(content string, line, character int) int {
+	offset := 0
+	for i := 0; i < line; i++ {
+		nl := strings.IndexByte(content[offset:], '\n')
+		if nl < 0 {
+			return len(content)
+		}
+		offset += nl + 1
+	}
+	units := 0
+	for i, r := range content[offset:] {
+		if r == '\n' || units >= character {
+			return offset + i
+		}
+		if r >= 0x10000 {
+			units += 2
+		} else {
+			units++
 		}
 	}
-	if start <= len(content) {
-		lines = append(lines, content[start:])
-	}
-	return lines
+	return len(content)
 }
 
 // ptrTo returns a pointer to the value.

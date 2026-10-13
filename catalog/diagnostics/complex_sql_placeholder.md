@@ -3,7 +3,7 @@ id: diag.complex_sql_placeholder
 title: Complex expression inside a SQLExecute named placeholder
 kind: diagnostic
 status: active
-authority: tool
+authority: advisory
 schema_ref: null
 default_severity: info
 config:
@@ -25,6 +25,17 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Range fixed for multi-line SQL strings: it stayed on the string's
+      first line, past its end. Shared helper with udobject_array_in_clause.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to advisory: the style-guide record
+      complex_sql_placeholder (level advisory) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 
@@ -36,7 +47,8 @@ complex expression — anything that does not match the standard placeholder
 grammar `identifier` optionally followed by `. : [ ] ( ) , '` characters. In
 practice that means expressions containing spaces or arithmetic /
 concatenation operators (`?sPrefix + sSuffix?`). The range covers just the
-placeholder inside the string.
+placeholder inside the string, on the placeholder's own line when the
+string spans several lines.
 
 It must NOT flag:
 

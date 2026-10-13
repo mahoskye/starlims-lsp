@@ -3,8 +3,8 @@ id: diag.empty_optional_param_array
 title: Trailing empty array passed for an optional parameter
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: style_only
+schema_ref: lints.parameter_skipping_style.trailing_params
 default_severity: info
 config:
   - ssl.diagnostics.infoDiagnostics
@@ -24,6 +24,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to style_only: the style-guide record
+      empty_optional_param_array (level style_only) names this rule in
+      enforced_by, so the guide is not silent.
 issues: []
 ---
 

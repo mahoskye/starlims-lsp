@@ -164,40 +164,29 @@ func TestClassContextForms(t *testing.T) {
 	}
 }
 
+// Keyword, operator, and literal descriptions come from the published
+// reference (issue #252); the gotchas the hand-written one-liners used to
+// carry (EXITCASE fall-through, FINALLY restrictions, = vs != on strings)
+// now ride in the hover's caveats and don't-list, pinned by
+// TestReferenceHoversCarryGotchas in the providers package.
 func TestKeywordAndOperatorDescriptions(t *testing.T) {
-	// Source-of-truth alignment: keyword descriptions must reflect authoritative language rules
-
-	// EXITCASE must mention fall-through / multi-match behavior
-	desc := SSLKeywordDescriptions["EXITCASE"]
-	if !strings.Contains(desc, "without it") || !strings.Contains(desc, "evaluated") {
-		t.Errorf("EXITCASE description must explain that without it, later :CASE blocks are still evaluated; got: %q", desc)
-	}
-
-	// FINALLY must list all four restricted keywords
-	desc = SSLKeywordDescriptions["FINALLY"]
-	for _, kw := range []string{":RETURN", ":EXITFOR", ":EXITWHILE", ":LOOP"} {
-		if !strings.Contains(desc, kw) {
-			t.Errorf("FINALLY description must mention %s restriction; got: %q", kw, desc)
+	for _, kw := range SSLKeywords {
+		if SSLKeywordDescriptions[kw] == "" {
+			t.Errorf("keyword %s has no reference description", kw)
 		}
 	}
-
-	// = operator must mention prefix/loose matching
-	desc = SSLOperatorDescriptions["="]
-	if !strings.Contains(desc, "prefix") || !strings.Contains(desc, "loose") {
-		t.Errorf("= description must mention loose prefix matching; got: %q", desc)
+	for _, op := range SSLOperators {
+		if SSLOperatorDescriptions[op] == "" {
+			t.Errorf("operator %s has no reference description", op)
+		}
 	}
-
-	// != operator must convey that it's the opposite of == (exact match),
-	// not = (prefix match on strings).
-	desc = SSLOperatorDescriptions["!="]
-	if !strings.Contains(desc, "==") || !strings.Contains(desc, "prefix") {
-		t.Errorf("!= description must reference == and explain '=' is prefix-match on strings; got: %q", desc)
+	for _, lit := range SSLLiterals {
+		if SSLLiteralDescriptions[lit] == "" {
+			t.Errorf("literal %s has no reference description", lit)
+		}
 	}
-
-	// $ operator must explain containment direction
-	desc = SSLOperatorDescriptions["$"]
-	if !strings.Contains(desc, "left") && !strings.Contains(desc, "right") {
-		t.Errorf("$ description should clarify containment direction; got: %q", desc)
+	if desc := SSLOperatorDescriptions["="]; !strings.Contains(desc, "prefix") {
+		t.Errorf("= description must mention prefix matching for strings; got: %q", desc)
 	}
 }
 

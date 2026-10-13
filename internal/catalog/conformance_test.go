@@ -105,6 +105,13 @@ func TestSlugBijection(t *testing.T) {
 	}
 }
 
+// panicOnlyDiagnostics are emitted only when the pipeline recovers from a
+// panic. No input produces one on a correct build, so a '### Flags' fence
+// cannot exist; the entry's tests drive a real panic instead.
+var panicOnlyDiagnostics = map[string]bool{
+	"internal_error": true,
+}
+
 // TestEntryLints enforces status-dependent prose requirements. Structural
 // validity (frontmatter, enums, ID/path agreement) is enforced by Load.
 func TestEntryLints(t *testing.T) {
@@ -140,7 +147,7 @@ func TestEntryLints(t *testing.T) {
 			if !e.HasH2("Examples") {
 				t.Errorf("%s: active diagnostic missing '## Examples'", e.Path)
 			}
-			if countExecutable(e.FencesIn("Flags")) == 0 {
+			if countExecutable(e.FencesIn("Flags")) == 0 && !panicOnlyDiagnostics[e.Slug()] {
 				t.Errorf("%s: active diagnostic needs at least one non-expect=fail '### Flags' fence", e.Path)
 			}
 			if countExecutable(e.FencesIn("Does not flag")) == 0 {
@@ -240,7 +247,13 @@ func TestCriterionTraceability(t *testing.T) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".git" || name == "bin" || name == "node_modules" || name == "dev" || name == "snapshots" {
+			// Hidden directories (.git, and tool state such as .claude,
+			// which can hold whole git worktrees of other branches) are
+			// not this checkout's tests.
+			if path != repoRoot && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			if name == "bin" || name == "node_modules" || name == "dev" || name == "snapshots" {
 				return filepath.SkipDir
 			}
 			return nil

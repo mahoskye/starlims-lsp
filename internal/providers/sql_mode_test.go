@@ -78,7 +78,7 @@ ORDER BY v.VISITDATE`
 
 	// Hybrid shape: a :PARAMETERS header declares the placeholder, so the
 	// implicit-alias body draws no diagnostic at all.
-	hybrid := `:PARAMETERS patOrigRec;
+	hybrid := `:PARAMETERS patOrigRec := 0;
 
 SELECT p.ORIGREC PatientId
 FROM PATIENTS p
@@ -122,32 +122,6 @@ func TestGetDiagnostics_SQLContentOutsideDataSourceStillFlags(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	if diags := GetDiagnostics(sql, opts); len(diags) == 0 {
 		t.Error("expected SSL diagnostics on SQL content outside a data source")
-	}
-}
-
-// IsSQLDocument classifies whole-document content, tolerating leading SQL
-// comments while never classifying SSL content as SQL.
-func TestIsSQLDocument(t *testing.T) {
-	cases := []struct {
-		name    string
-		content string
-		want    bool
-	}{
-		{"plain select", "SELECT SampleID FROM Samples", true},
-		{"leading sql comments", "-- note\n/* block */\nSELECT SampleID FROM Samples", true},
-		{"insert", "INSERT INTO AuditLog (Msg) VALUES ('x')", true},
-		{"ssl leading comment", "/* datasource doc;\n:PARAMETERS sStatus;", false},
-		{"ssl code", ":PARAMETERS sStatus;\nsSQL := \"SELECT X FROM T\";", false},
-		{"empty", "", false},
-		{"prose mentioning select", "SELECT is a keyword in SQL", false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsSQLDocument(tc.content); got != tc.want {
-				t.Errorf("IsSQLDocument(%q) = %v, want %v", tc.content, got, tc.want)
-			}
-		})
 	}
 }
 
@@ -319,7 +293,7 @@ func TestGetDiagnostics_BannerBeforeHeaderKeepsHybridDetection(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 
-	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus;\n\nSELECT s.sample_id FROM samples s WHERE s.sample_status = @sStatus\n"
+	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT s.sample_id FROM samples s WHERE s.sample_status = @sStatus\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected no diagnostics for banner+header+SQL data source, got %+v", diags)
 	}
@@ -345,7 +319,7 @@ func TestGetDiagnostics_HeaderOnlyDataSource(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 
-	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus;\n"
+	clean := bannerComment + ":DSN := conn;\n:PARAMETERS sStatus := \"A\";\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected no diagnostics for banner+header-only data source, got %+v", diags)
 	}
@@ -353,34 +327,6 @@ func TestGetDiagnostics_HeaderOnlyDataSource(t *testing.T) {
 	flagged := bannerComment + ":dsn := conn;\n"
 	if diags := GetDiagnostics(flagged, opts); len(diags) == 0 {
 		t.Error("expected header checks to still run on a header-only data source")
-	}
-}
-
-// IsSQLCommentOnly accepts terminated SQL comments and whitespace only —
-// never the unterminated SSL comment form, never real content.
-// [spec feature.diagnostics_pipeline/A16]
-func TestIsSQLCommentOnly(t *testing.T) {
-	cases := []struct {
-		name    string
-		content string
-		want    bool
-	}{
-		{"banner", bannerComment, true},
-		{"line_comment", "-- note\n", true},
-		{"line_comment_no_newline", "-- note", true},
-		{"mixed_comments", "/* a */\n-- b\n/* c */", true},
-		{"empty", "", false},
-		{"whitespace_only", "  \n\t\n", false},
-		{"ssl_comment", "/* datasource doc;\n", false},
-		{"comment_then_sql", "/* a */\nSELECT 1 FROM DUAL", false},
-		{"comment_then_directive", "/* a */\n:DSN := conn;", false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsSQLCommentOnly(tc.content); got != tc.want {
-				t.Errorf("IsSQLCommentOnly(%q) = %v, want %v", tc.content, got, tc.want)
-			}
-		})
 	}
 }
 
@@ -437,7 +383,7 @@ func TestGetDiagnostics_SQLDataSource_FunctionNameColumnsAndInertSemicolons(t *t
 		"function_name_table":  "delete from FORMAT where ORIGREC = 1\n",
 		"block_comment":        "/* examples: 'all;msoffice->pdf' and 'doc->pdf'; keep in sync */\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf'\nwhere ORIGREC = 1\n",
 		"line_comment":         "update DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' -- default is 'all;msoffice->pdf'; keep\nwhere ORIGREC = 1\n",
-		"hybrid":               ":DSN := \"LimsDB\";\n:PARAMETERS pDocType;\n\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' /* e.g. 'a;b'; note */\nwhere DOCTYPE = @pDocType\n",
+		"hybrid":               ":DSN := \"LimsDB\";\n:PARAMETERS pDocType := \"\";\n\nupdate DOCTYPESCONVERSION\nset FORMAT = 'all;msoffice->pdf' /* e.g. 'a;b'; note */\nwhere DOCTYPE = @pDocType\n",
 	} {
 		if diags := GetDiagnostics(content, opts); len(diags) != 0 {
 			t.Errorf("%s: expected no diagnostics, got %+v", name, diags)
@@ -446,11 +392,11 @@ func TestGetDiagnostics_SQLDataSource_FunctionNameColumnsAndInertSemicolons(t *t
 }
 
 // A bare `;` outside comments and string literals in a SQL-mode
-// data-source body warns with datasource_sql_semicolon at the semicolon's
-// position — including in the hybrid shape, where positions are offset
-// past the directive header and the header's own `;` terminators never
-// flag. The warning honors rule overrides and never fires outside
-// data-source files. [spec feature.diagnostics_pipeline/A20]
+// data-source body is an error (datasource_sql_semicolon) at the
+// semicolon's position — including in the hybrid shape, where positions
+// are offset past the directive header and the header's own `;`
+// terminators never flag. The diagnostic honors rule overrides and never
+// fires outside data-source files. [spec feature.diagnostics_pipeline/A20]
 func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
@@ -468,7 +414,7 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	plain := "update A set X = 1;\nupdate B set Y = 2\n"
 	hits := collect(plain, opts)
 	if len(hits) != 1 {
-		t.Fatalf("plain: expected exactly one separator warning, got %+v", hits)
+		t.Fatalf("plain: expected exactly one separator error, got %+v", hits)
 	}
 	// Error, not warning: STARLIMS refuses the document outright with
 	// "Invalid SQL statement: remove any misplaced semicolons(;)"
@@ -483,7 +429,7 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	hybrid := ":DSN := \"LimsDB\";\n:PARAMETERS p1;\n\nselect A from B where C = @p1;\n"
 	hits = collect(hybrid, opts)
 	if len(hits) != 1 {
-		t.Fatalf("hybrid: expected exactly one separator warning (header ';' must not flag), got %+v", hits)
+		t.Fatalf("hybrid: expected exactly one separator error (header ';' must not flag), got %+v", hits)
 	}
 	if hits[0].Range.Start.Line != 3 || hits[0].Range.Start.Character != 29 {
 		t.Errorf("hybrid: expected range at 3:29 (the body ';'), got %+v", hits[0].Range)
@@ -492,12 +438,12 @@ func TestGetDiagnostics_DataSourceSQLSemicolon(t *testing.T) {
 	override := opts
 	override.RuleOverrides = map[string]string{CodeDatasourceSQLSemicolon: "off"}
 	if hits := collect(plain, override); len(hits) != 0 {
-		t.Errorf("override off: expected no separator warnings, got %+v", hits)
+		t.Errorf("override off: expected no separator errors, got %+v", hits)
 	}
 
 	ssl := DefaultDiagnosticOptions()
 	if hits := collect(":DECLARE nX;\nnX := 1;\n", ssl); len(hits) != 0 {
-		t.Errorf("ssl file: separator warning must not fire outside data sources, got %+v", hits)
+		t.Errorf("ssl file: separator error must not fire outside data sources, got %+v", hits)
 	}
 }
 
@@ -587,7 +533,7 @@ func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T)
 		"*******************************************************/;\n"
 	sql := "SELECT s.SAMPLE_ID, s.STATUS, t.NAME || ' (' || t.CODE || ')'\n" +
 		"FROM SAMPLES s, TESTS t\n" +
-		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = ?sStatus? or s.RUSH = 'Y'\n"
+		"WHERE s.TEST_ID = t.TEST_ID and s.STATUS = @sStatus or s.RUSH = 'Y'\n"
 
 	onlySemicolon := func(label, content string) {
 		t.Helper()
@@ -609,7 +555,7 @@ func TestGetDiagnostics_BannerClosingSemicolonKeepsHybridDetection(t *testing.T)
 	onlySemicolon("banner-*/;", clean)
 
 	// Spaces before the `;` are the same idiom, and the same error.
-	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus;\n\n" + sql
+	spaced := strings.Replace(banner, "*/;", "*/  ;", 1) + ":PARAMETERS sStatus := \"Done\";\n\n" + sql
 	onlySemicolon("banner-*/ ;", spaced)
 
 	// Dropping the `;` is the fix, and leaves the document clean.
@@ -665,7 +611,7 @@ func TestGetDiagnostics_CommentedOutDirectiveIsNotSSLMarker(t *testing.T) {
 
 	clean := ":PARAMETERS sFolderNo := '12345';\n" +
 		"--:PARAMETERS sFolderNo := '';\n" +
-		"SELECT f.FOLDER_NO, f.STATUS FROM FOLDERS f WHERE f.FOLDER_NO = ?sFolderNo?\n"
+		"SELECT f.FOLDER_NO, f.STATUS FROM FOLDERS f WHERE f.FOLDER_NO = @sFolderNo\n"
 	if diags := GetDiagnostics(clean, opts); len(diags) != 0 {
 		t.Errorf("expected SQL mode for body with commented-out directive, got %+v", diags)
 	}
@@ -734,7 +680,7 @@ func TestSQLModeDataSource_SSLStyleBannerAboveHeader(t *testing.T) {
 // [spec feature.diagnostics_pipeline/A31] The end-to-end consequence: the
 // SQL body of such a document draws no SSL diagnostics.
 func TestDiagnostics_SSLBannerDataSourceBodyIsNotLexedAsSSL(t *testing.T) {
-	content := "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT io.name FROM sample WHERE status = ?sStatus? AND a = 1\n"
+	content := "/* DATA SOURCE: X;\n:DSN := conn;\n:PARAMETERS sStatus := \"A\";\n\nSELECT io.name FROM sample WHERE status = @sStatus AND a = 1\n"
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
 	opts.IncludeInfoDiagnostics = true

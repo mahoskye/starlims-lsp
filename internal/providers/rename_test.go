@@ -14,7 +14,7 @@ func parseText(text string) ([]parser.ProcedureInfo, []parser.VariableInfo) {
 	tokens := lex.Tokenize()
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
-	return p.ExtractProcedures(ast), p.ExtractVariables(ast)
+	return p.ExtractProcedures(ast), p.ExtractVariables()
 }
 
 // ==================== PrepareRename Tests ====================
@@ -709,5 +709,157 @@ func TestPrepareRename_OnePartDispatchString_Rejected(t *testing.T) {
 	col := strings.Index(`:RETURN DoProc("CalcTotal");`, "CalcTotal") + 3
 	if result := PrepareRename(text, 4, col, "file:///test.ssl", procedures, variables); result != nil {
 		t.Errorf("expected rejection inside a 1-part dispatch string, got %+v", result)
+	}
+}
+
+// [spec feature.rename/A5] — NIL and built-in class names are not legal new
+// names either (issue #258).
+func TestRename_InvalidNewName_LiteralAndClass(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sName;
+sName := "test";
+:ENDPROC;`
+	procedures, variables := parseText(text)
+	for _, bad := range []string{"NIL", "nil", "Email", "SSLDataset"} {
+		if result := Rename(text, 3, 1, bad, "file:///test.ssl", procedures, variables); result != nil {
+			t.Errorf("expected rename to %q to be rejected", bad)
+		}
+	}
+}
+
+// [spec feature.rename/A18] — a dispatch string naming the like-spelled
+// procedure is a procedure call site: renaming the variable (or a member)
+// leaves `DoProc("Calc")` untouched (issue #258).
+func TestRename_VariableLeavesLikeNamedDispatchString(t *testing.T) {
+	text := `:PROCEDURE Calc;
+:RETURN 1;
+:ENDPROC;
+:PROCEDURE Main;
+:DECLARE Calc, nX, oObj;
+Calc := 1;
+nX := DoProc("Calc");
+nX := oObj:Calc();
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	res := Rename(text, 6, 1, "nCalc", "file:///t.ssl", procedures, variables)
+	if res == nil {
+		t.Fatal("expected the variable rename to produce edits")
+	}
+	for _, line := range editedLines(res) {
+		if line == 6 || line == 0 || line == 7 {
+			t.Errorf("variable rename must not edit the dispatch string, the procedure, or the member (edited line %d)", line)
+		}
+	}
+}
+
+// [spec feature.rename/A21] — edit ranges are character (rune) columns: a
+// non-ASCII character earlier on the line never skews the edit (issue #258).
+func TestRename_NonASCIIBeforeOccurrence(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sName;
+sName := "Größe" + sName;
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	res := Rename(text, 3, 1, "sNew", "file:///t.ssl", procedures, variables)
+	if res == nil {
+		t.Fatal("expected edits")
+	}
+	got := applyEdits(text, res.Changes["file:///t.ssl"])
+	want := `:PROCEDURE Test;
+:DECLARE sNew;
+sNew := "Größe" + sNew;
+:ENDPROC;`
+	if got != want {
+		t.Errorf("rename produced:\n%s\nwant:\n%s", got, want)
+	}
+
+	// Prepare-rename on the second occurrence ranges over exactly the name.
+	prep := PrepareRename(text, 3, 22, "file:///t.ssl", procedures, variables)
+	if prep == nil || prep.Range.Start.Character != 19 || prep.Range.End.Character != 24 {
+		t.Errorf("expected prepare range 19-24 on the second sName, got %+v", prep)
+	}
+}
+
+// [spec feature.rename/A22] — renaming a file-wide variable leaves alone a
+// procedure that declares its own local of the same name (issue #258).
+func TestRename_FileWideSkipsShadowingProcedure(t *testing.T) {
+	text := `:PUBLIC gCount;
+gCount := 0;
+:PROCEDURE Uses;
+gCount := gCount + 1;
+:ENDPROC;
+:PROCEDURE Shadows;
+:DECLARE gCount;
+gCount := 5;
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	res := Rename(text, 2, 1, "gTotal", "file:///t.ssl", procedures, variables)
+	if res == nil {
+		t.Fatal("expected edits")
+	}
+	lines := editedLines(res)
+	for _, want := range []int{0, 1, 3} {
+		if !containsLine(lines, want) {
+			t.Errorf("expected the public's occurrence on line %d to be edited, got %v", want, lines)
+		}
+	}
+	if containsLine(lines, 6) || containsLine(lines, 7) {
+		t.Errorf("the shadowing procedure's own local must not be edited, got %v", lines)
+	}
+}
+
+// [spec feature.rename/A23] — Rename repeats prepare's guards: a request
+// positioned inside a comment or string produces no edits (issue #258).
+func TestRename_FromCommentOrStringProducesNoEdits(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE sName;
+/* sName is documented here;
+sName := "sName";
+:ENDPROC;`
+	procedures, variables := parseText(text)
+	if res := Rename(text, 3, 4, "sNew", "file:///t.ssl", procedures, variables); res != nil {
+		t.Errorf("rename from a comment must produce no edits, got %+v", res)
+	}
+	if res := Rename(text, 4, 12, "sNew", "file:///t.ssl", procedures, variables); res != nil {
+		t.Errorf("rename from a string must produce no edits, got %+v", res)
+	}
+}
+
+func applyEdits(text string, edits []TextEdit) string {
+	lines := strings.Split(text, "\n")
+	// Apply right-to-left per line so earlier columns stay valid.
+	byLine := map[int][]TextEdit{}
+	for _, e := range edits {
+		byLine[e.Range.Start.Line] = append(byLine[e.Range.Start.Line], e)
+	}
+	for ln, es := range byLine {
+		runes := []rune(lines[ln])
+		for i := 0; i < len(es); i++ {
+			for j := i + 1; j < len(es); j++ {
+				if es[j].Range.Start.Character > es[i].Range.Start.Character {
+					es[i], es[j] = es[j], es[i]
+				}
+			}
+		}
+		for _, e := range es {
+			runes = append(append(append([]rune{}, runes[:e.Range.Start.Character]...), []rune(e.NewText)...), runes[e.Range.End.Character:]...)
+		}
+		lines[ln] = string(runes)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// [spec feature.rename/A21] — getWordRange matches on the original line by
+// characters: a non-ASCII character whose case mapping changes length
+// (`İ`) earlier on the line neither panics nor shifts the range (issue #255).
+func TestGetWordRange_NonASCIICaseMapping(t *testing.T) {
+	text := "x := \"İİİ\" + SNAME;"
+	r := getWordRange(text, 1, 15, "sName")
+	start := len([]rune("x := \"İİİ\" + "))
+	if r == nil || r.Start.Character != start || r.End.Character != start+5 {
+		t.Errorf("expected range %d-%d, got %+v", start, start+5, r)
 	}
 }

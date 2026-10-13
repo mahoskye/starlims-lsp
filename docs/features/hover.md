@@ -37,18 +37,24 @@ The hover provider displays contextual information when the user hovers over ide
 
 Hover content is rendered as Markdown text:
 
-```markdown
-**SQLExecute(commandString: variant, [friendlyName: variant], ...)**
+````markdown
+```ssl
+SQLExecute(sCommandString, [sConnectionName], [bRollbackExistingTransaction], ...)
+```
 
-Built-in SSL function
+*Built-in SSL function*
+
+Executes SQL and returns either query results or a success flag.
 
 **Parameters:**
-- `commandString`: The SQL command to execute
-- `friendlyName`: Optional logging/friendly name
-- `...`: Additional optional execution controls
+- `sCommandString`: *(string)* SQL to execute. Must be a non-empty string.
+- `sConnectionName`: *(string, optional, default: current default connection)* Connection name to run the SQL against.
+- ...
 
-**Returns:** Variant result routed by SQLExecute
-```
+**Returns:** `any` — Rows for a `SELECT` statement, ...; a boolean success value for other statements.
+
+**Documented exceptions:** ...
+````
 
 ### 2.3 Hover Response Structure
 
@@ -157,10 +163,10 @@ result := SQLExecute(query, "ds");
    followed by the built-in function description and parameter list
    
    **Parameters:**
-   - `commandString`: ...
-   - `friendlyName`: ...
+   - `sCommandString`: *(string)* ...
+   - `sConnectionName`: *(string, optional, default: current default connection)* ...
    
-   **Returns:** variant
+   **Returns:** `any` — ...
 ;
 ```
 
@@ -270,17 +276,17 @@ sCustomer := "ACME";
 sSQL := "SELECT * FROM customers WHERE name = ?sCustomer?";
 /* Hover position: over "sCustomer" inside the ?...?;
 /* Expected:
-   **SQL Parameter: sCustomer**
-   Named parameter placeholder
-   This placeholder will be replaced with the value of `sCustomer` at runtime.
+   **SQL parameter `?sCustomer?`** *(named placeholder)*
+   SQLExecute binds the current value of `sCustomer` as a query parameter;
+   only SQLExecute substitutes `?name?`.
 ;
 
 /* Test: Hover over positional SQL placeholder;
 RunSQL("SELECT * FROM t WHERE a = ? AND b = ?", {val1, val2});
 /* Hover position: over second "?";
 /* Expected:
-   **SQL Parameter #2**
-   Positional parameter placeholder
+   **SQL parameter #2** *(positional placeholder)*
+   Bound to the 2nd element of the values array.
 ;
 ```
 
@@ -310,8 +316,8 @@ The current server returns hover contents without an explicit hover range.
 
 ### 8.3 Function Signature Database
 
-All 330 canonical built-in functions are exposed through the canonical inventory in `internal/constants/canonical.go`, backed by the legacy signature corpus in `internal/constants/signatures.go`, with:
+All 330 canonical built-in functions are exposed through the canonical inventory in `internal/constants/canonical.go`, generated from the vendored reference (`generated_functions.go`) with the documented overrides in `internal/constants/function_overrides.go`, with:
 - Function name
-- Parameter list (name, type, optional flag)
+- Parameter list (name, type, required/optional, default)
 - Return type
 - Description

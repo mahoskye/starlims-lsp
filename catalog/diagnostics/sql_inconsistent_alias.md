@@ -3,7 +3,7 @@ id: diag.sql_inconsistent_alias
 title: SELECT list mixing AS and bare aliases
 kind: diagnostic
 status: active
-authority: style_only
+authority: tool
 schema_ref: null
 default_severity: info
 config:
@@ -13,6 +13,7 @@ suppressible: true
 spec_options:
   include_info_diagnostics: true
 tests:
+  - internal/providers/datasource_sql_content_test.go
   - internal/providers/providers_test.go
 history:
   - date: 2026-08-28
@@ -21,6 +22,21 @@ history:
       Introduced as part of the info-tier SQL advisory batch: seven
       observations the formatter cannot act on, aimed at the
       assistant/LLM consumers the tier serves.
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      False positive fixed: the TOP count was left in the first item, so
+      `select top 10 col, x as y` read `10 col` as a bare alias and flagged a
+      consistent list. The whole TOP clause is now skipped. Authority
+      corrected style_only -> tool: the style guide has no record for it.
+  - date: 2026-10-13
+    ref: "issue #294"
+    note: >-
+      Also runs on SQL-mode data-source bodies, which previously got only
+      the semicolon and placeholder checks. Corpus (--info, 6,228 files):
+      +86 sql_comma_join, +164 sql_select_star, +16
+      sql_inconsistent_alias, +1 sql_dialect_mix; no unicode or collate
+      findings.
 issues: []
 ---
 
@@ -32,8 +48,14 @@ recognized embedded-SQL call. Items are split at depth-zero commas
 between `SELECT` and `FROM`; an item classifies as bare-aliased when it
 ends with an identifier directly following another value token
 (identifier, number, string, placeholder, or `)`) with no dot chaining.
+A leading `DISTINCT` and a `TOP` clause (the keyword, its count `10` or
+`(10)`, and any `PERCENT` / `WITH TIES`) are not part of the first item.
 One diagnostic per string when both forms are present; the range covers
 the string token.
+Each string piece of a concatenated argument is judged on its own. A
+piece that opens or closes inside a `'…'` literal continued across
+concatenation is a fragment, not a statement, so it is left to
+`sql_literal_splice` and skipped here.
 
 It must NOT flag:
 
@@ -43,7 +65,11 @@ It must NOT flag:
   consistency is the rule, not either form;
 - qualified column references (`t.col` is a dot chain, not a bare
   alias);
-- `DISTINCT`/`TOP` prefixes and `*` items.
+- `DISTINCT`/`TOP` prefixes and `*` items — in particular a `TOP 10`
+  count is never read as an item whose trailing column is a bare alias.
+
+It also runs on the body of a SQL-mode data source (D15), which is one
+statement: the finding is ranged on the body's first word (issue #294).
 
 ## Examples
 
@@ -63,6 +89,12 @@ aRows := SQLExecute("select o.ordno as orderno, o.folderno as fno from orders o"
 
 ```ssl
 aRows := SQLExecute("select o.ordno, o.folderno from orders o");
+```
+
+### Does not flag
+
+```ssl
+aRows := SQLExecute("select top 10 o.ordno, o.folderno as fno from orders o");
 ```
 
 ## Rationale

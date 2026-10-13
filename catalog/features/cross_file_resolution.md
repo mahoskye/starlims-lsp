@@ -9,6 +9,9 @@ config: []
 tests:
   - internal/server/script_identity_test.go
   - internal/server/cross_file_test.go
+  - internal/server/workspace_index_test.go
+  - internal/server/uri_test.go
+  - internal/server/uri_server_test.go
 history:
   - date: 2026-07-02
     ref: "cross-file milestone plan"
@@ -43,6 +46,43 @@ history:
       within the language, not a namespace collision, and is unaffected.)
       Class-only dispatch classification (DispatchResolvesToClassOnly)
       added for diag.execfunction_class_target.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      ProcedureInfo.IsPrivate now requires an annotation in force — the
+      exact lowercase form on the line immediately before :PROCEDURE —
+      matching diag.visibility_annotation. A near-miss spelling or an
+      annotation detached by a blank line or another comment used to mark
+      the procedure private (and hide it from completion) although the
+      runtime leaves it public.
+  - date: 2026-10-13
+    ref: "issue #255 (features audit)"
+    note: >-
+      Truthful null enforced: when a rule finds the named script but the
+      script lacks the procedure, neither the basename degradation nor the
+      workspace-unique fallback runs (they used to land in an unrelated
+      script, which rename then treated as an unambiguous caller). A7
+      strengthened; class-only classification gets its criterion (A20).
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      The include closure reports whether it is complete (A23). A
+      document whose :INCLUDE could not be read no longer gets
+      undeclared_variable findings: on the production corpus's
+      unmodified product code, 134 of the 210 --strict findings in files
+      with an :INCLUDE named a variable the included script declares.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      One canonical file URI (A21). The index keyed files by an unescaped
+      URI built from the path while VS Code sends `%20`-escaped ones, so
+      the open-document overlay never applied, cross-file rename skipped
+      call sites, workspace symbols listed an open file twice, a didClose
+      re-index added a second entry, and Delete events missed. On Windows
+      the drive letter broke the path conversion both ways and the index
+      found nothing. Index maintenance hardened (A22): a file whose parse
+      panics is logged and skipped, watched-file re-indexing runs on the
+      background worker, and a delete supersedes an in-flight parse.
 issues: []
 ---
 
@@ -76,14 +116,20 @@ Windows-style `/C:/...` paths):
   procedure (the flat-layout form). When both rules hit, both candidate
   sets are returned.
 - 3+-part `…Cat.Script.Proc`: category chain first (all leading segments
-  joined form the category); when it yields nothing, degrade to
+  joined form the category); when the chain finds no script, degrade to
   script-basename match on the second-to-last segment.
 - Final fallback for either shape: the last segment as a
-  **workspace-unique** procedure name — applied only when no other rule
-  hit and exactly one candidate exists. Two or more candidates yield
-  nothing (the uniqueness gate keeps flat-layout guessing quiet).
+  **workspace-unique** procedure name — applied only when no rule found
+  the named script and exactly one candidate exists. Two or more
+  candidates yield nothing (the uniqueness gate keeps flat-layout guessing
+  quiet).
 - **Truthful null**: a resolved script that lacks the named procedure
-  contributes nothing — resolution never lands "near" a target.
+  contributes nothing, and its presence stops the later rules — neither
+  the degradation nor the fallback runs — so resolution never lands
+  "near" a target in some other script.
+- **Class-only classification** (for `diag.execfunction_class_target`):
+  a dotted target is class-only when it has at least one candidate and
+  every candidate is a `:CLASS` file.
 
 **Include resolution** (`:INCLUDE` targets, already unquoted): dotted
 `Category.Script` uses the category chain, degrading to a basename match;
@@ -108,22 +154,48 @@ as declared in the including file. The closure is transitive — included
 scripts' own `:INCLUDE`s contribute too — with a visited-set cycle guard,
 and an ambiguous include target contributes the union of all its
 resolution candidates (erring toward fewer false positives). Unresolvable
-targets contribute nothing; without a workspace index, diagnostics behave
-exactly as before (single-file). Open included documents contribute their
+targets contribute nothing. Open included documents contribute their
 live-buffer declarations, consistent with the open-document overlay.
 Consumers: `diag.undeclared_variable` and `diag.invalid_sql_param`.
+The closure also reports whether it is complete: every `:INCLUDE` target
+in it resolved to a readable file. A document with an `:INCLUDE` whose
+closure is incomplete — a target that does not resolve, or no workspace
+index at all, as in `--validate` — gets no `undeclared_variable`
+findings, since the unread script may declare any name (DECISIONS.md
+D10, issue #304). `invalid_sql_param` keeps its single-file behavior.
 
 **Candidate ordering and cap**: anchored canonical-layout matches order
 before flat matches, path-lexicographic within each group, capped at 10.
 
 **Visibility**: `/*@private;` and `/*@protected;` procedures resolve for
 navigation (following author intent); completion surfaces filter them out
-separately (feature.completion, when cross-file completion lands).
+separately (feature.completion, when cross-file completion lands). A
+procedure counts as annotated only when the annotation is in force — the
+exact form on the line immediately before `:PROCEDURE` — the same verdict
+diag.visibility_annotation reports (issue #255).
 
 **Open-document overlay**: resolutions into currently-open documents
 re-derive their target line from the live document cache, so unsaved
 edits never produce stale jump targets; a procedure deleted in the live
 buffer drops that candidate entirely.
+
+**File identity**: a file has one URI inside the server. Every URI a
+client sends (document requests, watched-file events, workspace roots)
+is canonicalized at the handler boundary, and the index builds its keys
+from paths with the same function, so the open-document store and the
+index always agree on which file is which. The canonical form is the
+one VS Code sends: unreserved characters and `/` literal, every other
+byte percent-encoded (`Server%20Scripts`), and on Windows a lower-case,
+escaped drive letter (`file:///c%3A/...`). Converting back to a path
+strips the slash before a Windows drive letter and maps a URI authority
+to a UNC path. URIs in responses use the canonical form.
+
+**Index maintenance**: the startup walk and every later re-index (a
+watched-file Created or Changed event, a document closing) parse on a
+bounded background worker, never on the request goroutine. A file whose
+parse panics is logged to stderr and skipped. A Delete event, or a newer
+re-index of the same file, supersedes any parse of it still in flight,
+so a stale parse cannot re-add a deleted file.
 
 ## Acceptance
 
@@ -133,7 +205,7 @@ buffer drops that candidate entirely.
 - A4: Given an indexed script with a file-level `:PARAMETERS`, when a 2-part `Category.Script` target resolves, then the result is that script's entry point at the `:PARAMETERS` line (line 0 when the script has none).
 - A5: Given a flat-layout file `Helpers.ssl` containing `:PROCEDURE CalculateTotal`, when `Helpers.CalculateTotal` resolves, then the result is that procedure's line in that file.
 - A6: Given `Cat.Script.Proc` where the category is unknown to the workspace, when it resolves, then the script-basename degradation finds `Script` and returns procedure `Proc`.
-- A7: Given a target whose script resolves but whose procedure does not exist in it, when it resolves, then NO result is returned.
+- A7: Given a target whose script resolves but whose procedure does not exist in it, when it resolves, then NO result is returned — even when another script defines a workspace-unique procedure of that name.
 - A8: Given targets differing from the indexed names only by case, when they resolve, then they resolve identically to the exact-case forms.
 - A9: Given two files matching the same target (one anchored, one flat), when it resolves, then both candidates are returned with the anchored match first.
 - A10: Given a target matching no category or script rule whose last segment names a procedure found in exactly one workspace file, when it resolves, then that procedure is returned; given the same shape with the procedure in two files, then nothing is returned.
@@ -146,6 +218,10 @@ buffer drops that candidate entirely.
 - A17: Given a script and a data source sharing a name, when a dispatch or include target names it, then only the script is returned; when a data-source target names it, then only the data source is returned.
 - A18: Given file A with `:INCLUDE B;` where B declares `:PUBLIC gShared;` and B itself includes C declaring `:PUBLIC gDeep;`, when A's include declaration closure is computed, then it contains both `gShared` and `gDeep`; a cyclic include chain (C including A) terminates without error.
 - A19: Given an include target resolving to two candidate files with different declarations, when the closure is computed, then it contains the union of both candidates' declared names; an unresolvable include target contributes nothing.
+- A20: Given a dotted dispatch target whose every candidate is a `:CLASS` file, when class-only classification runs, then it is true; when any candidate is an ordinary script, or there is no candidate, then it is false.
+- A21: Given workspace files under a path containing a space and a client that sends `%20`-escaped URIs (and, on Windows, `file:///c%3A/...` drive URIs), when the client opens, closes, renames across, or reports watched-file events for those files, then each file is indexed under exactly one key — the open-document overlay applies, cross-file rename reaches the closed callers, workspace symbols list an open file once, a didClose re-index leaves one entry, and a Delete event removes it — and the URIs in responses are the client's own spelling; Windows paths and URIs convert in both directions (drive letters, percent-encoding, UNC).
+- A22: Given background indexing, when a file's parse panics, then the panic is logged and only that file is skipped; when watched-file Created/Changed events arrive, then the handler returns without parsing and the files are indexed on the background worker; and when a Delete event arrives while a re-index of the same file is queued or parsing, then the file is not added back.
+- A23: Given a document with `:INCLUDE B;` and a name declared nowhere, when diagnostics run with undeclared checking on, then `undeclared_variable` flags the name only when B resolves through the workspace index (the closure is complete); when B does not resolve, or there is no workspace index, then the document gets no `undeclared_variable` finding, and a document without an `:INCLUDE` is checked as before (issue #304).
 
 ## Rationale
 

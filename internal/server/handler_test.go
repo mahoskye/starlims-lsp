@@ -848,6 +848,37 @@ func TestHandleCompletion_ColonTriggerSuppressedAfterIdentifier(t *testing.T) {
 	}
 }
 
+// Issue #267: an SSL array (or scalar) has no SSL-object members and no
+// enumerable native members, so `aItems:` offers nothing.
+//
+// [spec feature.completion/A11]
+func TestHandleCompletion_NoMembersOnSSLValues(t *testing.T) {
+	s := newTestServerWithDocument(":DECLARE aItems, sName;\naItems := {1, 2};\nsName := \"x\";\naItems:")
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 3, Character: 7},
+		},
+		Context: &protocol.CompletionContext{
+			TriggerKind:      protocol.CompletionTriggerKindTriggerCharacter,
+			TriggerCharacter: ptrTo(":"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, _ := result.([]protocol.CompletionItem)
+	for _, label := range []string{"GetProperty", "IsProperty", "AddProperty", "Count"} {
+		if containsCompletionLabel(items, label) {
+			t.Errorf("did not expect %q after an array receiver", label)
+		}
+	}
+	if len(items) != 0 {
+		t.Errorf("expected no completions after an array receiver, got %d", len(items))
+	}
+}
+
 // Issue #11: ':' trigger SHOULD surface keyword completions when ':' begins
 // a new token (preceded by whitespace or SOL).
 //
@@ -1368,5 +1399,48 @@ oClient:
 	}
 	if !containsCompletionLabel(items, "MyTag") {
 		t.Error("expected shape-augmented property MyTag merged into typed completions")
+	}
+}
+
+// [spec feature.completion/A12] — variable completions are scoped to the
+// cursor's procedure plus script-level and :PUBLIC declarations, one item
+// per name case-insensitively (issue #258).
+func TestHandleCompletion_VariablesScopedAndDeduplicated(t *testing.T) {
+	s := newTestServerWithDocument(`:PUBLIC gShared;
+:DECLARE sTop;
+:PROCEDURE First;
+:DECLARE sOnlyFirst, sDup;
+:ENDPROC;
+:PROCEDURE Second;
+:DECLARE sOnlySecond, SDUP;
+x := 1;
+:ENDPROC;`)
+
+	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+			Position:     protocol.Position{Line: 7, Character: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	items, _ := result.([]protocol.CompletionItem)
+	for _, want := range []string{"gShared", "sTop", "sOnlySecond", "SDUP"} {
+		if !containsCompletionLabel(items, want) {
+			t.Errorf("expected variable completion %q", want)
+		}
+	}
+	if containsCompletionLabel(items, "sOnlyFirst") {
+		t.Error("another procedure's local must not be offered")
+	}
+	dups := 0
+	for _, it := range items {
+		if strings.EqualFold(it.Label, "sDup") {
+			dups++
+		}
+	}
+	if dups != 1 {
+		t.Errorf("expected exactly one sDup item, got %d", dups)
 	}
 }

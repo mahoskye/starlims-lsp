@@ -3,7 +3,7 @@ id: diag.udobject_array_in_clause
 title: UDObject property expanded inside a SQL IN clause
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: warning
 severity_overridable: true
@@ -24,6 +24,17 @@ history:
   - date: 2026-05-01
     ref: "vs-code-ssl-formatter PR #58"
     note: Extension quick-fix keyed on this slug (copy-to-local rewrite).
+  - date: 2026-10-13
+    ref: "issue #255 (catalog audit)"
+    note: >-
+      Authority tool -> authoritative, mirroring the style-guide record.
+      Range fixed for multi-line SQL strings: it stayed on the string's first
+      line, past its end, which also misplaced the extension's quick-fix.
+      Panic fixed: the IN lookback sliced an upper-cased copy of the string by
+      an offset into the original, and case mapping can change byte length
+      (a dotless ı is two bytes, its upper case one); the pipeline's recover
+      then replaced every diagnostic in the file with internal_error. The
+      lookback now upper-cases ASCII only.
 issues: []
 ---
 
@@ -35,7 +46,8 @@ inside an `IN (...)` clause: the string text immediately before the
 placeholder, ignoring spaces/tabs, must be `(` preceded by the word `IN`
 (case-insensitive, at a word boundary). Every string literal in the file
 is scanned — the rule is not limited to `SQLExecute` arguments. The range
-covers the placeholder inside the string; the message quotes it and names
+covers the placeholder inside the string, on the placeholder's own line
+when the string spans several lines; the message quotes it and names
 the runtime error verbatim ("The current array has more than 1
 dimmension.", sic).
 
@@ -69,9 +81,22 @@ aIds := oFilter:aIds;
 SQLExecute("SELECT ID FROM samples WHERE ID IN (?aIds?)");
 ```
 
+### Flags
+
+```ssl
+:DECLARE aRows, oFilter;
+aRows := SQLExecute("
+    SELECT ID
+    FROM samples
+    WHERE Status NOT IN (?oFilter:aCodes?)
+");
+```
+
 ## Rationale
 
-This encodes a verified runtime failure, not a style preference: IN-clause
+The style guide's `udobject_array_in_clause` record states this rule at
+level authoritative. It encodes a verified runtime failure, not a style
+preference: IN-clause
 array expansion of a UDObject property dies with the (misspelled) engine
 error recorded in history, and the fix — copy to a local, expand the local
 — is mechanical enough that the extension ships it as a quick-fix keyed on

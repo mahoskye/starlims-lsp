@@ -62,6 +62,7 @@ type Fence struct {
 // Lang returns the fence's language token (the first word of the info
 // string). Only "ssl" fences are executable spec; anything else is
 // illustration.
+// API (no production caller): used by the catalog conformance tests.
 func (f Fence) Lang() string {
 	lang, _, _ := strings.Cut(f.Info, " ")
 	return lang
@@ -109,11 +110,13 @@ func (e *Entry) Slug() string {
 }
 
 // HasH2 reports whether the body contains the given ## heading.
+// API (no production caller): used by the catalog conformance tests.
 func (e *Entry) HasH2(name string) bool {
 	return slices.Contains(e.H2s, name)
 }
 
 // FencesIn returns the fences under the given ### section heading.
+// API (no production caller): used by the catalog conformance tests.
 func (e *Entry) FencesIn(section string) []Fence {
 	var out []Fence
 	for _, f := range e.Fences {

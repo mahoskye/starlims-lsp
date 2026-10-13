@@ -90,8 +90,8 @@
     },
     "ERROR": {
       "title": "ERROR",
-      "summary": "Defines a legacy error handler for the statements that follow it in the current procedure or method.",
-      "syntax": ":ERROR;"
+      "summary": "Starts a legacy error handler at the end of a procedure that handles failures in the statements before it.",
+      "syntax": ":PROCEDURE ProcName;\n    protected_statements;\n:ERROR;\n    handler_statements;\n:ENDPROC;"
     },
     "EXITCASE": {
       "title": "EXITCASE",
@@ -131,7 +131,7 @@
     "INHERIT": {
       "title": "INHERIT",
       "summary": "Specifies the parent class for an SSL class.",
-      "syntax": ":INHERIT ClassName;"
+      "syntax": ":INHERIT Category.ClassName;"
     },
     "LABEL": {
       "title": "LABEL",
@@ -165,7 +165,7 @@
     },
     "PUBLIC": {
       "title": "PUBLIC",
-      "summary": "Declares public variables shared down the call stack — visible to the declaring scope and every scope it calls.",
+      "summary": "Declares public variables shared across the running program — reachable from any procedure until the program context clears them.",
       "syntax": ":PUBLIC variable1[, variable2, ...];"
     },
     "REGION": {
@@ -176,7 +176,7 @@
     "RESUME": {
       "title": "RESUME",
       "summary": "Continues execution after a legacy :ERROR handler, starting with the statement after the one that failed.",
-      "syntax": ":RESUME;"
+      "syntax": ":PROCEDURE ProcName;\n    protected_statements;\n:ERROR;\n    handler_statements;\n:RESUME;\n:ENDPROC;"
     },
     "RETURN": {
       "title": "RETURN",
@@ -283,7 +283,7 @@
     },
     "decrement": {
       "title": "-- (decrement)",
-      "summary": "Decreases a number variable by one, trims trailing spaces in strings, or subtracts days from a date depending on operand type.",
+      "summary": "Decreases a number variable by one, or subtracts one day from a date variable.",
       "syntax": "--variable",
       "type_behavior": [
         {
@@ -295,8 +295,8 @@
         {
           "left": "string",
           "right": "n/a",
-          "result": "string",
-          "behavior": "Trims trailing spaces from the string"
+          "result": "error",
+          "behavior": "Raises a runtime invalid-operand error"
         },
         {
           "left": "date",
@@ -359,7 +359,7 @@
           "left": "string",
           "right": "non-string",
           "result": "error",
-          "behavior": "Raises a runtime error because $ does not implicitly convert the right operand to string."
+          "behavior": "Raises a runtime error because $ does not implicitly convert the right operand to string. The message ends invalid operand: <value> (of type <type>) for operator: $."
         },
         {
           "left": "non-string",
@@ -454,6 +454,12 @@
           "behavior": "Returns .F.."
         },
         {
+          "left": "number/date",
+          "right": "NIL",
+          "result": "boolean",
+          "behavior": "Returns .F.."
+        },
+        {
           "left": "code block",
           "right": "any",
           "result": "error",
@@ -538,13 +544,13 @@
           "left": "string",
           "right": "string",
           "result": "boolean",
-          "behavior": "Returns .T. when the strings are not equal under SSL's prefix matching."
+          "behavior": "Returns .T. when the strings are not exactly equal."
         },
         {
           "left": "string",
           "right": "non-string",
           "result": "boolean",
-          "behavior": "Returns .T. (underlying = returns .F.)."
+          "behavior": "Returns .T.."
         },
         {
           "left": "array",
@@ -572,7 +578,13 @@
         },
         {
           "left": "number/boolean/date",
-          "right": "incompatible",
+          "right": "NIL",
+          "result": "boolean",
+          "behavior": "Returns .T.."
+        },
+        {
+          "left": "number/boolean/date",
+          "right": "incompatible non-NIL",
           "result": "error",
           "behavior": "Raises a runtime invalid-operand error."
         }
@@ -588,6 +600,12 @@
           "right": "n/a",
           "result": "number",
           "behavior": "Adds 1 to the variable in place."
+        },
+        {
+          "left": "date",
+          "right": "n/a",
+          "result": "date",
+          "behavior": "Adds one day to the variable in place."
         }
       ]
     },
@@ -808,6 +826,12 @@
           "behavior": "Returns .T.."
         },
         {
+          "left": "number/boolean/date",
+          "right": "NIL",
+          "result": "boolean",
+          "behavior": "Returns .T.."
+        },
+        {
           "left": "code block",
           "right": "any",
           "result": "error",
@@ -871,6 +895,12 @@
         {
           "left": "NIL",
           "right": "non-NIL",
+          "result": "boolean",
+          "behavior": "Returns .T.."
+        },
+        {
+          "left": "number/boolean/date",
+          "right": "NIL",
           "result": "boolean",
           "behavior": "Returns .T.."
         },
@@ -1057,6 +1087,12 @@
           "behavior": "Returns .F.."
         },
         {
+          "left": "number/boolean/date",
+          "right": "NIL",
+          "result": "boolean",
+          "behavior": "Returns .F.."
+        },
+        {
           "left": "code block",
           "right": "any",
           "result": "error",
@@ -1126,6 +1162,12 @@
           "behavior": "Returns .T. only when both operands reference the same array instance."
         },
         {
+          "operator": "equals",
+          "symbol": "=",
+          "returns": "boolean",
+          "behavior": "Returns .T. only when both operands reference the same array instance."
+        },
+        {
           "operator": "not-equals",
           "symbol": "!=",
           "returns": "boolean",
@@ -1134,74 +1176,32 @@
       ],
       "members": [
         {
-          "member": "Append",
-          "kind": "Method",
-          "parameters": "element (any)",
-          "returns": "none",
-          "description": "Adds an element to the end of the array."
+          "task": "Count elements",
+          "use": "ALen"
         },
         {
-          "member": "RemoveAt",
-          "kind": "Method",
-          "parameters": "index (number)",
-          "returns": "none",
-          "description": "Removes the element at the specified 1-based position."
+          "task": "Append an element",
+          "use": "AAdd"
         },
         {
-          "member": "InsertAt",
-          "kind": "Method",
-          "parameters": "index (number), value (any)",
-          "returns": "none",
-          "description": "Inserts a value at the specified 1-based position."
+          "task": "Find an element",
+          "use": "AScan"
         },
         {
-          "member": "Index",
-          "kind": "Method",
-          "parameters": "index (number)",
-          "returns": "any",
-          "description": "Returns the value at the specified 1-based position. In SSL code this is normally used through indexing syntax such as aValues[2]."
+          "task": "Sort",
+          "use": "SortArray"
         },
         {
-          "member": "IsEmpty",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "boolean",
-          "description": "Returns .T. when the array has zero elements."
+          "task": "Test for no elements",
+          "use": "Empty"
         },
         {
-          "member": "ToJson",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "string",
-          "description": "Serializes the array as JSON array text."
+          "task": "Serialize to JSON",
+          "use": "ToJson"
         },
         {
-          "member": "clone",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "array",
-          "description": "Returns a deep copy of the array and its contained values."
-        },
-        {
-          "member": "GetList",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "any",
-          "description": "Returns the array contents in list form for APIs that expose list-style access."
-        },
-        {
-          "member": "value",
-          "kind": "Property",
-          "parameters": "—",
-          "returns": "any",
-          "description": "Gets or replaces the full array contents."
-        },
-        {
-          "member": "Count",
-          "kind": "Property",
-          "parameters": "—",
-          "returns": "number",
-          "description": "Returns the number of top-level elements."
+          "task": "Copy",
+          "use": "aValues:Clone(), a .NET member; see below"
         }
       ]
     },
@@ -1243,58 +1243,20 @@
       ],
       "members": [
         {
-          "member": "value",
-          "returns": "boolean",
-          "description": "The stored boolean value.",
-          "group": "properties"
+          "task": "Combine or negate",
+          "use": ".AND., .OR., .NOT. or !"
         },
         {
-          "member": "And(vValue)",
-          "returns": "boolean",
-          "description": "Returns the logical AND of this boolean and another boolean value. Raises a runtime error for non-boolean operands.",
-          "group": "methods"
+          "task": "Compare",
+          "use": "== or ="
         },
         {
-          "member": "Or(vValue)",
-          "returns": "boolean",
-          "description": "Returns the logical OR of this boolean and another boolean value. Raises a runtime error for non-boolean operands.",
-          "group": "methods"
+          "task": "Convert to text",
+          "use": "LimsString, which gives .T. or .F."
         },
         {
-          "member": "Not()",
-          "returns": "boolean",
-          "description": "Returns the negated boolean value.",
-          "group": "methods"
-        },
-        {
-          "member": "Eq(vValue)",
-          "returns": "boolean",
-          "description": "Returns .T. when both operands are booleans with the same value. Raises a runtime error for non-boolean operands.",
-          "group": "methods"
-        },
-        {
-          "member": "EqEq(vValue)",
-          "returns": "boolean",
-          "description": "Exact equality check. For booleans, this behaves the same as Eq(vValue).",
-          "group": "methods"
-        },
-        {
-          "member": "IsEmpty()",
-          "returns": "boolean",
-          "description": "Returns .T. when the boolean is .F. and .F. when the boolean is .T..",
-          "group": "methods"
-        },
-        {
-          "member": "ToJson()",
-          "returns": "string",
-          "description": "Returns the JSON boolean text true or false.",
-          "group": "methods"
-        },
-        {
-          "member": "clone()",
-          "returns": "boolean",
-          "description": "Returns a copy of the boolean value.",
-          "group": "methods"
+          "task": "Serialize to JSON",
+          "use": "ToJson, which gives true or false"
         }
       ]
     },
@@ -1324,28 +1286,16 @@
       ],
       "members": [
         {
-          "member": "eval",
-          "kind": "Method",
-          "returns": "any",
-          "description": "Evaluates the code block with the arguments you provide."
+          "task": "Run the code block",
+          "use": "Eval(fnDouble, 2)"
         },
         {
-          "member": "IsEmpty()",
-          "kind": "Method",
-          "returns": "boolean",
-          "description": "Returns .T. when the code block is uninitialized, otherwise .F.."
+          "task": "Check that a value is a code block",
+          "use": "LimsTypeEx(vValue) == \"CODEBLOCK\""
         },
         {
-          "member": "ToString()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Always returns the fixed text Code block. Does not expose the parameter list or expression body."
-        },
-        {
-          "member": "clone()",
-          "kind": "Method",
-          "returns": "code block",
-          "description": "Creates another code block value that reuses the same callable logic."
+          "task": "Find a matching array element",
+          "use": "AScan with a code block"
         }
       ]
     },
@@ -1411,58 +1361,32 @@
       ],
       "members": [
         {
-          "member": "value",
-          "kind": "Property",
-          "returns": "date",
-          "description": "Gets or sets the stored date value."
+          "task": "Test for an empty date",
+          "use": "Empty"
         },
         {
-          "member": "IsEmpty()",
-          "kind": "Method",
-          "returns": "boolean",
-          "description": "Returns .T. when the date is empty, .F. otherwise."
+          "task": "Format as text",
+          "use": "DToC, DateToString, or dValue:ToString(sFormat), a .NET member"
         },
         {
-          "member": "ToString()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Formats the date using the default MM/dd/yyyy display format. Returns \"  /  /    \" when the date is empty."
+          "task": "Compact yyyyMMdd text",
+          "use": "DToS"
         },
         {
-          "member": "ToString(sFormat)",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Formats the date using a caller-supplied format string. Returns \"  /  /    \" when the date is empty."
+          "task": "Read the year, month or day",
+          "use": "Year, Month, Day"
         },
         {
-          "member": "ToJson()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Serializes the date to an ISO 8601 date/time string wrapped as JSON text. Returns null for empty dates."
+          "task": "Add or subtract days",
+          "use": "+ and - with a number of days"
         },
         {
-          "member": "clone()",
-          "kind": "Method",
-          "returns": "date",
-          "description": "Creates a copy of the current date value."
+          "task": "Add months or years",
+          "use": "DateAdd(dValue, n, \"month\"), or dValue:AddMonths(n) and dValue:AddYears(n), .NET members"
         },
         {
-          "member": "MakeInvariant()",
-          "kind": "Method",
-          "returns": "NIL",
-          "description": "Marks the date as a wall-clock value with no time-zone offset in JSON output."
-        },
-        {
-          "member": "MakeLocal()",
-          "kind": "Method",
-          "returns": "NIL",
-          "description": "Marks the date as a local-time value so JSON output includes the local offset."
-        },
-        {
-          "member": "ChangeKind(nKind)",
-          "kind": "Method",
-          "returns": "NIL",
-          "description": "Changes how the stored date is interpreted for later serialization."
+          "task": "Serialize to JSON",
+          "use": "ToJson"
         }
       ]
     },
@@ -1472,40 +1396,24 @@
       "runtime_type": "OBJECT",
       "members": [
         {
-          "member": "GetProperty(sName)",
-          "kind": "Method",
-          "returns": "any",
-          "description": "Reads a public field or property by name."
+          "task": "Read a property",
+          "use": "oNet:PropertyName, e.g. oBuilder:Length"
         },
         {
-          "member": "SetProperty(sName, vValue)",
-          "kind": "Method",
-          "returns": "none",
-          "description": "Writes an existing public field or property by name."
+          "task": "Call a method",
+          "use": "oNet:MethodName(args), e.g. oBuilder:Append(\"-01\")"
         },
         {
-          "member": "IsProperty(sName)",
-          "kind": "Method",
-          "returns": "boolean",
-          "description": "Returns .T. when a public field or property with the given name exists."
+          "task": "Call a static method",
+          "use": "Connect to the type as static with LimsNETConnect(, \"System.Math\",, .T.), then oMath:Abs(-42)"
         },
         {
-          "member": "Invoke(sName, [aArgs])",
-          "kind": "Method",
-          "returns": "any",
-          "description": "Calls a public method by name and returns its result."
+          "task": "Serialize a DataSet to JSON",
+          "use": "ToJson(oDataSet)"
         },
         {
-          "member": "IsEmpty()",
-          "kind": "Method",
-          "returns": "boolean",
-          "description": "Returns .T. only when the wrapped reference is null."
-        },
-        {
-          "member": "ToJson()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Serializes the wrapped value to JSON when it is a DataSet. Other wrapped values raise an error."
+          "task": "Check the type",
+          "use": "LimsTypeEx returns \"OBJECT\""
         }
       ]
     },
@@ -1607,52 +1515,28 @@
       ],
       "members": [
         {
-          "member": "value",
-          "kind": "Property",
-          "returns": "number",
-          "description": "Gets or sets the stored numeric value."
+          "task": "Convert to text",
+          "use": "LimsString, or nValue:ToString(), a .NET member; see below"
         },
         {
-          "member": "IsInt",
-          "kind": "Property",
-          "returns": "boolean",
-          "description": "Returns .T. when the value is a whole number within the 32-bit signed integer range (-2147483648 through 2147483647)."
+          "task": "Format with a pattern",
+          "use": "nValue:ToString(sFormat), such as ToString(\"N2\"), a .NET member; see below"
         },
         {
-          "member": "IsInt64",
-          "kind": "Property",
-          "returns": "boolean",
-          "description": "Returns .T. when the value is a whole number within the 64-bit signed integer range."
+          "task": "Test for zero",
+          "use": "Empty"
         },
         {
-          "member": "IsEmpty()",
-          "kind": "Method",
-          "returns": "boolean",
-          "description": "Returns .T. when the value is 0, .F. otherwise."
+          "task": "Test for a whole number",
+          "use": "nValue == Integer(nValue), with Integer"
         },
         {
-          "member": "ToString()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Formats the number using the default numeric string representation."
+          "task": "Round or truncate",
+          "use": "Round, Integer"
         },
         {
-          "member": "ToString(sDecimal, sGroup)",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Formats the number using caller-supplied decimal and group separators."
-        },
-        {
-          "member": "ToJson()",
-          "kind": "Method",
-          "returns": "string",
-          "description": "Serializes the number with . as the decimal separator and , as the group separator."
-        },
-        {
-          "member": "clone()",
-          "kind": "Method",
-          "returns": "number",
-          "description": "Creates a copy of the current numeric value."
+          "task": "Serialize to JSON",
+          "use": "ToJson"
         }
       ]
     },
@@ -1764,14 +1648,14 @@
           "kind": "Method",
           "parameters": "none",
           "returns": "object",
-          "description": "Returns a deep copy for dynamic objects created with CreateLocal() or CreateUdObject()."
+          "description": "On dynamic objects created with CreateUdObject(), returns a new object with the same XmlType and dynamic properties. Only the top-level properties are copied. Nested arrays and objects are shared with the original. Clone() works the same."
         },
         {
           "member": "ToString()",
           "kind": "Method",
           "parameters": "none",
-          "returns": "string",
-          "description": "On dynamic objects, returns the serialized XML text."
+          "returns": "NIL",
+          "description": "On dynamic objects created with CreateUdObject(), returns NIL, not the XML text. Use Serialize() for XML."
         },
         {
           "member": "Destroy()",
@@ -1844,46 +1728,40 @@
       ],
       "members": [
         {
-          "member": "value",
-          "kind": "Property",
-          "parameters": "—",
-          "returns": "string",
-          "description": "Returns the stored text value."
+          "task": "Test for blank or whitespace-only text",
+          "use": "Empty"
         },
         {
-          "member": "clone()",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "string",
-          "description": "Returns a copy of the string."
+          "task": "Count characters",
+          "use": "Len"
         },
         {
-          "member": "IsEmpty()",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "boolean",
-          "description": "Returns .T. when the value is null, empty, or only whitespace made of spaces, tabs, carriage returns, or line feeds."
+          "task": "Read one character",
+          "use": "sValue[nPos] (see Indexing)"
         },
         {
-          "member": "ToJson()",
-          "kind": "Method",
-          "parameters": "none",
-          "returns": "string",
-          "description": "Returns JSON string text, or null when the string value is null."
+          "task": "Take part of the text",
+          "use": "SubStr, Left, Right"
         },
         {
-          "member": "CompareTo(sOther)",
-          "kind": "Method",
-          "parameters": "sOther (string)",
-          "returns": "number",
-          "description": "Returns a negative number, 0, or a positive number based on lexical ordering."
+          "task": "Find text",
+          "use": "At, or $ for a yes/no check"
         },
         {
-          "member": "Index(nPos)",
-          "kind": "Method",
-          "parameters": "nPos (number)",
-          "returns": "string",
-          "description": "Returns the character at the specified 1-based position. In SSL code this is normally used through sValue[nPos]."
+          "task": "Change case or trim",
+          "use": "Upper, Lower, AllTrim"
+        },
+        {
+          "task": "Replace text",
+          "use": "Replace (case-insensitive), StrTran (case-sensitive)"
+        },
+        {
+          "task": "Serialize to JSON",
+          "use": "ToJson"
+        },
+        {
+          "task": "Compare order",
+          "use": "<, >, or sValue:CompareTo(sOther), a .NET member; see below"
         }
       ]
     }
@@ -2606,17 +2484,22 @@
           "name": "InvariantDateColumns",
           "type": "array",
           "access": "write-only",
-          "description": "In SQL mode, supplies the invariant date columns passed to the export operation."
+          "description": "In SQL mode, names date columns that are exported exactly as stored, without conversion from UTC to local time."
+        },
+        {
+          "name": "ErrorMsg",
+          "type": "string",
+          "access": "read-write",
+          "description": "Final error text from the export run. NIL on a new instance, before DoExport() runs."
         }
       ],
       "methods": [
         {
           "name": "DoExport()",
           "returns": "boolean",
-          "description": "Runs the export and returns the completion result from the underlying export process. It also updates ErrorMsg with the final exporter message when the call returns normally."
+          "description": "Runs the export and returns .T. when the export run completes, .F. otherwise. It also updates ErrorMsg with the final exporter message when the call returns normally."
         }
-      ],
-      "base_class": "EnterpriseImpExBase"
+      ]
     },
     "FtpsClient": {
       "title": "FtpsClient",
@@ -2696,7 +2579,7 @@
           "name": "LogFilePath",
           "type": "string",
           "access": "read-write",
-          "description": "Current log file path. Setting it attempts to create or replace the file and resets the active trace listeners to write to that file."
+          "description": "Current log file path. Setting it creates or replaces the file and sends the trace log there."
         },
         {
           "name": "ResultTable",
@@ -2984,7 +2867,7 @@
       "constructors": [
         {
           "signature": "SDMSDocUploader{oCredentials}",
-          "description": "Creates an uploader and loads the SDMS URL, username, password hash, site ID, and session ID from the credentials object. Workflow IDs start in a missing state and must be set before workflow-specific calls.",
+          "description": "Creates an uploader and loads the SDMS URL, username, password hash, site ID, and session ID from the credentials object. Workflow IDs start unset; set `WorkflowId`, `StageId`, and `ActionId` before workflow-specific calls.",
           "parameters": [
             {
               "parameter": "oCredentials",
@@ -2996,7 +2879,7 @@
         },
         {
           "signature": "SDMSDocUploader{}",
-          "description": "Creates an uploader without loading SDMS connection or authentication values. Workflow IDs start at `0`, so the workflow-specific missing-ID validation described below does not run automatically unless you assign your own values."
+          "description": "Creates an uploader without loading SDMS connection or authentication values. Workflow IDs start at `0`, so workflow-specific methods do not raise the missing-ID errors described below; if you don't set the IDs, `0` is sent."
         }
       ],
       "properties": [
@@ -3193,7 +3076,7 @@
     },
     "SSLCodeProvider": {
       "title": "SSLCodeProvider",
-      "summary": "Compiles published server scripts and data sources and returns a list of compilation errors.",
+      "summary": "Compiles published server scripts and data sources and returns the compilation errors found.",
       "constructors": [
         {
           "signature": "SSLCodeProvider{}",
@@ -3348,13 +3231,13 @@
           "name": "GenCode",
           "type": "number",
           "access": "read-only",
-          "description": "Numeric error code."
+          "description": "Numeric error code. For a SQL Server error, observed as 0, like Code."
         },
         {
           "name": "Code",
           "type": "number",
           "access": "read-only",
-          "description": "Alias of GenCode."
+          "description": "Numeric error code. For an error from RaiseError, the code you passed. For a SQL Server error, observed as 0. Read the SQL Server error number from GenCode on GetLastSQLError() instead."
         },
         {
           "name": "FullDescription",
@@ -3390,19 +3273,13 @@
     },
     "SSLExpando": {
       "title": "SSLExpando",
-      "summary": "SSLExpando is a built-in object class for storing named values whose shape is decided at runtime.",
-      "constructors": [
-        {
-          "signature": "SSLExpando{}",
-          "description": "Creates an empty `SSLExpando` instance."
-        }
-      ],
+      "summary": "SSLExpando is the class of dynamic objects created with CreateUdObject(), which store named values whose shape is decided at runtime.",
       "properties": [
         {
           "name": "XmlType",
           "type": "string",
           "access": "read-write",
-          "description": "XML root element name used by ToString() and Serialize()"
+          "description": "XML root element name used by Serialize()"
         }
       ],
       "methods": [
@@ -3433,8 +3310,8 @@
         },
         {
           "name": "ToString",
-          "returns": "string",
-          "description": "Returns the object's XML representation"
+          "returns": "NIL",
+          "description": "Returns NIL, not XML. Use Serialize() for XML"
         }
       ]
     },
@@ -3577,7 +3454,7 @@
           "name": "SQLState",
           "type": "string",
           "access": "read-only",
-          "description": "Provider error state or code text captured for the SQL error."
+          "description": "Provider error state or code text captured for the SQL error. On SQL Server, this is SQL- followed by the zero-padded error number, for example SQL-00207 for an invalid column."
         },
         {
           "name": "ErrorStackTrace",
@@ -3601,7 +3478,7 @@
           "name": "GenCode",
           "type": "number",
           "access": "read-only",
-          "description": "Numeric code derived from SQLState. If SQLState is a 9-character provider code, SSL tries its 5-character suffix. Returns 0 when no numeric code can be extracted."
+          "description": "Numeric database error code. On SQL Server, this is the native error number (for example 207 for an invalid column, 208 for an invalid object). Returns 0 when no number is available."
         },
         {
           "name": "Sql",
@@ -3696,32 +3573,8 @@
       "summary": "Creates and manages a database sequence for a table field on Oracle or SQL Server.",
       "constructors": [
         {
-          "signature": "Sequence{sPlatforma, sTableName, sFieldName}",
-          "description": "Creates a sequence object with an empty prefix.",
-          "parameters": [
-            {
-              "parameter": "sPlatforma",
-              "type": "string",
-              "required": "yes",
-              "description": "Database platform. \"ORACLE\" selects Oracle behavior. Any other value uses SQL Server behavior."
-            },
-            {
-              "parameter": "sTableName",
-              "type": "string",
-              "required": "yes",
-              "description": "Table name used to derive the sequence name."
-            },
-            {
-              "parameter": "sFieldName",
-              "type": "string",
-              "required": "yes",
-              "description": "Field name used to derive the sequence name."
-            }
-          ]
-        },
-        {
           "signature": "Sequence{sPlatforma, sTableName, sFieldName, sPrefix}",
-          "description": "Creates a sequence object with an additional name suffix.",
+          "description": "Creates a sequence object for a table field. All four arguments are required. The three-argument form `Sequence{sPlatforma, sTableName, sFieldName}` fails to compile with `invalid arguments for constructor`.",
           "parameters": [
             {
               "parameter": "sPlatforma",
@@ -3744,8 +3597,8 @@
             {
               "parameter": "sPrefix",
               "type": "string",
-              "required": "no",
-              "description": "Optional suffix added to the derived sequence name. If omitted or passed as NIL, an empty suffix is used."
+              "required": "yes",
+              "description": "Despite its name, sPrefix is appended as a suffix: C_<TABLE>_<FIELD>_<SPREFIX>. Pass \"\" for no suffix. With \"\", the sequence is named C_<TABLE>_<FIELD>, for example C_SAMPLE_SAMPLE_ID for table sample and field sample_id."
             }
           ]
         }
@@ -3848,8 +3701,7 @@
           "returns": "object",
           "description": "Loads one table from the import folder and returns it as a CDataTable, or NIL when loading fails."
         }
-      ],
-      "base_class": "EnterpriseImpExBase"
+      ]
     },
     "WebServices": {
       "title": "WebServices",
@@ -4284,7 +4136,7 @@
           "name": "WsAssembly",
           "type": "object",
           "access": "read-only",
-          "description": "Advanced — a handle to the generated proxy types for the configured WSDL. Used internally by Parameters:CreateCustomType and GetWSType; rarely needed directly."
+          "description": "Advanced; rarely needed directly."
         }
       ],
       "methods": [
@@ -4464,7 +4316,7 @@
           "type": "array",
           "required": "yes",
           "default": "—",
-          "description": "Existing array to modify."
+          "description": "Existing array to modify. Must be an array; see the warning above."
         },
         {
           "name": "vElement",
@@ -4712,14 +4564,14 @@
       "signature": "AddColDelimiters(sDSN, aCols, sTable)",
       "returns": {
         "type": "none",
-        "description": "No return value. The function updates `aCols` directly."
+        "description": "Calls from SSL do not compile, so there is no result to use."
       },
       "parameters": [
         {
           "name": "sDSN",
           "type": "string",
           "required": "no",
-          "default": "\"\"",
+          "default": "—",
           "description": "Data source name used to determine delimiter rules."
         },
         {
@@ -4727,14 +4579,14 @@
           "type": "array",
           "required": "yes",
           "default": "—",
-          "description": "Array of column names to update in place. Each element is replaced with a qualified name."
+          "description": "Array of column names to qualify."
         },
         {
           "name": "sTable",
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Table name used to qualify each column. The function trims this value before using it."
+          "description": "Table name used to qualify each column."
         }
       ]
     },
@@ -4751,8 +4603,8 @@
           "name": "sDSN",
           "type": "string",
           "required": "no",
-          "default": "\"\"",
-          "description": "Data source name used to determine delimiter rules. Unsupported or empty values produce no delimiter characters."
+          "default": "default connection",
+          "description": "Name of the database connection whose delimiter rules apply, such as \"DATABASE\". Omitted or NIL uses the default connection's delimiters; \"\" produces no delimiter characters. A name that is not a configured connection raises an error."
         },
         {
           "name": "sName",
@@ -4784,7 +4636,7 @@
           "type": "string or array",
           "required": "yes",
           "default": "—",
-          "description": "Property name as a string, or an array of property-name strings. Each name must be a valid property identifier."
+          "description": "Property name as a string, or an array of property-name strings. Use valid SSL identifiers."
         }
       ]
     },
@@ -4852,7 +4704,7 @@
           "type": "string",
           "required": "no",
           "default": "empty string",
-          "description": "Exact operation code such as DUP, SUM, COPY, or SORT. The documented codes are uppercase. Unrecognized values return NIL."
+          "description": "Exact operation code such as DUP, SUM, COPY, or SORT. The documented codes are uppercase, and matching is case-sensitive: \"sum\" is not recognized. Unrecognized values return NIL."
         },
         {
           "name": "vValue",
@@ -5023,7 +4875,7 @@
           "type": "any",
           "required": "yes",
           "default": "—",
-          "description": "Target label text. A string literal is used directly as the target text. Any other expression is evaluated and converted to a string before SSL compares it to the labels registered in the current procedure."
+          "description": "Target label text. A string literal is used directly as the target text. Any other expression is evaluated and converted to a string before SSL compares it to the labels in the current procedure."
         }
       ]
     },
@@ -5293,7 +5145,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted or non-positive, the implementation uses 21."
+          "description": "Server port. If omitted or non-positive, 21 is used, even on the SFTP path. Pass 22 explicitly when the SFTP server uses the standard SFTP port."
         },
         {
           "name": "sProxy",
@@ -5629,7 +5481,7 @@
       "signature": "CreateLocal(sVarName, [vVarValue])",
       "returns": {
         "type": "any",
-        "description": "Returns the supplied `vVarValue`. If `vVarValue` is omitted, the local variable is still created with `\"\"`, and the call returns no value."
+        "description": "Returns the supplied `vVarValue`. If `vVarValue` is omitted, the local variable is still created with `\"\"`, and the call returns `NIL`."
       },
       "parameters": [
         {
@@ -5663,7 +5515,7 @@
       "signature": "CreatePublic(sVarName, [vVarValue])",
       "returns": {
         "type": "any",
-        "description": "The supplied `vVarValue`. If `vVarValue` is omitted, the public variable is created with `\"\"`, and the call returns no value."
+        "description": "The supplied `vVarValue`. If `vVarValue` is omitted, the public variable is created with `\"\"`, and the call returns `NIL`."
       },
       "parameters": [
         {
@@ -5705,7 +5557,7 @@
           "type": "string",
           "required": "conditional",
           "default": "—",
-          "description": "Name of a user-defined :CLASS to instantiate. Not for built-in classes such as Email{} or SSLDataset{}."
+          "description": "Category-qualified name of the user-defined :CLASS script to instantiate, written Category.ScriptName (for example, \"Samples.SampleTicket\" for a class script named SampleTicket in the Samples category). Not for built-in classes such as Email{} or SSLDataset{}."
         },
         {
           "name": "aArgs",
@@ -5752,7 +5604,7 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "Case-insensitive regular-expression filter applied to each file's full path while scanning. You can combine include and exclude expressions with ;. When omitted, all files are eligible."
+          "description": "Case-insensitive regular-expression filter applied to each file's full path while scanning. When omitted, all files are eligible."
         },
         {
           "name": "sPassword",
@@ -6015,7 +5867,7 @@
       "signature": "DateFromString(sDateAsString, [vFormat], [bUseLocalCulture], [bMakeInvariant])",
       "returns": {
         "type": "date",
-        "description": "The parsed date value, marked as local when `bMakeInvariant` is `NIL` or `.F.`, or as an unspecified date when `bMakeInvariant` is `.T.`."
+        "description": "The parsed date value, marked as local when `bMakeInvariant` is `NIL` or `.F.`. When `bMakeInvariant` is `.T.`, the result is an invariant (unspecified-kind) date, so `IsInvariantDate` returns `.T.`."
       },
       "parameters": [
         {
@@ -6044,7 +5896,7 @@
           "type": "boolean or NIL",
           "required": "no",
           "default": "NIL",
-          "description": "When .T., return an unspecified date. When NIL or .F., return a local date."
+          "description": "When .T., return an invariant (unspecified-kind) date, so IsInvariantDate returns .T.. When NIL or .F., return a local date."
         }
       ]
     },
@@ -6282,7 +6134,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted, or if a non-positive value is supplied, the function uses 21."
+          "description": "Server port. If omitted, or if a non-positive value is supplied, the function uses 21. This also applies when bIsSFTP is .T., so pass 22 explicitly for a standard SFTP server."
         },
         {
           "name": "sProxy",
@@ -6364,7 +6216,7 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Path and wildcard pattern to list, such as \"C:\\\\Reports\\\\*.txt\". If it points to an existing directory, Directory lists that directory with the * pattern. If you pass an empty string, the listing logic uses the current working directory after the whitelist check passes."
+          "description": "Path and wildcard pattern to list, such as \"C:\\Reports\\*.txt\". If it points to an existing directory, Directory lists that directory with the wildcard pattern *. If you pass an empty string, the listing logic uses the current working directory after the whitelist check passes."
         },
         {
           "name": "sAttributes",
@@ -6389,7 +6241,7 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Procedure name to invoke. Use a one-segment name for a procedure in the current script, or a three-segment name to dispatch through the same runtime path as ExecFunction."
+          "description": "Procedure name to invoke. Use a one-segment name for a procedure in the current script, or a three-segment name to call Category.Script.Procedure the same way ExecFunction does."
         },
         {
           "name": "aArguments",
@@ -6575,11 +6427,11 @@
     },
     "DocCreateACL": {
       "title": "DocCreateACL",
-      "summary": "Creates a Documentum ACL and returns the backend result string.",
+      "summary": "Creates a Documentum ACL and returns a result string.",
       "signature": "DocCreateACL(sAclName, [sDescription], [aGroups])",
       "returns": {
         "type": "string",
-        "description": "Result string returned by the ACL creation call, or `\"\"` when the backend call returns no value."
+        "description": "Result string returned by the ACL create request, or `\"\"` when the request returns no value."
       },
       "parameters": [
         {
@@ -6696,7 +6548,7 @@
     },
     "DocCreateUser": {
       "title": "DocCreateUser",
-      "summary": "Creates a new user account and returns its identifier.",
+      "summary": "Creates a Documentum user and returns its identifier.",
       "signature": "DocCreateUser(",
       "returns": {
         "type": "string",
@@ -6792,7 +6644,7 @@
       "signature": "DocDelete(sObjId, [bAllVersions])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the delete operation succeeds. `.F.` when the backend delete call fails or does not return success."
+        "description": "`.T.` when the delete operation succeeds. `.F.` when the delete fails or does not return success."
       },
       "parameters": [
         {
@@ -6807,7 +6659,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".T.",
-          "description": "When .T., the backend delete request uses the all-versions form. When .F., it uses the single-version form."
+          "description": "When .T., all versions are deleted. When .F., a single-version delete is requested."
         }
       ]
     },
@@ -6817,7 +6669,7 @@
       "signature": "DocDeleteCabinet(sCabinetId, [bDeepDelete])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the cabinet delete succeeds. `.F.` when the backend delete call fails."
+        "description": "`.T.` when the cabinet delete succeeds. `.F.` when the delete fails."
       },
       "parameters": [
         {
@@ -6832,7 +6684,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".T.",
-          "description": "Delete mode flag passed to the Documentum cabinet delete operation. If omitted, the function uses .T.."
+          "description": "When .T., the delete proceeds recursively. When .F., the delete fails if the cabinet has children. If omitted, the function uses .T.."
         }
       ]
     },
@@ -6867,7 +6719,7 @@
       "signature": "DocDeleteUser(sLoginName)",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the delete completes successfully. `.F.` only when the delete path does not return a value."
+        "description": "`.T.` when the delete completes successfully. `.F.` when Documentum does not confirm the delete. A missing user raises instead (see Exceptions)."
       },
       "parameters": [
         {
@@ -6952,7 +6804,7 @@
           "type": "string",
           "required": "no",
           "default": "omitted",
-          "description": "Export format to request. When omitted, the one-argument overload is used."
+          "description": "Export format to request. When omitted, the default export format is used."
         }
       ]
     },
@@ -7038,7 +6890,7 @@
           "type": "string",
           "required": "no",
           "default": "omitted",
-          "description": "Comma-separated attribute list to request. Omit it, or pass NIL, to request all attributes."
+          "description": "Comma-separated attribute list to request. Omit it, or pass NIL or \"\", to request all attributes."
         }
       ]
     },
@@ -7237,7 +7089,7 @@
     },
     "DocPauseWorkflow": {
       "title": "DocPauseWorkflow",
-      "summary": "Temporarily halts workflow processing to prevent further steps until manual intervention or review.",
+      "summary": "Pauses a Documentum workflow and returns whether the pause succeeded.",
       "signature": "DocPauseWorkflow(sWorkflowId)",
       "returns": {
         "type": "boolean",
@@ -7547,11 +7399,11 @@
     },
     "DocUpdateUser": {
       "title": "DocUpdateUser",
-      "summary": "Updates a Documentum user and returns the backend result message.",
+      "summary": "Updates a Documentum user and returns the Documentum result message.",
       "signature": "DocUpdateUser(sLoginName, sPassword, [sUserName], [sEMail], [sDefaultFolder], [sGroupName], [sPermissionSet], [nUserPrivileges])",
       "returns": {
         "type": "string",
-        "description": "The backend result message, or an empty string when the update path does not return a value."
+        "description": "The result message Documentum returns for the update, or an empty string when there is none."
       },
       "parameters": [
         {
@@ -7703,8 +7555,8 @@
           "name": "sRetType",
           "type": "string",
           "required": "no",
-          "default": "BASE64",
-          "description": "Optional return-type argument retained by the public signature."
+          "default": "—",
+          "description": "Accepted but ignored: passing \"HEX\" returns the same string as omitting it."
         }
       ]
     },
@@ -7732,7 +7584,7 @@
       "signature": "EndLimsTransaction([sConnectionName], [bCommit])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the transaction scope ends successfully. Raises an exception on failure rather than returning `.F.`."
+        "description": "`.T.` when the transaction scope ends successfully, and also when no transaction is open. Raises an exception on failure rather than returning `.F.`."
       },
       "parameters": [
         {
@@ -7753,11 +7605,11 @@
     },
     "ErrorMes": {
       "title": "ErrorMes",
-      "summary": "Logs an error message and returns the resulting message string.",
-      "signature": "ErrorMes(vCaption, vMessage)",
+      "summary": "Writes an error message to the server log, even when user-message logging is disabled, and returns the formatted log entry.",
+      "signature": "ErrorMes(vCaption, [vMessage])",
       "returns": {
         "type": "string",
-        "description": "The string returned by the underlying message routine after the error message is processed."
+        "description": "The full formatted log entry, the same text written to the server log. The entry starts with a header line of slash-separated fields: the current user, the date as `yyyymmdd`, the time, the product version, the script location with its line number, and the server process and machine, ending with the caption. The message follows on the next line, and the entry ends with trailing blank lines. Because `ErrorMes` always writes, it does not return the empty string that `UsrMes` returns when user-message logging is disabled."
       },
       "parameters": [
         {
@@ -7765,14 +7617,14 @@
           "type": "any",
           "required": "yes",
           "default": "—",
-          "description": "Caption or lead text for the error message."
+          "description": "Caption text. When vMessage is omitted or empty, this value is logged as the message and the caption is ****User message****."
         },
         {
           "name": "vMessage",
           "type": "any",
-          "required": "yes",
-          "default": "—",
-          "description": "Message body or detail text."
+          "required": "no",
+          "default": "NIL",
+          "description": "Message body, written on the line after the header."
         }
       ]
     },
@@ -8019,7 +7871,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Optional argument array for the dynamic call. When supplied, it must be an array."
+          "description": "Optional argument array for the dynamic call. When supplied, it must be an array. The dynamic code receives the elements, in order, through its own :PARAMETERS statement: ExecUdf(\":PARAMETERS a, b; :RETURN a + b;\", {2, 3}) returns 5."
         },
         {
           "name": "bCacheCode",
@@ -8218,7 +8070,7 @@
       "signature": "GetAppBaseFolder()",
       "returns": {
         "type": "string",
-        "description": "The base folder path configured for the application context."
+        "description": "The base folder path configured for the application context, ending with a backslash."
       }
     },
     "GetAppWorkPathFolder": {
@@ -8227,12 +8079,12 @@
       "signature": "GetAppWorkPathFolder()",
       "returns": {
         "type": "string",
-        "description": "The application work path folder configured in the system."
+        "description": "The application work path folder configured in the system, ending with a backslash."
       }
     },
     "GetByName": {
       "title": "GetByName",
-      "summary": "Retrieves the value of a variable by name from local or public storage.",
+      "summary": "Retrieves the value of a variable by name from the current scope, a caller scope, or public storage.",
       "signature": "GetByName(sName)",
       "returns": {
         "type": "any",
@@ -8244,14 +8096,14 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "The name of the variable to retrieve. Case-sensitive."
+          "description": "The name of the variable to retrieve. Matched case-insensitively."
         }
       ]
     },
     "GetConnectionByName": {
       "title": "GetConnectionByName",
       "summary": "Retrieves a database connection object using a specified connection name.",
-      "signature": "GetConnectionByName(sConnectionName)",
+      "signature": "GetConnectionByName([sConnectionName])",
       "returns": {
         "type": "SQLConnection",
         "description": "The SQL connection object for the specified connection name."
@@ -8272,13 +8124,13 @@
       "signature": "GetConnectionStrings()",
       "returns": {
         "type": "array",
-        "description": "Two-dimensional array of connections. Each row contains three strings: the connection name, the provider name, and the full connection string."
+        "description": "Two-dimensional array of connections. Each row contains three strings: the connection name, the provider settings string, and the full connection string."
       }
     },
     "GetDBMSName": {
       "title": "GetDBMSName",
       "summary": "Returns the DBMS platform name for a configured database connection.",
-      "signature": "GetDBMSName(sConnectionName)",
+      "signature": "GetDBMSName([sConnectionName])",
       "returns": {
         "type": "string",
         "description": "The DBMS platform identifier for the specified connection: `\"SQL\"` for SQL Server connections and `\"ORACLE\"` for Oracle connections."
@@ -8289,14 +8141,14 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "Connection name to look up. If omitted or NIL, the default connection is used."
+          "description": "Connection name to look up. If omitted, empty, or NIL, the default connection is used."
         }
       ]
     },
     "GetDBMSProviderName": {
       "title": "GetDBMSProviderName",
       "summary": "Returns the uppercase DBMS provider identifier for a named database connection.",
-      "signature": "GetDBMSProviderName(sConnectionName)",
+      "signature": "GetDBMSProviderName([sConnectionName])",
       "returns": {
         "type": "string",
         "description": "The DBMS provider identifier in uppercase."
@@ -8317,7 +8169,7 @@
       "signature": "GetDSParameters(sDsName)",
       "returns": {
         "type": "array",
-        "description": "An array of parameter key strings for the specified data source."
+        "description": "An array of parameter key strings for the specified data source, in declaration order. This is the order in which `RunDS` binds the values in its `aParameters` array."
       },
       "parameters": [
         {
@@ -8378,7 +8230,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Array of 1-based column indexes to treat as invariant-date columns."
+          "description": "Date columns to return as stored, without time-zone conversion. Pass 1-based column indexes or column names."
         }
       ]
     },
@@ -8445,7 +8297,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Array of 1-based numeric column indexes to treat as invariant-date columns."
+          "description": "Date columns to return as stored, without time-zone conversion. Pass 1-based column indexes or column names."
         }
       ]
     },
@@ -8555,14 +8407,14 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Accepted by the function signature, but currently ignored by the implementation."
+          "description": "Accepted but has no effect on the returned XML."
         },
         {
           "name": "aUniqueConstraints",
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Accepted by the function signature, but currently ignored by the implementation."
+          "description": "Accepted but has no effect on the returned XML."
         }
       ]
     },
@@ -8587,7 +8439,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Field definitions for the output columns. Each element may be a field name string or a definition array such as {\"sample_id\", \"S\", 20} or {\"result_value\", \"N\", 10, 2}."
+          "description": "Field definitions for the output columns. Each element may be a field name string or a definition array such as {\"sample_id\", \"S\", 20} or {\"result_value\", \"N\", 10, 2}. Omitting it raises an error; an empty array returns an empty string."
         },
         {
           "name": "sTableName",
@@ -8675,7 +8527,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Array of 1-based numeric column indexes to treat as invariant-date columns."
+          "description": "Date columns to return as stored, without time-zone conversion. Pass 1-based column indexes or column names."
         }
       ]
     },
@@ -8727,7 +8579,7 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "Remote directory to list. The value is passed directly to the FTP or SFTP implementation."
+          "description": "Remote directory to list, as the server expects it."
         },
         {
           "name": "sFilePattern",
@@ -8755,7 +8607,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted or non-positive, the implementation uses 21."
+          "description": "Server port. If omitted or not positive, port 21 is used."
         },
         {
           "name": "sProxy",
@@ -8776,7 +8628,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Set to .T. to use the SFTP implementation. Omitted or NIL keeps the FTP implementation."
+          "description": "Set to .T. to use SFTP. Omitted or NIL uses FTP."
         },
         {
           "name": "sPrivateKeyFilePath",
@@ -8793,7 +8645,7 @@
       "signature": "GetFileVersion(sFileName)",
       "returns": {
         "type": "string",
-        "description": "The file version string returned for `sFileName`."
+        "description": "The file version string returned for `sFileName`, or an empty string when the file exists but carries no version information (for example a `.ini` or `.txt` file)."
       },
       "parameters": [
         {
@@ -8858,7 +8710,7 @@
           "type": "string",
           "required": "no",
           "default": "sRemoteFileName",
-          "description": "Local path and file name to create. If empty, the function uses sRemoteFileName."
+          "description": "Local path and file name to create. If empty, the function uses sRemoteFileName. Pass a full local path so you control where the file is written."
         },
         {
           "name": "sUserName",
@@ -9095,8 +8947,8 @@
           "name": "sConnectionName",
           "type": "string",
           "required": "no",
-          "default": "\"DATABASE\"",
-          "description": "Connection name to use."
+          "default": "—",
+          "description": "Connection name to use. When omitted, the query runs against the default connection (\"DATABASE\" in a standard install). Pass the name explicitly if your script changes the default with SetDefaultConnection."
         },
         {
           "name": "aValues",
@@ -9148,7 +9000,7 @@
     },
     "GetPrinters": {
       "title": "GetPrinters",
-      "summary": "Returns a list of printer names currently installed on the system.",
+      "summary": "Returns a list of printer names installed on the STARLIMS application server.",
       "signature": "GetPrinters()",
       "returns": {
         "type": "array",
@@ -9169,7 +9021,7 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "Data source name used to determine the database platform."
+          "description": "Name of the database connection whose platform determines the delimiter, such as \"DATABASE\". If omitted or empty, the default connection is used. A name that is not a configured connection raises an error."
         },
         {
           "name": "bOpen",
@@ -9208,7 +9060,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Replacement strings corresponding to aSourceValues. Must have the same number of elements as aSourceValues."
+          "description": "Replacement strings corresponding to aSourceValues. Must have the same number of elements as aSourceValues. Non-string values, such as numbers, are converted to text."
         }
       ]
     },
@@ -9398,7 +9250,7 @@
       "signature": "GetWebFolder()",
       "returns": {
         "type": "string",
-        "description": "The current web folder path."
+        "description": "The current web folder path, ending with a backslash."
       }
     },
     "HasProperty": {
@@ -9551,7 +9403,7 @@
           "type": "boolean",
           "required": "yes",
           "default": "—",
-          "description": ".T. enables SQL error suppression. .F. restores normal SQL error throwing."
+          "description": ".T. (the starting value) enables SQL error suppression, which takes effect only while ShowSqlErrors is .F.. .F. makes failing statements raise whatever ShowSqlErrors is set to."
         }
       ]
     },
@@ -9561,7 +9413,7 @@
       "signature": "InBatchProcess()",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the current execution context is running in batch process mode; otherwise `.F.`."
+        "description": "`.T.` when the current execution context is running in batch process mode; otherwise `.F.`. A job submitted in `\"internal\"` mode returns `.F.`."
       }
     },
     "InfoMes": {
@@ -9859,7 +9711,7 @@
     "LDAPAuth": {
       "title": "LDAPAuth",
       "summary": "Authenticates a user by binding directly to an LDAP server.",
-      "signature": "LDAPAuth(sLdapHost, [nLdapPort], sLdapUserName, [sLdapPassword], [sLdapDistinctiveName], [bSecure])",
+      "signature": "LDAPAuth(sLdapHost, [nLdapPort], sLdapUserName, sLdapPassword, [sLdapDistinctiveName], [bSecure])",
       "returns": {
         "type": "string",
         "description": "Returns `\"\"` when the bind succeeds."
@@ -9889,9 +9741,9 @@
         {
           "name": "sLdapPassword",
           "type": "string",
-          "required": "no",
-          "default": "\"\"",
-          "description": "Password passed to the bind operation. An empty password raises an exception."
+          "required": "yes",
+          "default": "—",
+          "description": "Password passed to the bind operation. An empty or omitted password raises The password cannot be null."
         },
         {
           "name": "sLdapDistinctiveName",
@@ -9951,7 +9803,7 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "User identifier inserted into sSearchFilter with string.Format(sSearchFilter, sSearchUserName). In normal usage this is the user being authenticated."
+          "description": "User identifier substituted for {0} in sSearchFilter. In normal usage this is the user being authenticated. Needed whenever the filter (including the default) contains {0}."
         },
         {
           "name": "sSearchUserPassword",
@@ -9979,7 +9831,7 @@
           "type": "string",
           "required": "no",
           "default": "(&(objectClass=user)(name={0}))",
-          "description": "LDAP filter pattern. When supplied, it is formatted with sSearchUserName. The search must return exactly one entry."
+          "description": "LDAP filter pattern; {0} (in a supplied filter or the default) is replaced with sSearchUserName. The search must return exactly one entry."
         },
         {
           "name": "sAuthAttribName",
@@ -10122,7 +9974,7 @@
     "LSearch": {
       "title": "LSearch",
       "summary": "Returns a single value from a SQL query, or a caller-supplied fallback when the query produces no scalar result.",
-      "signature": "LSearch(sCommandString, vDefaultValue, [sConnectionName], [aArrayOfValues])",
+      "signature": "LSearch(sCommandString, [vDefaultValue], [sConnectionName], [aArrayOfValues])",
       "returns": {
         "type": "any",
         "description": "The scalar result from the query, or `vDefaultValue` when no scalar value is returned."
@@ -10138,9 +9990,9 @@
         {
           "name": "vDefaultValue",
           "type": "any",
-          "required": "yes",
+          "required": "no",
           "default": "—",
-          "description": "Value returned when the query returns no row or the scalar result is database NULL."
+          "description": "Value returned when the query returns no row or the scalar result is database NULL. When it is omitted, or NIL, a query that matches no row returns an empty string."
         },
         {
           "name": "sConnectionName",
@@ -10179,7 +10031,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Not implemented. This argument must be omitted or skipped. Passing any array value raises aFieldList != NULL - Not implemented yet."
+          "description": "Not implemented. This argument must be omitted or skipped. Passing any array value raises fieldList != NULL - Not implemented yet."
         },
         {
           "name": "sConnectionName",
@@ -10278,7 +10130,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Not implemented. This argument must be omitted or skipped. Passing any array value raises aFieldList != NULL - Not implemented yet."
+          "description": "Not implemented. This argument must be omitted or skipped. Passing any array value raises fieldList != NULL - Not implemented yet."
         },
         {
           "name": "sConnectionName",
@@ -10516,11 +10368,11 @@
     },
     "LimsGetDateFormat": {
       "title": "LimsGetDateFormat",
-      "summary": "Returns the current global date format string used for date parsing and formatting.",
+      "summary": "Returns the current session date format string used for date parsing and formatting.",
       "signature": "LimsGetDateFormat()",
       "returns": {
         "type": "string",
-        "description": "The current date format pattern used throughout the application (e.g., `\"MM/dd/yyyy\"`)."
+        "description": "The date format pattern currently in effect for this session (e.g., `\"M/d/yyyy\"`)."
       }
     },
     "LimsNETCast": {
@@ -10634,11 +10486,11 @@
     },
     "LimsSetCounter": {
       "title": "LimsSetCounter",
-      "summary": "Generates the next counter value and, when given matching field and value arrays, inserts a new row with that key.",
+      "summary": "Generates the next counter value and inserts a new row with that key into the target table.",
       "signature": "LimsSetCounter(sTableName, sFieldName, [sPrefix], [aFields], [aValues], [nIncrementWith])",
       "returns": {
         "type": "number",
-        "description": "The generated numeric counter value."
+        "description": "The generated numeric counter value. When no counter exists yet for the table, field, and prefix, this is `1`."
       },
       "parameters": [
         {
@@ -10646,7 +10498,7 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Target table name. The generated key is inserted into this table when the field and value arrays match."
+          "description": "Target table name. The generated key is inserted into this table as a new row."
         },
         {
           "name": "sFieldName",
@@ -10699,14 +10551,14 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Connection name of the configured connection to register. If the runtime supplies a null value, SSL substitutes the current default connection name before lookup."
+          "description": "Connection name of the configured connection to register. Always pass the name explicitly."
         }
       ]
     },
     "LimsSqlDisconnect": {
       "title": "LimsSqlDisconnect",
-      "summary": "Closes an active database connection by name and removes it from the internal registry.",
-      "signature": "LimsSqlDisconnect([sConnectionName])",
+      "summary": "Closes an active database connection by name and removes it from the session's connection list.",
+      "signature": "LimsSqlDisconnect(sConnectionName)",
       "returns": {
         "type": "boolean",
         "description": "`.T.` if the disconnect operation succeeded; `.F.` otherwise."
@@ -10715,9 +10567,9 @@
         {
           "name": "sConnectionName",
           "type": "string",
-          "required": "no",
-          "default": "NIL",
-          "description": "Connection name of the connection to disconnect. When NIL, falls back to the system default connection."
+          "required": "yes",
+          "default": "—",
+          "description": "Name of the connection to disconnect. Always pass the name explicitly."
         }
       ]
     },
@@ -10745,16 +10597,16 @@
       "signature": "LimsTime()",
       "returns": {
         "type": "string",
-        "description": "The current time formatted with the active time format."
+        "description": "The current time formatted with the active time format. With the default format, the result is a 24-hour `HH:mm:ss` string such as `18:54:22`."
       }
     },
     "LimsType": {
       "title": "LimsType",
-      "summary": "Returns the single-character SSL type code for a variable name or expression.",
+      "summary": "Returns the SSL type code for a variable name or expression.",
       "signature": "LimsType(sParam)",
       "returns": {
         "type": "string",
-        "description": "A single-character type code based on what `sParam` evaluates to."
+        "description": "A one- or two-character type code based on what `sParam` evaluates to."
       },
       "parameters": [
         {
@@ -10883,7 +10735,7 @@
       "signature": "MakeDirOnFtp(",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the remote directory creation call succeeds; `.F.` when the FTP request fails (handled as a `WebException` on the FTP path) or when the directory-creation call fails after a successful connect and login (SFTP path)."
+        "description": "`.T.` when the remote directory creation call succeeds; `.F.` when the server rejects the FTP request, or when the SFTP directory-creation call fails after a successful connect and login."
       },
       "parameters": [
         {
@@ -10919,7 +10771,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted or less than or equal to 0, the implementation uses 21 on both the FTP and SFTP paths."
+          "description": "Server port. If omitted or less than or equal to 0, the function uses 21 on both the FTP and SFTP paths."
         },
         {
           "name": "sProxy",
@@ -10933,7 +10785,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Set to .T. to use the SFTP implementation. Omit it or pass NIL/.F. to use FTP."
+          "description": "Set to .T. to use SFTP. Omit it or pass NIL/.F. to use FTP."
         },
         {
           "name": "sPrivateKeyFilePath",
@@ -11130,7 +10982,7 @@
           "type": "string",
           "required": "no",
           "default": "NIL",
-          "description": "Source directory portion of the remote path. Empty values are passed through to the underlying FTP or SFTP download step."
+          "description": "Source directory portion of the remote path. An empty value is handled differently on FTP and SFTP (see Caveats)."
         },
         {
           "name": "sRemoteDirectoryTo",
@@ -11172,7 +11024,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted or non-positive, the implementation uses 21, even on the SFTP path."
+          "description": "Server port. If omitted or non-positive, the function uses 21, even for SFTP."
         },
         {
           "name": "sProxy",
@@ -11186,7 +11038,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Set to .T. to use the SFTP implementation. Omitted or NIL keeps the FTP implementation."
+          "description": "Set to .T. to use SFTP. Omitted or NIL uses FTP."
         },
         {
           "name": "sPrivateKeyFilePath",
@@ -11248,7 +11100,7 @@
       "signature": "PrepareArrayForIn(aTarget, sItemType)",
       "returns": {
         "type": "array",
-        "description": "The same array after preparation. Empty input receives one sentinel element based on `sItemType`. Non-empty input keeps its length with `\"\"` elements replaced by the string sentinel."
+        "description": "The same array after preparation. Empty input receives one sentinel element based on `sItemType`. Non-empty input keeps its length with `\"\"` elements replaced by the string sentinel. The string sentinel is `C7082BA7C83D38CAE98421BE494753931F8B52A8` (the same value `BuildStringForIn` uses); the numeric sentinel is `-2147483648`."
       },
       "parameters": [
         {
@@ -11269,11 +11121,11 @@
     },
     "PrmCount": {
       "title": "PrmCount",
-      "summary": "Returns how many arguments were passed to the currently executing procedure.",
+      "summary": "Returns how many arguments the caller passed to the current server script; only valid in script-level code.",
       "signature": "PrmCount()",
       "returns": {
         "type": "number",
-        "description": "The number of arguments passed to the current procedure call."
+        "description": "The number of arguments the caller passed to the current server script."
       }
     },
     "RaiseError": {
@@ -11282,7 +11134,7 @@
       "signature": "RaiseError(sMessage, [sLocation], [nErrorCode], [oInnerException])",
       "returns": {
         "type": "boolean",
-        "description": "The surfaced return type is boolean, but `RaiseError` does not return normally because it always raises an error."
+        "description": "The declared return type is boolean, but `RaiseError` does not return normally because it always raises an error."
       },
       "parameters": [
         {
@@ -11336,21 +11188,21 @@
     "Rat": {
       "title": "Rat",
       "summary": "Finds the last occurrence of a substring in a string and returns its one-based position.",
-      "signature": "Rat(subStr, source)",
+      "signature": "Rat(sSubString, sSource)",
       "returns": {
         "type": "number",
         "description": "The one-based position of the last match, or `0` when no match is found."
       },
       "parameters": [
         {
-          "name": "subStr",
+          "name": "sSubString",
           "type": "string",
           "required": "yes",
           "default": "—",
           "description": "Substring to look for."
         },
         {
-          "name": "source",
+          "name": "sSource",
           "type": "string",
           "required": "yes",
           "default": "—",
@@ -11411,7 +11263,7 @@
           "type": "number",
           "required": "no",
           "default": "64000 when omitted or <= 0",
-          "description": "Maximum bytes to read on the FTP path. On the current SFTP path, the full file is still read."
+          "description": "Maximum bytes to read on the FTP path. On SFTP, the full file is still read."
         },
         {
           "name": "sUserName",
@@ -11459,7 +11311,7 @@
     },
     "ReadText": {
       "title": "ReadText",
-      "summary": "Retrieves text content from a file in memory, allowing partial reads and encoding selection.",
+      "summary": "Reads a text file and returns its contents, or the first n characters, as a string, with an optional encoding.",
       "signature": "ReadText(sFileName, [nCharsToRead], [sEncoding])",
       "returns": {
         "type": "string",
@@ -11495,7 +11347,7 @@
       "signature": "RenameOnFtp(sServerNameOrIP, [sRemoteDirectory], sFileNameOld, sFileNameNew, [sUserName], [sPassword], [nPort], [sProxy], [bIsSFTP], [sPrivateKeyFilePath])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the rename completes; `.F.` when the underlying FTP or SFTP move helper cannot complete the rename."
+        "description": "`.T.` when the rename completes; `.F.` when the rename cannot be completed."
       },
       "parameters": [
         {
@@ -11545,7 +11397,7 @@
           "type": "number",
           "required": "no",
           "default": "21",
-          "description": "Server port. If omitted or non-positive, the implementation uses 21, even on the SFTP path."
+          "description": "Server port. If omitted or non-positive, the function uses 21, even for SFTP."
         },
         {
           "name": "sProxy",
@@ -11559,7 +11411,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Set to .T. to use the SFTP implementation. Omitted or NIL keeps the FTP implementation."
+          "description": "Set to .T. to use SFTP. Omitted or NIL uses FTP."
         },
         {
           "name": "sPrivateKeyFilePath",
@@ -11605,21 +11457,21 @@
     "Replicate": {
       "title": "Replicate",
       "summary": "Creates a string by repeating the source string a specified number of times.",
-      "signature": "Replicate(source, count)",
+      "signature": "Replicate(sSource, nCount)",
       "returns": {
         "type": "string",
-        "description": "String consisting of the source string repeated count times"
+        "description": "String consisting of the source string repeated `nCount` times"
       },
       "parameters": [
         {
-          "name": "source",
+          "name": "sSource",
           "type": "string",
           "required": "yes",
           "default": "—",
           "description": "Source string to be repeated"
         },
         {
-          "name": "count",
+          "name": "nCount",
           "type": "number",
           "required": "yes",
           "default": "—",
@@ -11735,7 +11587,7 @@
           "type": "number",
           "required": "yes",
           "default": "—",
-          "description": "Number of decimal places to round to."
+          "description": "Number of decimal places to round to, from 0 to 15."
         },
         {
           "name": "sMidPointRounding",
@@ -11810,7 +11662,7 @@
           "type": "array",
           "required": "no",
           "default": "NIL",
-          "description": "Optional array of argument values for the target data source. If supplied, it must be an array."
+          "description": "Optional array of argument values for the target data source, bound by position in the order its :PARAMETERS declares them. If supplied, it must be an array."
         },
         {
           "name": "vReturnType",
@@ -11823,11 +11675,11 @@
     },
     "RunSQL": {
       "title": "RunSQL",
-      "summary": "Executes a SQL statement and returns whether execution completed without an uncaught SQL error.",
+      "summary": "Executes a non-query SQL statement and returns .T. on success. Under default settings, a failed statement raises an error.",
       "signature": "RunSQL(sCommandString, [sConnectionName], [aValues])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the statement executes successfully; `.F.` when a handled SQL error occurs while SQL error ignoring is enabled (check `GetLastSQLError` for details)."
+        "description": "`.T.` when the statement executes successfully; `.F.` when the statement fails while `ShowSqlErrors` is `.F.` and `IgnoreSqlErrors` is `.T.` (check `GetLastSQLError` for details). Under the default settings a failure raises instead of returning `.F.`."
       },
       "parameters": [
         {
@@ -11881,7 +11733,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".T.",
-          "description": "For non-SELECT statements, rolls back the current transaction when execution fails and this argument is .T.."
+          "description": "Applies to non-SELECT statements. No effect on a failed statement was observed: an open transaction stays open whether this is .T. or .F., so end the transaction yourself; see Caveats."
         },
         {
           "name": "bNullAsBlank",
@@ -11895,21 +11747,21 @@
           "type": "array",
           "required": "no",
           "default": "omitted",
-          "description": "Array of date column positions to treat as invariant when materializing SELECT results."
+          "description": "Date columns to return as stored, without time-zone conversion, when materializing SELECT results. Pass 1-based column positions or column names."
         },
         {
           "name": "vReturnType",
           "type": "boolean or string",
           "required": "no",
           "default": "\"array\"",
-          "description": "When the prepared SQL begins with SELECT: .F. or non-xml/non-dataset strings return an array, .T. or \"xml\" returns XML text, and the exact string \"dataset\" returns a dataset object. Ignored for other statements."
+          "description": "For a SELECT statement: .F. or non-xml/non-dataset strings return an array, .T. or \"xml\" returns XML text, and the exact string \"dataset\" returns a dataset object. Ignored for other statements."
         },
         {
           "name": "sTableName",
           "type": "string",
           "required": "no",
           "default": "omitted",
-          "description": "Optional table name to use for XML or dataset-shaped results when the prepared SQL begins with SELECT."
+          "description": "Optional table name to use for XML or dataset-shaped results for a SELECT statement."
         },
         {
           "name": "bIncludeSchema",
@@ -12071,21 +11923,21 @@
           "type": "boolean",
           "required": "no",
           "default": ".T.",
-          "description": "Present in the signature. Outbox processing catches per-email send failures, continues with later rows, and returns .F. if any row fails."
+          "description": "Has no effect: per-email send failures are caught either way, processing continues with later rows, and the function returns .F. if any row fails."
         },
         {
           "name": "bUseCDO",
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Passed through to the underlying send operation."
+          "description": "Legacy transport flag, as for SendLimsEmail; leave it .F.."
         },
         {
           "name": "nTimeout",
           "type": "number",
           "required": "no",
           "default": "240",
-          "description": "Send timeout in seconds. A negative value is treated as the absolute timeout value with alternate send behavior."
+          "description": "Send timeout in seconds."
         }
       ]
     },
@@ -12122,9 +11974,9 @@
         {
           "name": "sSubject",
           "type": "string",
-          "required": "no",
-          "default": "\"\"",
-          "description": "Subject line. The surfaced signature allows it to be omitted, but the normal send path rejects an empty subject."
+          "required": "yes",
+          "default": "—",
+          "description": "Subject line. An empty subject makes the send fail."
         },
         {
           "name": "sMessageBody",
@@ -12194,7 +12046,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".F.",
-          "description": "Legacy transport flag retained in the public signature."
+          "description": "Legacy flag; leave it .F.."
         },
         {
           "name": "nTimeout",
@@ -12348,7 +12200,7 @@
       "signature": "SendToFtp(sServerNameOrIP, sRemoteDirectory, [sRemoteFileName], sLocalFileName, sUserName, sPassword, [nPort], [sProxy], [bUsePassive], [bIsSFTP], [sPrivateKeyFilePath])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the file upload completes successfully; `.F.` when the selected backend catches a file-read or transfer error during the upload attempt."
+        "description": "`.T.` when the file upload completes successfully; `.F.` when a file-read or transfer error occurs during the upload attempt."
       },
       "parameters": [
         {
@@ -12363,7 +12215,7 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Remote folder path passed to the selected backend."
+          "description": "Remote folder path on the server."
         },
         {
           "name": "sRemoteFileName",
@@ -12436,7 +12288,7 @@
       "signature": "SendToOutbox(",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the outbox row is written successfully; `.F.` when the queue operation fails without raising, such as the `bIgnoreErrors` handling for `NIL` required arguments."
+        "description": "`.T.` when the outbox row is written successfully; `.F.` when the queue operation fails without raising."
       },
       "parameters": [
         {
@@ -12444,21 +12296,21 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "SMTP server name. NIL is handled by bIgnoreErrors; an empty string is invalid."
+          "description": "SMTP server name. Must not be NIL or empty (see Exceptions)."
         },
         {
           "name": "aRecipients",
           "type": "array",
           "required": "yes",
           "default": "—",
-          "description": "Recipient address array. NIL is handled by bIgnoreErrors; an empty array is invalid."
+          "description": "Recipient address array. Must not be NIL or empty (see Exceptions)."
         },
         {
           "name": "sFromWho",
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Sender address. NIL is handled by bIgnoreErrors; an empty string is invalid."
+          "description": "Sender address. Must not be NIL or empty (see Exceptions)."
         },
         {
           "name": "sSubject",
@@ -12528,7 +12380,7 @@
           "type": "boolean",
           "required": "no",
           "default": ".T.",
-          "description": "Accepted for API compatibility. The three required-argument validation throws occur unconditionally regardless of this value."
+          "description": "Does not suppress the required-argument exceptions listed under Exceptions."
         },
         {
           "name": "bUseSSL",
@@ -12661,7 +12513,7 @@
     },
     "SetGroupSeparator": {
       "title": "SetGroupSeparator",
-      "summary": "Changes the group (thousands) separator character used when numbers are formatted as strings across the application.",
+      "summary": "Changes the group (thousands) separator character used when numbers are formatted as strings.",
       "signature": "SetGroupSeparator(sGroupSep)",
       "returns": {
         "type": "string",
@@ -12853,7 +12705,7 @@
     },
     "ShowSqlErrors": {
       "title": "ShowSqlErrors",
-      "summary": "Sets the SQL error display flag and returns the previous setting.",
+      "summary": "Sets the SQL error display flag, which decides whether a failing RunSQL raises, and returns the previous setting.",
       "signature": "ShowSqlErrors(bEnable)",
       "returns": {
         "type": "boolean",
@@ -12865,7 +12717,7 @@
           "type": "boolean",
           "required": "yes",
           "default": "—",
-          "description": ".T. enables SQL error display. .F. disables it."
+          "description": ".T. (the starting value) enables SQL error display, so a failing RunSQL raises. .F. disables it, so a failing RunSQL returns .F. while IgnoreSqlErrors is .T.."
         }
       ]
     },
@@ -12875,7 +12727,7 @@
       "signature": "SigFig(sStandard, nDigits, nValue)",
       "returns": {
         "type": "string",
-        "description": "The formatted string returned by the selected rounding routine."
+        "description": "The rounded value as a formatted string."
       },
       "parameters": [
         {
@@ -12883,14 +12735,14 @@
           "type": "string",
           "required": "yes",
           "default": "—",
-          "description": "Rounding standard name. The implementation has explicit handling for FDA, EPA, and ISO."
+          "description": "Rounding standard name. Supported standards are FDA, EPA, and ISO."
         },
         {
           "name": "nDigits",
           "type": "number",
           "required": "yes",
           "default": "—",
-          "description": "Digit count passed to the rounding routine."
+          "description": "Whole-number digit count. FDA and ISO use it as decimal places; EPA uses it as the number of significant digits."
         },
         {
           "name": "nValue",
@@ -12943,7 +12795,7 @@
       "signature": "StdRound(sStandard, nDigits, nNumber)",
       "returns": {
         "type": "string",
-        "description": "The formatted string returned by the selected rounding routine."
+        "description": "The rounded value as a formatted string."
       },
       "parameters": [
         {
@@ -12958,7 +12810,7 @@
           "type": "number",
           "required": "yes",
           "default": "—",
-          "description": "Whole-number digit count passed to the selected rounding routine. FDA and ISO use it as decimal digits; EPA uses it in its own significant-digit-style rounding path."
+          "description": "Whole-number digit count. FDA and ISO use it as decimal places; EPA uses it as the number of significant digits."
         },
         {
           "name": "nNumber",
@@ -13043,7 +12895,7 @@
     "StrTran": {
       "title": "StrTran",
       "summary": "Replaces all occurrences of a specified substring with another substring in a source string.",
-      "signature": "StrTran(source, searchFor, replaceWith)",
+      "signature": "StrTran(source, searchFor, [replaceWith])",
       "returns": {
         "type": "string",
         "description": "New string containing the replacement result."
@@ -13078,7 +12930,7 @@
       "signature": "StrZero(nNumber, [nLength], [nDecimals])",
       "returns": {
         "type": "string",
-        "description": "The formatted number, left-padded with zeros to the requested width. Returns a string of `*` characters when the value overflows the requested width."
+        "description": "The formatted number, left-padded with zeros to the requested width. Decimal digits that do not fit are dropped. Returns a string of `*` characters when the integer part is wider than the requested width."
       },
       "parameters": [
         {
@@ -13256,7 +13108,7 @@
       "signature": "Time()",
       "returns": {
         "type": "string",
-        "description": "The current time formatted with the active time format."
+        "description": "The current time formatted with the active time format. With the default format, the result is a 24-hour `HH:mm:ss` string such as `18:54:22`."
       }
     },
     "ToJson": {
@@ -13690,7 +13542,7 @@
       "signature": "WriteToFtp(sServerNameOrIP, sRemoteDirectory, sRemoteFileName, sFileContents, sUserName, sPassword, [nPort], [sProxy], [bIsSFTP], [sPrivateKeyFilePath])",
       "returns": {
         "type": "boolean",
-        "description": "`.T.` when the write completes successfully; `.F.` when the transfer operation reaches the FTP or SFTP write step and that step fails with a handled web exception."
+        "description": "`.T.` when the write completes successfully; `.F.` when the upload itself fails. Some setup errors raise instead of returning `.F.`; see Caveats."
       },
       "parameters": [
         {

@@ -9,6 +9,7 @@ config: []
 tests:
   - internal/providers/providers_test.go
   - internal/providers/udobject_shapes_test.go
+  - internal/server/handler_test.go
 history:
   - date: 2026-05-06
     ref: "PR #10 (v0.7.4), issues #8/#9"
@@ -29,6 +30,30 @@ history:
       (categories-only level 0 per the noise policy); the pre-existing
       vs-code-ssl-formatter#74 same-file exception is now documented
       here and A5 narrowed to non-dispatch strings.
+  - date: 2026-10-13
+    ref: "#252"
+    note: >-
+      Built-in function, keyword, operator, and literal completion
+      documentation now comes from the vendored reference (shared with
+      hover), and function snippets use reference parameter names as
+      placeholders (`SQLExecute(${1:sCommandString})`). The trigger and
+      context contract below is unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      ProcedureInfo.IsPrivate now requires an annotation in force — the
+      exact lowercase form on the line immediately before :PROCEDURE —
+      matching diag.visibility_annotation. A near-miss spelling or an
+      annotation detached by a blank line or another comment used to mark
+      the procedure private (and hide it from completion) although the
+      runtime leaves it public.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      Variable completions scoped: the cursor's procedure plus
+      script-level and :PUBLIC declarations, one item per name
+      case-insensitively (A12). Every declaration from every procedure
+      was listed before, duplicates included.
 issues: []
 ---
 
@@ -50,7 +75,10 @@ trigger policy:
     result is `:DECLARE`, never `::DECLARE`.
 - Explicit invocation returns the full set: keywords, built-in functions and
   classes, literals, operators, document-local procedures and variables, and
-  snippets. Inside `:CLASS` methods it adds class-context forms (`Me`,
+  snippets. Variables are those visible at the cursor — the enclosing
+  procedure's locals and parameters, script-level declarations, and
+  `:PUBLIC` names — one item per name case-insensitively, the nearest
+  scope winning; another procedure's locals are never offered. Inside `:CLASS` methods it adds class-context forms (`Me`,
   `Base`, `Constructor`) and inserts sibling methods as `Me:Method(...)`.
 - Class-only forms are never suggested outside a `:CLASS` method.
 - Inside string literals and comments, no completions are returned.
@@ -65,7 +93,10 @@ trigger policy:
   (feature.cross_file_resolution): before any dot, same-file procedures
   plus workspace category names only; after `Category.`, that category's
   scripts; after `Category.Script.` or flat `Script.`, that script's
-  procedures with `/*@private;`/`/*@protected;` ones excluded. All items
+  procedures with `/*@private;`/`/*@protected;` ones excluded — an
+  annotation counts only when it is in force (exact form, on the line
+  immediately before `:PROCEDURE`; diag.visibility_annotation reports the
+  inert ones, and an inert annotation never hides a procedure). All items
   insert plain text. `.` remains a non-trigger character (the trigger
   policy above is unchanged): segment completions appear on explicit
   invocation or while the popup is already open — do not "fix" this by
@@ -92,6 +123,8 @@ trigger policy:
 - A8: Given `ExecFunction("Cat.")` where `Cat` is a workspace category, when completion is requested, then the scripts in that category are offered.
 - A9: Given `ExecFunction("Cat.Script.")` resolving to a workspace script, when completion is requested, then that script's procedures are offered, excluding `/*@private;` and `/*@protected;` ones.
 - A10: Given `DoProc("Script.")` where `Script` matches a flat-layout script basename, when completion is requested, then that script's non-private procedures are offered.
+- A11: Given `aItems:` where aItems holds an SSL array, string, number, logical or date (no class, returns-object or CreateUdObject shape), when completion triggers, then no items are offered — in particular no SSL-object members (`GetProperty`, `IsProperty`, `AddProperty`, ...), which those values do not have, and no guessed .NET members, whose names are case-sensitive and unlisted (issue #267).
+- A12: Given two procedures each declaring locals (one name repeated with different casing) plus script-level and `:PUBLIC` declarations, when completion is requested inside the second procedure, then its locals, the script-level variables, and the publics are offered, the first procedure's own locals are not, and each name appears once.
 
 ## Rationale
 

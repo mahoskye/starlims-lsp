@@ -3,7 +3,7 @@ id: diag.limit_public_vars
 title: PUBLIC variables discouraged
 kind: diagnostic
 status: active
-authority: style_only
+authority: advisory
 schema_ref: lints.coding_standards.limit_public_vars
 default_severity: info
 config:
@@ -31,6 +31,14 @@ history:
       each site. Info is the opt-in advisory tier
       (ssl.diagnostics.infoDiagnostics); explicit ssl.diagnostics.rules
       entries still promote or disable per rule.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to advisory: the style-guide record
+      limit_public_vars (level advisory) names this rule in enforced_by,
+      so the guide is not silent. Rationale corrected: the severity is
+      info by D13 (advisory tier), where it said warning; the record's
+      warning is a deliberate difference.
 issues: []
 ---
 
@@ -66,9 +74,11 @@ nLocal := 1;
 
 ## Rationale
 
-The schema lists `limit_public_vars` under `lints.coding_standards` with
-`severity: warning` (style_only): ":PUBLIC variables persist across all
-procedures and risk namespace pollution. Prefer :DECLARE with parameter
-passing." Valid SSL — the code compiles and runs — hence a warning, not
-an error, and per-occurrence so every shared-state declaration is visible
-in review. Introduced in the 2026-03-21 alignment pass (history).
+The schema lists `limit_public_vars` under `lints.coding_standards`
+(style-guide record limit_public_vars, advisory, severity warning):
+":PUBLIC variables persist across all procedures and risk namespace
+pollution. Prefer :DECLARE with parameter passing." Valid SSL — the code
+compiles and runs — so it is advisory, and per-occurrence so every
+shared-state declaration is visible in review. The severity is info, not
+the record's warning: DECISIONS.md D13 moved this rule into the opt-in
+advisory tier (PR #213), a deliberate difference from the record. Introduced in the 2026-03-21 alignment pass (history).

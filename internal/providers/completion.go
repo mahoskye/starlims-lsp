@@ -81,52 +81,29 @@ func GetKeywordCompletions() []CompletionItem {
 func GetFunctionCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, fnName := range constants.SSLFunctionNames {
-		items = append(items, buildFunctionCompletion(fnName, false))
+		items = append(items, buildFunctionCompletion(fnName))
 	}
 	return items
 }
 
-// GetFunctionSnippetCompletions returns function snippet completions with parameter placeholders.
-func GetFunctionSnippetCompletions() []CompletionItem {
-	var items []CompletionItem
-	for _, fnName := range constants.SSLFunctionNames {
-		items = append(items, buildFunctionCompletion(fnName, true))
-	}
-	return items
-}
-
-func buildFunctionCompletion(fnName string, useSnippet bool) CompletionItem {
+func buildFunctionCompletion(fnName string) CompletionItem {
 	detail := "SSL Function"
 	doc := fmt.Sprintf("Built-in SSL function: %s", fnName)
-	insertText := fnName
-	label := fnName
-	kind := CompletionKindFunction
-	format := InsertTextFormatPlainText
-
-	if useSnippet {
-		label = fnName + "()"
-		kind = CompletionKindSnippet
-		format = InsertTextFormatSnippet
-		insertText = fmt.Sprintf("%s($0)", fnName)
-	}
 
 	// Try to get richer info from signatures
 	if sig, ok := constants.GetFunctionSignature(fnName); ok {
 		docInfo := buildFunctionDoc(sig)
 		detail = docInfo.Detail
 		doc = docInfo.Documentation
-		if useSnippet {
-			insertText = buildFunctionSnippet(fnName, sig)
-		}
 	}
 
 	return CompletionItem{
-		Label:            label,
-		Kind:             kind,
+		Label:            fnName,
+		Kind:             CompletionKindFunction,
 		Detail:           detail,
 		Documentation:    doc,
-		InsertText:       insertText,
-		InsertTextFormat: format,
+		InsertText:       fnName,
+		InsertTextFormat: InsertTextFormatPlainText,
 	}
 }
 
@@ -312,11 +289,16 @@ func GetStatusKeywordCompletions() []CompletionItem {
 func GetPredefinedGlobalCompletions() []CompletionItem {
 	var items []CompletionItem
 	for _, g := range constants.SSLPredefinedGlobals {
+		// Request and Response are offered with their own documentation
+		// in endpoint scripts only (GetEndpointAmbientCompletions).
+		if strings.EqualFold(g, "Request") || strings.EqualFold(g, "Response") {
+			continue
+		}
 		items = append(items, CompletionItem{
 			Label:            g,
 			Kind:             CompletionKindVariable,
 			Detail:           "Predefined Global",
-			Documentation:    "Runtime-provided read-only global variable.",
+			Documentation:    "Declared by a base STARLIMS installation; an installation may declare more or fewer. A local with the same name hides it.",
 			InsertText:       g,
 			InsertTextFormat: InsertTextFormatPlainText,
 		})
@@ -446,10 +428,49 @@ func GetProcedureNameCompletions(procedures []parser.ProcedureInfo) []Completion
 	return items
 }
 
-// GetVariableCompletions returns variable completions from the current document.
+// VisibleVariables returns the declarations visible at a 1-based line:
+// those inside the cursor's procedure, then script-level declarations
+// (outside every procedure) and :PUBLIC names. Another procedure's locals
+// and parameters are out of scope (issue #258). Names are de-duplicated
+// case-insensitively, the nearest scope winning.
+func VisibleVariables(procedures []parser.ProcedureInfo, variables []parser.VariableInfo, line int) []parser.VariableInfo {
+	cursorProc := parser.FindProcedureAtLine(procedures, line)
+	inCursorProc := func(v parser.VariableInfo) bool {
+		return cursorProc != nil && v.Line >= cursorProc.StartLine && v.Line <= cursorProc.EndLine
+	}
+	var local, outer []parser.VariableInfo
+	for _, v := range variables {
+		switch {
+		case inCursorProc(v):
+			local = append(local, v)
+		case v.Scope == parser.ScopePublic || parser.FindProcedureAtLine(procedures, v.Line) == nil:
+			outer = append(outer, v)
+		}
+	}
+	seen := make(map[string]bool)
+	var visible []parser.VariableInfo
+	for _, v := range append(local, outer...) {
+		key := strings.ToLower(v.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		visible = append(visible, v)
+	}
+	return visible
+}
+
+// GetVariableCompletions returns variable completions from the given
+// declarations, one item per name (case-insensitive; first wins).
 func GetVariableCompletions(variables []parser.VariableInfo) []CompletionItem {
 	var items []CompletionItem
+	seen := make(map[string]bool)
 	for _, v := range variables {
+		key := strings.ToLower(v.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		items = append(items, CompletionItem{
 			Label:            v.Name,
 			Kind:             CompletionKindVariable,

@@ -424,15 +424,41 @@ func emitTypes(ref *referenceFile) []byte {
 			}
 			buf.WriteString("\t\t},\n")
 		}
-		if len(entry.Members) > 0 {
+		// The Members section holds one of two table shapes: a member
+		// table (Member | Kind | ... — the object type) or, for value
+		// types with no SSL-defined `:` members, a Task | Use table naming
+		// the function or operator to reach for instead. A row matching
+		// neither shape fails generation: an unrecognized table must not
+		// silently become empty members again.
+		var members, tasks []tableRow
+		for _, row := range entry.Members {
+			switch {
+			case cell(row, "member", "name") != "":
+				members = append(members, row)
+			case cell(row, "task") != "":
+				tasks = append(tasks, row)
+			default:
+				fail("type %q: members row has neither a member/name nor a task column: %v", k, row)
+			}
+		}
+		if len(members) > 0 {
 			buf.WriteString("\t\tMembers: []TypeMember{\n")
-			for _, row := range entry.Members {
+			for _, row := range members {
 				fmt.Fprintf(&buf, "\t\t\t{Name: %s, Kind: %s, Returns: %s, Description: %s, Group: %s},\n",
 					quote(cell(row, "member", "name")),
 					quote(cell(row, "kind")),
 					quote(cell(row, "returns")),
 					quote(cell(row, "description")),
 					quote(cell(row, "group")))
+			}
+			buf.WriteString("\t\t},\n")
+		}
+		if len(tasks) > 0 {
+			buf.WriteString("\t\tTasks: []TypeTask{\n")
+			for _, row := range tasks {
+				fmt.Fprintf(&buf, "\t\t\t{Task: %s, Use: %s},\n",
+					quote(cell(row, "task")),
+					quote(cell(row, "use")))
 			}
 			buf.WriteString("\t\t},\n")
 		}
@@ -468,8 +494,8 @@ func emitClasses(ref *referenceFile) []byte {
 			for _, c := range entry.Constructors {
 				buf.WriteString("\t\t\t{\n")
 				fmt.Fprintf(&buf, "\t\t\t\tSignature: %s,\n", quote(c.Signature))
-				if c.Description != "" {
-					fmt.Fprintf(&buf, "\t\t\t\tDescription: %s,\n", quote(c.Description))
+				if desc := constructorDescription(c); desc != "" {
+					fmt.Fprintf(&buf, "\t\t\t\tDescription: %s,\n", quote(desc))
 				}
 				if len(c.Parameters) > 0 {
 					buf.WriteString("\t\t\t\tParameters: []FunctionParameter{\n")
@@ -561,7 +587,7 @@ func emitReturns(ref *referenceFile) []byte {
 
 func emitFunctions(ref *referenceFile) []byte {
 	var buf bytes.Buffer
-	writeHeader(&buf, fmt.Sprintf("Generated function inventory (%d functions). Curated signatures with parameter detail still live in signatures.go and overlay these names in canonical.go.", len(ref.Functions)))
+	writeHeader(&buf, fmt.Sprintf("Generated function inventory (%d functions): names, summaries, and full signatures. Deliberate, documented overrides live in function_overrides.go and are applied in canonical.go.", len(ref.Functions)))
 
 	buf.WriteString("// GeneratedFunctionNames is the canonical PascalCase list of built-in SSL functions.\n")
 	buf.WriteString("var GeneratedFunctionNames = []string{\n")
@@ -571,7 +597,6 @@ func emitFunctions(ref *referenceFile) []byte {
 	buf.WriteString("}\n\n")
 
 	buf.WriteString("// GeneratedFunctionSummaries maps each function (lowercase) to its published one-line summary and signature.\n")
-	buf.WriteString("// Used as a fallback when signatures.go has no curated entry for a name.\n")
 	buf.WriteString("var GeneratedFunctionSummaries = map[string]struct {\n")
 	buf.WriteString("\tTitle     string\n")
 	buf.WriteString("\tSummary   string\n")
@@ -591,8 +616,79 @@ func emitFunctions(ref *referenceFile) []byte {
 		}
 		buf.WriteString("\t},\n")
 	}
+	buf.WriteString("}\n\n")
+
+	buf.WriteString("// GeneratedFunctionSignatures maps each function (lowercase) to its full\n")
+	buf.WriteString("// published signature: parameter names, types, required-ness, defaults and\n")
+	buf.WriteString("// descriptions, and the return type and description. Hover, signature help,\n")
+	buf.WriteString("// and completion render from this (issue #252).\n")
+	buf.WriteString("var GeneratedFunctionSignatures = map[string]FunctionSignature{\n")
+	for _, k := range canonicalSorted(ref.Functions) {
+		entry := ref.Functions[k]
+		fmt.Fprintf(&buf, "\t%s: {\n", quote(strings.ToLower(k)))
+		fmt.Fprintf(&buf, "\t\tName:        %s,\n", quote(entry.Title))
+		fmt.Fprintf(&buf, "\t\tDescription: %s,\n", quote(entry.Summary))
+		if entry.Returns != nil {
+			if t := strings.Trim(entry.Returns.Type, "`"); t != "" {
+				fmt.Fprintf(&buf, "\t\tReturnType: %s,\n", quote(t))
+			}
+			if entry.Returns.Description != "" {
+				fmt.Fprintf(&buf, "\t\tReturnDescription: %s,\n", quote(entry.Returns.Description))
+			}
+		}
+		if strings.Contains(entry.Signature, "...") {
+			buf.WriteString("\t\tVariadic: true,\n")
+		}
+		if len(entry.Parameters) > 0 {
+			buf.WriteString("\t\tParameters: []FunctionParameter{\n")
+			for _, p := range entry.Parameters {
+				name := cell(p, "name", "parameter")
+				if name == "" {
+					fail("function %q: parameter row has no name: %v", k, p)
+				}
+				required := strings.ToLower(strings.TrimSpace(cell(p, "required")))
+				switch required {
+				case "yes", "no", "conditional":
+				default:
+					fail("function %q parameter %q: unrecognized required value %q", k, name, required)
+				}
+				fmt.Fprintf(&buf, "\t\t\t{Name: %s, Type: %s, Required: %t, Conditional: %t, Default: %s, Description: %s},\n",
+					quote(name),
+					quote(cell(p, "type")),
+					required == "yes",
+					required == "conditional",
+					quote(parameterDefault(cell(p, "default"))),
+					quote(cell(p, "description")))
+			}
+			buf.WriteString("\t\t},\n")
+		}
+		buf.WriteString("\t},\n")
+	}
 	buf.WriteString("}\n")
 	return buf.Bytes()
+}
+
+// parameterDefault normalizes a published Default cell. An em dash means
+// "no default" and "omitted" means the argument is simply left out; neither
+// is a default value worth rendering.
+func parameterDefault(v string) string {
+	switch strings.TrimSpace(v) {
+	case "", "—", "-", "omitted":
+		return ""
+	}
+	return strings.TrimSpace(v)
+}
+
+// constructorDescription drops a description that is really the
+// constructor's parameter table flattened into one line (upstream extracts
+// the table text when no prose precedes it). The parameters are already
+// carried as structured rows, so the flattened copy is only noise.
+func constructorDescription(c constructorReference) string {
+	desc := strings.TrimSpace(c.Description)
+	if strings.HasPrefix(desc, "|") {
+		return ""
+	}
+	return desc
 }
 
 func emitSpecialForms(ref *referenceFile) []byte {

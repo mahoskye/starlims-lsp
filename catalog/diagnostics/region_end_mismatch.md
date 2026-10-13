@@ -5,7 +5,7 @@ kind: diagnostic
 status: active
 authority: tool
 schema_ref: null
-default_severity: warning
+default_severity: hint
 severity_overridable: true
 suppressible: true
 tests:
@@ -23,16 +23,27 @@ history:
       name (style guide module_structure syntax); trailing text is prose.
       The rule narrows to the one real error — an endregion with no open
       region — implemented alongside LIFO pairing in feature.folding.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Severity warning -> hint: an orphan endregion has no runtime effect, so
+      by kind it is a style finding (the related style-guide record
+      endregion_takes_no_name is info). The region opener now requires the
+      whole word `region` (here and in feature.folding): `/* Regional ...;`
+      used to open a region and so hid a later orphan endregion.
 issues: []
 ---
 
 ## Behavior
 
-Flags a `/* endregion;` marker when no `/* region;` is open. The canonical
+Flags a `/* endregion;` marker when no `/* region;` is open, at hint
+severity. The canonical
 closer takes no name — any trailing text before the `;` is prose and is
 ignored — so the only structural error an endregion can express is having
 nothing to close. Pairing is innermost-first (LIFO), mirroring
-`feature.folding`.
+`feature.folding`. Both markers are recognized only as whole words: a
+comment such as `/* Regional settings;` opens nothing, so it cannot hide
+an orphan endregion.
 
 It must NOT flag:
 
@@ -50,6 +61,14 @@ It must NOT flag:
 /* endregion;
 :PROCEDURE Helper;
 :ENDPROC;
+```
+
+### Flags
+
+```ssl
+/* Regional settings follow;
+:DECLARE nCount;
+/* endregion;
 ```
 
 ### Does not flag
@@ -75,8 +94,9 @@ It must NOT flag:
 
 Region markers are author-written structure; an orphan `endregion` used to
 be silently ignored, leaving the author unaware their markers are
-unbalanced. Warning severity: the code still runs (comments have no
-runtime effect), but the document's region structure is broken. The rule
+unbalanced. Hint severity: the code runs unchanged (comments have no
+runtime effect); only the editor's region structure is broken, which is a
+style finding, not a likely bug. The rule
 deliberately does NOT try to validate names: the maintainer confirmed the
 canonical syntax is a nameless closer (`/* region Name; ... /* endregion;`
 per the style guide), so trailing text is prose — the initial name-matching

@@ -3,7 +3,7 @@ id: diag.base_standalone
 title: Base used without a member access
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,6 +19,15 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      base_member_access (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. A member named Base on
+      some receiver (`oUri:Base`) no longer flags (D10, issue #258), and
+      every name in a :DECLARE / :PARAMETERS / :PUBLIC list is exempt,
+      not only the first.
 issues: []
 ---
 
@@ -40,7 +49,11 @@ It must NOT flag:
 - well-formed `Base:MemberName` references;
 - `Base` in declaration positions — an identifier immediately following
   `:DECLARE`, `:PARAMETERS`, `:DEFAULT`, `:PUBLIC`, `:PROCEDURE`, `:CLASS`,
-  or `:INHERIT` is a declared name, not a reference.
+  or `:INHERIT`, or any later name in a `:DECLARE` / `:PARAMETERS` /
+  `:PUBLIC` list, is a declared name, not a reference;
+- a member named `Base` on some receiver (`oUri:Base`) — the preceding
+  `:` makes it member access, which never warns (DECISIONS.md D10,
+  issue #258).
 
 ## Examples
 
@@ -65,12 +78,24 @@ Base:Init();
 :ENDPROC;
 ```
 
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS oUri;
+:DECLARE sHost, sRoot;
+sRoot := oUri:Base;
+sHost := oUri:Base:Host;
+:ENDPROC;
+```
+
 ## Rationale
 
 `Base` standing alone has no value in SSL — the runtime resolves it only
 as a member-access qualifier, so any other use is guaranteed-broken code
 and merits an error. The check is purely token-shape based (`Base` not
-followed by `:`), which keeps it precise: the only exempted positions are
-declarations, where the word is a name rather than a reference. Introduced
+followed by `:`), which keeps it precise: the exempted positions are declarations, where
+the word is a name rather than a reference, and member access, where it
+names a member of something else (D10). Introduced
 in the style-guide alignment pass (commit cdbfee6); the code slug was
 stabilized in PR #3 (v0.4.0).

@@ -43,81 +43,28 @@ slug with expected behavior, executable examples, and decision history:
 - Generated table: [docs/reference/DIAGNOSTICS.md](../reference/DIAGNOSTICS.md)
 - Entries: [`catalog/diagnostics/`](../../catalog/diagnostics/)
 
-The table below was the hand-maintained list this section used to carry; it
-is retained only until every catalog entry is reviewed, and is no longer
-updated. **Do not add rows here — add or edit a catalog entry instead.**
-
-| Diagnostic | Severity | Description |
-|------------|----------|-------------|
-| Unclosed blocks | Error | `:IF` without `:ENDIF`, etc. |
-| Unmatched delimiters | Error | `(`, `[`, `{` without matching closer |
-| Block depth exceeded | Warning | Nesting exceeds configured maximum |
-| Missing EXITCASE | Warning | Style warning when a `:CASE` or `:OTHERWISE` block omits `:EXITCASE` |
-| Bare logical operators | Error | `AND` instead of `.AND.` |
-| Keyword form errors | Error | Bare, lowercase, or mixed-case SSL keywords |
-| INCLUDE placement | Info | `:INCLUDE` should stay at the top of the file |
-| DEFAULT on DECLARE | Warning | `:DEFAULT` only works with `:PARAMETERS` |
-| DEFAULT placement | Error | `:DEFAULT` must immediately follow `:PARAMETERS` |
-| PARAMETERS placement | Error | `:PARAMETERS` must immediately follow `:PROCEDURE`, and script-level parameters must appear before top-level statements |
-| BEGININLINECODE without name | Error | `:BEGININLINECODE` must have an identifier or quoted name |
-| TRY/CATCH/FINALLY structure | Error | Bare `:TRY...:ENDTRY`, empty `:TRY` body, multi-`CATCH`, wrong `:CATCH` / `:FINALLY` order, and empty `:FINALLY` body |
-| ERROR handler structure | Error | `:ERROR` must contain at least one statement before `:RESUME` or the end of the current scope |
-| CATCH clause form | Error | `:CATCH` cannot name an exception variable; use `GetLastSSLError()` inside the block |
-| Missing comment terminator | Error | SSL comments must end with `;` |
-| Comment termination heuristic | Warning | Flags comments that terminate before the line ends |
-| FOR numeric checks | Warning | Inferred non-numeric loop variables and bounds in `:FOR ... :TO ... :STEP ...` headers |
-| Type-safety advisories | Info/Warning | Conservative inferred-type checks for `NIL`, `$`, string `=`, and code-block comparison gotchas |
-| Class member order | Info | Class members must be `:INHERIT`, `:DECLARE`, methods, then `Constructor` |
-| Class-context `DoProc` misuse | Error | Inside class methods, use `Me:Method()` / `Base:Method()` instead of `DoProc(...)` |
-| Constructor return value | Error | `:RETURN` inside a `Constructor` cannot return a value |
-| `Me` / `Base` misuse | Error | `Me` is class-only; `Base` must be `Base:MemberName` inside a `:CLASS` with `:INHERIT` |
-| Branch target labels | Error | Literal `Branch("...")` targets must include `LABEL` token text such as `"LABEL SKIP"` |
-| Direct procedure calls | Error | Custom procedures must be invoked with `DoProc(...)` / `ExecFunction(...)` |
-| Wrong SQL placeholder style | Warning | Only `SQLExecute` supports `?varName?`; other DB helpers require positional `?` and value arrays |
-| Dot property access | Error | `oObj.Prop` should be `oObj:Prop` |
-| Built-in class via `CreateUdObject` | Error | Built-in classes such as `Email` or `CDataTable` must use `ClassName{}` instead of `CreateUdObject("ClassName")` |
-| Zero-based array index | Error | SSL arrays are 1-based |
-| Assignment in condition | Warning | `:=` inside `:IF` / `:WHILE` / `:CASE` conditions is usually a bug |
-| Empty trailing arg arrays | Info | Prefer `DoProc("Name")` over `DoProc("Name", {})` and similar empty trailing optional args |
-| Loop/finally control misuse | Error | `:EXITFOR`, `:EXITWHILE`, `:LOOP`, and `:RETURN` are restricted by loop context and `:FINALLY` rules |
-| Deprecated keywords | Warning/Info | `:ERROR`, `:RESUME`, `:LABEL` are flagged as legacy constructs |
-| PUBLIC usage | Warning | `:PUBLIC` is discouraged because it creates shared global state |
-| Excessive procedure parameters | Warning | Procedures with more than 20 parameters should be refactored |
-| Global assignment | Error | Assignment to `MYUSERNAME` (always) or any configured global variable |
-| BEGINCASE without CASE | Error | `:BEGINCASE` requires at least one `:CASE` block |
-| Class instantiation syntax | Error | Built-in classes use curly braces: `Email{}` not `Email()` |
-| Complex SQL placeholders | Info | Complex expressions in `?...?` SQLExecute placeholders should be pre-computed into variables |
-| Missing quotes in DoProc/ExecFunction | Error | First argument to `DoProc(...)` / `ExecFunction(...)` must be a string literal |
-| Non-preferred operators | Info | `#` and `<>` should use `!=` instead |
-| Hungarian notation | Warning | Optional style check |
-| Scientific notation hint | Info | Number immediately followed by `e`/`E` suggesting missing decimal |
-| Missing OTHERWISE | Info | `:BEGINCASE` without `:OTHERWISE` default handler |
-| Name length exceeded | Info | Variable names > 20 chars or procedure names > 30 chars |
-| Visibility annotations on class methods | Warning | `/*@private;` / `/*@protected;` have no effect on class methods |
-| NIL method calls | Warning | Method call on NIL literal or variable known to be NIL |
-| Redeclared variables | Hint | Same variable declared twice in same scope (re-declaration is a no-op) |
-| Nested IIF | Info | Nested `IIF()` calls reduce readability; use `:BEGINCASE` or `:IF` |
-| Negative logic with ELSE | Hint | Negated `:IF` condition with `:ELSE` — consider inverting |
-| Style-level parameter count | Hint | Procedures with more than 8 parameters (style guide recommendation) |
-| `:STEP` spacing | Warning | `:STEP` keyword without a preceding space in `:FOR` loops |
-| `:REGION` legacy warning | Info | `:REGION`/`:ENDREGION` is a legacy functional construct — prefer `/* region` / `/* endregion` comments |
-| Code block structure | Warning | Code block literal `{|| expr}` has empty parameter list — at least one bound variable required |
+Each row of the generated table gives the rule's default severity; each
+entry says whether the rule is always on or opt-in, and why.
 
 ### 2.3 Opt-in Diagnostics
 
-These diagnostics are implemented but disabled by default:
+Checks with inherent false-positive exposure are off by default
+([D5](../../catalog/DECISIONS.md)):
 
-| Diagnostic | Severity | Description |
-|------------|----------|-------------|
-| Undeclared variables | Warning | Variable used without declaration (enable via `CheckUndeclaredVars`) |
-| Unused variables | Hint | Variable declared but never used (enable via `CheckUnusedVars`) |
-| SQL parameter validation | Warning | SQL `?param?` not matching declared variable (enable via `CheckSQLParams`) |
-| Hungarian notation | Warning | Prefix conventions (enable via `CheckHungarianNotation`) |
-| The entire info tier | Info | All info-severity rules, including the seven SQL advisories (enable via `ssl.diagnostics.infoDiagnostics`) |
+| Diagnostic | Default severity | How to enable |
+|------------|------------------|---------------|
+| `hungarian_notation` | Warning | `ssl.diagnostics.hungarianNotation`; `--validate --hungarian` (which also enables `hungarian_type_mismatch`) |
+| `hungarian_type_mismatch` | Warning | `ssl.diagnostics.hungarianTypes`; `--validate --hungarian-types` |
+| `unused_variable` | Hint | `ssl.diagnostics.unusedVariables`; `--validate --strict` |
+| `undeclared_variable` | Warning | `--validate --strict` (no editor setting) |
+| `invalid_sql_param` | Warning | `--validate --strict` (no editor setting) |
+| The entire info tier | Info | `ssl.diagnostics.infoDiagnostics`; `--validate --info` |
 
 ### 2.4 Planned Diagnostics
 
-*No planned diagnostics at this time. All previously planned diagnostics have been implemented.*
+Planned behavior is specified as `status: planned` catalog entries (listed
+in [STATUS.md](../STATUS.md)); proposed rules are tracked as
+[open issues](https://github.com/mahoskye/starlims-lsp/issues).
 
 ---
 
@@ -125,14 +72,10 @@ These diagnostics are implemented but disabled by default:
 
 ### 3.1 Diagnostic Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `ssl.diagnostics.hungarianNotation` | bool | `false` | Enforce Hungarian prefixes on declared variables |
-| `ssl.diagnostics.hungarianPrefixes` | string[] | `["a","b","d","fn","n","o","s","v"]` | Allowed prefixes |
-| `ssl.diagnostics.globals` | string[] | `[]` | Pre-declared global variables |
-| `ssl.diagnostics.maxBlockDepth` | int | `4` | Maximum block nesting depth |
-
-Additional always-on style diagnostics include compact label forms such as `:LABELSKIP;` being accepted, informational warnings when trailing empty argument arrays like `DoProc("MyProc", {})` should be omitted, `:INCLUDE` placement guidance, `:PUBLIC` warnings, `:PARAMETERS` placement enforcement, parameter-count warnings, legacy `:ERROR` / `:RESUME` warnings, `:ERROR` handler-body validation, `:CATCH` clause-form validation, literal `Branch("...")` label-target validation, and class-only rules such as constructor placement plus `Me` / `Base` / `DoProc(...)` usage inside class code.
+All diagnostic settings — the opt-in switches above, `hungarianPrefixes`,
+`globals`, `maxBlockDepth`, per-rule overrides (`rules`), and
+`endpointPatterns` — are documented with their defaults in
+[CONFIGURATION.md §5](../configuration/CONFIGURATION.md#5-diagnostic-options).
 
 ### 3.2 Configuration via LSP
 

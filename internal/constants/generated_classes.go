@@ -128,8 +128,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Provides access to the column definitions of a CDataTable.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "CDataColumns{oDataTable}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `oDataTable` | object | yes | The `CDataTable` whose columns are exposed by the collection. In most scripts, use `oTable:Columns` instead of constructing the collection directly. |",
+				Signature: "CDataColumns{oDataTable}",
 				Parameters: []FunctionParameter{
 					{Name: "oDataTable", Type: "object", Required: true, Description: "The CDataTable whose columns are exposed by the collection. In most scripts, use oTable:Columns instead of constructing the collection directly."},
 				},
@@ -222,8 +221,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 				Description: "Creates an `Email` object with exception suppression enabled by default. Operations return `.T.` or `.F.`, and failures are exposed through the `Exception` property.",
 			},
 			{
-				Signature:   "Email{bIgnoreExceptions}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `bIgnoreExceptions` | boolean | yes | When `.T.`, methods suppress exceptions and return `.F.` on failure. When `.F.`, failures raise exceptions. |",
+				Signature: "Email{bIgnoreExceptions}",
 				Parameters: []FunctionParameter{
 					{Name: "bIgnoreExceptions", Type: "boolean", Required: true, Description: "When .T., methods suppress exceptions and return .F. on failure. When .F., failures raise exceptions."},
 				},
@@ -260,13 +258,11 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		},
 	},
 	"enterpriseexporter": {
-		Title:     "EnterpriseExporter",
-		Summary:   "Exports tables into a destination folder.",
-		BaseClass: "EnterpriseImpExBase",
+		Title:   "EnterpriseExporter",
+		Summary: "Exports tables into a destination folder.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "EnterpriseExporter{aTables, bSysTables, sPath}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `aTables` | array | yes | Table list. Use a simple array of table names in default mode, or an array of table entries in `IsEnterpriseOnly` and `FromSQL` modes. In entry-based modes, each entry starts with the output table name and can include a second string value used as the source string for that table. | | `bSysTables` | boolean | yes | When `.T.`, exports system-table content instead of regular table content. | | `sPath` | string | yes | Destination folder for the export output. The exporter writes one subfolder and one `.txt` file per table. |",
+				Signature: "EnterpriseExporter{aTables, bSysTables, sPath}",
 				Parameters: []FunctionParameter{
 					{Name: "aTables", Type: "array", Required: true, Description: "Table list. Use a simple array of table names in default mode, or an array of table entries in IsEnterpriseOnly and FromSQL modes. In entry-based modes, each entry starts with the output table name and can include a second string value used as the source string for that table."},
 					{Name: "bSysTables", Type: "boolean", Required: true, Description: "When .T., exports system-table content instead of regular table content."},
@@ -280,10 +276,11 @@ var GeneratedClassDetails = map[string]ClassDetails{
 			{Name: "IsEnterpriseOnly", Type: "boolean", Access: "write-only", Description: "Switches the export to enterprise-only mode, where each table entry can supply a custom FROM source."},
 			{Name: "FromSQL", Type: "boolean", Access: "write-only", Description: "Switches the export to SQL mode, where each table entry can supply a full SQL statement."},
 			{Name: "NullAsBlank", Type: "boolean", Access: "write-only", Description: "In SQL mode, controls whether exported NULL values are treated as blanks. Defaults to .F.."},
-			{Name: "InvariantDateColumns", Type: "array", Access: "write-only", Description: "In SQL mode, supplies the invariant date columns passed to the export operation."},
+			{Name: "InvariantDateColumns", Type: "array", Access: "write-only", Description: "In SQL mode, names date columns that are exported exactly as stored, without conversion from UTC to local time."},
+			{Name: "ErrorMsg", Type: "string", Access: "read-write", Description: "Final error text from the export run. NIL on a new instance, before DoExport() runs."},
 		},
 		Methods: []ClassMethod{
-			{Name: "DoExport", Returns: "boolean", Description: "Runs the export and returns the completion result from the underlying export process. It also updates ErrorMsg with the final exporter message when the call returns normally."},
+			{Name: "DoExport", Returns: "boolean", Description: "Runs the export and returns .T. when the export run completes, .F. otherwise. It also updates ErrorMsg with the final exporter message when the call returns normally."},
 		},
 	},
 	"ftpsclient": {
@@ -327,7 +324,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Properties: []ClassProperty{
 			{Name: "DiffDataTable", Type: "string", Access: "read-only", Description: "Serialized dataset string produced by the most recent successful Compare() call. Empty until a comparison serializes the current result table."},
 			{Name: "InternalErrors", Type: "string", Access: "read-only", Description: "Accumulated error text captured when log-file setup fails or when metadata retrieval calls fail while collecting forms, scripts, data sources, or tables."},
-			{Name: "LogFilePath", Type: "string", Access: "read-write", Description: "Current log file path. Setting it attempts to create or replace the file and resets the active trace listeners to write to that file."},
+			{Name: "LogFilePath", Type: "string", Access: "read-write", Description: "Current log file path. Setting it creates or replaces the file and sends the trace log there."},
 			{Name: "ResultTable", Type: "object", Access: "read-only", Description: "Current package table used for collected dictionary metadata and later comparison results."},
 		},
 	},
@@ -425,14 +422,14 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Constructors: []ConstructorSignature{
 			{
 				Signature:   "SDMSDocUploader{oCredentials}",
-				Description: "Creates an uploader and loads the SDMS URL, username, password hash, site ID, and session ID from the credentials object. Workflow IDs start in a missing state and must be set before workflow-specific calls.",
+				Description: "Creates an uploader and loads the SDMS URL, username, password hash, site ID, and session ID from the credentials object. Workflow IDs start unset; set `WorkflowId`, `StageId`, and `ActionId` before workflow-specific calls.",
 				Parameters: []FunctionParameter{
 					{Name: "oCredentials", Type: "object", Required: true, Description: "Credentials object supplying SDMS URL, username, password hash, site ID, and session ID."},
 				},
 			},
 			{
 				Signature:   "SDMSDocUploader{}",
-				Description: "Creates an uploader without loading SDMS connection or authentication values. Workflow IDs start at `0`, so the workflow-specific missing-ID validation described below does not run automatically unless you assign your own values.",
+				Description: "Creates an uploader without loading SDMS connection or authentication values. Workflow IDs start at `0`, so workflow-specific methods do not raise the missing-ID errors described below; if you don't set the IDs, `0` is sent.",
 			},
 		},
 		Properties: []ClassProperty{
@@ -466,22 +463,13 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Creates and manages a database sequence for a table field on Oracle or SQL Server.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "Sequence{sPlatforma, sTableName, sFieldName}",
-				Description: "Creates a sequence object with an empty prefix.",
-				Parameters: []FunctionParameter{
-					{Name: "sPlatforma", Type: "string", Required: true, Description: "Database platform. \"ORACLE\" selects Oracle behavior. Any other value uses SQL Server behavior."},
-					{Name: "sTableName", Type: "string", Required: true, Description: "Table name used to derive the sequence name."},
-					{Name: "sFieldName", Type: "string", Required: true, Description: "Field name used to derive the sequence name."},
-				},
-			},
-			{
 				Signature:   "Sequence{sPlatforma, sTableName, sFieldName, sPrefix}",
-				Description: "Creates a sequence object with an additional name suffix.",
+				Description: "Creates a sequence object for a table field. All four arguments are required. The three-argument form `Sequence{sPlatforma, sTableName, sFieldName}` fails to compile with `invalid arguments for constructor`.",
 				Parameters: []FunctionParameter{
 					{Name: "sPlatforma", Type: "string", Required: true, Description: "Database platform. \"ORACLE\" selects Oracle behavior. Any other value uses SQL Server behavior."},
 					{Name: "sTableName", Type: "string", Required: true, Description: "Table name used to derive the sequence name."},
 					{Name: "sFieldName", Type: "string", Required: true, Description: "Field name used to derive the sequence name."},
-					{Name: "sPrefix", Type: "string", Required: false, Description: "Optional suffix added to the derived sequence name. If omitted or passed as NIL, an empty suffix is used."},
+					{Name: "sPrefix", Type: "string", Required: true, Description: "Despite its name, sPrefix is appended as a suffix: C_\u003cTABLE\u003e_\u003cFIELD\u003e_\u003cSPREFIX\u003e. Pass \"\" for no suffix. With \"\", the sequence is named C_\u003cTABLE\u003e_\u003cFIELD\u003e, for example C_SAMPLE_SAMPLE_ID for table sample and field sample_id."},
 				},
 			},
 		},
@@ -523,7 +511,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 	},
 	"sslcodeprovider": {
 		Title:   "SSLCodeProvider",
-		Summary: "Compiles published server scripts and data sources and returns a list of compilation errors.",
+		Summary: "Compiles published server scripts and data sources and returns the compilation errors found.",
 		Constructors: []ConstructorSignature{
 			{
 				Signature:   "SSLCodeProvider{}",
@@ -584,8 +572,8 @@ var GeneratedClassDetails = map[string]ClassDetails{
 			{Name: "RuntimeException", Type: "object", Access: "read-only", Description: "Low-level exception object. Prefer Description, Operation, Code, or FullDescription for typical error handling."},
 			{Name: "Description", Type: "string", Access: "read-only", Description: "Primary error message text."},
 			{Name: "Operation", Type: "string", Access: "read-only", Description: "Reported error location or operation name. This can be empty."},
-			{Name: "GenCode", Type: "number", Access: "read-only", Description: "Numeric error code."},
-			{Name: "Code", Type: "number", Access: "read-only", Description: "Alias of GenCode."},
+			{Name: "GenCode", Type: "number", Access: "read-only", Description: "Numeric error code. For a SQL Server error, observed as 0, like Code."},
+			{Name: "Code", Type: "number", Access: "read-only", Description: "Numeric error code. For an error from RaiseError, the code you passed. For a SQL Server error, observed as 0. Read the SQL Server error number from GenCode on GetLastSQLError() instead."},
 			{Name: "FullDescription", Type: "string", Access: "read-only", Description: "Multi-line diagnostic text with abbreviated stack details and nested causes."},
 			{Name: "FullDescriptionEx", Type: "string", Access: "read-only", Description: "Multi-line diagnostic text with full stack details and nested causes."},
 			{Name: "NETException", Type: "object", Access: "read-only", Description: "Low-level exception object for advanced troubleshooting or interop scenarios."},
@@ -595,15 +583,9 @@ var GeneratedClassDetails = map[string]ClassDetails{
 	},
 	"sslexpando": {
 		Title:   "SSLExpando",
-		Summary: "SSLExpando is a built-in object class for storing named values whose shape is decided at runtime.",
-		Constructors: []ConstructorSignature{
-			{
-				Signature:   "SSLExpando{}",
-				Description: "Creates an empty `SSLExpando` instance.",
-			},
-		},
+		Summary: "SSLExpando is the class of dynamic objects created with CreateUdObject(), which store named values whose shape is decided at runtime.",
 		Properties: []ClassProperty{
-			{Name: "XmlType", Type: "string", Access: "read-write", Description: "XML root element name used by ToString() and Serialize()"},
+			{Name: "XmlType", Type: "string", Access: "read-write", Description: "XML root element name used by Serialize()"},
 		},
 		Methods: []ClassMethod{
 			{Name: "clone", Returns: "object", Description: "Creates a new SSLExpando with the same XmlType and current dynamic properties"},
@@ -611,7 +593,7 @@ var GeneratedClassDetails = map[string]ClassDetails{
 			{Name: "SetProperty", Returns: "none", Description: "Sets XmlType or a dynamic property"},
 			{Name: "IsProperty", Returns: "boolean", Description: "Returns whether a property is available"},
 			{Name: "GetPropList", Returns: "array", Description: "Returns the current dynamic property names"},
-			{Name: "ToString", Returns: "string", Description: "Returns the object's XML representation"},
+			{Name: "ToString", Returns: "NIL", Description: "Returns NIL, not XML. Use Serialize() for XML"},
 		},
 	},
 	"sslintdictionary": {
@@ -649,15 +631,13 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Matches SSL strings against a stored regular expression pattern.",
 		Constructors: []ConstructorSignature{
 			{
-				Signature:   "SSLRegex{sPattern}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store |",
+				Signature: "SSLRegex{sPattern}",
 				Parameters: []FunctionParameter{
 					{Name: "sPattern", Type: "string", Required: true, Description: "Regular expression pattern to store"},
 				},
 			},
 			{
-				Signature:   "SSLRegex{sPattern, bCaseSensitive}",
-				Description: "| Parameter | Type | Required | Description | |-----------|------|----------|-------------| | `sPattern` | string | yes | Regular expression pattern to store | | `bCaseSensitive` | boolean | no | `.T.` for case-sensitive matching, `.F.` for case-insensitive matching. Omitting this parameter gives case-sensitive matching. |",
+				Signature: "SSLRegex{sPattern, bCaseSensitive}",
 				Parameters: []FunctionParameter{
 					{Name: "sPattern", Type: "string", Required: true, Description: "Regular expression pattern to store"},
 					{Name: "bCaseSensitive", Type: "boolean", Required: false, Description: ".T. for case-sensitive matching, .F. for case-insensitive matching. Omitting this parameter gives case-sensitive matching."},
@@ -676,11 +656,11 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		Summary: "Represents the SQL-specific error object returned after a database failure.",
 		Properties: []ClassProperty{
 			{Name: "ErrorMessage", Type: "string", Access: "read-only", Description: "Combined message text from the captured database exception chain, or No Exception. when no message text was captured."},
-			{Name: "SQLState", Type: "string", Access: "read-only", Description: "Provider error state or code text captured for the SQL error."},
+			{Name: "SQLState", Type: "string", Access: "read-only", Description: "Provider error state or code text captured for the SQL error. On SQL Server, this is SQL- followed by the zero-padded error number, for example SQL-00207 for an invalid column."},
 			{Name: "ErrorStackTrace", Type: "string", Access: "read-only", Description: "Combined stack trace text from the captured exception chain, or Empty stack trace. when no stack trace text was captured."},
 			{Name: "Description", Type: "string", Access: "read-only", Description: "Alias of ErrorMessage."},
 			{Name: "Operation", Type: "string", Access: "read-only", Description: "Always returns SQL operation."},
-			{Name: "GenCode", Type: "number", Access: "read-only", Description: "Numeric code derived from SQLState. If SQLState is a 9-character provider code, SSL tries its 5-character suffix. Returns 0 when no numeric code can be extracted."},
+			{Name: "GenCode", Type: "number", Access: "read-only", Description: "Numeric database error code. On SQL Server, this is the native error number (for example 207 for an invalid column, 208 for an invalid object). Returns 0 when no number is available."},
 			{Name: "Sql", Type: "string", Access: "read-only", Description: "SQL statement associated with the captured database error, when available."},
 		},
 	},
@@ -716,9 +696,8 @@ var GeneratedClassDetails = map[string]ClassDetails{
 		},
 	},
 	"tablesimport": {
-		Title:     "TablesImport",
-		Summary:   "Loads one imported table at a time from a folder structure and returns it as a CDataTable.",
-		BaseClass: "EnterpriseImpExBase",
+		Title:   "TablesImport",
+		Summary: "Loads one imported table at a time from a folder structure and returns it as a CDataTable.",
 		Constructors: []ConstructorSignature{
 			{
 				Signature:   "TablesImport{sFolder}",

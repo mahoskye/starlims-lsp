@@ -3,7 +3,7 @@
 This document summarizes SSL coding conventions and best practices.
 
 > **See also:** [AGENTS.md](../../AGENTS.md) for quick AI agent reference.
-> **Authority:** `dev/ssl-style-guide/` is the source of truth when this public summary lags behind.
+> **Authority:** The upstream [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) is the source of truth when this public summary lags behind.
 
 ---
 
@@ -286,13 +286,13 @@ Place `/*@private;` or `/*@protected;` on its own line immediately before `:PROC
 ### Code Organization
 
 - Prefer comment regions (`/* region ...;` / `/* endregion;`) for editor grouping
-- Treat `:REGION` / `:ENDREGION` as legacy functional text-capture constructs (body text stored for runtime retrieval via `GetRegion(sValue, vSrc, vDst)`), not formatting aids
+- Treat `:REGION` / `:ENDREGION` as functional text-capture constructs (body text stored for runtime retrieval via `GetRegion(sValue, vSrc, vDst)`), not formatting aids
 
 ---
 
 ## SQL Standards
 
-> **Full reference:** `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md` is the authoritative Oracle SQL formatting specification. The rules below are a normative summary.
+> **Full reference:** [`sql-canonical-compact-reference.md`](https://github.com/mahoskye/ssl-style-guide/blob/main/ssl-style-guide/sql-canonical-compact-reference.md) in the upstream style guide is the authoritative Oracle SQL formatting specification. The rules below are a normative summary.
 
 ### Canonical Compact Style
 
@@ -1019,7 +1019,7 @@ sName := LSearch("SELECT Name FROM Customers WHERE ID = ?", "",, {nCustomerID});
     /* Handle error;
     oErr := GetLastSSLError();
     sMsg := "Error: " + oErr:Description;
-    UsrMes(sMsg, "Error");
+    ErrorMes("Error", sMsg);
     :RETURN NIL;
 :FINALLY;
     /* Cleanup (always runs);

@@ -3,8 +3,8 @@ id: diag.class_instantiation_curly
 title: Built-in class instantiated with parentheses
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: object_oriented.object_creation.builtin_classes.syntax
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -23,6 +23,12 @@ history:
       False positive fixed: identifiers preceded by the ':' member-access
       punctuation (oSvc:Email(...)) are exempt — that is a member call, not
       an instantiation.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      builtin_classes_curly_braces (level authoritative) names this rule
+      in enforced_by, so the guide is not silent.
 issues: ["#32"]
 ---
 

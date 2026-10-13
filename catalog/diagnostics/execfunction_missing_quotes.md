@@ -20,6 +20,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code execfunction_missing_quotes assigned.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      dot_property_access no longer also reports the first `.Name`
+      fragment of an unquoted dispatch path; this rule's fix-it message
+      is the one finding.
 issues: []
 ---
 
@@ -41,8 +47,8 @@ It must NOT flag when:
   inspected;
 - the identifier is neither `ExecFunction` nor `DoProc`.
 
-Note: the same bare `.Proc` fragment also independently triggers the general
-`dot_property_access` diagnostic; this rule adds the call-specific fix hint.
+Note: `dot_property_access` stays silent on that first `.Proc` fragment, so
+the defect reports once, here, with the call-specific fix (issue #255).
 
 ## Examples
 

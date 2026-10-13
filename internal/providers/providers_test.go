@@ -138,9 +138,8 @@ func TestGetHover_BuiltinFunction(t *testing.T) {
 
 // TestGetHover_FunctionExceptions confirms that documented exceptions from
 // ssl-element-meta.json are appended to the function-hover output. The
-// canary is ExecFunction — its docs page lists two exception triggers
-// ("Called with no arguments at all." and "aParameters is provided but
-// is not an array.").
+// canary is ExecFunction — its docs page lists a runtime exception for a
+// one-segment name that matches no script.
 func TestGetHover_FunctionExceptions(t *testing.T) {
 	// [spec feature.hover/A2]
 	text := `result := ExecFunction("Foo", {});`
@@ -152,7 +151,7 @@ func TestGetHover_FunctionExceptions(t *testing.T) {
 	if !strings.Contains(hover.Contents, "Documented exceptions") {
 		t.Errorf("expected hover to include exceptions section; got:\n%s", hover.Contents)
 	}
-	if !strings.Contains(hover.Contents, "Please provide at least one parameter for ExecFunction") {
+	if !strings.Contains(hover.Contents, "There is no script with name: <sName> among default categories.") {
 		t.Errorf("expected hover to quote canonical exception message; got:\n%s", hover.Contents)
 	}
 }
@@ -442,7 +441,7 @@ y := localVar;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to localVar in ProcA (line 2)
 	// Should only find references within ProcA, not ProcB
@@ -483,7 +482,7 @@ x := gCounter + 1;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to gCounter (line 1)
 	locations := FindReferencesWithScope(text, 1, 10, "file:///test.ssl", true, procedures, variables)
@@ -516,7 +515,7 @@ y := sName;
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to sName in ProcA (line 2)
 	locations := FindReferencesWithScope(text, 2, 13, "file:///test.ssl", true, procedures, variables)
@@ -554,7 +553,7 @@ x := HelperProc();
 	p := parser.NewParser(tokens)
 	ast := p.Parse()
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 
 	// Find references to HelperProc (line 1)
 	locations := FindReferencesWithScope(text, 1, 12, "file:///test.ssl", true, procedures, variables)
@@ -802,53 +801,64 @@ DoProc("TargetProc");
 
 // ==================== Document Symbols Tests ====================
 
-// [spec feature.document_symbols/A1]
+// [spec feature.document_symbols/A1] — a Function symbol per procedure,
+// with exactly its parameters as Variable children ranged over their own
+// names, including when a bare :PARAMETERS puts the names on following
+// lines (issue #255).
 func TestGetDocumentSymbols_Procedures(t *testing.T) {
 	text := `:PROCEDURE Test1;
 :ENDPROC;
 
 :PROCEDURE Test2;
-:PARAMETERS param1;
+:PARAMETERS sA, nB;
+:ENDPROC;
+
+:PROCEDURE Test3;
+:PARAMETERS
+    sC,
+    nD;
 :ENDPROC;`
 
 	symbols := GetDocumentSymbols(text)
 
-	if len(symbols) < 2 {
-		t.Fatalf("expected at least 2 symbols, got %d", len(symbols))
+	type child struct {
+		name      string
+		line, col int
 	}
-
-	// Check that we found both procedures
-	foundTest1 := false
-	foundTest2 := false
+	want := map[string][]child{
+		"Test1": nil,
+		"Test2": {{"sA", 4, 12}, {"nB", 4, 16}},
+		"Test3": {{"sC", 9, 4}, {"nD", 10, 4}},
+	}
+	found := map[string]bool{}
 	for _, sym := range symbols {
-		if sym.Name == "Test1" {
-			foundTest1 = true
-			if sym.Kind != SymbolKindFunction {
-				t.Errorf("expected Test1 to be a function symbol")
-			}
+		expected, ok := want[sym.Name]
+		if !ok {
+			continue
 		}
-		if sym.Name == "Test2" {
-			foundTest2 = true
-			if sym.Kind != SymbolKindFunction {
-				t.Errorf("expected Test2 to be a function symbol")
+		found[sym.Name] = true
+		if sym.Kind != SymbolKindFunction {
+			t.Errorf("%s: expected kind Function, got %v", sym.Name, sym.Kind)
+		}
+		if len(sym.Children) != len(expected) {
+			t.Errorf("%s: expected %d parameter children, got %+v", sym.Name, len(expected), sym.Children)
+			continue
+		}
+		for k, c := range sym.Children {
+			e := expected[k]
+			if c.Name != e.name || c.Kind != SymbolKindVariable {
+				t.Errorf("%s child %d: expected Variable %q, got %q kind %v", sym.Name, k, e.name, c.Name, c.Kind)
 			}
-			// Note: Parameter extraction from :PARAMETERS depends on parser implementation
-			// If children are found, verify they're valid
-			if len(sym.Children) > 0 {
-				for _, child := range sym.Children {
-					if child.Kind != SymbolKindVariable {
-						t.Errorf("expected parameter child to be variable symbol")
-					}
-				}
+			sel := c.SelectionRange
+			if sel.Start.Line != e.line || sel.Start.Character != e.col || sel.End.Character != e.col+len(e.name) {
+				t.Errorf("%s child %q: expected selection %d:%d-%d, got %+v", sym.Name, e.name, e.line, e.col, e.col+len(e.name), sel)
 			}
 		}
 	}
-
-	if !foundTest1 {
-		t.Error("expected to find Test1 symbol")
-	}
-	if !foundTest2 {
-		t.Error("expected to find Test2 symbol")
+	for name := range want {
+		if !found[name] {
+			t.Errorf("expected a symbol for %s", name)
+		}
 	}
 }
 
@@ -940,6 +950,54 @@ func TestGetDocumentSymbols_FileOrder(t *testing.T) {
 	}
 }
 
+// [spec feature.document_symbols/A8] — nested regions nest: Inner is a child
+// of Outer, a procedure inside Inner appears exactly once (under Inner),
+// and each region's selectionRange covers exactly its name (issue #255).
+func TestGetDocumentSymbols_NestedRegions(t *testing.T) {
+	text := `/* region Outer;
+/* region Inner;
+:PROCEDURE Deep;
+:ENDPROC;
+/* endregion;
+:PROCEDURE Shallow;
+:ENDPROC;
+/* endregion;`
+
+	symbols := GetDocumentSymbols(text)
+	if len(symbols) != 1 || symbols[0].Name != "Outer" {
+		t.Fatalf("expected Outer as the only top-level symbol, got %+v", symbols)
+	}
+	outer := symbols[0]
+	if sel := outer.SelectionRange; sel.Start.Line != 0 || sel.Start.Character != 10 || sel.End.Character != 15 {
+		t.Errorf("Outer selectionRange must cover exactly the name (0:10-15), got %+v", sel)
+	}
+
+	var inner *DocumentSymbol
+	shallowCount := 0
+	for i := range outer.Children {
+		switch outer.Children[i].Name {
+		case "Inner":
+			inner = &outer.Children[i]
+		case "Shallow":
+			shallowCount++
+		case "Deep":
+			t.Error("Deep belongs to Inner, not directly to Outer")
+		}
+	}
+	if inner == nil || inner.Kind != SymbolKindNamespace {
+		t.Fatalf("expected Inner as a Namespace child of Outer, got %+v", outer.Children)
+	}
+	if shallowCount != 1 {
+		t.Errorf("expected Shallow exactly once under Outer, got %d", shallowCount)
+	}
+	if len(inner.Children) != 1 || inner.Children[0].Name != "Deep" {
+		t.Errorf("expected Deep as Inner's only child, got %+v", inner.Children)
+	}
+	if sel := inner.SelectionRange; sel.Start.Line != 1 || sel.Start.Character != 10 || sel.End.Character != 15 {
+		t.Errorf("Inner selectionRange must cover exactly the name (1:10-15), got %+v", sel)
+	}
+}
+
 // ==================== Folding Range Tests ====================
 
 func TestGetFoldingRanges_Procedures(t *testing.T) {
@@ -999,7 +1057,7 @@ func TestGetSignatureHelp_KnownFunction(t *testing.T) {
 	text := `result := Len(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for Len(")
 	}
@@ -1012,7 +1070,7 @@ func TestGetSignatureHelp_ActiveParameter(t *testing.T) {
 	text := `result := SubStr("hello", 1, `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SubStr")
 	}
@@ -1022,7 +1080,7 @@ func TestGetSignatureHelp_ActiveParameter(t *testing.T) {
 }
 
 // [spec feature.signature_help/A4]
-func TestGetSignatureHelpWithProcedures_UserDefinedProcReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_UserDefinedProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE MyCustomProc;
 :PARAMETERS sName, nValue, bFlag;
 :ENDPROC;
@@ -1031,19 +1089,16 @@ result := MyCustomProc(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor inside the call to MyCustomProc
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 24)
+	help := GetSignatureHelpFromTokens(tokens, 5, 24)
 
 	if help != nil {
 		t.Fatal("expected no signature help for direct user-defined procedure call")
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_DirectUserProcActiveParameterReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_DirectUserProcActiveParameterReturnsNil(t *testing.T) {
 	text := `:PROCEDURE Calculate;
 :PARAMETERS nA, nB, nC;
 :ENDPROC;
@@ -1052,19 +1107,16 @@ result := Calculate(1, 2, `
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the second comma (third parameter)
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 26)
+	help := GetSignatureHelpFromTokens(tokens, 5, 26)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_NoParamsReturnsNilForDirectProc(t *testing.T) {
+func TestGetSignatureHelp_NoParamsReturnsNilForDirectProc(t *testing.T) {
 	text := `:PROCEDURE DoSomething;
 :ENDPROC;
 
@@ -1072,19 +1124,16 @@ result := DoSomething(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren (column 23)
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 4, 23)
+	help := GetSignatureHelpFromTokens(tokens, 4, 23)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
 	}
 }
 
-func TestGetSignatureHelpWithProcedures_BuiltInTakesPrecedence(t *testing.T) {
+func TestGetSignatureHelp_BuiltInTakesPrecedence(t *testing.T) {
 	// Built-in functions should still work and take precedence
 	text := `:PROCEDURE Len;
 :PARAMETERS x;
@@ -1094,27 +1143,25 @@ result := Len(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 15)
+	help := GetSignatureHelpFromTokens(tokens, 5, 15)
 
 	if help == nil {
 		t.Fatal("expected signature help")
 	}
 
 	// Should get the built-in Len function, not the user-defined one
+	// (signature help never describes user procedures since cdbfee6 —
+	// feature.signature_help A4 — so assert the built-in's shape directly).
 	sig := help.Signatures[0]
-	// Built-in Len has a specific signature with type info
-	if strings.Contains(sig.Documentation, "User-defined") {
-		t.Error("expected built-in function signature, got user-defined")
+	if !strings.HasPrefix(strings.ToLower(sig.Label), "len(") || len(sig.Parameters) == 0 {
+		t.Errorf("expected the built-in Len signature, got label %q with %d parameters", sig.Label, len(sig.Parameters))
 	}
 }
 
 // [spec feature.signature_help/A4]
-func TestGetSignatureHelpWithProcedures_CaseInsensitiveUserProcReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_CaseInsensitiveUserProcReturnsNil(t *testing.T) {
 	text := `:PROCEDURE myproc;
 :PARAMETERS sValue;
 :ENDPROC;
@@ -1123,12 +1170,9 @@ result := MYPROC(`
 
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
-	p := parser.NewParser(tokens)
-	ast := p.Parse()
-	procedures := p.ExtractProcedures(ast)
 
 	// Position cursor after the opening paren
-	help := GetSignatureHelpWithProcedures(tokens, procedures, 5, 18)
+	help := GetSignatureHelpFromTokens(tokens, 5, 18)
 
 	if help != nil {
 		t.Fatalf("expected no signature help for direct user procedure call, got %+v", help)
@@ -1140,15 +1184,15 @@ func tokenizeForSignatureHelp(t *testing.T, text string) []lexer.Token {
 	return lexer.NewLexer(text).Tokenize()
 }
 
-// TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero: immediately
+// TestGetSignatureHelp_OpenParenActiveParamZero: immediately
 // after the opening paren of a built-in call, the signature with its
 // parameter list is returned and activeParameter is 0.
 // [spec feature.signature_help/A1]
-func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
+func TestGetSignatureHelp_OpenParenActiveParamZero(t *testing.T) {
 	text := `result := SQLExecute(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1166,14 +1210,14 @@ func TestGetSignatureHelpWithProcedures_OpenParenActiveParamZero(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_ConstructorContext: signature help
+// TestGetSignatureHelp_ConstructorContext: signature help
 // inside `Email{` returns the class's constructor signatures on the wired
 // token-based path (issue #40). [spec feature.signature_help/A8]
-func TestGetSignatureHelpWithProcedures_ConstructorContext(t *testing.T) {
+func TestGetSignatureHelp_ConstructorContext(t *testing.T) {
 	text := `oMail := Email{`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected constructor signature help for Email{")
 	}
@@ -1190,16 +1234,16 @@ func TestGetSignatureHelpWithProcedures_ConstructorContext(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount: commas
+// TestGetSignatureHelp_ArrayLiteralCommasDoNotCount: commas
 // inside an array literal argument belong to the literal, not the enclosing
 // call's parameter index (fixed alongside issue #40's brace handling).
-func TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount(t *testing.T) {
+func TestGetSignatureHelp_ArrayLiteralCommasDoNotCount(t *testing.T) {
 	// Cursor inside the array literal: the enclosing DoProc is at its
 	// second argument (one top-level comma), not its fourth.
 	text := `DoProc("Calc", {1, 2, `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		// DoProc is a built-in dispatch function with a signature.
 		t.Fatal("expected signature help for DoProc")
@@ -1209,16 +1253,16 @@ func TestGetSignatureHelpWithProcedures_ArrayLiteralCommasDoNotCount(t *testing.
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_TopLevelCommasOnly: activeParameter
+// TestGetSignatureHelp_TopLevelCommasOnly: activeParameter
 // counts top-level commas only — commas inside string literals must not
 // advance it, and it stays put while typing within an argument.
 // [spec feature.signature_help/A2]
-func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
+func TestGetSignatureHelp_TopLevelCommasOnly(t *testing.T) {
 	// One top-level comma; the commas inside the SQL string don't count.
 	text := `result := SQLExecute("SELECT a, b, c FROM t", `
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1)
 	if help == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1230,7 +1274,7 @@ func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
 	text2 := `result := SQLExecute("SELECT a, b, c FROM t", sName`
 	tokens2 := tokenizeForSignatureHelp(t, text2)
 
-	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(text2)+1)
+	help2 := GetSignatureHelpFromTokens(tokens2, 1, len(text2)+1)
 	if help2 == nil {
 		t.Fatal("expected signature help for SQLExecute")
 	}
@@ -1239,14 +1283,14 @@ func TestGetSignatureHelpWithProcedures_TopLevelCommasOnly(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_NestedCallsInnermost: inside nested
+// TestGetSignatureHelp_NestedCallsInnermost: inside nested
 // calls the innermost enclosing call's signature is shown; once the inner
 // call closes, the outer one is. [spec feature.signature_help/A3]
-func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
+func TestGetSignatureHelp_NestedCallsInnermost(t *testing.T) {
 	inner := `result := Upper(AllTrim(`
 	tokens := tokenizeForSignatureHelp(t, inner)
 
-	help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(inner)+1)
+	help := GetSignatureHelpFromTokens(tokens, 1, len(inner)+1)
 	if help == nil {
 		t.Fatal("expected signature help inside AllTrim(")
 	}
@@ -1257,7 +1301,7 @@ func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
 	outer := `result := Upper(AllTrim(sValue)`
 	tokens2 := tokenizeForSignatureHelp(t, outer)
 
-	help2 := GetSignatureHelpWithProcedures(tokens2, nil, 1, len(outer)+1)
+	help2 := GetSignatureHelpFromTokens(tokens2, 1, len(outer)+1)
 	if help2 == nil {
 		t.Fatal("expected signature help after inner call closed")
 	}
@@ -1266,26 +1310,26 @@ func TestGetSignatureHelpWithProcedures_NestedCallsInnermost(t *testing.T) {
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil: names not in
+// TestGetSignatureHelp_UnknownFunctionReturnsNil: names not in
 // the built-in inventory produce no signature help.
 // [spec feature.signature_help/A5]
-func TestGetSignatureHelpWithProcedures_UnknownFunctionReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_UnknownFunctionReturnsNil(t *testing.T) {
 	text := `result := NotARealFunction(`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+	if help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1); help != nil {
 		t.Fatalf("expected no signature help for unknown function, got %+v", help)
 	}
 }
 
-// TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil: positions outside
+// TestGetSignatureHelp_OutsideCallReturnsNil: positions outside
 // any call's argument list produce no signature help.
 // [spec feature.signature_help/A7]
-func TestGetSignatureHelpWithProcedures_OutsideCallReturnsNil(t *testing.T) {
+func TestGetSignatureHelp_OutsideCallReturnsNil(t *testing.T) {
 	text := `x := 5;`
 	tokens := tokenizeForSignatureHelp(t, text)
 
-	if help := GetSignatureHelpWithProcedures(tokens, nil, 1, len(text)+1); help != nil {
+	if help := GetSignatureHelpFromTokens(tokens, 1, len(text)+1); help != nil {
 		t.Fatalf("expected no signature help outside a call, got %+v", help)
 	}
 }
@@ -1696,39 +1740,6 @@ func TestGetDiagnostics_ValidCode(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_BlockDepth(t *testing.T) {
-	// Create deeply nested blocks
-	text := `:PROCEDURE Test;
-:IF a;
-:IF b;
-:IF c;
-:IF d;
-:IF e;
- x := 1;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDIF;
-:ENDPROC;`
-
-	opts := DefaultDiagnosticOptions()
-	opts.MaxBlockDepth = 3 // Allow only 3 levels of nesting
-
-	diagnostics := GetDiagnostics(text, opts)
-
-	foundDepthWarning := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "nesting depth") || strings.Contains(d.Message, "depth") {
-			foundDepthWarning = true
-		}
-	}
-
-	if !foundDepthWarning {
-		t.Log("Note: Block depth warning may not trigger for this test case")
-	}
-}
-
 func TestGetDiagnostics_HungarianNotationDisabled(t *testing.T) {
 	text := `:PROCEDURE Test;
 :PARAMETERS nCount, sName;
@@ -1815,16 +1826,19 @@ func TestGetDiagnostics_DefaultMustFollowParameters(t *testing.T) {
 }
 
 func TestGetDiagnostics_BareKeywordNameIsIdentifier(t *testing.T) {
-	// IF without a colon is just an identifier, not a keyword — no diagnostic.
+	// IF without a colon is just an identifier, not a keyword: no keyword-form
+	// rule may fire. (The statement itself is malformed and reports
+	// unexpected_token, which is not what this test is about.)
 	text := `IF x = 1;
     value := 1;
 ENDIF;`
 
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "must be colon-prefixed") {
-			t.Error("bare keyword-named identifier should not trigger colon-prefix diagnostic")
+		switch d.Code {
+		case CodeKeywordUppercase, CodeUnknownKeyword, CodeDeprecatedKeyword, CodeLabelKeywordForm:
+			t.Errorf("bare keyword-named identifier should not trigger a keyword-form diagnostic: %s %s", d.Code, d.Message)
 		}
 	}
 }
@@ -1846,7 +1860,7 @@ func TestGetDiagnostics_KeywordMustBeUppercase(t *testing.T) {
 }
 
 func TestGetDiagnostics_UnknownColonKeyword(t *testing.T) {
-	text := `:ENDCLASS;`
+	text := `:ENDWITH;`
 
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
@@ -1857,6 +1871,29 @@ func TestGetDiagnostics_UnknownColonKeyword(t *testing.T) {
 	}
 
 	t.Fatal("expected unknown keyword diagnostic")
+}
+
+// :ENDCLASS is a known invalid form, not an unknown name: it gets its own
+// error code (issue #269), in scripts and data sources alike.
+func TestGetDiagnostics_EndClassInvalid(t *testing.T) {
+	for _, isDS := range []bool{false, true} {
+		opts := DefaultDiagnosticOptions()
+		opts.IsDataSourceFile = isDS
+		found := false
+		// An SSL-mode body (a := assignment) so a data source is checked
+		// as SSL, not routed to SQL mode.
+		for _, d := range GetDiagnostics(":DECLARE nX;\nnX := 1;\n:ENDCLASS;", opts) {
+			if d.Code == CodeUnknownKeyword {
+				t.Errorf("data source %v: :ENDCLASS must not read as unknown", isDS)
+			}
+			if d.Code == CodeEndClassInvalid && d.Severity == SeverityError {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("data source %v: want endclass_invalid at error", isDS)
+		}
+	}
 }
 
 func TestGetDiagnostics_LegacyCompactLabelAccepted(t *testing.T) {
@@ -2692,50 +2729,50 @@ func TestGetDiagnostics_BareLogicalOperators_ValidSyntax(t *testing.T) {
 }
 
 func TestGetDiagnostics_DefaultOnDeclareLine(t *testing.T) {
+	// diag.default_on_declare_line, re-scoped in issue #255: a :DEFAULT
+	// whose target is not a :PARAMETERS name, on any line.
 	text := `:PROCEDURE Test;
+:PARAMETERS sIn;
 :DECLARE sName; :DEFAULT sName, "";
+:DECLARE sOther;
+:DEFAULT sOther, 1;
 :ENDPROC;`
 
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// Should find error for :DEFAULT on same line as :DECLARE (language constraint)
-	foundDefaultError := false
+	var lines []int
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
-			foundDefaultError = true
+		if d.Code == CodeDefaultOnDeclareLine {
 			if d.Severity != SeverityError {
-				t.Errorf("expected error severity for DEFAULT on DECLARE line, got %v", d.Severity)
+				t.Errorf("expected error severity, got %v", d.Severity)
 			}
+			lines = append(lines, d.Range.Start.Line)
 		}
 	}
-
-	if !foundDefaultError {
-		t.Error("expected error for :DEFAULT on same line as :DECLARE")
+	if len(lines) != 2 || lines[0] != 2 || lines[1] != 4 {
+		t.Errorf("expected default_on_declare_line on lines 2 and 4 (0-based), got %v", lines)
 	}
 }
 
 func TestGetDiagnostics_DefaultOnDeclareLine_ValidSyntax(t *testing.T) {
-	text := `:PROCEDURE Test;
-:PARAMETERS sName;
-:DEFAULT sName, "";
-:DECLARE sLocal;
+	// A :DEFAULT on a parameter never flags, even when a :DECLARE shares
+	// its line or a script-level :PARAMETERS supplies the name.
+	text := `:PARAMETERS sTop;
+:DEFAULT sTop, "";
+:PROCEDURE Test;
+:PARAMETERS sName; :DEFAULT sName, ""; :DECLARE sLocal;
 :ENDPROC;`
 
-	opts := DefaultDiagnosticOptions()
-	diagnostics := GetDiagnostics(text, opts)
-
-	// Should NOT find warning - :DEFAULT is with :PARAMETERS (correct) and :DECLARE is separate
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "DEFAULT") && strings.Contains(d.Message, "DECLARE") {
-			t.Errorf("unexpected DEFAULT/DECLARE warning when syntax is valid: %s", d.Message)
+	for _, d := range GetDiagnostics(text, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDefaultOnDeclareLine {
+			t.Errorf("unexpected default_on_declare_line at line %d: %s", d.Range.Start.Line, d.Message)
 		}
 	}
 }
 
 // ==================== Global Variable Assignment Tests ====================
 
-func TestGetDiagnostics_GlobalAssignment_Error(t *testing.T) {
+func TestGetDiagnostics_GlobalAssignment_Warning(t *testing.T) {
 	text := `:PROCEDURE Test;
 gCurrentUser := "admin";
 x := gCurrentUser;
@@ -2748,10 +2785,10 @@ x := gCurrentUser;
 	// Should find error for assigning to gCurrentUser
 	foundGlobalError := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") && strings.Contains(d.Message, "gCurrentUser") {
+		if strings.Contains(d.Message, "Assignment to global variable") && strings.Contains(d.Message, "gCurrentUser") {
 			foundGlobalError = true
-			if d.Severity != SeverityError {
-				t.Errorf("expected error severity for global assignment, got %v", d.Severity)
+			if d.Severity != SeverityWarning {
+				t.Errorf("expected warning severity for global assignment, got %v", d.Severity)
 			}
 		}
 	}
@@ -2774,7 +2811,7 @@ Len(gCurrentUser);
 
 	// Should NOT find any global assignment errors - just reading the global, not assigning
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") {
+		if strings.Contains(d.Message, "Assignment to global variable") {
 			t.Errorf("unexpected global assignment error when only reading: %s", d.Message)
 		}
 	}
@@ -2792,7 +2829,7 @@ GCURRENTUSER := "admin";
 	// Should find error even with different casing
 	foundGlobalError := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Cannot assign to global variable") {
+		if strings.Contains(d.Message, "Assignment to global variable") {
 			foundGlobalError = true
 		}
 	}
@@ -3172,8 +3209,8 @@ x := NIL;
 // Test that SSL classes are not flagged as undeclared
 func TestGetDiagnostics_UndeclaredVariable_ClassesNotFlagged(t *testing.T) {
 	text := `:PROCEDURE Test;
-:DECLARE oExpando, oDataset;
-oExpando := SSLExpando{};
+:DECLARE oEmail, oDataset;
+oEmail := Email{};
 oDataset := SSLDataset{};
 :ENDPROC;`
 
@@ -3181,9 +3218,9 @@ oDataset := SSLDataset{};
 	opts.CheckUndeclaredVars = true
 	diagnostics := GetDiagnostics(text, opts)
 
-	// Should NOT find undeclared warnings for SSLExpando or SSLDataset
+	// Should NOT find undeclared warnings for Email or SSLDataset
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "SSLExpando") || strings.Contains(d.Message, "SSLDataset") {
+		if strings.Contains(d.Message, "Email") || strings.Contains(d.Message, "SSLDataset") {
 			t.Errorf("SSL built-in classes should not be flagged as undeclared: %s", d.Message)
 		}
 	}
@@ -3512,6 +3549,37 @@ func TestGetFoldingRanges_OrphanEndregion_ClosesNothing(t *testing.T) {
 	}
 }
 
+// [spec feature.folding/A9] — :REGION/:ENDREGION and
+// :BEGININLINECODE/:ENDINLINECODE keyword blocks fold with kind region
+// (issue #255).
+func TestGetFoldingRanges_RegionAndInlineCodeKeywords(t *testing.T) {
+	text := `:REGION Template;
+Dear $Name$,
+thank you.
+:ENDREGION;
+:BEGININLINECODE Snippet;
+nCount := 1;
+nCount += 1;
+:ENDINLINECODE;`
+
+	ranges := GetFoldingRanges(text)
+	foundRegion, foundInline := false, false
+	for _, r := range ranges {
+		if r.Kind != "region" {
+			continue
+		}
+		if r.StartLine == 0 && r.EndLine == 3 {
+			foundRegion = true
+		}
+		if r.StartLine == 4 && r.EndLine == 7 {
+			foundInline = true
+		}
+	}
+	if !foundRegion || !foundInline {
+		t.Errorf("expected region folds 0-3 (:REGION) and 4-7 (:BEGININLINECODE), got: %+v", ranges)
+	}
+}
+
 func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
 	text := `/* endregion;
 :PROCEDURE Helper;
@@ -3523,13 +3591,32 @@ func TestGetDiagnostics_RegionEndMismatch(t *testing.T) {
 	for _, d := range diagnostics {
 		if d.Code == CodeRegionEndMismatch {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity, got %v", d.Severity)
+			if d.Severity != SeverityHint {
+				t.Errorf("expected hint severity, got %v", d.Severity)
 			}
 		}
 	}
 	if !found {
 		t.Errorf("expected region_end_mismatch for endregion with no open region, got: %+v", diagnostics)
+	}
+}
+
+// [spec feature.folding/A8]
+func TestGetDiagnostics_RegionEndMismatch_WordBoundary(t *testing.T) {
+	// A comment that merely starts with the letters "region" opens
+	// nothing, so it cannot hide an orphan endregion — and it does not
+	// fold as a region either.
+	text := `/* Regional settings follow;
+:DECLARE nCount;
+/* endregion;`
+
+	if got := codeCount(GetDiagnostics(text, DefaultDiagnosticOptions()), CodeRegionEndMismatch); got != 1 {
+		t.Errorf("expected one region_end_mismatch, got %d", got)
+	}
+	for _, r := range GetFoldingRanges(text) {
+		if r.Kind == "region" {
+			t.Errorf("'/* Regional ...' must not open a region, got %+v", r)
+		}
 	}
 }
 
@@ -3565,8 +3652,8 @@ func TestGetHover_MeKeyword(t *testing.T) {
 	if !strings.Contains(hover.Contents, "Me") {
 		t.Errorf("expected hover to contain 'Me', got: %s", hover.Contents)
 	}
-	if !strings.Contains(strings.ToLower(hover.Contents), "self-reference") {
-		t.Errorf("expected hover to explain Me is a self-reference, got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "current class instance") {
+		t.Errorf("expected hover to explain Me refers to the current class instance, got: %s", hover.Contents)
 	}
 }
 
@@ -4240,12 +4327,15 @@ func TestGetSQLPlaceholderHover_NamedParameter(t *testing.T) {
 		t.Fatal("expected hover for named parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter: userId") {
-		t.Errorf("expected hover to contain 'SQL Parameter: userId', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter `?userId?`") {
+		t.Errorf("expected hover to name the placeholder, got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "Named parameter") {
-		t.Errorf("expected hover to mention 'Named parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "named placeholder") || !strings.Contains(hover.Contents, "binds the current value of `userId`") {
+		t.Errorf("expected hover to explain SQLExecute binds the variable's value, got: %s", hover.Contents)
+	}
+	if !strings.Contains(hover.Contents, "Only `SQLExecute` substitutes") {
+		t.Errorf("expected hover to say only SQLExecute substitutes named placeholders, got: %s", hover.Contents)
 	}
 }
 
@@ -4260,12 +4350,12 @@ func TestGetSQLPlaceholderHover_PositionalParameter(t *testing.T) {
 		t.Fatal("expected hover for positional parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter #1") {
-		t.Errorf("expected hover to contain 'SQL Parameter #1', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter #1") {
+		t.Errorf("expected hover to contain 'SQL parameter #1', got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "1st parameter") {
-		t.Errorf("expected hover to mention '1st parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "1st element of the values array") {
+		t.Errorf("expected hover to mention the 1st values-array element, got: %s", hover.Contents)
 	}
 }
 
@@ -4279,12 +4369,12 @@ func TestGetSQLPlaceholderHover_SecondPositionalParameter(t *testing.T) {
 		t.Fatal("expected hover for second positional parameter, got nil")
 	}
 
-	if !strings.Contains(hover.Contents, "SQL Parameter #2") {
-		t.Errorf("expected hover to contain 'SQL Parameter #2', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "SQL parameter #2") {
+		t.Errorf("expected hover to contain 'SQL parameter #2', got: %s", hover.Contents)
 	}
 
-	if !strings.Contains(hover.Contents, "2nd parameter") {
-		t.Errorf("expected hover to mention '2nd parameter', got: %s", hover.Contents)
+	if !strings.Contains(hover.Contents, "2nd element of the values array") {
+		t.Errorf("expected hover to mention the 2nd values-array element, got: %s", hover.Contents)
 	}
 }
 
@@ -4588,24 +4678,33 @@ func TestGetDiagnostics_ZeroBasedArrayIndex(t *testing.T) {
 
 func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 	// [0] on a value reached through colon member access may be a 0-based
-	// .NET collection: warning, not error (issue #152). Chained access
-	// behaves the same.
+	// .NET collection, so it is an info-tier advisory, not an error
+	// (issues #152/#255). Chained access behaves the same, and the default
+	// surface drops it. A chain through `:Tables` (the DataSet API) is
+	// silent at every tier (issue #304), so these use other members.
+	infoOpts := DefaultDiagnosticOptions()
+	infoOpts.IncludeInfoDiagnostics = true
 	cases := []struct {
 		name string
 		code string
 	}{
-		{name: "member access", code: `oTable := dataSet:Tables[0];`},
-		{name: "chained member access", code: `oCol := dataSet:Tables:Columns[0];`},
+		{name: "member access", code: `oItem := oList:Items[0];`},
+		{name: "chained member access", code: `oCol := oGrid:Layout:Columns[0];`},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			found := false
 			for _, d := range GetDiagnostics(tc.code, DefaultDiagnosticOptions()) {
 				if d.Code == CodeZeroBasedArrayIndex {
+					t.Errorf("info-tier advisory must be gated off by default: %s", d.Message)
+				}
+			}
+			found := false
+			for _, d := range GetDiagnostics(tc.code, infoOpts) {
+				if d.Code == CodeZeroBasedArrayIndex {
 					found = true
-					if d.Severity != SeverityWarning {
-						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					if d.Severity != SeverityInfo {
+						t.Errorf("expected SeverityInfo, got %d", d.Severity)
 					}
 					if !strings.Contains(d.Message, ".NET") {
 						t.Errorf("message should mention .NET collections: %s", d.Message)
@@ -4613,7 +4712,7 @@ func TestGetDiagnostics_ZeroBasedArrayIndex_MemberAccessWarns(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Error("expected zero-index warning on member-access subscript")
+				t.Error("expected zero-index advisory on member-access subscript")
 			}
 		})
 	}
@@ -4695,8 +4794,8 @@ func TestGetDiagnostics_NamedSQLParamsWithWrongFunction(t *testing.T) {
 			for _, d := range diagnostics {
 				if strings.Contains(d.Message, "Named SQL parameter") && strings.Contains(d.Message, tc.funcName) {
 					found = true
-					if d.Severity != SeverityWarning {
-						t.Errorf("expected SeverityWarning, got %d", d.Severity)
+					if d.Severity != SeverityError {
+						t.Errorf("expected SeverityError, got %d", d.Severity)
 					}
 					break
 				}
@@ -5077,7 +5176,7 @@ func TestGetDiagnostics_ComplexSQLPlaceholder_StandardFormsNotFlagged(t *testing
 	}
 
 	for _, code := range cases {
-		diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+		diagnostics := GetDiagnostics(code, infoEnabledOptions())
 		for _, d := range diagnostics {
 			if strings.Contains(d.Message, "Complex expression") {
 				t.Errorf("standard placeholder should not trigger complex warning: %s\n  got: %s", code, d.Message)
@@ -5089,7 +5188,7 @@ func TestGetDiagnostics_ComplexSQLPlaceholder_StandardFormsNotFlagged(t *testing
 func TestGetDiagnostics_ComplexSQLPlaceholder_SimpleNotFlagged(t *testing.T) {
 	code := `SQLExecute("SELECT * FROM T WHERE Code = ?sCode?");`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Complex expression") {
@@ -5513,17 +5612,19 @@ oInt := LimsNetConnect("System", "System.Numerics.BigInteger");
 aBytes := oInt:ToByteArray();
 bZero := aBytes[0] == 0;`
 
+	infoOpts := DefaultDiagnosticOptions()
+	infoOpts.IncludeInfoDiagnostics = true
 	found := false
-	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+	for _, d := range GetDiagnostics(code, infoOpts) {
 		if d.Code == CodeZeroBasedArrayIndex {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity on .NET-derived [0], got %v", d.Severity)
+			if d.Severity != SeverityInfo {
+				t.Errorf("expected info severity on .NET-derived [0], got %v", d.Severity)
 			}
 		}
 	}
 	if !found {
-		t.Error("expected zero_based_array_index warning on .NET-derived [0]")
+		t.Error("expected zero_based_array_index advisory on .NET-derived [0]")
 	}
 
 	reassigned := `:DECLARE oInt, aBytes, bZero;
@@ -6054,24 +6155,6 @@ func TestGetDiagnostics_ExitForInFinally(t *testing.T) {
 	t.Fatal("expected EXITFOR-in-FINALLY diagnostic")
 }
 
-// --- Empty BEGINCASE ---
-
-func TestGetDiagnostics_EmptyBeginCase(t *testing.T) {
-	// :BEGINCASE with no :CASE is a compile error
-	code := `:BEGINCASE;
-:ENDCASE;`
-
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "requires at least one ':CASE' block") {
-			return
-		}
-	}
-
-	t.Fatal("expected empty BEGINCASE diagnostic")
-}
-
 // --- :ERROR handler must have body ---
 
 func TestGetDiagnostics_ErrorHandlerWithBody(t *testing.T) {
@@ -6112,7 +6195,7 @@ func TestGetDiagnostics_IncludeAtTopIsClean(t *testing.T) {
 :DECLARE x;
 x := 1;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "should appear early in the file") {
@@ -6127,7 +6210,7 @@ func TestGetDiagnostics_NotPreferredOperators_ValidNotEquals(t *testing.T) {
 	code := `:IF x != 1;
 :ENDIF;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "instead of") && strings.Contains(d.Message, "!=") {
@@ -6205,7 +6288,7 @@ func TestGetDiagnostics_VariableNameOK(t *testing.T) {
 	// Variable name within limit (prefix stripped)
 	code := `:DECLARE sShortName;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 20-character limit") {
@@ -6235,7 +6318,7 @@ func TestGetDiagnostics_ProcedureNameOK(t *testing.T) {
 	code := `:PROCEDURE ValidateSample;
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "exceeds 30-character limit") {
@@ -6367,7 +6450,7 @@ bFlag := .T.;
 // --- Scientific notation diagnostic ---
 
 func TestGetDiagnostics_ScientificNotationWithoutDecimal(t *testing.T) {
-	// 7e2 should trigger a warning about missing decimal point
+	// 7e2 does not compile: an error about the missing decimal point (#291)
 	text := `:DECLARE nVal;
 nVal := 7e2;`
 	diagnostics := GetDiagnostics(text, DiagnosticOptions{})
@@ -6376,8 +6459,8 @@ nVal := 7e2;`
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "scientific notation") && strings.Contains(d.Message, "decimal") {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected SeverityWarning, got %d", d.Severity)
+			if d.Severity != SeverityError {
+				t.Errorf("expected SeverityError, got %d", d.Severity)
 			}
 		}
 	}
@@ -6399,7 +6482,7 @@ nVal := 7.0e2;`
 	}
 }
 
-// --- D12: :ENDFOR detection ---
+// --- :ENDFOR detection ---
 
 func TestGetDiagnostics_EndForIsInvalid(t *testing.T) {
 	text := `:FOR i := 1 :TO 10;
@@ -6438,7 +6521,7 @@ func TestGetDiagnostics_EndForCaseInsensitive(t *testing.T) {
 	}
 }
 
-// --- D13: Redeclared variables ---
+// --- Redeclared variables ---
 
 func TestGetDiagnostics_RedeclaredVariable(t *testing.T) {
 	text := `:DECLARE sName;
@@ -6476,7 +6559,7 @@ sName := "B";
 	}
 }
 
-// --- D14: Empty trailing array with GetDataSet ---
+// --- Empty trailing array with GetDataSet ---
 
 func TestGetDiagnostics_EmptyTrailingArray_GetDataSet(t *testing.T) {
 	text := `:DECLARE sSQL, sXml;
@@ -6500,7 +6583,7 @@ func TestGetDiagnostics_EmptyTrailingArray_GetDataSet_WithParams(t *testing.T) {
 	text := `:DECLARE sSQL, sXml, sStatus;
 sSQL := "SELECT * FROM Table WHERE Status = ?";
 sXml := GetDataSet(sSQL, {sStatus});`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Omit") && strings.Contains(d.Message, "{}") {
@@ -6509,10 +6592,11 @@ sXml := GetDataSet(sSQL, {sStatus});`
 	}
 }
 
-// --- D15: Class member order with :INHERIT before :DECLARE ---
+// --- Class member order with :INHERIT before :DECLARE ---
 
 func TestGetDiagnostics_ClassMemberOrder_InheritBeforeDeclare(t *testing.T) {
-	// Correct order: INHERIT, DECLARE, methods, Constructor
+	// Correct order: :INHERIT, then :DECLARE, then methods (Constructor
+	// position is not enforced).
 	text := `:CLASS MyClass;
 :INHERIT BaseClass;
 :DECLARE sField;
@@ -6520,10 +6604,10 @@ func TestGetDiagnostics_ClassMemberOrder_InheritBeforeDeclare(t *testing.T) {
 :ENDPROC;
 :PROCEDURE Constructor;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "member order") || strings.Contains(d.Message, "should appear before") {
+		if d.Code == CodeClassMemberOrder {
 			t.Errorf("correct class member order should not produce diagnostics, got: %s", d.Message)
 		}
 	}
@@ -6536,16 +6620,25 @@ func TestGetDiagnostics_ClassMemberOrder_DeclareBeforeInherit(t *testing.T) {
 :INHERIT BaseClass;
 :PROCEDURE DoWork;
 :ENDPROC;`
-	diagnostics := GetDiagnostics(text, infoEnabledOptions())
+	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
+	// :INHERIT not directly after :CLASS is a compile error, reported as
+	// diag.inherit_position at error severity, not as the info-tier
+	// class_member_order note (issue #255).
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "INHERIT") && (strings.Contains(d.Message, "before") || strings.Contains(d.Message, "order")) {
+		if d.Code == CodeInheritPosition {
 			found = true
+			if d.Severity != SeverityError {
+				t.Errorf("inherit_position severity = %v, want error", d.Severity)
+			}
+		}
+		if d.Code == CodeClassMemberOrder {
+			t.Errorf("misplaced :INHERIT must not also report class_member_order: %s", d.Message)
 		}
 	}
 	if !found {
-		t.Error("expected diagnostic about :INHERIT needing to come before :DECLARE")
+		t.Error("expected inherit_position for :INHERIT after :DECLARE")
 	}
 }
 
@@ -6563,7 +6656,7 @@ func TestGetDiagnostics_ClassMemberOrder_ConstructorAnywhere(t *testing.T) {
 :PROCEDURE Constructor;
 :ENDPROC;`,
 	} {
-		diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+		diagnostics := GetDiagnostics(text, infoEnabledOptions())
 		for _, d := range diagnostics {
 			if d.Code == CodeClassMemberOrder {
 				t.Errorf("unexpected class_member_order diagnostic for permitted Constructor placement: %s", d.Message)
@@ -6572,7 +6665,7 @@ func TestGetDiagnostics_ClassMemberOrder_ConstructorAnywhere(t *testing.T) {
 	}
 }
 
-// --- D16: String equality = vs == asymmetry ---
+// --- String equality = vs == asymmetry ---
 
 func TestGetDiagnostics_LooseStringEquality_PrefixMatch(t *testing.T) {
 	text := `:DECLARE sStatus;
@@ -6597,7 +6690,7 @@ func TestGetDiagnostics_StrictStringEquality_NoWarning(t *testing.T) {
 sStatus := "Logged";
 :IF sStatus == "Logged";
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "prefix matching") {
@@ -6606,23 +6699,7 @@ sStatus := "Logged";
 	}
 }
 
-// --- D17: :ERROR/:RESUME structure validation ---
-
-func TestGetDiagnostics_ErrorHandlerRequiresStatement(t *testing.T) {
-	text := `:ERROR;
-:RESUME;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	found := false
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "ERROR") && strings.Contains(d.Message, "at least one statement") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected diagnostic about :ERROR requiring at least one statement")
-	}
-}
+// --- :ERROR/:RESUME structure validation ---
 
 func TestGetDiagnostics_ErrorHandlerWithStatement_NoWarning(t *testing.T) {
 	text := `:ERROR;
@@ -6670,7 +6747,7 @@ UsrMes("Error");
 	}
 }
 
-// --- D18: Branch target with :LABELName compact form ---
+// --- Branch target with :LABELName compact form ---
 
 func TestGetDiagnostics_BranchTarget_CompactLabelForm(t *testing.T) {
 	// :LABELSKIP; produces token text "LABELSKIP", so Branch("SKIP") won't match
@@ -6678,16 +6755,17 @@ func TestGetDiagnostics_BranchTarget_CompactLabelForm(t *testing.T) {
 Branch("SKIP");`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// This should produce a diagnostic because "SKIP" doesn't match "LABELSKIP"
-	// (The Branch target must include the full token text including "LABEL" prefix)
+	// The Branch target must include the label token text including the
+	// "LABEL" prefix (diag.branch_target_label), so a bare "SKIP" is flagged.
 	foundBranch := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Branch") || strings.Contains(d.Message, "LABEL") {
+		if d.Code == CodeBranchTargetLabel {
 			foundBranch = true
 		}
 	}
-	// Just verify it doesn't crash - exact behavior depends on implementation
-	_ = foundBranch
+	if !foundBranch {
+		t.Error(`expected branch_target_label for Branch("SKIP")`)
+	}
 }
 
 func TestGetDiagnostics_BranchTarget_SpacedLabelForm(t *testing.T) {
@@ -6696,15 +6774,15 @@ func TestGetDiagnostics_BranchTarget_SpacedLabelForm(t *testing.T) {
 Branch("LABEL SKIP");`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
-	// Should not produce branch-target-mismatch errors (this is correct usage)
+	// Should not produce branch-target diagnostics (this is correct usage)
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Branch target") && strings.Contains(d.Message, "does not match") {
-			t.Error("correct Branch target 'LABEL SKIP' should not produce mismatch diagnostic")
+		if d.Code == CodeBranchTargetLabel {
+			t.Errorf("correct Branch target 'LABEL SKIP' should not be flagged: %s", d.Message)
 		}
 	}
 }
 
-// --- D19: Visibility annotation placement ---
+// --- Visibility annotation placement ---
 
 func TestGetDiagnostics_VisibilityAnnotation_BeforeNonProcedure(t *testing.T) {
 	text := `/*@private;
@@ -6740,23 +6818,6 @@ func TestGetDiagnostics_VisibilityAnnotation_ProtectedInClass(t *testing.T) {
 	}
 }
 
-// --- D20: NIL method calls ---
-
-func TestGetDiagnostics_NilMethodCall_AfterReassignment(t *testing.T) {
-	// After reassigning to non-NIL, method calls should be fine
-	text := `:DECLARE oObj;
-oObj := NIL;
-oObj := CreateUdObject();
-oObj:Method();`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "NIL") && strings.Contains(d.Message, "method") {
-			t.Error("should not flag method call after reassignment from NIL to non-NIL")
-		}
-	}
-}
-
 // --- Pass 2: Nested IIF ---
 
 func TestGetDiagnostics_NestedIIF(t *testing.T) {
@@ -6778,7 +6839,7 @@ sResult := IIF(bCond1, IIF(bCond2, "A", "B"), "C");`
 func TestGetDiagnostics_NestedIIF_SingleNotFlagged(t *testing.T) {
 	text := `:DECLARE sResult;
 sResult := IIF(bCond, "Yes", "No");`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "Nested IIF") || strings.Contains(d.Message, "IIF()") {
@@ -6805,7 +6866,7 @@ func TestGetDiagnostics_NegativeLogic(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected hint about inverting condition to use positive logic")
+		t.Error("expected info about inverting condition to use positive logic")
 	}
 }
 
@@ -6815,7 +6876,7 @@ func TestGetDiagnostics_NegativeLogic_NoElseNoWarning(t *testing.T) {
 :IF .NOT. bFlag;
     DoProc("HandleFalse");
 :ENDIF;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(text, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "positive logic") || strings.Contains(d.Message, "invert") {
@@ -6869,20 +6930,6 @@ sName := "test";
 }
 
 // --- Pass 2: Skipped param spacing (adjacent commas) ---
-
-func TestGetDiagnostics_SkippedParamSpacing(t *testing.T) {
-	// {param1,,param3} is valid, {param1, , param3} is not
-	// This is a lexer/formatting concern, verify valid form doesn't crash
-	text := `:DECLARE sResult;
-sResult := DoProc("MyProc", {1,,3,,5});`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-	// Should not produce any diagnostic about the skipped params
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "skipped") && strings.Contains(d.Message, "param") {
-			t.Error("valid skipped param syntax should not produce diagnostic")
-		}
-	}
-}
 
 // --- Pass 2: Code block (lambda) with comparisons ---
 
@@ -7056,7 +7103,7 @@ func TestGetDiagnostics_CatchMustBeBeforeFinally(t *testing.T) {
 	}
 }
 
-// --- Pass 2: :EXITFOR outside :FOR loop ---
+// --- Pass 2: :EXITWHILE outside :WHILE loop ---
 
 func TestGetDiagnostics_ExitWhileOutsideWhile_Standalone(t *testing.T) {
 	text := `:PROCEDURE Test;
@@ -7116,8 +7163,8 @@ oObj := CreateUdObject({{"name", "test"}, {"value", 42}});`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "CreateUdObject") && strings.Contains(d.Message, "built-in") {
-			t.Error("anonymous CreateUdObject should not trigger built-in class misuse warning")
+		if d.Code == CodeCreateUdObjectBuiltinMisuse {
+			t.Errorf("anonymous CreateUdObject should not trigger built-in class misuse warning: %s", d.Message)
 		}
 	}
 }
@@ -7198,23 +7245,6 @@ func TestGetDiagnostics_EmptyCatchBody_Valid(t *testing.T) {
 }
 
 // --- Pass 3: :TRY with only :CATCH (no :FINALLY) is valid ---
-
-func TestGetDiagnostics_TryOnlyCatch_Valid(t *testing.T) {
-	text := `:PROCEDURE Test;
-:TRY;
-    sVal := "";
-:CATCH;
-    sVal := "error";
-:ENDTRY;
-:ENDPROC;`
-	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "FINALLY") && strings.Contains(d.Message, "required") {
-			t.Error(":TRY with only :CATCH (no :FINALLY) should be valid")
-		}
-	}
-}
 
 // --- Pass 3: :OTHERWISE skipped once any :CASE body ran (even without :EXITCASE) ---
 
@@ -7361,7 +7391,7 @@ func TestGetDiagnostics_ZeroBasedArrayAccess(t *testing.T) {
 	}
 }
 
-// --- Tests for new diagnostics: STEP spacing, REGION legacy, code block structure ---
+// --- Tests for new diagnostics: STEP spacing, code block structure ---
 
 func TestGetDiagnostics_StepSpacingWarning(t *testing.T) {
 	// :STEP without a preceding space should warn
@@ -7425,7 +7455,7 @@ func TestGetDiagnostics_CodeBlockWithParams_NoWarning(t *testing.T) {
 
 // ==================== Source-of-Truth Validation Tests ====================
 // Tests below validate alignment between the implementation and the
-// authoritative language rules in dev/ssl-style-guide/agent-guides/.
+// published SSL reference.
 
 func TestGetHover_Me_NoDirectCallExample(t *testing.T) {
 	// Source of truth: custom procedures cannot be called directly.
@@ -7443,8 +7473,8 @@ Me:Helper();
 	if strings.Contains(hover.Contents, "DoSomething(Me)") {
 		t.Error("Me hover should not suggest direct procedure calls like DoSomething(Me)")
 	}
-	if !strings.Contains(hover.Contents, "ExecFunction") {
-		t.Error("Me hover should show ExecFunction example for passing self as argument")
+	if !strings.Contains(hover.Contents, "Me:MethodName()") {
+		t.Error("Me hover should show the Me:MethodName() form for calling sibling methods")
 	}
 }
 
@@ -7637,7 +7667,7 @@ func TestGetDiagnostics_StringExactEquality_NoWarning(t *testing.T) {
 	// == for strings should NOT warn about prefix matching
 	text := `:IF sStatus == "Logged";
 :ENDIF;`
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	for _, d := range diagnostics {
@@ -7935,7 +7965,7 @@ func TestGetDiagnostics_NotEqualsNonStringStaysSilent(t *testing.T) {
 	x := 1;
 :ENDIF;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 	for _, d := range diagnostics {
 		if d.Code == CodeEqualsVsStrictEquals {
@@ -7954,7 +7984,7 @@ func TestGetDiagnostics_NotEqualsNoAsymmetryWarning(t *testing.T) {
 	x := 1;
 :ENDIF;`
 
-	opts := DefaultDiagnosticOptions()
+	opts := infoEnabledOptions()
 	diagnostics := GetDiagnostics(text, opts)
 
 	for _, d := range diagnostics {
@@ -8171,8 +8201,8 @@ func TestGetHover_BuilderDirective(t *testing.T) {
 	if hover == nil {
 		t.Fatal("expected hover info for :DSN builder directive")
 	}
-	if !strings.Contains(hover.Contents, "builder directive") {
-		t.Error("expected hover to mention 'builder directive'")
+	if !strings.Contains(hover.Contents, "data source directive") {
+		t.Error("expected hover to identify a data source directive")
 	}
 	if !strings.Contains(hover.Contents, "database connection") {
 		t.Error("expected hover to describe DSN purpose")
@@ -8231,20 +8261,31 @@ func TestGetDiagnostics_DataSource_DefaultStatementFlagged(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_DataSource_ParametersWithoutDefaultsValid(t *testing.T) {
-	// diag.datasource_default_required was removed (issue #147,
-	// ssl-style-guide#48): the data source builder accepts :PARAMETERS
-	// without inline defaults, so no default-related error may fire.
-	code := `:PARAMETERS sName, nCount := 10;`
+func TestGetDiagnostics_DataSource_ParametersWithoutDefaults(t *testing.T) {
+	// diag.datasource_default_required, reinstated (issues #263, #269):
+	// a data source whose script-level :PARAMETERS has a name without an
+	// inline default fails when it runs. Only the defaultless name is
+	// reported; a procedure's own :PARAMETERS inside the data source is not
+	// the data source's interface and is never checked.
+	code := `:PARAMETERS sName, nCount := 10;
+:PROCEDURE Helper;
+:PARAMETERS sInner;
+:RETURN sInner;
+:ENDPROC;`
 
 	opts := DefaultDiagnosticOptions()
 	opts.IsDataSourceFile = true
-	diagnostics := GetDiagnostics(code, opts)
-
-	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "inline ':=' default") || d.Code == "datasource_default_required" {
-			t.Errorf("defaultless data source parameter must not be flagged: %s", d.Message)
+	var got []string
+	for _, d := range GetDiagnostics(code, opts) {
+		if d.Code == CodeDatasourceDefaultRequired {
+			if d.Severity != SeverityError {
+				t.Errorf("severity = %v, want error", d.Severity)
+			}
+			got = append(got, d.Message)
 		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0], "'sName'") {
+		t.Fatalf("want only sName reported, got %v", got)
 	}
 }
 
@@ -8458,8 +8499,10 @@ func TestGetDiagnostics_DataSource_BuilderDirectiveCaseSensitive(t *testing.T) {
 	}
 }
 
-func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testing.T) {
-	// In regular script files, builder directives should be flagged as unknown keywords
+func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlagged(t *testing.T) {
+	// In regular script files, a builder directive is a known form that is
+	// valid only in data sources: its own error code, not unknown_keyword
+	// (issue #269).
 	code := `:DSN := MyConnection;`
 
 	opts := DefaultDiagnosticOptions()
@@ -8468,12 +8511,15 @@ func TestGetDiagnostics_NonDataSource_BuilderDirectiveFlaggedAsUnknown(t *testin
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Unknown SSL keyword") {
+		if d.Code == CodeUnknownKeyword {
+			t.Errorf(":DSN must not read as unknown: %s", d.Message)
+		}
+		if d.Code == CodeBuilderDirectiveOutsideDatasource && d.Severity == SeverityError {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("expected unknown keyword diagnostic for :DSN in regular script file")
+		t.Fatal("expected builder_directive_outside_datasource error for :DSN in regular script file")
 	}
 }
 
@@ -8832,39 +8878,6 @@ SqlCommand := "TABLE " + sCols + " end";`
 	}
 }
 
-// Panic recovery: a panic anywhere inside collectDiagnostics should NOT
-// kill the server. It should surface as a single internal_error diagnostic
-// so the editor stays usable and bug reports are easy to file.
-// [spec feature.diagnostics_pipeline/A7]
-func TestGetDiagnostics_PanicRecovery(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("panic propagated past collectDiagnostics: %v", r)
-		}
-	}()
-
-	// We can't easily synthesize a panic from input alone, so just verify
-	// the safety net is wired: pretend a check function panicked by passing
-	// a nil token slice that would otherwise be handled gracefully — call
-	// the recovery path explicitly via a helper.
-	got := func() (out []Diagnostic) {
-		defer func() {
-			if r := recover(); r != nil {
-				out = []Diagnostic{{
-					Severity: SeverityError,
-					Source:   "ssl-lsp",
-					Code:     "internal_error",
-					Message:  "synthetic",
-				}}
-			}
-		}()
-		panic("synthetic panic for test")
-	}()
-	if len(got) != 1 || got[0].Code != "internal_error" {
-		t.Fatalf("recovery contract: expected one internal_error diagnostic, got %+v", got)
-	}
-}
-
 func hasDiagnosticCode(diags []Diagnostic, code string) bool {
 	for _, d := range diags {
 		if d.Code == code {
@@ -8962,7 +8975,10 @@ func TestEndpointAmbients_RequestAndResponseAcceptedInEndpoint(t *testing.T) {
 	}
 }
 
-func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
+func TestEndpointAmbients_RequestNotUndeclaredOutsideEndpoint(t *testing.T) {
+	// DECISIONS.md D4 (amended): Request and Response are platform objects
+	// readable in any script — referencing one outside an endpoint does
+	// not raise — so they are never undeclared.
 	text := `:DECLARE sUrl;
 	sUrl := Request:Url;`
 
@@ -8970,15 +8986,10 @@ func TestEndpointAmbients_RequestFlaggedOutsideEndpoint(t *testing.T) {
 	opts.CheckUndeclaredVars = true
 	opts.IsEndpointFile = false
 
-	diags := GetDiagnostics(text, opts)
-	found := false
-	for _, d := range diags {
-		if d.Code == CodeUndeclaredVariable && strings.Contains(d.Message, "Request") {
-			found = true
+	for _, d := range GetDiagnostics(text, opts) {
+		if d.Code == CodeUndeclaredVariable {
+			t.Fatalf("Request must not be undeclared outside an endpoint: %+v", d)
 		}
-	}
-	if !found {
-		t.Fatalf("expected Request to be flagged as undeclared in non-endpoint file, got %+v", diags)
 	}
 }
 
@@ -9221,14 +9232,20 @@ func TestGetDiagnostics_InvalidLimsTypeExComparisonFlagged(t *testing.T) {
 }
 
 func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
-	// Valid result strings in any casing and non-literal comparands are
-	// out of scope.
+	// Valid result strings, prefix matches under `=`, and non-literal
+	// comparands are out of scope (issue #255).
 	code := `:PROCEDURE Check;
 :PARAMETERS uValue, sExpected;
 :IF LimsTypeEx(uValue) == "NUMERIC";
 	:RETURN .T.;
 :ENDIF;
-:IF limstypeex(uValue) = "string";
+:IF limstypeex(uValue) = "STRING";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) = "NUM";
+	:RETURN .T.;
+:ENDIF;
+:IF "STRINGS" = LimsTypeEx(uValue);
 	:RETURN .T.;
 :ENDIF;
 :IF LimsTypeEx(uValue) == sExpected;
@@ -9243,6 +9260,45 @@ func TestGetDiagnostics_InvalidLimsTypeExComparisonNotFlagged(t *testing.T) {
 		if d.Code == CodeInvalidLimsTypeExComparison {
 			t.Errorf("unexpected invalid_limstypeex_comparison at line %d: %s", d.Range.Start.Line, d.Message)
 		}
+	}
+}
+
+func TestGetDiagnostics_InvalidLimsTypeExComparisonCaseAndOperators(t *testing.T) {
+	// String comparison is case-sensitive, so a lowercase result name can
+	// never match; `<>` and `#` are inequality like `!=` (issue #255).
+	code := `:PROCEDURE Check;
+:PARAMETERS uValue;
+:IF LimsTypeEx(uValue) == "numeric";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) <> "NUMBER";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) # "NUMBER";
+	:RETURN .T.;
+:ENDIF;
+:IF LimsTypeEx(uValue) = "NUMBERS";
+	:RETURN .T.;
+:ENDIF;
+:ENDPROC;`
+
+	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+
+	var lines []int
+	always := 0
+	for _, d := range diagnostics {
+		if d.Code == CodeInvalidLimsTypeExComparison {
+			lines = append(lines, d.Range.Start.Line)
+			if strings.Contains(d.Message, "always true") {
+				always++
+			}
+		}
+	}
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 invalid_limstypeex_comparison findings, got lines %v", lines)
+	}
+	if always != 2 {
+		t.Errorf("expected the two inequality findings to say 'always true', got %d", always)
 	}
 }
 
@@ -9323,10 +9379,10 @@ func TestGetDiagnostics_UnjustifiedCollateOptIn(t *testing.T) {
 	// COLLATERAL does not match.
 	code := `:PROCEDURE Main;
 :DECLARE aRows, aOk, aSub;
-aRows := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
+aRows := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
 /* server default is case-sensitive so the report must sort case-insensitively;
-aOk := LSelect("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS", "", "CONN");
-aSub := LSelect("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'", "", "CONN");
+aOk := SQLExecute("SELECT NAME FROM SAMPLES ORDER BY NAME COLLATE Latin1_General_CI_AS");
+aSub := SQLExecute("SELECT NAME FROM SAMPLES WHERE KIND = 'COLLATERAL'");
 :ENDPROC;`
 
 	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
@@ -9356,7 +9412,12 @@ x := DoProc("Helper", {1},,);
 CallMe(1,);
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	// Info tier: dropped by default.
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeTrailingSkipCommas); got != 0 {
+		t.Fatalf("trailing_skip_commas fired with the info tier off: %d", got)
+	}
+
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	var lines []int
 	for _, d := range diagnostics {
@@ -9377,9 +9438,10 @@ func TestGetDiagnostics_TrailingSkipCommasNotFlagged(t *testing.T) {
 CallMe(1,, 3);
 x := DoProc("Helper", {1});
 aList := {1, 2,};
+x := x:Substring(1,);
 :ENDPROC;`
 
-	diagnostics := GetDiagnostics(code, DefaultDiagnosticOptions())
+	diagnostics := GetDiagnostics(code, infoEnabledOptions())
 
 	for _, d := range diagnostics {
 		if d.Code == CodeTrailingSkipCommas {
@@ -9396,6 +9458,7 @@ func TestGetDiagnostics_SpacedSkipCommasOptIn(t *testing.T) {
 CallMe(1, , 3);
 CallMe(1,, 3);
 CallMe(1, 2, 3);
+CallMe(1, , );
 :ENDPROC;`
 
 	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
@@ -9468,8 +9531,8 @@ sOut := String:Format("Completed in {0:N3}s - {1}", 12, sName);
 }
 
 func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
-	// diag.visibility_annotation_usage (issue #198): off by default; when
-	// enabled, hints on effective annotations only — a class-file
+	// diag.visibility_annotation_usage (issue #198): info tier, so off by
+	// default (D13); when enabled, reports effective annotations only — a class-file
 	// annotation keeps its visibility_annotation warning and gets no hint.
 	script := `/*@private;
 :PROCEDURE Helper;
@@ -9488,12 +9551,12 @@ func TestGetDiagnostics_VisibilityAnnotationUsageOptIn(t *testing.T) {
 		if d.Code == CodeVisibilityAnnotationUsage {
 			hits++
 			if d.Range.Start.Line != 0 {
-				t.Errorf("expected hint on line 0, got %d", d.Range.Start.Line)
+				t.Errorf("expected the diagnostic on line 0, got %d", d.Range.Start.Line)
 			}
 		}
 	}
 	if hits != 1 {
-		t.Fatalf("expected one visibility_annotation_usage hint, got %d", hits)
+		t.Fatalf("expected one visibility_annotation_usage diagnostic, got %d", hits)
 	}
 
 	classFile := `:CLASS Widget;
@@ -9808,5 +9871,153 @@ func TestStrictChecksExemptDataSources(t *testing.T) {
 	}
 	if !found {
 		t.Error("the data-source exemption leaked into ordinary SSL documents")
+	}
+}
+
+// ==================== Diagnostics audit, batch B (issue #255) ====================
+
+func TestGetDiagnostics_RaiseErrorInCatch_MemberCallNotFlagged(t *testing.T) {
+	// D10: a qualified recv:RaiseError(...) is a member call, never the
+	// built-in.
+	code := `:PROCEDURE Demo;
+:DECLARE oLog;
+:TRY;
+	oLog := 1;
+:CATCH;
+	oLog:RaiseError("logged, not raised");
+:ENDTRY;
+:ENDPROC;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeRaiseErrorInCatch); got != 0 {
+		t.Errorf("member RaiseError must not flag, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_RunSQLNonDML_ASTEdges(t *testing.T) {
+	// D10: member calls are out of scope. A SELECT continuing an INSERT
+	// across a concatenation is not the statement's leading keyword, and
+	// a query that does not begin with a literal is not provable. A
+	// parenthesized literal still is.
+	code := `:PROCEDURE Main;
+:DECLARE oSql, sPrefix;
+oSql:RunSql("SELECT ID FROM SAMPLES");
+RunSQL("INSERT INTO ARCHIVE " + "SELECT * FROM SAMPLES");
+RunSQL(sPrefix + "SELECT 1 FROM DUAL");
+RunSQL(("SELECT 1 FROM DUAL"));
+:ENDPROC;`
+
+	var lines []int
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeRunSQLNonDML {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 5 {
+		t.Fatalf("expected runsql_non_dml on line 5 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_StepZeroLiteral_WholeExpression(t *testing.T) {
+	// The whole step expression must be the zero literal; a literal zero
+	// that only starts a larger expression proves nothing.
+	code := `:PROCEDURE Demo;
+:DECLARE i, nInc;
+nInc := 2;
+:FOR i := 1 :TO 10 :STEP 0 + nInc;
+:NEXT;
+:ENDPROC;`
+
+	if got := codeCount(GetDiagnostics(code, DefaultDiagnosticOptions()), CodeStepZeroLiteral); got != 0 {
+		t.Errorf("':STEP 0 + nInc' must not flag, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_SingleFinally_ExtraClauseDoesNotFillFirst(t *testing.T) {
+	// Statements after a duplicate :FINALLY belong to no clause, so an
+	// empty first :FINALLY is still reported.
+	code := `:PROCEDURE Demo;
+:DECLARE nCount;
+:TRY;
+nCount := 1;
+:FINALLY;
+:FINALLY;
+nCount := 3;
+:ENDTRY;
+:ENDPROC;`
+
+	diags := GetDiagnostics(code, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeSingleFinally); got != 1 {
+		t.Errorf("expected one single_finally, got %d", got)
+	}
+	if got := codeCount(diags, CodeFinallyEmpty); got != 1 {
+		t.Errorf("expected finally_empty on the empty first :FINALLY, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_ParametersFirst_SecondScriptLevel(t *testing.T) {
+	code := `:PARAMETERS a;
+:PARAMETERS b;
+:RETURN a;`
+
+	var lines []int
+	for _, d := range GetDiagnostics(code, DefaultDiagnosticOptions()) {
+		if d.Code == CodeParametersFirst {
+			lines = append(lines, d.Range.Start.Line)
+		}
+	}
+	if len(lines) != 1 || lines[0] != 1 {
+		t.Fatalf("expected parameters_first on line 1 only (0-indexed), got %v", lines)
+	}
+}
+
+func TestGetDiagnostics_ProcedureDeclarationSyntax_OneFinding(t *testing.T) {
+	// The C-style bare form is one defect: procedure_declaration_syntax
+	// names it and unexpected_token defers. Without the paren the shape
+	// is not that rule's, and unexpected_token keeps it.
+	withParen := `PROCEDURE Demo(nValue);
+:RETURN .T.;`
+	diags := GetDiagnostics(withParen, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeProcedureDeclarationSyntax); got != 1 {
+		t.Errorf("expected one procedure_declaration_syntax, got %d", got)
+	}
+	if got := codeCount(diags, CodeUnexpectedToken); got != 0 {
+		t.Errorf("unexpected_token must defer to procedure_declaration_syntax, got %d", got)
+	}
+
+	bare := `PROCEDURE Demo;
+:RETURN .T.;`
+	diags = GetDiagnostics(bare, DefaultDiagnosticOptions())
+	if got := codeCount(diags, CodeProcedureDeclarationSyntax); got != 0 {
+		t.Errorf("bare PROCEDURE Name; is not procedure_declaration_syntax's, got %d", got)
+	}
+	if got := codeCount(diags, CodeUnexpectedToken); got != 1 {
+		t.Errorf("expected unexpected_token for bare PROCEDURE Name;, got %d", got)
+	}
+}
+
+func TestGetDiagnostics_UnexpectedToken_GluedStepHint(t *testing.T) {
+	// `:TO nMax:STEP 2` parses as member access on the limit; the parse
+	// failure is unexpected_token's, with a pointer at the missing space.
+	// step_spacing only sees a numeric limit, where :STEP still lexes as
+	// the keyword.
+	code := `:PROCEDURE Demo;
+:DECLARE i, nMax;
+nMax := 10;
+:FOR i := 1 :TO nMax:STEP 2;
+:NEXT;
+:ENDPROC;`
+
+	diags := GetDiagnostics(code, DefaultDiagnosticOptions())
+	found := false
+	for _, d := range diags {
+		if d.Code == CodeUnexpectedToken && strings.Contains(d.Message, "missing space before ':STEP'") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected unexpected_token with the ':STEP' spacing hint, got %+v", diags)
+	}
+	if got := codeCount(diags, CodeStepSpacing); got != 0 {
+		t.Errorf("step_spacing must not also fire, got %d", got)
 	}
 }

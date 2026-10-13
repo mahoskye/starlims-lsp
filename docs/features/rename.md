@@ -151,7 +151,7 @@ Valid runtime dispatch uses `DoProc("CalcTotal")` or `ExecFunction(...)`, and th
 | Limitation | Description |
 |------------|-------------|
 | Variables single-file | Locals/params/`:PUBLIC` rename within the file; only procedure subjects rename workspace-wide (issue #125) |
-| Class-file procedures | Cross-file rename is refused — `obj:Method()`/`Base:Method()` callers are invisible to the LSP (D8); same-file rename still works |
+| Class-file procedures | Cross-file rename is refused — `obj:Method()`/`Base:Method()` callers are invisible to the LSP (decision D8 of the [cross-file plan](../plans/2026-07-24-cross-file-references-rename.md), not catalog D8); same-file rename still works |
 | Ambiguous dispatch sites | A site resolving to multiple candidate files is skipped, never guessed |
 | Concatenated dispatch strings | `DoProc("CAT." + sName)` is never edited |
 | No preview | Some editors show preview; depends on client support |

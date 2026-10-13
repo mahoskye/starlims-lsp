@@ -3,8 +3,8 @@ id: diag.endfor_invalid
 title: ":ENDFOR used to terminate a FOR loop"
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: blocks.for.end
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -24,6 +24,20 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      An :ENDFOR closing an open :FOR now ends that loop for structure
+      purposes, so the typo no longer also reports unclosed_block on the
+      :FOR. authority corrected to authoritative: the style-guide record
+      endfor_invalid (level authoritative) names this rule in
+      enforced_by, so the guide is not silent.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch D)"
+    note: >-
+      The block scanner now pairs `:ENDFOR` with its `:FOR` silently, so
+      the loop is no longer also reported as unclosed_block — one typo,
+      one finding.
 issues: []
 ---
 
@@ -74,6 +88,7 @@ It must NOT flag:
 is a high-frequency guess that SSL rejects — the loop terminator is `:NEXT`.
 Rather than the generic "Unknown SSL keyword" warning, this earns a
 dedicated error with the exact replacement (be7a174), and the data source
-variant (f6e78ef) keeps the message consistent everywhere. Note the
-unterminated `:FOR` will typically also raise an unclosed-block diagnostic;
-that is a separate rule.
+variant (f6e78ef) keeps the message consistent everywhere. An `:ENDFOR`
+that closes an open `:FOR` ends that loop for the structure and
+loop-control checks, so the typo does not also report `unclosed_block` on
+the `:FOR` (issue #255): one mistake, one finding.

@@ -3,7 +3,7 @@ id: diag.me_outside_class
 title: Me used outside a class definition
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -35,7 +35,14 @@ history:
       compile inside the :CLASS and are valid — single-file analysis
       cannot tell, so such files warn instead of error. A workspace
       include-graph reverse lookup remains a possible future upgrade.
-issues: ["#32"]
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Authority corrected tool -> authoritative to mirror the style guide
+      record (me_inside_class_only, error), whose include-library
+      exception matches the issue #171 warning tier. Closed issue #32
+      dropped from issues.
+issues: []
 ---
 
 ## Behavior
@@ -130,9 +137,9 @@ vValue := oConfig:Me;
 
 ## Rationale
 
-The style guide lists `Me` among the class-context special forms
-(special_literals.class_context_forms): it is only meaningful inside a
-`:CLASS` definition. Because a wrong `Me` is a guaranteed runtime failure,
+The style guide's `me_inside_class_only` record (authoritative, error)
+restricts `Me` to a `:CLASS` definition, with one exception: a library
+compiled into a class through `:INCLUDE`, which is the warning tier. Because a wrong `Me` is a guaranteed runtime failure,
 this is an error, matching the sibling Base rules introduced in the same
 commit (cdbfee6). The line-based class-range guard trades precision for
 safety: it can never false-positive inside a real class file, at the cost

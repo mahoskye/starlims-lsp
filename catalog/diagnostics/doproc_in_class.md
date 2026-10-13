@@ -4,7 +4,7 @@ title: DoProc call inside a class method
 kind: diagnostic
 status: active
 authority: authoritative
-schema_ref: lints.compile_errors.doproc_in_class
+schema_ref: lints.compile_errors.rules.doproc_in_class
 default_severity: error
 severity_overridable: true
 suppressible: true
@@ -34,6 +34,16 @@ history:
       check now flags only string-literal targets without a qualifier
       dot (the provable class-local/base form); non-literal targets are
       left alone as unprovable. Message reworded accordingly.
+  - date: 2026-10-13
+    ref: "issue #260"
+    note: >-
+      Re-checked against the reference verified on STARLIMS 12. Its
+      functions/DoProc.md first marked the qualified form inside a class
+      method as unconfirmed, then confirmed it: a fully qualified
+      Category.Script.Procedure target is accepted and runs that
+      procedure, while a bare name is a compile-time error. Behavior and
+      prose already match; the qualified Does-not-flag fence pins the
+      silence, and a second one pins the reference's own shape.
 issues: ["ssl-style-guide#49"]
 ---
 
@@ -94,6 +104,19 @@ It must NOT flag:
 	:DECLARE bResult;
 	bResult := DoProc("API_Helper.ValidationHelper.ValidateProperties", {oInput});
 	:RETURN bResult;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:CLASS TextCleaner;
+:DECLARE sLast;
+
+:PROCEDURE Clean;
+	:PARAMETERS sValue;
+	Me:sLast := DoProc("Common.TextRules.Normalize", {sValue});
+	:RETURN Me:sLast;
 :ENDPROC;
 ```
 

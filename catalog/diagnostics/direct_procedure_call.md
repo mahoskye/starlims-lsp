@@ -3,13 +3,14 @@ id: diag.direct_procedure_call
 title: Procedure called directly instead of via DoProc/ExecFunction
 kind: diagnostic
 status: active
-authority: tool
-schema_ref: null
+authority: authoritative
+schema_ref: function_calls.direct_calls.restrictions
 default_severity: error
 severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/fp_triage_304_test.go
 history:
   - date: 2026-02-02
     ref: "commit 7261172"
@@ -34,6 +35,24 @@ history:
       a procedure declared in this file keeps the error (definite misuse);
       an unknown bare callable warns with wording that names both
       possibilities.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      no_direct_procedure_calls (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. A bare AND/OR/NOT in
+      operator position followed by `(` is bare_logical_operator's
+      finding and no longer also reports here.
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      A call to a procedure's own name from inside its body moved from
+      the error tier to the warning tier. Shipped product code declares
+      procedures named after vendor built-ins missing from the published
+      inventory and calls the built-in from inside them; the call
+      compiles and reaches the built-in, so the in-file declaration does
+      not prove a dispatch bypass there. The warning names both readings
+      (recursion written C-style, or a wrapper).
 issues: []
 ---
 
@@ -49,7 +68,12 @@ Severity is tiered (issue #167):
 
 - **Error** when the called name matches a `:PROCEDURE` declared in this
   file — dispatch bypass is then provable, and the message prescribes the
-  DoProc/ExecFunction/Me: alternatives.
+  DoProc/ExecFunction/Me: alternatives. The exception is a call from
+  inside the body of the procedure it names (issue #304): that is either
+  recursion written C-style or a procedure wrapping a vendor built-in of
+  the same name (shipped product code wraps unpublished built-ins this
+  way, and the call reaches the built-in), so it warns and the message
+  names both readings.
 - **Warning** otherwise: an unknown bare callable cannot be distinguished
   from a vendor built-in missing from the published function inventory
   (stock SYSTEMINIT/IMPEXP_FRAMEWORK-era scripts call
@@ -69,7 +93,10 @@ It must NOT flag:
 - procedure declarations: `:PROCEDURE Name(...)` and the colonless
   `PROCEDURE Name(...)` typo are reported by
   `procedure_declaration_syntax` instead (d134334);
-- a bare reference without parentheses (`x := MyHelper;`).
+- a bare reference without parentheses (`x := MyHelper;`);
+- a bare `AND`/`OR`/`NOT` in operator position followed by `(`
+  (`bA AND (bB)`) — that is `bare_logical_operator`'s finding (issue
+  #255).
 
 ## Examples
 
@@ -121,6 +148,29 @@ It must NOT flag:
 ```ssl
 :DECLARE s;
 s := LimsCleanUp();
+```
+
+### Flags
+
+(warning tier — a call to the procedure's own name from its body, issue #304)
+
+```ssl
+:PROCEDURE ReadSetting;
+:PARAMETERS sKey;
+	:DECLARE sValue;
+	sValue := ReadSetting(Upper(sKey));
+	:RETURN sValue;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS bReady, bDone;
+:IF bReady AND (bDone);
+:ENDIF;
+:ENDPROC;
 ```
 
 ## Rationale

@@ -10,6 +10,7 @@ severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/comment_termination_test.go
+  - internal/providers/fp_triage_304_test.go
 history:
   - date: 2026-03-30
     ref: "commits 764a8de -> fe7a3aa -> 0d46f55"
@@ -38,6 +39,25 @@ history:
       comments AND to a comment whose ';' lands on its first line (the
       issue's original shape). Paragraph-break suppression (issue #6)
       still applies unchanged.
+  - date: 2026-10-13
+    ref: "issue #269"
+    note: >-
+      Severity re-checked against the style guide, which maps
+      no_semicolon_in_comment_text and banner_has_no_semicolon (both
+      error) to this rule. Kept at warning: when the stranded text does
+      not parse, unexpected_token already reports the compile error at
+      error severity, and this rule explains its cause. When the text
+      happens to parse, it is a detection heuristic, so error would
+      overstate certainty about intent.
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      The bare-keyword break-out no longer fires when the keyword-named
+      word is the target of an assignment on its line
+      (`label := ...`). Shipped product code names a local after a
+      keyword and assigns it on the line after a two-line comment;
+      a keyword name followed by `:=` is a statement, not a doc header
+      cut in half.
 issues: ["#25"]
 ---
 
@@ -51,7 +71,9 @@ the author intended, in exactly three situations:
 - **Bare-keyword break-out** (error): a `/*` comment spanning multiple lines
   terminates, and the next significant token is an identifier that matches
   an SSL keyword name (e.g. `Parameters`, `Default`) — the signature of a
-  doc-header comment cut in half.
+  doc-header comment cut in half. An identifier followed on its line by
+  `:=` or a compound assignment operator is an assignment, not a stranded
+  header line, and does not count (issue #304).
 - **Orphaned-prose break-out** (warning): a terminated `/*` comment —
   whether it spans multiple lines or its `;` lands on the first line — is
   followed, with no paragraph break in between, by a significant line that
@@ -78,6 +100,8 @@ It must NOT flag when:
 - the comment is a `/* region` / `/* endregion` marker, whose `;` is
   intentional;
 - an ordinary terminated comment is simply followed by code on later lines;
+- the next line assigns a variable whose name happens to be a keyword
+  name (`label := ...`) — that is a statement (issue #304);
 - the next line is a single bare identifier followed by valid code — one
   identifier can legitimately start a statement continued on the next line,
   so the prose signal requires the second identifier to share the first
@@ -139,6 +163,18 @@ DoProc("X");
 that spans two lines;
 orphan
 nCount := 1;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE label;
+	/* collect the request values
+	before they are parsed;
+	label := GetFromSession("Values");
+	:RETURN label;
+:ENDPROC;
 ```
 
 ### Does not flag

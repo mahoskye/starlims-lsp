@@ -46,7 +46,7 @@ Each parameter includes:
 
 | Property | Description |
 |----------|-------------|
-| `label` | Parameter portion of signature (e.g., `commandString: variant`) |
+| `label` | Parameter name as it appears in the signature label (e.g., `sCommandString`) |
 | `documentation` | Parameter description |
 
 ### 2.5 Coverage
@@ -114,10 +114,10 @@ SQLExecute(|
 /* Position: after '(';
 /* Expected:
    signatures: [{
-     label: "SQLExecute(commandString: variant, [friendlyName: variant], [rollbackExistingTransaction: variant], [nullAsBlank: variant], [invariantDateColumns: variant], [returnType: variant], [tableName: variant], [includeSchema: variant], [includeHeader: variant]) → variant",
+     label: "SQLExecute(sCommandString, [sConnectionName], [bRollbackExistingTransaction], [bNullAsBlank], [aInvariantDateCols], [vReturnType], [sTableName], [bIncludeSchema], [bIncludeHeader]) → any",
      parameters: [
-       { label: "commandString: variant" },
-       { label: "friendlyName: variant" }
+       { label: "sCommandString" },
+       { label: "sConnectionName" }
      ]
    }],
    activeParameter: 0

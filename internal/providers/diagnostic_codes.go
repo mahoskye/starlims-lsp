@@ -1,5 +1,15 @@
 package providers
 
+// Data-source header and parameter-list rules from the reference's
+// data-sources guide (issue #260). A separate block so adding them does not
+// realign the stable-code table below.
+const (
+	CodeEmptyParameters                  = "empty_parameters"
+	CodeDatasourceSQLQuestionPlaceholder = "datasource_sql_question_placeholder"
+	CodeNullAsBlankValue                 = "nullasblank_value"
+	CodeInvariantDateColumnsQuoted       = "invariant_date_columns_quoted"
+)
+
 // Diagnostic codes are stable, machine-readable identifiers for diagnostic
 // rules. Clients use them to wire quick-fix code actions, suppression
 // comments, and per-rule severity overrides.
@@ -39,13 +49,17 @@ const (
 	CodeMaxParamsWarning        = "max_params_warning"
 	CodeLimitPublicVars         = "limit_public_vars"
 	CodePreferExitCase          = "prefer_exitcase"
+	CodeExitCaseLastInBranch    = "exitcase_last_in_branch"
 	CodeParametersFirst         = "parameters_first"
 	CodeDefaultAfterParameters  = "default_after_parameters"
 	CodeIncludeEarly            = "include_early"
+	CodeIncludeQuotedTarget     = "include_quoted_target"
 	CodeConstructorOutsideClass = "constructor_outside_class"
 
 	// Schema lints — datasource.
 	CodeNoDefaultStatementsInDatasource = "no_default_statements_in_datasource"
+	CodeDatasourceDefaultRequired       = "datasource_default_required"
+	CodeInlineDefaultOutsideDatasource  = "inline_default_outside_datasource"
 	CodeDatasourceSQLSemicolon          = "datasource_sql_semicolon"
 	CodeDatasourceUndeclaredPlaceholder = "datasource_undeclared_placeholder"
 
@@ -82,12 +96,14 @@ const (
 	CodeBaseStandalone              = "base_standalone"
 	CodeBaseOutsideClass            = "base_outside_class"
 	CodeBaseRequiresInherit         = "base_requires_inherit"
+	CodeInvalidNativeMember         = "invalid_native_member"
 	CodeUnmatchedDelimiter          = "unmatched_delimiter"
 	CodeMismatchedDelimiter         = "mismatched_delimiter"
 	CodeUnclosedDelimiter           = "unclosed_delimiter"
 	CodeUnmatchedBlockEnd           = "unmatched_block_end"
 	CodeUnclosedBlock               = "unclosed_block"
 	CodeMismatchedBlockEnd          = "mismatched_block_end"
+	CodeStrayBlockKeyword           = "stray_block_keyword"
 	CodeMaxBlockDepth               = "max_block_depth"
 	CodeHungarianNotation           = "hungarian_notation"
 	CodeMissingOtherwise            = "missing_otherwise"
@@ -128,6 +144,7 @@ const (
 	CodeSqlInjection                = "sql_injection"
 	CodeClassNameCollision          = "class_name_collision"
 	CodeUnqualifiedFieldAssignment  = "unqualified_field_assignment"
+	CodeUnqualifiedFieldRead        = "unqualified_field_read"
 	CodeStepZeroLiteral             = "step_zero_literal"
 	CodeExitCaseAfterReturn         = "exitcase_after_return"
 	CodeMixedErrorHandlingFamilies  = "mixed_error_handling_families"
@@ -149,4 +166,22 @@ const (
 	CodeSQLSelectStar               = "sql_select_star"
 	CodeSQLSuspectPlaceholder       = "sql_suspect_placeholder"
 	CodeHungarianTypeMismatch       = "hungarian_type_mismatch"
+	CodeEqualsEmptyString           = "equals_empty_string"
+	CodeInheritPosition             = "inherit_position"
+)
+
+// Known-invalid forms reported as compile errors (issue #269). A separate
+// block so adding them does not realign the stable-code table above.
+const (
+	CodeInheritQualifiedName              = "inherit_qualified_name"
+	CodeEndClassInvalid                   = "endclass_invalid"
+	CodeBuilderDirectiveOutsideDatasource = "builder_directive_outside_datasource"
+)
+
+// Pipeline-level codes: emitted by the diagnostics pipeline itself rather
+// than by a rule.
+const (
+	// CodeInternalError reports a panic recovered during diagnostic
+	// collection (feature.diagnostics_pipeline A7).
+	CodeInternalError = "internal_error"
 )

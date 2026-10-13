@@ -3,7 +3,7 @@ id: diag.builder_directive_case
 title: Data source builder directive not uppercase
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -22,6 +22,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      Fences use the documented `:DSN := name;` directive form
+      (reference guides/data-sources). authority set to authoritative:
+      the reference states directive names are case-sensitive and a
+      lowercase directive is ignored.
 issues: []
 ---
 
@@ -40,7 +47,7 @@ fences below run with `is_data_source_file: true`).
 
 It must NOT flag:
 
-- correctly uppercased directives (`:DSN LimsMain;`);
+- correctly uppercased directives (`:DSN := DATABASE;`);
 - the same text in a regular `.ssl` file — there the general keyword-form
   checks own the token (an unknown `:dsn` reports as
   `diag.unknown_keyword` instead);
@@ -52,22 +59,37 @@ It must NOT flag:
 ### Flags
 
 ```ssl
-:dsn LimsMain;
-SELECT 1;
+:dsn := DATABASE;
+:PARAMETERS sStatus := "A";
+
+SELECT sampleid FROM sample WHERE status = @sStatus
+```
+
+### Flags
+
+```ssl
+:DSN := DATABASE;
+:NullAsBlank := true;
+SELECT 1
 ```
 
 ### Does not flag
 
 ```ssl
-:DSN LimsMain;
-SELECT 1;
+:DSN := DATABASE;
+:TABLENAME := sample;
+:NULLASBLANK := true;
+:PARAMETERS sStatus := "A";
+
+SELECT sampleid FROM sample WHERE status = @sStatus
 ```
 
 ## Rationale
 
-Builder directives configure how the data source SQL is executed; a
-wrong-cased directive doesn't error at runtime — it simply never takes
-effect, which surfaces as mysterious data behavior far from the typo.
+Builder directives configure how the data source SQL is executed. The
+reference (guides/data-sources) states directive names are
+case-sensitive and a lowercase directive line is ignored: a wrong-cased
+directive doesn't error at runtime — it simply never takes effect, which surfaces as mysterious data behavior far from the typo.
 That silent-misconfiguration mode justifies error severity even though the
 file "runs". Introduced with data source support (commit f6e78ef); the
 code slug was stabilized in PR #3 (v0.4.0).

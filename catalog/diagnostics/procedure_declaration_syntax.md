@@ -17,6 +17,12 @@ history:
       Introduced (checkProcedureDeclarationSyntax) so C-style declaration
       typos get a syntax error instead of the misleading
       direct_procedure_call message; runs ahead of that check by design.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      One finding per cause: since the statement grammar (issue #240) the
+      bare `PROCEDURE Name(...)` form was also reported as unexpected_token at
+      the name. unexpected_token now defers to this rule for that shape.
 issues: []
 ---
 
@@ -35,16 +41,19 @@ languages, both at `error` severity:
   covers the `(` token.
 
 Whitespace and comments between the keyword, name, and `(` are skipped when
-matching. Exactly one diagnostic is emitted per malformed declaration, and
-the same construct is deliberately NOT also reported as
-`diag.direct_procedure_call`.
+matching. Exactly one diagnostic is emitted per malformed declaration: the
+same construct is deliberately NOT also reported as
+`diag.direct_procedure_call`, and `diag.unexpected_token` — whose statement
+grammar stops at the name after a bare `PROCEDURE` — defers to this rule
+for the shape it reports.
 
 It must NOT flag:
 
 - a correct declaration `:PROCEDURE Name;` with arguments via
   `:PARAMETERS`;
 - a bare `PROCEDURE Name;` without parentheses (no `(` signal — not
-  provably a declaration attempt);
+  provably a declaration attempt). The statement still does not parse,
+  and `diag.unexpected_token` reports it;
 - `PROCEDURE` or `:PROCEDURE` not followed by an identifier.
 
 ## Examples
@@ -72,6 +81,13 @@ ENDPROC;
 :PARAMETERS nValue;
 :RETURN nValue;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+PROCEDURE Demo;
+:RETURN .T.;
 ```
 
 ## Rationale

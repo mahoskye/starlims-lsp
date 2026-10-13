@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -64,15 +65,23 @@ type RegionInfo struct {
 	Name      string
 	StartLine int
 	EndLine   int
+	// NameColumn and NameLength locate the region's name on its opening
+	// marker line (0-based character, rune length) — the `region` keyword
+	// itself for an unnamed region.
+	NameColumn int
+	NameLength int
 }
 
 type regionEvent struct {
-	Line    int
-	Name    string
-	IsStart bool
+	Line       int
+	Name       string
+	IsStart    bool
+	NameColumn int
+	NameLength int
 }
 
 // GetDocumentSymbols returns all document symbols.
+// API (no production caller): the text-input form of GetDocumentSymbolsFromTokens, which the server calls.
 func GetDocumentSymbols(text string) []DocumentSymbol {
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()
@@ -98,7 +107,7 @@ func GetDocumentSymbolsFromTokens(tokens []lexer.Token, ast *parser.Node) []Docu
 func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Parser) []DocumentSymbol {
 	// Extract all elements first
 	procedures := p.ExtractProcedures(ast)
-	variables := p.ExtractVariables(ast)
+	variables := p.ExtractVariables()
 	regions := extractRegions(tokens)
 
 	// Build procedure symbols
@@ -115,25 +124,47 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 			Children:       nil,
 		}
 
-		if len(proc.Parameters) > 0 {
-			procSymbol.Detail = fmt.Sprintf("(%s)", strings.Join(proc.Parameters, ", "))
-		}
-
-		// Add parameters as children
-		for _, param := range proc.Parameters {
+		// Parameter children come from statement-based declaration
+		// resolution, so a bare `:PARAMETERS` with its names on the
+		// following lines still yields them, each ranged over its own name
+		// (issue #255). The procedure's extracted parameter list is the
+		// fallback when no declaration info is available.
+		var paramNames []string
+		for _, v := range variables {
+			if v.Scope != parser.ScopeParameter || v.Line < proc.StartLine || v.Line > proc.EndLine {
+				continue
+			}
+			paramNames = append(paramNames, v.Name)
+			nameRange := Range{
+				Start: Position{Line: v.Line - 1, Character: v.Column - 1},
+				End:   Position{Line: v.Line - 1, Character: v.Column - 1 + len(v.Name)},
+			}
 			procSymbol.Children = append(procSymbol.Children, DocumentSymbol{
-				Name: param,
-				Kind: SymbolKindVariable,
-				Range: Range{
-					Start: Position{Line: proc.StartLine - 1, Character: 0},
-					End:   Position{Line: proc.StartLine - 1, Character: len(param)},
-				},
-				SelectionRange: Range{
-					Start: Position{Line: proc.StartLine - 1, Character: 0},
-					End:   Position{Line: proc.StartLine - 1, Character: len(param)},
-				},
-				Detail: "parameter",
+				Name:           v.Name,
+				Kind:           SymbolKindVariable,
+				Range:          nameRange,
+				SelectionRange: nameRange,
+				Detail:         "parameter",
 			})
+		}
+		if len(paramNames) == 0 {
+			paramNames = proc.Parameters
+			for _, param := range proc.Parameters {
+				approx := Range{
+					Start: Position{Line: proc.StartLine - 1, Character: 0},
+					End:   Position{Line: proc.StartLine - 1, Character: len(param)},
+				}
+				procSymbol.Children = append(procSymbol.Children, DocumentSymbol{
+					Name:           param,
+					Kind:           SymbolKindVariable,
+					Range:          approx,
+					SelectionRange: approx,
+					Detail:         "parameter",
+				})
+			}
+		}
+		if len(paramNames) > 0 {
+			procSymbol.Detail = fmt.Sprintf("(%s)", strings.Join(paramNames, ", "))
 		}
 
 		procSymbols = append(procSymbols, procSymbol)
@@ -159,12 +190,46 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 		}
 	}
 
-	// Build region symbols with procedures as children
-	regionSymbols := make([]DocumentSymbol, 0, len(regions))
-	usedProcs := make(map[int]bool) // Track which procedures are nested in regions
+	// Regions nest: each region's parent is the innermost other region that
+	// contains it, and each procedure or public belongs to the innermost
+	// region containing it — so a symbol appears exactly once (issue #255).
+	sort.SliceStable(regions, func(a, b int) bool {
+		if regions[a].StartLine != regions[b].StartLine {
+			return regions[a].StartLine < regions[b].StartLine
+		}
+		return regions[a].EndLine > regions[b].EndLine
+	})
+	// With regions sorted outer-before-inner, the innermost container of a
+	// span is the LAST region in order that contains it; a region's parent
+	// can only come before it.
+	innermost := func(startLine, endLine, limit int) int {
+		best := -1
+		for r := 0; r < limit; r++ {
+			if regions[r].StartLine <= startLine && endLine <= regions[r].EndLine {
+				best = r
+			}
+		}
+		return best
+	}
 
-	for _, region := range regions {
-		regionSymbol := DocumentSymbol{
+	regionParent := make([]int, len(regions))
+	for r := range regions {
+		regionParent[r] = innermost(regions[r].StartLine, regions[r].EndLine, r)
+	}
+	procRegion := make([]int, len(procSymbols))
+	for i, procSym := range procSymbols {
+		procRegion[i] = innermost(procSym.Range.Start.Line+1, procSym.Range.End.Line+1, len(regions))
+	}
+	varRegion := make([]int, len(varSymbols))
+	for i, varSym := range varSymbols {
+		line := varSym.Range.Start.Line + 1
+		varRegion[i] = innermost(line, line, len(regions))
+	}
+
+	var buildRegion func(r int) DocumentSymbol
+	buildRegion = func(r int) DocumentSymbol {
+		region := regions[r]
+		sym := DocumentSymbol{
 			Name: region.Name,
 			Kind: SymbolKindNamespace,
 			Range: Range{
@@ -172,63 +237,47 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 				End:   Position{Line: region.EndLine - 1, Character: 0},
 			},
 			SelectionRange: Range{
-				Start: Position{Line: region.StartLine - 1, Character: 0},
-				End:   Position{Line: region.StartLine - 1, Character: len(region.Name)},
+				Start: Position{Line: region.StartLine - 1, Character: region.NameColumn},
+				End:   Position{Line: region.StartLine - 1, Character: region.NameColumn + region.NameLength},
 			},
-			Detail:   "region",
-			Children: nil,
+			Detail: "region",
 		}
-
-		// Find procedures that fall within this region
 		for i, procSym := range procSymbols {
-			procStartLine := procSym.Range.Start.Line + 1 // Convert back to 1-based
-			procEndLine := procSym.Range.End.Line + 1
-
-			// Check if procedure is fully contained within region
-			if procStartLine >= region.StartLine && procEndLine <= region.EndLine {
-				regionSymbol.Children = append(regionSymbol.Children, procSym)
-				usedProcs[i] = true
+			if procRegion[i] == r {
+				sym.Children = append(sym.Children, procSym)
 			}
 		}
-
-		// Find public variables that fall within this region
-		for _, varSym := range varSymbols {
-			varLine := varSym.Range.Start.Line + 1 // Convert back to 1-based
-			if varLine >= region.StartLine && varLine <= region.EndLine {
-				regionSymbol.Children = append(regionSymbol.Children, varSym)
+		for i, varSym := range varSymbols {
+			if varRegion[i] == r {
+				sym.Children = append(sym.Children, varSym)
 			}
 		}
-
-		regionSymbols = append(regionSymbols, regionSymbol)
+		for child := range regions {
+			if regionParent[child] == r {
+				sym.Children = append(sym.Children, buildRegion(child))
+			}
+		}
+		return sym
 	}
 
-	// Build final result
+	// Build final result: ungrouped procedures, ungrouped publics, then the
+	// top-level region containers (which now hold their children).
 	var symbols []DocumentSymbol
-
-	// Add procedures that are not inside any region
 	for i, procSym := range procSymbols {
-		if !usedProcs[i] {
+		if procRegion[i] < 0 {
 			symbols = append(symbols, procSym)
 		}
 	}
-
-	// Add public variables that are not inside any region
-	for _, varSym := range varSymbols {
-		varLine := varSym.Range.Start.Line + 1
-		insideRegion := false
-		for _, region := range regions {
-			if varLine >= region.StartLine && varLine <= region.EndLine {
-				insideRegion = true
-				break
-			}
-		}
-		if !insideRegion {
+	for i, varSym := range varSymbols {
+		if varRegion[i] < 0 {
 			symbols = append(symbols, varSym)
 		}
 	}
-
-	// Add regions (which now contain their children)
-	symbols = append(symbols, regionSymbols...)
+	for r := range regions {
+		if regionParent[r] < 0 {
+			symbols = append(symbols, buildRegion(r))
+		}
+	}
 
 	return symbols
 }
@@ -271,7 +320,7 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 
 	// Match region comments, handling optional trailing semicolon and whitespace.
 	// SSL comments are: /* comment text ;
-	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\s*(.*?)(?:\s*;?\s*)?$`)
+	regionStartPattern := regexp.MustCompile(`(?i)^/\*\s*region\b\s*(.*?)(?:\s*;?\s*)?$`)
 	regionEndPattern := regexp.MustCompile(`(?i)^/\*\s*endregion\b`)
 
 	for _, token := range tokens {
@@ -287,10 +336,15 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 				name := strings.TrimSpace(matches[1])
 				name = strings.TrimSuffix(name, ";")
 				name = strings.TrimSpace(name)
+				// Locate the name (or, unnamed, the `region` keyword) within
+				// the marker for an exact selection range.
+				located := name
 				if name == "" {
 					name = "Region"
+					located = ""
 				}
-				events = append(events, regionEvent{Line: token.Line, Name: name, IsStart: true})
+				col, length := regionNameSpan(token, located)
+				events = append(events, regionEvent{Line: token.Line, Name: name, IsStart: true, NameColumn: col, NameLength: length})
 				continue
 			}
 
@@ -311,12 +365,14 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 	type stackItem struct {
 		name      string
 		startLine int
+		nameCol   int
+		nameLen   int
 	}
 	var regionStack []stackItem
 
 	for _, event := range events {
 		if event.IsStart {
-			regionStack = append(regionStack, stackItem{name: event.Name, startLine: event.Line})
+			regionStack = append(regionStack, stackItem{name: event.Name, startLine: event.Line, nameCol: event.NameColumn, nameLen: event.NameLength})
 			continue
 		}
 		if len(regionStack) == 0 {
@@ -330,24 +386,50 @@ func extractRegions(tokens []lexer.Token) []RegionInfo {
 		start := regionStack[len(regionStack)-1]
 		regionStack = regionStack[:len(regionStack)-1]
 		regions = append(regions, RegionInfo{
-			Name:      start.name,
-			StartLine: start.startLine,
-			EndLine:   event.Line,
+			Name:       start.name,
+			StartLine:  start.startLine,
+			EndLine:    event.Line,
+			NameColumn: start.nameCol,
+			NameLength: start.nameLen,
 		})
 	}
 
 	for _, region := range regionStack {
 		regions = append(regions, RegionInfo{
-			Name:      region.name,
-			StartLine: region.startLine,
-			EndLine:   lastLine,
+			Name:       region.name,
+			StartLine:  region.startLine,
+			EndLine:    lastLine,
+			NameColumn: region.nameCol,
+			NameLength: region.nameLen,
 		})
 	}
 
 	return regions
 }
 
+// regionNameSpan returns the 0-based character and rune length of name
+// within a region-marker comment token; an empty name locates the `region`
+// keyword instead. Falls back to the token start when not found.
+func regionNameSpan(token lexer.Token, name string) (int, int) {
+	lower := strings.ToLower(token.Text)
+	kw := strings.Index(lower, "region")
+	if kw < 0 {
+		return token.Column - 1, 0
+	}
+	if name == "" {
+		return token.Column - 1 + utf8.RuneCountInString(token.Text[:kw]), len("region")
+	}
+	after := kw + len("region")
+	idx := strings.Index(token.Text[after:], name)
+	if idx < 0 {
+		return token.Column - 1 + utf8.RuneCountInString(token.Text[:kw]), len("region")
+	}
+	start := after + idx
+	return token.Column - 1 + utf8.RuneCountInString(token.Text[:start]), utf8.RuneCountInString(name)
+}
+
 // GetFoldingRanges returns folding ranges for the document.
+// API (no production caller): the text-input form of GetFoldingRangesFromTokens, which the server calls.
 func GetFoldingRanges(text string) []FoldingRange {
 	lex := lexer.NewLexer(text)
 	tokens := lex.Tokenize()

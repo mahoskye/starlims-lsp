@@ -3,7 +3,7 @@ id: diag.bare_logical_operator
 title: Bare AND/OR/NOT instead of .AND./.OR./.NOT.
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -28,6 +28,15 @@ history:
       expression-operator positions (And/Or between two operands, Not as
       prefix before an operand); declaration lists, member access, and
       assignment targets are identifier slots and never flag.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      authority corrected to authoritative: the style-guide record
+      bare_logical_operator (level authoritative) names this rule in
+      enforced_by, so the guide is not silent. One finding per bare
+      word: direct_procedure_call no longer also reports `AND (`/`NOT (`
+      as a call, and unexpected_token no longer reports the operand
+      after a prefix bare `Not`.
 issues: []
 ---
 
@@ -49,6 +58,11 @@ Operator position (issue #165):
 - `Not` flags in prefix position — an operand follows and no operand
   precedes.
 
+The bare word is the one finding: `bA AND (bB)` and `NOT (bA)` are not
+also reported as calls by `diag.direct_procedure_call`, and in
+`:IF Not bA;` the operand after `Not` is not also reported by
+`diag.unexpected_token` (issue #255).
+
 It must NOT flag:
 
 - the correct operators `.AND.`, `.OR.`, `.NOT.` — the lexer produces
@@ -68,6 +82,20 @@ It must NOT flag:
 :PROCEDURE Demo;
 :DECLARE bReady, bDone;
 :IF bReady AND bDone;
+:ENDIF;
+:ENDPROC;
+```
+
+### Flags
+
+Followed by a parenthesis, the bare word is still an operator, not a call.
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE bReady, bDone;
+:IF bReady AND (bDone);
+:ENDIF;
+:IF NOT (bDone);
 :ENDIF;
 :ENDPROC;
 ```
@@ -115,5 +143,7 @@ false positive (a variable literally named `And`)" for zero false
 negatives; issue #165 showed the false positive is real (WSDL-generated
 proxy classes declare members named `And`/`Or`), so the check narrowed to
 operator positions, where the operand-adjacency test keeps every genuine
-misuse flagged. Introduced in commit 567b287; the code slug was stabilized
+misuse flagged. The sibling rules that see the same token
+(`direct_procedure_call`, `unexpected_token`) defer to this one, so one
+typo is one finding (issue #255). Introduced in commit 567b287; the code slug was stabilized
 in PR #3 (v0.4.0).

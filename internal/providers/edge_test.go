@@ -149,7 +149,8 @@ x := 1;
 		}
 	}
 
-	// Should have at least one depth warning since we have 4 levels of IF nesting
+	// Should have at least one max_block_depth diagnostic (info severity, D13)
+	// since we have 4 levels of IF nesting
 	foundDepthWarning := false
 	for _, d := range diagnostics {
 		if strings.Contains(d.Message, "nesting depth") || strings.Contains(d.Message, "depth") {

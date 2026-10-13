@@ -52,6 +52,7 @@ func (c CallSite) EffectiveArgs() []*Expr {
 // source order (a nested call follows the call it sits inside). Regions
 // the expression parser could not resolve simply yield no call sites —
 // unknown is never reported as evidence.
+// API (no production caller): the token-stream entry point; the providers call CollectCallsIn over statements they already extracted.
 func CollectCalls(tokens []lexer.Token) []CallSite {
 	return CollectCallsIn(ExtractStatementExpressions(tokens))
 }

@@ -24,8 +24,9 @@ type SQLFormattingOptions struct {
 // SQL formatting styles:
 // - "standard": Simple clause breaks (FROM, WHERE, JOIN on new lines).
 // - "canonicalCompact": Balanced formatting with indented AND/OR and smart column wrapping.
-// - "compact": Minimal formatting, single line where possible.
 // - "expanded": Each column/condition on its own line.
+// "compact" is a deprecated alias for "canonicalCompact" (issue #219),
+// kept while the VS Code extension still offers it (issue #257).
 
 // DefaultSQLFormattingOptions returns default SQL formatting options.
 // Default follows the official STARLIMS Style Guide.
@@ -67,6 +68,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// Filter out whitespace tokens for formatting (preserve hints and comments)
 	var nonWSTokens []SQLToken
 	for _, t := range tokens {
+		// An unclosed quote or comment swallows the rest of the text,
+		// including the newline the multi-line layout adds after it, so
+		// every pass grew the string by a line. Leave such SQL as written
+		// (issue #256, found by FuzzFormat).
+		if t.Unterminated {
+			return sql
+		}
 		if t.Type != SQLTokenWhitespace {
 			nonWSTokens = append(nonWSTokens, t)
 		}
@@ -117,9 +125,14 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// excluded from hang-indent — the subquery has its own formatting.
 	var parenOpenCols []int
 
-	// CASE in SELECT tracking (Gap 6)
-	caseInSelectColumns := false
-	caseDepth := 0
+	// CASE layout (Gap 6, issue #271): one frame per open CASE, innermost
+	// last. Every multi-line CASE lays out the same way in every clause:
+	// WHEN/ELSE caseBranchIndent columns past the CASE keyword, END
+	// aligned with CASE, a broken THEN value caseBranchIndent past WHEN.
+	var caseStack []*sqlCaseFrame
+	// Paren depth of the most recent SELECT keyword — the depth at which a
+	// comma separates SELECT-list items.
+	selectParenDepth := 0
 
 	// OVER() window-spec tracking (Gap 8, issue #122). State is entered at
 	// the '(' following OVER — after OVER's own line placement is settled —
@@ -182,6 +195,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			case "SELECT":
 				currentClause = "SELECT"
 				inSelectColumns = true
+				selectParenDepth = parenDepth
 			case "UPDATE":
 				currentClause = "UPDATE"
 			case "INSERT":
@@ -227,16 +241,6 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// Track BETWEEN for BETWEEN...AND suppression
 		if upperText == "BETWEEN" && t.Type == SQLTokenKeyword {
 			afterBetween = true
-		}
-
-		// Track CASE blocks in SELECT columns (Gap 6)
-		// Note: END tracking must happen AFTER formatting decisions (below)
-		// so caseInSelectColumns is still true when END is being formatted.
-		if upperText == "CASE" && t.Type == SQLTokenKeyword {
-			if caseDepth == 0 && inSelectColumns {
-				caseInSelectColumns = true
-			}
-			caseDepth++
 		}
 
 		// Track WITHIN GROUP (...) — the compound stays glued and its paren
@@ -366,8 +370,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				style = "canonicalCompact"
 			}
 
-			// Break conditions for major clauses (all styles except compact)
-			if style != "compact" && SQLBreakBeforeKeywords[upperText] && t.Type == SQLTokenKeyword {
+			// Break conditions for major clauses
+			if SQLBreakBeforeKeywords[upperText] && t.Type == SQLTokenKeyword {
 				// Don't break before JOIN if preceded by modifier
 				if upperText == "JOIN" && prev != nil && SQLJoinModifiers[prevUpper] {
 					needsBreak = false
@@ -397,8 +401,10 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					// clauses inside OVER (...) are laid out solely by the
 					// dedicated window-spec rule (issue #122)
 					needsBreak = false
-				} else if upperText == "CASE" && prev != nil && prev.Type == SQLTokenOperator {
-					// CASE after = in SET clause stays inline: fldsts = CASE WHEN ...
+				} else if upperText == "CASE" {
+					// CASE placement is owned by the CASE layout rule below
+					// (issue #271): it stays where it is written unless that
+					// rule moves it. Proactive wrapping may still break it.
 					needsBreak = false
 				} else {
 					needsBreak = true
@@ -470,13 +476,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// SET clause formatting. Plain UPDATE breaks every assignment to
 			// its own line (S38); MERGE keeps the first assignment on the
 			// UPDATE SET line and aligns the rest under it (S43, issue #95).
-			if style != "compact" && prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
+			if prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
 				}
 			}
-			if style != "compact" && prev != nil && prev.Text == "," && currentClause == "SET" && parenDepth == 0 {
+			if prev != nil && prev.Text == "," && currentClause == "SET" && parenDepth == 0 {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
@@ -494,7 +500,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// (S34/S35, issue #93): the '(' stays on its keyword's line,
 			// the list starts on the next line indented one level, and the
 			// ')' closes on its own line at the parent indent.
-			if style != "compact" && rootCommand != "MERGE" && t.Text == "(" &&
+			if rootCommand != "MERGE" && t.Text == "(" &&
 				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
 				subqueryParenDepths[parenDepth] = true
 				closerIndent := ""
@@ -506,7 +512,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 
 			// Content of a block paren starts on its own line, one level past
 			// the closer's indent.
-			if style != "compact" && prev != nil && prev.Text == "(" && t.Text != ")" {
+			if prev != nil && prev.Text == "(" && t.Text != ")" {
 				if closerIndent, ok := blockParens[parenDepth]; ok {
 					needsBreak = true
 					extraIndent = closerIndent
@@ -514,7 +520,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 
 			// Subquery SELECT — parenDepth already provides one level of indent
-			if style != "compact" && upperText == "SELECT" && prev != nil && prev.Text == "(" {
+			if upperText == "SELECT" && prev != nil && prev.Text == "(" {
 				needsBreak = true
 				subqueryParenDepths[parenDepth] = true
 			}
@@ -524,8 +530,17 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// length. If continuing on the current line would overflow, move
 			// the whole projection to its own line — better than splitting
 			// the projection later and stranding pieces of it.
+			// A projection opening with `(CASE` counts too (issue #271): its
+			// '(' has already raised parenDepth, and once CASE stopped
+			// breaking onto its own line, a parenthesized CASE item left at
+			// the end of a long SELECT line pushed its branches off the right.
+			projDepth := parenDepth
+			if t.Text == "(" && i+1 < len(nonWSTokens) && nonWSTokens[i+1].Type == SQLTokenKeyword &&
+				strings.ToUpper(nonWSTokens[i+1].Text) == "CASE" {
+				projDepth--
+			}
 			if !needsBreak && prev != nil && prev.Text == "," &&
-				inSelectColumns && parenDepth == 0 && f.opts.MaxLineLength > 0 &&
+				inSelectColumns && projDepth == 0 && f.opts.MaxLineLength > 0 &&
 				(style == "canonicalCompact" || style == "expanded" || style == "standard") {
 				end := f.projectionEndIndex(nonWSTokens, i)
 				projLen := f.projectionRenderLen(nonWSTokens, i, end)
@@ -535,7 +550,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				}
 				if currentLineLen+spaceLen+projLen > f.opts.MaxLineLength {
 					needsBreak = true
-					extraIndent = strings.Repeat(" ", 7) // align with SELECT columns
+					// align with SELECT columns (column 7 past the base)
+					spaces := 7 - len(f.indentString)*parenDepth
+					if spaces < 0 {
+						spaces = 0
+					}
+					extraIndent = strings.Repeat(" ", spaces)
 				}
 			}
 
@@ -643,29 +663,143 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			}
 		}
 
-		// CASE/END in SELECT columns: break with col-7 alignment instead of col 0
-		if needsBreak && inSelectColumns {
-			if upperText == "CASE" {
-				extraIndent = strings.Repeat(" ", 7) // align with SELECT columns
-			} else if upperText == "END" && caseInSelectColumns {
-				extraIndent = strings.Repeat(" ", 7) // END aligns with CASE
+		// CASE layout (Gap 6, issue #271) — the same shape in every clause
+		// (sql-canonical-compact-reference §2.3, §5.1–5.3): WHEN/ELSE
+		// caseBranchIndent past CASE, END aligned with CASE, a broken THEN
+		// value caseBranchIndent past WHEN. A CASE inside an OVER (...)
+		// spec (issue #122), or one that fits inline inside a function's
+		// argument list (`SUM(CASE WHEN ... END)`), stays on one line.
+		var pushedCase *sqlCaseFrame
+		if isComplex && !isFirstToken {
+			var top *sqlCaseFrame
+			if len(caseStack) > 0 {
+				top = caseStack[len(caseStack)-1]
 			}
-		}
+			// colIndent turns an absolute output column into the extra
+			// indent the line writer adds after base + paren indentation.
+			colIndent := func(col int) string {
+				spaces := col - len(baseIndent) - len(f.indentString)*parenDepth
+				if spaces < 0 {
+					spaces = 0
+				}
+				return strings.Repeat(" ", spaces)
+			}
 
-		// WHEN/ELSE inside CASE in SELECT columns: align at col 11 (7 + 4).
-		// Inside an OVER (...) spec the clause line owns its CASE whole
-		// (issue #122), so the rule is suppressed there.
-		if caseInSelectColumns && (upperText == "WHEN" || upperText == "ELSE") && t.Type == SQLTokenKeyword &&
-			!(inOverClause && parenDepth >= overParenDepth) {
-			needsBreak = true
-			extraIndent = strings.Repeat(" ", 11)
-		}
+			// A THEN value (or an ELSE value) the frame decided to break
+			// starts its own line caseBranchIndent past its WHEN/ELSE.
+			valueBreak := false
+			tokDepth := parenDepth // depth outside this token's own '('
+			if t.Text == "(" {
+				tokDepth--
+			}
+			if top != nil && !top.inline && prev != nil && prev.Type == SQLTokenKeyword &&
+				t.Type != SQLTokenComment && tokDepth == top.parenDepth {
+				switch strings.ToUpper(prev.Text) {
+				case "THEN":
+					// a THEN that had to wrap already starts its own line;
+					// its value stays with it (reference §2.10 form)
+					valueBreak = top.breakThen && !top.thenWrapped
+				case "ELSE":
+					valueBreak = top.breakElse
+				}
+			}
+			if valueBreak {
+				needsBreak = true
+				extraIndent = colIndent(top.branchCol + caseBranchIndent)
+			}
 
-		// Rule B: AND/OR continuing a WHEN's predicate inside CASE-in-SELECT
-		// indents one step past the WHEN keyword (col 11 + indentSize).
-		if needsBreak && caseInSelectColumns && parenDepth == 0 &&
-			(upperText == "AND" || upperText == "OR") && t.Type == SQLTokenKeyword {
-			extraIndent = strings.Repeat(" ", 11) + f.indentString
+			if t.Type == SQLTokenKeyword {
+				switch upperText {
+				case "CASE":
+					frame := &sqlCaseFrame{parenDepth: parenDepth, endIdx: findSQLCaseEnd(nonWSTokens, i),
+						flatCol: len(baseIndent) + len(f.indentString)*parenDepth, predThen: -1}
+					switch {
+					case (top != nil && top.inline) || (inOverClause && parenDepth >= overParenDepth):
+						frame.inline = true
+						needsBreak = false
+					case valueBreak:
+						// nested CASE as a THEN/ELSE value — placed above
+					case inSelectColumns && parenDepth == selectParenDepth && prev != nil && prev.Text == ",":
+						// a CASE item in the SELECT list starts its own line
+						// at the SELECT-list column
+						needsBreak = true
+						extraIndent = strings.Repeat(" ", 7)
+					case !needsBreak && parenDepth > 0 && !subqueryParenDepths[parenDepth] &&
+						f.caseFitsInline(nonWSTokens, i, frame.endIdx, currentLineLen, prev, prevPrevToken):
+						frame.inline = true
+					case !needsBreak && f.opts.MaxLineLength > 0:
+						// CASE stays where it is written — unless that column
+						// is so far right that its WHEN lines cannot fit, or
+						// its THEN values only fit when moved, in which case
+						// it continues on the next line, like any other wrap.
+						caseCol := currentLineLen
+						if prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken) {
+							caseCol++
+						}
+						wrapExtra := f.indentString
+						if inSelectColumns {
+							wrapExtra = strings.Repeat(" ", 7) // SELECT-list column
+						}
+						wrapCol := len(baseIndent) + len(f.indentString)*parenDepth + len(wrapExtra)
+						if wrapCol < caseCol &&
+							(caseCol+caseBranchIndent+f.caseHeadWidth(nonWSTokens, i, frame.endIdx) > f.opts.MaxLineLength ||
+								f.caseBreaksThen(nonWSTokens, i, frame.endIdx, caseCol+caseBranchIndent, frame.flatCol) &&
+									!f.caseBreaksThen(nonWSTokens, i, frame.endIdx, wrapCol+caseBranchIndent, frame.flatCol)) {
+							needsBreak = true
+							extraIndent = wrapExtra
+						}
+					}
+					caseStack = append(caseStack, frame)
+					pushedCase = frame
+				case "WHEN", "ELSE":
+					if top != nil {
+						if top.inline {
+							needsBreak = false
+						} else {
+							needsBreak = true
+							top.branchCol = top.col + caseBranchIndent
+							extraIndent = colIndent(top.branchCol)
+							top.predThen = -1
+							if upperText == "WHEN" {
+								top.predThen = f.whenPredicateInline(nonWSTokens, i, top.branchCol)
+							}
+							if upperText == "ELSE" {
+								top.breakElse = f.caseValueBreaks(nonWSTokens, i, i+1, top.endIdx, top.branchCol, top.flatCol)
+							}
+						}
+					}
+				case "END":
+					if top != nil {
+						if top.inline {
+							needsBreak = false
+						} else {
+							needsBreak = true
+							extraIndent = colIndent(top.col)
+						}
+					}
+				case "THEN":
+					// A predicate too long for THEN to fit wraps THEN onto
+					// its own line at the WHEN column, value following
+					// (`WHEN <long predicate>` / `THEN 'value'`).
+					if top != nil && !top.inline && parenDepth == top.parenDepth {
+						top.thenWrapped = needsBreak
+						if needsBreak {
+							extraIndent = colIndent(top.branchCol)
+						}
+					}
+				case "AND", "OR":
+					// Rule B: AND/OR continuing a WHEN predicate indents one
+					// step past the WHEN keyword — unless the whole predicate
+					// fits on the WHEN line, where it stays (issue #286).
+					if top != nil {
+						if top.inline || (top.predThen >= 0 && i < top.predThen) {
+							needsBreak = false
+						} else if needsBreak && parenDepth == top.parenDepth {
+							extraIndent = colIndent(top.branchCol + len(f.indentString))
+						}
+					}
+				}
+			}
 		}
 
 		// A long LISTAGG projection wraps before WITHIN, keeping the whole
@@ -884,16 +1018,337 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		}
 		lastTokStartCol = tokStartCol
 
-		// Post-token: decrement CASE depth after END has been formatted
-		if upperText == "END" && t.Type == SQLTokenKeyword && caseDepth > 0 {
-			caseDepth--
-			if caseDepth == 0 {
-				caseInSelectColumns = false
+		// CASE frames: anchor a new frame to the column CASE was written
+		// at; close the innermost frame once its END is written.
+		if pushedCase != nil {
+			pushedCase.col = tokStartCol
+			pushedCase.branchCol = tokStartCol + caseBranchIndent
+			if !pushedCase.inline {
+				pushedCase.breakThen = f.caseBreaksThen(nonWSTokens, i, pushedCase.endIdx, pushedCase.branchCol, pushedCase.flatCol)
 			}
+		} else if upperText == "END" && t.Type == SQLTokenKeyword && len(caseStack) > 0 {
+			caseStack = caseStack[:len(caseStack)-1]
 		}
 	}
 
 	return result.String()
+}
+
+// caseBranchIndent is how far WHEN/ELSE sit past their CASE keyword, and a
+// broken THEN/ELSE value past its WHEN/ELSE (sql-canonical-compact-reference
+// layout table: "Indented 4 spaces under CASE; END aligned with CASE").
+const caseBranchIndent = 4
+
+// sqlCaseFrame is the layout state of one open CASE expression.
+type sqlCaseFrame struct {
+	col        int  // output column of the CASE keyword (END aligns here)
+	branchCol  int  // output column of the current WHEN/ELSE keyword
+	parenDepth int  // paren depth at CASE — its WHEN/THEN/ELSE/END live here
+	endIdx     int  // token index of the matching END (len(tokens) if none)
+	flatCol    int  // column a subquery's ')' returns to at this depth
+	inline     bool // the whole CASE stays on one line
+	breakThen  bool // every THEN value starts its own line
+	breakElse  bool // the ELSE value starts its own line
+	// thenWrapped: the current branch's THEN wrapped onto its own line
+	thenWrapped bool
+	// predThen is the index of the current WHEN's THEN when its whole
+	// predicate fits on the WHEN line, so AND/OR inside it stay inline
+	// (issue #286); -1 when the predicate breaks at AND/OR (Rule B).
+	predThen int
+}
+
+// findSQLCaseEnd returns the index of the END keyword closing the CASE at
+// start, or len(tokens) when the CASE is unterminated.
+func findSQLCaseEnd(tokens []SQLToken, start int) int {
+	depth := 0
+	for j := start; j < len(tokens); j++ {
+		if tokens[j].Type != SQLTokenKeyword {
+			continue
+		}
+		switch strings.ToUpper(tokens[j].Text) {
+		case "CASE":
+			depth++
+		case "END":
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return len(tokens)
+}
+
+// caseFitsInline reports whether the CASE at start, together with the rest
+// of the argument list it sits in, fits on the current line — the inline
+// form the reference uses for `SUM(CASE WHEN ... THEN 1 ELSE 0 END)`. A CASE
+// holding a subquery never stays inline: the subquery breaks regardless.
+func (f *SQLFormatter) caseFitsInline(tokens []SQLToken, start, end, lineLen int, prev, prevPrev *SQLToken) bool {
+	if f.opts.MaxLineLength <= 0 || end >= len(tokens) {
+		return false
+	}
+	for j := start; j <= end; j++ {
+		if tokens[j].Type == SQLTokenKeyword && strings.ToUpper(tokens[j].Text) == "SELECT" {
+			return false
+		}
+	}
+	// Extend through the ')' closing the enclosing argument list.
+	stop := end + 1
+	depth := 0
+	for ; stop < len(tokens); stop++ {
+		if tokens[stop].Text == "(" {
+			depth++
+		} else if tokens[stop].Text == ")" {
+			if depth == 0 {
+				stop++
+				break
+			}
+			depth--
+		}
+	}
+	if prev != nil && f.shouldAddSpace(prev, &tokens[start], prevPrev) {
+		lineLen++
+	}
+	return lineLen+f.projectionRenderLen(tokens, start, stop) <= f.opts.MaxLineLength
+}
+
+// caseBreaksThen decides, for the CASE at start, whether its THEN values go
+// on their own lines. Per the reference's consistency rule a CASE breaks all
+// of its THEN values or none: they break when any branch would overflow
+// with its value inline, or when any value is itself a CASE (§5.2, §5.3).
+func (f *SQLFormatter) caseBreaksThen(tokens []SQLToken, start, end, whenCol, flatCol int) bool {
+	nest, paren := 0, 0
+	whenIdx, thenIdx := -1, -1
+	for j := start + 1; j <= end && j < len(tokens); j++ {
+		t := tokens[j]
+		upper := strings.ToUpper(t.Text)
+		atTop := nest == 0 && paren == 0
+		if t.Type == SQLTokenKeyword && atTop && (upper == "WHEN" || upper == "ELSE" || upper == "END") {
+			if whenIdx >= 0 && thenIdx >= 0 && f.caseValueBreaks(tokens, whenIdx, thenIdx+1, j, whenCol, flatCol) {
+				return true
+			}
+			whenIdx, thenIdx = -1, -1
+			if upper == "WHEN" {
+				whenIdx = j
+			}
+			if upper == "END" {
+				break
+			}
+			continue
+		}
+		if t.Type == SQLTokenKeyword && atTop && upper == "THEN" && whenIdx >= 0 {
+			thenIdx = j
+			continue
+		}
+		switch {
+		case t.Text == "(":
+			paren++
+		case t.Text == ")":
+			paren--
+		case t.Type == SQLTokenKeyword && upper == "CASE":
+			nest++
+		case t.Type == SQLTokenKeyword && upper == "END":
+			nest--
+		}
+	}
+	return false
+}
+
+// caseValueBreaks reports whether the THEN/ELSE value tokens[valStart:valEnd]
+// of the branch whose keyword is at kwIdx must start its own line: when the
+// value is a CASE, or when the branch's last line would overflow with the
+// value inline. That line starts at WHEN/ELSE, at the last AND/OR that
+// Rule B breaks the predicate at, or at the ')' closing a subquery in the
+// predicate (back at flatCol). A value that opens a subquery stays on the
+// THEN/ELSE line — the subquery's '(' opens on its parent line (S-rules:
+// flat subqueries) — and only its first line counts.
+func (f *SQLFormatter) caseValueBreaks(tokens []SQLToken, kwIdx, valStart, valEnd, kwCol, flatCol int) bool {
+	if valEnd > len(tokens) {
+		valEnd = len(tokens)
+	}
+	if valStart >= valEnd {
+		return false
+	}
+	if tokens[valStart].Type == SQLTokenKeyword && strings.ToUpper(tokens[valStart].Text) == "CASE" {
+		return true
+	}
+	if isSQLSubqueryOpen(tokens, valStart) || f.opts.MaxLineLength <= 0 {
+		return false
+	}
+	segStart, segCol := kwIdx, kwCol
+	afterBetween := false
+	// A predicate that fits on its WHEN line is one segment (issue #286).
+	predInline := strings.EqualFold(tokens[kwIdx].Text, "WHEN") && f.whenPredicateInline(tokens, kwIdx, kwCol) >= 0
+	for j := kwIdx + 1; j < valStart; j++ {
+		if isSQLSubqueryOpen(tokens, j) {
+			j = matchingSQLParen(tokens, j)
+			segStart, segCol = j, flatCol
+			continue
+		}
+		if tokens[j].Type != SQLTokenKeyword || f.opts.Style == "standard" || predInline {
+			continue
+		}
+		switch strings.ToUpper(tokens[j].Text) {
+		case "BETWEEN":
+			afterBetween = true
+		case "AND":
+			if afterBetween {
+				afterBetween = false
+				continue
+			}
+			segStart, segCol = j, kwCol+len(f.indentString)
+		case "OR":
+			segStart, segCol = j, kwCol+len(f.indentString)
+		}
+	}
+	for j := valStart; j < valEnd; j++ {
+		if isSQLSubqueryOpen(tokens, j) {
+			valEnd = j + 1
+			break
+		}
+	}
+	return segCol+f.projectionRenderLen(tokens, segStart, valEnd) > f.opts.MaxLineLength
+}
+
+// whenPredicateInline returns the index of the THEN ending the WHEN at
+// whenIdx when `WHEN <predicate> THEN`, placed at col, fits within the line
+// length, so the predicate keeps its AND/OR inline (issue #286; style guide
+// §5.2). It returns -1 — break at AND/OR (Rule B) — when the predicate
+// overflows, holds a subquery (placed by the subquery rules), there is no
+// line length to fit against, or no THEN follows. A nested CASE inside the
+// predicate is measured as written.
+func (f *SQLFormatter) whenPredicateInline(tokens []SQLToken, whenIdx, col int) int {
+	if f.opts.MaxLineLength <= 0 {
+		return -1
+	}
+	nest, paren := 0, 0
+	for j := whenIdx + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		upper := strings.ToUpper(t.Text)
+		isKw := t.Type == SQLTokenKeyword
+		if isSQLSubqueryOpen(tokens, j) {
+			return -1
+		}
+		if nest == 0 && paren == 0 && isKw {
+			switch upper {
+			case "THEN":
+				if col+f.projectionRenderLen(tokens, whenIdx, j+1) <= f.opts.MaxLineLength {
+					return j
+				}
+				return -1
+			case "WHEN", "ELSE", "END":
+				return -1
+			}
+		}
+		switch {
+		case t.Text == "(":
+			paren++
+		case t.Text == ")":
+			paren--
+		case isKw && upper == "CASE":
+			nest++
+		case isKw && upper == "END":
+			nest--
+		}
+	}
+	return -1
+}
+
+// caseHeadWidth is the widest WHEN line of the CASE at start — WHEN, its
+// predicate and THEN, measured from the WHEN column, with the predicate
+// split where Rule B breaks it — or the `CASE operand` line of a simple
+// CASE. Lines that open or close a subquery are placed by the subquery,
+// not by the CASE, and are skipped. It decides whether the CASE can keep
+// its written column.
+func (f *SQLFormatter) caseHeadWidth(tokens []SQLToken, start, end int) int {
+	if end > len(tokens) {
+		end = len(tokens)
+	}
+	widest := 0
+	measure := func(from, to, offset int) {
+		if from < 0 || from >= to {
+			return
+		}
+		if w := offset + f.projectionRenderLen(tokens, from, to); w > widest {
+			widest = w
+		}
+	}
+	nest, paren := 0, 0
+	segStart, segOffset := -1, 0
+	afterBetween, sawWhen := false, false
+	for j := start + 1; j < end; j++ {
+		t := tokens[j]
+		upper := strings.ToUpper(t.Text)
+		isKw := t.Type == SQLTokenKeyword
+		if nest == 0 && paren == 0 && isKw && upper == "WHEN" {
+			if !sawWhen {
+				// simple CASE operand line, measured from the CASE column
+				// (a searched CASE measures just the keyword)
+				measure(start, j, -caseBranchIndent)
+				sawWhen = true
+			}
+			segStart, segOffset, afterBetween = j, 0, false
+			continue
+		}
+		if segStart >= 0 && nest == 0 && paren == 0 && isKw && upper == "THEN" {
+			measure(segStart, j+1, segOffset)
+			segStart = -1
+			continue
+		}
+		if segStart >= 0 && isSQLSubqueryOpen(tokens, j) {
+			measure(segStart, j+1, segOffset)
+			j = matchingSQLParen(tokens, j)
+			segStart = -1 // the ')' line belongs to the subquery's column
+			continue
+		}
+		if segStart >= 0 && isKw && f.opts.Style != "standard" {
+			switch upper {
+			case "BETWEEN":
+				afterBetween = true
+			case "AND", "OR":
+				if upper == "AND" && afterBetween {
+					afterBetween = false
+				} else {
+					measure(segStart, j, segOffset)
+					segStart, segOffset = j, len(f.indentString)
+				}
+			}
+		}
+		switch {
+		case t.Text == "(":
+			paren++
+		case t.Text == ")":
+			paren--
+		case isKw && upper == "CASE":
+			nest++
+		case isKw && upper == "END":
+			nest--
+		}
+	}
+	return widest
+}
+
+// isSQLSubqueryOpen reports whether tokens[i] is a '(' opening a subquery.
+func isSQLSubqueryOpen(tokens []SQLToken, i int) bool {
+	return i+1 < len(tokens) && tokens[i].Text == "(" &&
+		tokens[i+1].Type == SQLTokenKeyword && strings.ToUpper(tokens[i+1].Text) == "SELECT"
+}
+
+// matchingSQLParen returns the index of the ')' closing the '(' at open, or
+// len(tokens)-1 when it is unbalanced.
+func matchingSQLParen(tokens []SQLToken, open int) int {
+	depth := 0
+	for j := open; j < len(tokens); j++ {
+		switch tokens[j].Text {
+		case "(":
+			depth++
+		case ")":
+			depth--
+			if depth == 0 {
+				return j
+			}
+		}
+	}
+	return len(tokens) - 1
 }
 
 // projectionEndIndex returns the index (exclusive) of the end of the
@@ -1063,6 +1518,15 @@ func (f *SQLFormatter) applyKeywordCasing(t SQLToken) string {
 	return t.Text
 }
 
+// sqlUnarySignKeywords are keywords that introduce an operand, so a '+' or
+// '-' directly after one is a sign, not a binary operator. Value keywords
+// such as END and NULL are deliberately absent: `END - 1` is a subtraction.
+var sqlUnarySignKeywords = map[string]bool{
+	"SELECT": true, "DISTINCT": true, "WHERE": true, "HAVING": true, "ON": true,
+	"AND": true, "OR": true, "NOT": true, "BY": true, "BETWEEN": true, "LIKE": true,
+	"CASE": true, "WHEN": true, "THEN": true, "ELSE": true, "RETURN": true,
+}
+
 // shouldAddSpace checks if a space should be added between tokens.
 func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev ...*SQLToken) bool {
 	if prev == nil {
@@ -1109,6 +1573,13 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev .
 		return false
 	}
 
+	// A '-' never touches a following '-': `--` opens a line comment that
+	// swallows the rest of the line on the next pass (issue #303, found by
+	// FuzzFormat).
+	if prev.Text == "-" && strings.HasPrefix(curr.Text, "-") {
+		return true
+	}
+
 	// Space around operators — but not between unary minus/plus and its operand.
 	// Unary context: - or + after ( or , (no space before or after the sign).
 	// After = or other operators, keep space before the sign but not after.
@@ -1126,6 +1597,12 @@ func (f *SQLFormatter) shouldAddSpace(prev *SQLToken, curr *SQLToken, prevPrev .
 		}
 		if pp != nil && (pp.Text == "(" || pp.Text == "," || pp.Text == "=" ||
 			pp.Type == SQLTokenOperator) {
+			return false
+		}
+		// A sign after an operand-introducing keyword is unary too:
+		// `ELSE -1`, `THEN -1`, `AND -x < y` (issue #271 — `ELSE -1` was
+		// rewritten as `ELSE - 1`, reading as a binary minus).
+		if pp != nil && pp.Type == SQLTokenKeyword && sqlUnarySignKeywords[strings.ToUpper(pp.Text)] {
 			return false
 		}
 	}
@@ -1185,6 +1662,14 @@ func (f *SQLFormatter) FormatSQLInString(content string, quoteChar byte, baseInd
 
 	formatted := f.FormatSQL(content, baseIndent+f.indentString)
 
+	// SQL that FormatSQL declined to touch (an unclosed quote or comment)
+	// stays inline. Wrapping multi-line content in the rule-F newlines
+	// anyway grew the string by a line on every pass (issue #303, found
+	// by FuzzFormat).
+	if formatted == content && hasUnterminatedSQLToken(content) {
+		return string(quoteChar) + content + string(closeChar)
+	}
+
 	// A rewrite always takes the rule-F multi-line form (issue #219
 	// decision): the old path emitted changed-but-single-line output
 	// inline, silently padding the string's runtime value with no layout
@@ -1240,31 +1725,8 @@ func IsSQLString(content string) bool {
 	return isSQLStatementTokens(nonWSTokens)
 }
 
-// IsSQLDocument reports whether an entire document's content is a plain SQL
-// statement rather than SSL code — the data-source case
-// (feature.diagnostics_pipeline A10-A12): STARLIMS data sources often hold
-// raw SQL. Unlike IsSQLString it also ignores SQL comments and optimizer
-// hints, which legitimately precede a stored statement. SSL content never
-// classifies: an SSL leading comment (`/* text;`) has no `*/` terminator,
-// so the SQL lexer consumes the rest of the file as one comment token, and
-// SSL keywords/identifiers fail the command-keyword check.
-func IsSQLDocument(content string) bool {
-	lexer := NewSQLLexer(content)
-	tokens := lexer.Tokenize()
-
-	var significant []SQLToken
-	for _, t := range tokens {
-		if t.Type == SQLTokenWhitespace || t.Type == SQLTokenComment || t.Type == SQLTokenHint {
-			continue
-		}
-		significant = append(significant, t)
-	}
-
-	return isSQLStatementTokens(significant)
-}
-
 // isSQLStatementTokens applies the command-keyword and structure validation
-// shared by IsSQLString and IsSQLDocument to a pre-filtered token list.
+// of IsSQLString to a pre-filtered token list.
 func isSQLStatementTokens(tokens []SQLToken) bool {
 	if len(tokens) == 0 {
 		return false
@@ -1581,6 +2043,18 @@ func IsReformattableSQLString(content string) bool {
 		return false
 	}
 	return IsSQLString(content)
+}
+
+// hasUnterminatedSQLToken reports whether the SQL lexer finds an unclosed
+// quote, quoted identifier or block comment in content — the shape
+// FormatSQL returns unchanged.
+func hasUnterminatedSQLToken(content string) bool {
+	for _, t := range NewSQLLexer(content).Tokenize() {
+		if t.Unterminated {
+			return true
+		}
+	}
+	return false
 }
 
 // hasUnterminatedSQLBlockComment reports whether content leaves a `/*`

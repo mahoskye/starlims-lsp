@@ -11,5 +11,7 @@
 # Local markers
 .qdrant-initialized
 
-# Local development references
-dev/
+# Local development references (dev/ holds local copies of sibling repos).
+# dev/exprcoverage is a tracked developer tool, see README.
+/dev/*
+!/dev/exprcoverage/

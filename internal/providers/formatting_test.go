@@ -237,21 +237,31 @@ func TestFormatDocument_SQLStringFormatting(t *testing.T) {
 
 // [spec feature.formatting/A5]
 func TestFormatDocument_SQLFormattingDisabled(t *testing.T) {
-	// SSL code with SQL string
-	input := `ds := SQLExecute("select id from users");`
+	// Issue #64: SQL that fits on its line is left as written even with
+	// SQL formatting on, so the input must overflow the line for the
+	// enabled/disabled distinction to be observable.
+	input := `ds := SQLExecute("select id, full_name, mailing_address, phone, email from users where status = 'active' and role = 'ADMIN'");`
 
-	opts := DefaultFormattingOptions()
-	opts.SQL.Enabled = false
-
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	// SQL should remain lowercase when formatting is disabled
-	if strings.Contains(formatted, "SELECT") {
-		t.Error("SQL should not be formatted when disabled")
+	format := func(enabled bool) string {
+		opts := DefaultFormattingOptions()
+		opts.SQL.Enabled = enabled
+		edits := FormatDocument(input, opts)
+		if len(edits) == 0 {
+			return input
+		}
+		return edits[0].NewText
 	}
 
-	t.Logf("Formatted output:\n%s", formatted)
+	// Control: with SQL formatting on, the same input IS reformatted.
+	if enabled := format(true); !strings.Contains(enabled, "SELECT") || !strings.Contains(strings.TrimRight(enabled, "\n"), "\n") {
+		t.Fatalf("control: expected overflowing SQL to be reformatted when enabled, got:\n%s", enabled)
+	}
+
+	// With SQL formatting off, the string literal is left verbatim.
+	disabled := format(false)
+	if strings.TrimRight(disabled, "\n") != input {
+		t.Errorf("SQL string should be left verbatim when SQL formatting is disabled\n got: %q\nwant: %q", disabled, input)
+	}
 }
 
 // Range formatting tests
@@ -1059,48 +1069,56 @@ func TestFormatDocument_DetectedSQLStringFormatted(t *testing.T) {
 // [spec feature.formatting/A7] — with detection off, standalone strings are
 // untouched.
 func TestFormatDocument_DetectedSQLStringDisabled(t *testing.T) {
-	// When DetectSQLStrings is false, only SQL function args should be formatted
-	input := `sSQL := "select * from users where status = 'active'";`
+	// When DetectSQLStrings is false, only SQL function args should be
+	// formatted. Issue #64: fitting SQL is left as written regardless, so
+	// the input overflows the line to make the distinction observable.
+	input := `sSQL := "select id, full_name, mailing_address, phone, email, status, created_dt from users where status = 'active' and role_code = 'ADMIN'";`
 
-	opts := DefaultFormattingOptions()
-	opts.SQL.Enabled = true
-	opts.SQL.DetectSQLStrings = false
-
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	// SQL should NOT be formatted when detection is disabled
-	if strings.Contains(formatted, "SELECT") {
-		t.Error("expected SQL to NOT be formatted when DetectSQLStrings=false")
+	format := func(detect bool) string {
+		opts := DefaultFormattingOptions()
+		opts.SQL.Enabled = true
+		opts.SQL.DetectSQLStrings = detect
+		edits := FormatDocument(input, opts)
+		if len(edits) == 0 {
+			return input
+		}
+		return edits[0].NewText
 	}
 
-	// Original lowercase keywords should be preserved
-	if !strings.Contains(formatted, "select") {
-		t.Error("expected original 'select' to be preserved when DetectSQLStrings=false")
+	// Control: with detection on, the same input IS reformatted.
+	if detected := format(true); !strings.Contains(detected, "SELECT") || !strings.Contains(strings.TrimRight(detected, "\n"), "\n") {
+		t.Fatalf("control: expected overflowing standalone SQL to be reformatted with detection on, got:\n%s", detected)
 	}
 
-	t.Logf("Formatted output:\n%s", formatted)
+	// With detection off, the standalone string is left verbatim.
+	formatted := format(false)
+	if strings.TrimRight(formatted, "\n") != input {
+		t.Errorf("standalone SQL string should be left verbatim when DetectSQLStrings=false\n got: %q\nwant: %q", formatted, input)
+	}
 }
 
 // [spec feature.formatting/A3] — non-SQL string content is preserved.
 // [spec feature.formatting/A4] — plain-English strings are not treated as SQL.
 func TestFormatDocument_NonSQLStringNotFormatted(t *testing.T) {
-	// Regular English strings should not be touched by SQL detection
-	input := `msg := "Hello world, this is a message";`
+	// Regular English strings should not be touched by SQL detection. The
+	// line overflows so a (wrong) SQL detection would actually reflow it —
+	// fitting strings are left as written regardless (issue #64).
+	input := `msg := "Hello world, this is a message from the order desk; please select a time and update us from your account";`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
 	opts.SQL.DetectSQLStrings = true
 
 	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	// String should be unchanged
-	if !strings.Contains(formatted, `"Hello world, this is a message"`) {
-		t.Errorf("non-SQL string should not be modified, got:\n%s", formatted)
+	formatted := input
+	if len(edits) > 0 {
+		formatted = edits[0].NewText
 	}
 
-	t.Logf("Formatted output:\n%s", formatted)
+	// The statement (and the string) should be unchanged.
+	if strings.TrimRight(formatted, "\n") != input {
+		t.Errorf("non-SQL string should not be modified\n got: %q\nwant: %q", formatted, input)
+	}
 }
 
 // [spec feature.formatting/A7] — SQL function arguments still format when
@@ -1146,23 +1164,25 @@ func TestFormatDocument_SimpleSQLStaysOneLine(t *testing.T) {
 }
 
 func TestFormatDocument_InvalidSQLNotFormatted(t *testing.T) {
-	// "UPDATE your settings" should not be detected as SQL (no SET keyword)
-	input := `msg := "Update your settings in the configuration";`
+	// "Update your settings" should not be detected as SQL (no SET keyword).
+	// The line overflows so a (wrong) SQL detection would actually reflow
+	// it — fitting strings are left as written regardless (issue #64).
+	input := `msg := "Update your settings in the configuration panel where the account options are listed for each user";`
 
 	opts := DefaultFormattingOptions()
 	opts.SQL.Enabled = true
 	opts.SQL.DetectSQLStrings = true
 
 	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-
-	// Should NOT be formatted as SQL (no uppercase UPDATE)
-	// The original casing should be preserved
-	if strings.Contains(formatted, "UPDATE YOUR SETTINGS") {
-		t.Errorf("'Update your settings' should not be detected as SQL, got:\n%s", formatted)
+	formatted := input
+	if len(edits) > 0 {
+		formatted = edits[0].NewText
 	}
 
-	t.Logf("Formatted output:\n%s", formatted)
+	// Should NOT be formatted as SQL: no uppercased UPDATE, no reflow.
+	if strings.TrimRight(formatted, "\n") != input {
+		t.Errorf("'Update your settings' should not be detected as SQL\n got: %q\nwant: %q", formatted, input)
+	}
 }
 
 // --- TestFormatDocument_SkippedParameterCommas ---
@@ -1528,19 +1548,19 @@ func TestFormatDocument_ChainedMemberAccessNoSpaces(t *testing.T) {
 
 // --- Gap 5: Mashed :LABELName normalization ---
 
-func TestFormatDocument_MashedLabelNormalization(t *testing.T) {
-	input := `:LABELMyLabel;
-x := 1;`
-	opts := DefaultFormattingOptions()
-	edits := FormatDocument(input, opts)
-	formatted := edits[0].NewText
-	if strings.Contains(formatted, ":LABELMyLabel") {
-		t.Errorf("expected mashed label to be split, got:\n%s", formatted)
+func TestFormatDocument_JoinedLabelKeptVerbatim(t *testing.T) {
+	// `:LABELMyLabel` and `:LABEL MyLabel` store different label text, and
+	// Branch() matches it exactly (reference keywords/LABEL.md), so the
+	// formatter must not split the joined form — it used to, which sent
+	// every Branch("LABELMyLabel") to a label that no longer existed.
+	input := ":LABELMyLabel;\nx := 1;\nBranch(\"LABELMyLabel\");\n:LABEL Other;\n"
+	formatted := FormatDocument(input, DefaultFormattingOptions())[0].NewText
+	if !strings.Contains(formatted, ":LABELMyLabel;") || strings.Contains(formatted, ":LABEL MyLabel") {
+		t.Errorf("joined label must be kept verbatim, got:\n%s", formatted)
 	}
-	if !strings.Contains(formatted, ":LABEL MyLabel") {
-		t.Errorf("expected ':LABEL MyLabel', got:\n%s", formatted)
+	if !strings.Contains(formatted, ":LABEL Other;") {
+		t.Errorf("spaced label must be kept, got:\n%s", formatted)
 	}
-	t.Logf("Formatted output:\n%s", formatted)
 }
 
 // --- Keyword casing normalization ---
@@ -1900,12 +1920,12 @@ func TestFormat_BuiltinFunctionCase_PascalCase(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // Regression tests for embedded-SQL string-quote placement (anonymized).
-// These pin user-specified rules E and F and are expected to FAIL until the
-// formatter is updated.
+// These pin user-specified rules E and F (see
+// catalog/formatting/sql_in_strings.md).
 // ---------------------------------------------------------------------------
 
 // Rule F: the opening '"' of a multi-line SQL string stays on the same line
-// as its assignment / call argument. Currently it gets pushed to a new line.
+// as its assignment / call argument; it is never pushed to a line of its own.
 func TestFormatDocument_RuleF_OpenQuoteStaysOnAssignmentLine(t *testing.T) {
 	input := `sMySQL := "SELECT a.col1, a.col2 FROM my_table a JOIN other_table b ON b.id = a.id WHERE a.col3 = 'x'";`
 
@@ -2140,6 +2160,74 @@ func TestFormat_SemicolonEnforcement_AtEOFWithoutNewline(t *testing.T) {
 	want := ":DECLARE nValue;\nnValue := 1;\n"
 	if out != want {
 		t.Errorf("final statement should get its semicolon at EOF\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// Issue #256 (found by FuzzFormat) — trailing same-line whitespace before
+// EOF must not end up in front of the inserted semicolon: the first pass
+// produced "nValue := 1 ;" and the second collapsed it to "nValue := 1;".
+// [spec feature.formatting/A6]
+func TestFormat_SemicolonEnforcement_AtEOFAfterTrailingSpace(t *testing.T) {
+	opts := DefaultFormattingOptions()
+	for _, input := range []string{"nValue := 1 ", "nValue := 1 \t ", "0 "} {
+		once := FormatDocument(input, opts)[0].NewText
+		if strings.Contains(once, " ;") {
+			t.Errorf("%q: space kept before the EOF semicolon: %q", input, once)
+		}
+		if twice := formatAll(once, opts); twice != once {
+			t.Errorf("%q: not idempotent\nfirst:  %q\nsecond: %q", input, once, twice)
+		}
+	}
+	opts.TrimTrailingWhitespace = false
+	if out := FormatDocument("nValue := 1  ", opts)[0].NewText; out != "nValue := 1;\n" {
+		t.Errorf("trim off: got %q, want %q", out, "nValue := 1;\n")
+	}
+}
+
+// Issue #256 — minimized FuzzFormat findings: malformed or glued input on
+// which the first pass produced text the second pass changed again. Each
+// shape names the seam the two passes disagreed on.
+// [spec feature.formatting/A6]
+func TestFormat_IdempotentOnMalformedInput(t *testing.T) {
+	cases := []struct{ name, input string }{
+		{"trailing space before EOF semicolon", "0 "},
+		{"comma glued to operator", ",#"},
+		{"operator after statement break", ";#"},
+		{"unterminated comment after code", "0/*"},
+		{"colon without receiver, space after", ": A"},
+		{"colon without receiver, lowercase", ": a"},
+		{"colon after number", "0: a"},
+		{"operator glued to colon", ":#0"},
+		{"statement break inside open paren", "(;\"\""},
+		{"open paren after statement break", ";(00"},
+		{"glued proc boundary", ":ENDPROC:PROCEDURE"},
+		{"spaced proc boundary", ":ENDPROC :PROCEDURE"},
+		{"proc boundary inside open paren", "0 # 00:ENDPROC(:PROCEDURE 0"},
+		{"comment between words", "A/*;:IF+0"},
+		{"operator before comma", "0#,0"},
+		{"operator before trailing comment", ".#/*00"},
+		{"operator at EOF before comment", "!/*;\n!/*;#"},
+		{"operator before mid-line comment", "#/*;000000000"},
+		{"colon space equals", "A0: ="},
+		{"mashed label then operator", "0:LABEL0+000000"},
+		{"end-of-line comment before a multi-line one", "0/*;/*\n;"},
+		{"unterminated quote in SQL", "[SELECT A\"" + strings.Repeat("0", 80) + "]"},
+		// Issue #303 — embedded-SQL reflow shapes.
+		{"SQL number before spaced dot", "\"SELECT 0 A00000000) A0000000000 FROM A00000\xad\xad\xadA00000000000000000 0  A00000! AND A00000 !# 000 .A0000000000000000\""},
+		{"SQL unknown character before placeholder", "\"SELECT 00FRO!00000000000000000000000000'0'00000000000000000000000\xa9?\x880\xa80\xf9 ?000000?\""},
+		{"SQL lone placeholder glued to symbol or dot", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = ?# ?x? AND c = ?. ?y? AND d = 0 .e\""},
+		{"SQL number before dot and operator", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = 0 .! AND c = 1. AND d = 1.5\""},
+		{"SQL sign after sign", "\"SELECT a FROM t WHERE b" + strings.Repeat("0", 80) + " = (-\n- 1)\""},
+		{"unterminated quote in multi-line SQL", "[SELECT\n00000!\"000000000000000]"},
+	}
+	opts := DefaultFormattingOptions()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			once := formatAll(tc.input, opts)
+			if twice := formatAll(once, opts); twice != once {
+				t.Errorf("not idempotent\ninput:  %q\nfirst:  %q\nsecond: %q", tc.input, once, twice)
+			}
+		})
 	}
 }
 
@@ -2866,7 +2954,8 @@ func TestFormat_UnterminatedBlockCommentInSQLStringIsStable(t *testing.T) {
 		t.Errorf("orphan comment closer is not idempotent:\n%s", orphanFirst)
 	}
 
-	// A terminated block comment is still reflowed as before.
+	// A terminated block comment is not affected by the byte-preservation
+	// guard; formatting it stays idempotent.
 	ok := ":PROCEDURE T;\n:DECLARE s;\ns := \"\nSELECT a FROM b\n/* note */\nWHERE c = 1\n\";\n:ENDPROC;\n"
 	okFirst := fmtOnce(ok)
 	if okFirst != fmtOnce(okFirst) {

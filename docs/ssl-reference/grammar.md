@@ -2,7 +2,7 @@
 
 This document is a canonical summary of the SSL v11 grammar used by the LSP.
 
-**Authority:** `dev/ssl-style-guide/ssl-style-guide/ssl-ebnf-grammar.md` is the canonical grammar. When this summary lags, the source file wins.
+**Authority:** [`ssl-ebnf-grammar.md`](https://github.com/mahoskye/ssl-style-guide/blob/main/ssl-style-guide/ssl-ebnf-grammar.md) in the upstream style guide is the canonical grammar. When this summary lags, the source file wins.
 
 ---
 

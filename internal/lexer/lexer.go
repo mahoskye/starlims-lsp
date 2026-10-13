@@ -103,6 +103,16 @@ func (l *Lexer) Tokenize() []Token {
 	// mode for the region body (issue #164).
 	inRegionHeader := false
 
+	// A UTF-8 byte-order mark is an encoding marker, not source text.
+	// Editors strip it before the server sees the document, but a file read
+	// from disk (--validate, --format) still carries it. Keep it as a
+	// zero-width whitespace token so the formatter writes it back and no
+	// rule reads it as an unknown character (issue #255).
+	if len(l.input) > 0 && l.input[0] == '\uFEFF' {
+		tokens = append(tokens, Token{Type: TokenWhitespace, Text: "\uFEFF", Line: 1, Column: 1, Offset: 0})
+		l.pos = 1
+	}
+
 	for l.pos < len(l.input) {
 		char := l.input[l.pos]
 
@@ -576,11 +586,29 @@ func (l *Lexer) readCodeBlock() Token {
 	col := l.column
 	var text strings.Builder
 	depth := 0
+	var prevSig rune // last non-whitespace character consumed
 
 	for l.pos < len(l.input) {
+		// String literals in the body are opaque: a brace inside one must
+		// neither open nor close the literal (issue #255). `"{"` used to
+		// swallow the rest of the file and `"}"` ended the block early.
+		if depth > 0 {
+			if end := l.codeBlockStringEnd(prevSig); end > 0 {
+				for l.pos < end {
+					text.WriteRune(l.input[l.pos])
+					l.advance()
+				}
+				prevSig = '"'
+				continue
+			}
+		}
+
 		char := l.input[l.pos]
 		text.WriteRune(char)
 		l.advance()
+		if !unicode.IsSpace(char) {
+			prevSig = char
+		}
 
 		if char == '{' {
 			depth++
@@ -595,11 +623,53 @@ func (l *Lexer) readCodeBlock() Token {
 	return Token{Type: TokenCodeBlock, Text: text.String(), Line: line, Column: col, Offset: start}
 }
 
+// codeBlockStringEnd reports whether a string literal starts at the current
+// position inside a code-block body and, if so, returns the input position
+// just past its closing delimiter (0 otherwise). Quoted strings run to the
+// next matching quote. A `[` opens a bracket string only where it could not
+// be a subscript — mirroring isArrayAccessContext, a `[` after an
+// identifier, number, string, `)` or `]` indexes. An unterminated literal is
+// not treated as a string, so the brace scan degrades to its old behavior
+// instead of consuming the file.
+func (l *Lexer) codeBlockStringEnd(prevSig rune) int {
+	quote := l.input[l.pos]
+	switch quote {
+	case '"', '\'':
+		for i := l.pos + 1; i < len(l.input); i++ {
+			if l.input[i] == quote {
+				return i + 1
+			}
+		}
+		return 0
+	case '[':
+		if l.isIdentifierPart(prevSig) || prevSig == ')' || prevSig == ']' ||
+			prevSig == '"' || prevSig == '\'' {
+			return 0
+		}
+		// One level of bracket nesting, as in readString.
+		nested := false
+		for i := l.pos + 1; i < len(l.input); i++ {
+			switch {
+			case l.input[i] == '[' && !nested:
+				nested = true
+			case l.input[i] == ']' && nested:
+				nested = false
+			case l.input[i] == ']':
+				return i + 1
+			}
+		}
+		return 0
+	}
+	return 0
+}
+
 // readRegionBody consumes the raw text of a :REGION body: everything from
-// the current position up to (but not including) the line that carries the
-// closing :ENDREGION. The terminator must be line-leading — only whitespace
-// may precede it on its line — matching how region bodies are captured for
-// GetRegion(). With no terminator the body runs to EOF (the unclosed-block
+// the current position up to (but not including) the closing :ENDREGION.
+// A line-leading :ENDREGION (only whitespace before it) closes the body at
+// the start of its line. Mid-line, the complete `:ENDREGION;` closes it at
+// the colon, so `}:ENDREGION;` ends a template whose last line carries the
+// closer (issue #304); a mid-line :ENDREGION without its `;` is body text.
+// With no terminator the body runs to EOF (the unclosed-block
 // check still fires on the missing :ENDREGION). Returns ok=false when the
 // body is empty (e.g. `:REGION X; :ENDREGION;` on one line).
 func (l *Lexer) readRegionBody() (Token, bool) {
@@ -621,6 +691,14 @@ func (l *Lexer) readRegionBody() (Token, bool) {
 			continue
 		}
 		if !atLineLead {
+			// Mid-line, only the complete `:ENDREGION;` closes the body,
+			// cut at the colon so the text before it stays payload
+			// (`}:ENDREGION;` after a JSON template, issue #304). A
+			// mid-line `:ENDREGION` without its `;` stays body text.
+			if c == ':' && l.matchesEndRegion(i) && l.endRegionTerminated(i) {
+				end = i
+				break
+			}
 			continue
 		}
 		if c == ' ' || c == '\t' || c == '\r' {
@@ -665,6 +743,23 @@ func (l *Lexer) matchesEndRegion(i int) bool {
 	return true
 }
 
+// endRegionTerminated reports whether the `:ENDREGION` keyword at i is
+// followed, on the same line, by its terminating `;` (spaces and tabs
+// allowed in between).
+func (l *Lexer) endRegionTerminated(i int) bool {
+	for j := i + len(":ENDREGION"); j < len(l.input); j++ {
+		switch l.input[j] {
+		case ' ', '\t':
+			continue
+		case ';':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 func (l *Lexer) readUnknown() Token {
 	start := l.pos
 	line := l.line
@@ -682,20 +777,6 @@ func (l *Lexer) advance() {
 		l.column++
 	}
 	l.pos++
-}
-
-// GetTokenAtPosition returns the token at a specific position.
-func GetTokenAtPosition(tokens []Token, line, column int) *Token {
-	for i := range tokens {
-		token := &tokens[i]
-		if token.Line == line {
-			tokenEnd := token.Column + len(token.Text)
-			if column >= token.Column && column <= tokenEnd {
-				return token
-			}
-		}
-	}
-	return nil
 }
 
 // ContextType represents the type of context at a position.
@@ -718,23 +799,9 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 		tokenStartLine := token.Line
 		tokenStartCol := token.Column
 
-		// Calculate end position by counting newlines in the token text
+		// Calculate the end position by walking the token text: columns
+		// count runes, matching the lexer's Column.
 		tokenEndLine := tokenStartLine
-		tokenEndCol := tokenStartCol + len(token.Text)
-
-		for _, r := range token.Text {
-			if r == '\n' {
-				tokenEndLine++
-				tokenEndCol = 1
-			} else {
-				if tokenEndLine > tokenStartLine || tokenEndLine == tokenStartLine {
-					// Only increment if we're past the newline
-				}
-			}
-		}
-
-		// Recalculate properly
-		tokenEndLine = tokenStartLine
 		currentCol := tokenStartCol
 		for _, r := range token.Text {
 			if r == '\n' {
@@ -744,7 +811,7 @@ func GetContextAtPosition(tokens []Token, line, column int) ContextType {
 				currentCol++
 			}
 		}
-		tokenEndCol = currentCol
+		tokenEndCol := currentCol
 
 		// Check if position is within this token
 		inToken := false
@@ -790,12 +857,10 @@ func GetWordAtPosition(text string, line, column int) string {
 		return ""
 	}
 
-	lineText := lines[line-1]
-	if column < 1 || column > len(lineText)+1 {
+	runes := []rune(lines[line-1])
+	if column < 1 || column > len(runes)+1 {
 		return ""
 	}
-
-	runes := []rune(lineText)
 
 	// Find word boundaries
 	start := column - 1

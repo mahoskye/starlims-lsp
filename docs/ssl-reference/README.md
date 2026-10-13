@@ -3,7 +3,7 @@
 This section provides reference documentation for the STARLIMS Scripting Language (SSL).
 
 > **Quick Reference:** See [AGENTS.md](../../AGENTS.md) in the project root for AI agent coding conventions.
-> **Authority:** When these public docs disagree with `dev/ssl-style-guide/`, the `dev/ssl-style-guide/` material wins.
+> **Authority:** When these public docs disagree with the upstream sources, the upstream sources win: [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) for language and style rules, [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) for element behavior.
 
 ---
 
@@ -119,7 +119,7 @@ Base:Initialize(sValue);
 
 /* Object property access;
 oEmail:Subject := "Test";
-nCount := oDataset:RowCount;
+sXml := oDataset:ToXml();
 ```
 
 ---
@@ -131,7 +131,7 @@ The Language Server Protocol implementation sources:
 | Purpose | File |
 |---------|------|
 | Canonical public SSL inventories | `internal/constants/canonical.go` |
-| Legacy function signature corpus | `internal/constants/signatures.go` |
+| Documented function signature overrides | `internal/constants/function_overrides.go` |
 | Keywords, literals, operators, and legacy inventories | `internal/constants/constants.go` |
 | Parser | `internal/parser/parser.go` |
 | Diagnostics | `internal/providers/diagnostics.go` |

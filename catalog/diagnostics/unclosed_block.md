@@ -10,6 +10,7 @@ severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/lexer/lexer_test.go
 history:
   - date: 2026-01-10
     ref: "commit 442fa69 (initial commit)"
@@ -20,6 +21,27 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; behavior unchanged.
+  - date: 2026-10-13
+    ref: "issue #255"
+    note: >-
+      An :ENDFOR closing an open :FOR (endfor_invalid's finding) now
+      closes that loop, so the typo no longer also reports
+      unclosed_block on the :FOR.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch D)"
+    note: >-
+      Catalog audit: `:ENDFOR` now closes its `:FOR` silently. It is not
+      SSL and endfor_invalid reports it, but leaving the `:FOR` on the
+      stack also reported the loop as unclosed — two errors for one typo.
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      A `:REGION` whose closer shares a line with the end of its payload
+      (`}:ENDREGION;`) is closed. The lexer only accepted a line-leading
+      `:ENDREGION`, so the region swallowed the rest of the file and
+      reported unclosed; shipped product code stores a JSON template in
+      exactly this shape. A mid-line `:ENDREGION` still needs its `;` to
+      close the region (feature.diagnostics_pipeline).
 issues: []
 ---
 
@@ -49,9 +71,18 @@ user-facing configuration key; per-rule severity/off is available through
 It must NOT flag:
 
 - correctly paired blocks, however deeply nested;
+- a `:FOR` closed by the invalid `:ENDFOR` — `endfor_invalid` reports the
+  token, and the scanner pairs it with the `:FOR` so one typo stays one
+  finding;
 - a stray end keyword with nothing open — that is `unmatched_block_end`;
 - an end keyword that matches no open block at any depth — that is
-  `mismatched_block_end`, and no opener is popped.
+  `mismatched_block_end`, and no opener is popped;
+- a `:FOR` closed by the invalid `:ENDFOR` — `endfor_invalid` reports the
+  typo, and the `:ENDFOR` still closes the loop it was meant to close
+  (issue #255);
+- a `:REGION` closed by a `:ENDREGION;` on the payload's last line
+  (`}:ENDREGION;`): the complete closer ends the body wherever it sits on
+  the line (issue #304, feature.diagnostics_pipeline).
 
 ## Examples
 
@@ -75,10 +106,40 @@ It must NOT flag:
 
 ```ssl
 :PROCEDURE Demo;
+	:DECLARE i;
+	:FOR i := 1 :TO 10;
+	:ENDFOR;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
 	:IF nCount > 0;
 		nCount := 1;
 	:ENDIF;
 :ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:DECLARE i;
+:FOR i := 1 :TO 3;
+:ENDFOR;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE BuildPayload;
+	:RETURN GetRegion("Payload");
+:ENDPROC;
+
+:REGION Payload;{
+	"total": $nTotal$
+}:ENDREGION;
 ```
 
 ## Rationale
