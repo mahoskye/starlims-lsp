@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Two severities move to match the kind of finding (breaking for CLI
+  consumers that key on severity).** `trailing_skip_commas` goes from
+  hint to info, joining the opt-in advisory tier. Its catalog entry said
+  it was hint "like its sibling `empty_optional_param_array`", but that
+  sibling, which covers the `{}` form of the same style-guide clause
+  ("omit trailing optional parameters"), was already info. It is now
+  dropped by default; `--info` or an `ssl.diagnostics.rules` entry brings
+  it back. `region_end_mismatch` goes from warning to hint: an orphan
+  `/* endregion;` is a comment and has no runtime effect, so it is a
+  style finding, not a likely bug. Across 6,228 production files that
+  moves 10 findings from warning to hint and drops 32 hints from the
+  default output. No file changes `valid` (#255).
+
+- **Catalog authority now mirrors the style guide's rule records.**
+  `not_preferred_operator` → `style_only`, `runsql_non_dml` →
+  `advisory`, `single_catch` → `authoritative`, `step_spacing` and
+  `trailing_skip_commas` → `style_only`. Each entry had been written
+  before the style guide grew a record for its rule. `spaced_skip_commas`
+  and `trailing_skip_commas` now cite `lints.parameter_skipping_style`.
+  The two stay separate rules: they transcribe different clauses of that
+  lint and have different fixes (#255).
+
+### Fixed
+- **Member calls no longer trip built-in rules (D10).**
+  `raiseerror_in_catch`, `runsql_non_dml`, and `trailing_skip_commas`
+  found calls by scanning for an identifier followed by `(`, so
+  `oLog:RaiseError(...)` inside `:CATCH`, a class's own
+  `Me:RunSql("SELECT ...")`, or `s:Substring(1,)` all reported as though
+  they were the built-in. They now read call sites from the expression
+  tree and skip qualified calls. `runsql_non_dml` also lets a statement's
+  leading literal alone decide its keyword, so
+  `"INSERT INTO t " + "SELECT ..."` is no longer reported as a SELECT, and
+  its write-guards see every string piece of the argument (#255).
+
+- **`step_zero_literal` reads the whole step expression.** It checked
+  only the first token after `:STEP`, so `:STEP 0 + nInc`, a step of 2,
+  reported an infinite loop. The step must now be a zero literal,
+  optionally negated (#255).
+
+- **One finding per defect where two rules used to report it.** A
+  C-style `PROCEDURE Name(...)` was reported both as
+  `procedure_declaration_syntax` and, since the statement grammar
+  landed, as `unexpected_token` on the name. `unexpected_token` now
+  defers. A spaced skip-comma run that ends a call (`Foo(a, , )`) is left
+  to `trailing_skip_commas`, whose fix settles both (#255).
+
+- **Structure findings that were being masked now report.** Statements
+  after a duplicate `:FINALLY` were counted as the first `:FINALLY`'s
+  body, so an empty first clause escaped `finally_empty`. A second
+  script-level `:PARAMETERS` flagged only when another statement came
+  between the two lists; it now flags as a second block-level list
+  always did. A comment beginning with the letters "region"
+  (`/* Regional settings;`) opened a fold region, which also hid a later
+  orphan `/* endregion;`; the marker must now be a whole word (#255).
+
+- **A `:FOR` limit glued to `:STEP` gets a pointer at the missing
+  space.** With an identifier, call, or subscript limit,
+  `:TO nMax:STEP 2` parses `:STEP` as a member of the limit, and the
+  header failed with a bare "Unexpected number '2'". `step_spacing` never
+  saw that shape, because only a numeric limit leaves `:STEP` lexed as the
+  keyword. The `unexpected_token` message now ends
+  `(missing space before ':STEP'?)` (#255).
+
+  Measured over 6,228 production files with `--info`, these fixes move
+  one finding (a spaced run now left to `trailing_skip_commas`); every
+  other position is unchanged.
+
+Two follow-ups were filed rather than changed here. #291: rules that
+`unexpected_token` defers to at warning severity (`scientific_notation`,
+`unknown_keyword`, `unknown_token`) let a statement that does not parse
+validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
+`:FINALLY`, or `:ELSE` outside its block.
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

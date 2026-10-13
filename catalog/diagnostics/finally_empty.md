@@ -19,6 +19,12 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0), commit d744511"
     note: Stable code finally_empty assigned.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      An empty first :FINALLY followed by a duplicate :FINALLY now flags:
+      the duplicate's statements were counted as the first clause's body,
+      hiding this finding behind diag.single_finally.
 issues: []
 ---
 
@@ -29,7 +35,9 @@ Always-on structural check (part of the `:TRY` structure family): when a
 clause contains no statement. The diagnostic range is the `:FINALLY` token
 itself. Any significant token between `:FINALLY` and `:ENDTRY` other than
 `;` counts as a statement; comments and whitespace do NOT count, so a
-`:FINALLY` holding only a comment still flags.
+`:FINALLY` holding only a comment still flags. Statements after a
+duplicate `:FINALLY` (reported by `diag.single_finally`) belong to no
+clause and do not count toward the first `:FINALLY`'s body.
 
 It must NOT flag when:
 
@@ -57,6 +65,17 @@ It must NOT flag when:
 	nCount := 1;
 :FINALLY;
 	/* cleanup goes here someday;
+:ENDTRY;
+```
+
+### Flags
+
+```ssl
+:TRY;
+	nCount := 1;
+:FINALLY;
+:FINALLY;
+	nCount := 3;
 :ENDTRY;
 ```
 

@@ -29,6 +29,12 @@ history:
       scheme was drafted, then retired in maintainer review: the canonical
       closer '/* endregion;' takes no name — pairing is LIFO and trailing
       text on the closer is prose (A5/A6 rewritten accordingly).
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      The opener must be the whole word `region` (A8): `/* Regional ...;`
+      used to open a region named "al ...", which also hid an orphan
+      endregion from diag.region_end_mismatch.
 issues: []
 ---
 
@@ -41,7 +47,8 @@ element:
   `:WHILE`/`:ENDWHILE`, `:FOR`/`:NEXT`, `:BEGINCASE`/`:ENDCASE`,
   `:TRY`/`:ENDTRY`. Nested blocks each get their own range.
 - Region comment markers, kind `region`: `/* region <name>;` …
-  `/* endregion;` (marker keyword case-insensitive). A region with no name
+  `/* endregion;` (marker keyword case-insensitive, and a whole word —
+  `/* Regional settings;` is an ordinary comment). A region with no name
   is treated as named "Region".
 - Multi-line comments (`/*` … `;` spanning lines), kind `comment`.
 - Blocks that fit on a single line — control-flow, procedures, and region
@@ -73,6 +80,7 @@ Region end markers pair innermost-first (LIFO):
 - A6: Given `/* endregion;` with no open region followed by a balanced `/* region A;` … `/* endregion;` pair, when folding ranges are requested, then the orphan closer closes nothing (surfaced by diag.region_end_mismatch) and region A still folds correctly.
 - A7: Given a multi-line comment that is not a region marker, when folding
   ranges are requested, then it folds with kind `comment`, not `region`.
+- A8: Given a comment `/* Regional settings follow;` followed later by `/* endregion;`, when folding ranges are requested, then the comment opens no region (the marker keyword must be a whole word) and the endregion is an orphan.
 
 ## Rationale
 

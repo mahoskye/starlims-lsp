@@ -93,20 +93,20 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
 | `nil_not_empty_string` | NIL compared against a default-value literal | info | advisory | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
 | `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
-| `not_preferred_operator` | Discouraged inequality operator form | info | advisory | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
+| `not_preferred_operator` | Discouraged inequality operator form | info | style_only | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
 | `raiseerror_in_catch` | RaiseError called inside :CATCH | warning | style_only | active | [diag.raiseerror_in_catch](../../catalog/diagnostics/raiseerror_in_catch.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
-| `region_end_mismatch` | Region end marker with no open region | warning | tool | active | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
+| `region_end_mismatch` | Region end marker with no open region | hint | tool | active | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
 | `region_legacy` | REGION keyword flagged as legacy (removed — premise was wrong) | info | tool | removed | [diag.region_legacy](../../catalog/diagnostics/region_legacy.md) |
 | `return_from_constructor` | Return from a constructor (never implemented) | error | tool | removed | [diag.return_from_constructor](../../catalog/diagnostics/return_from_constructor.md) |
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
-| `runsql_non_dml` | RunSQL called with a result-returning statement | warning | tool | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
+| `runsql_non_dml` | RunSQL called with a result-returning statement | warning | advisory | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
 | `scientific_notation` | Scientific notation missing its decimal point | warning | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
-| `single_catch` | More than one CATCH in a TRY block | error | tool | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
+| `single_catch` | More than one CATCH in a TRY block | error | authoritative | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |
 | `sql_comma_join` | Pre-ANSI comma join in a FROM clause | info | style_only | active | [diag.sql_comma_join](../../catalog/diagnostics/sql_comma_join.md) |
@@ -117,9 +117,9 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `sql_literal_splice` | SQL character literal spliced across concatenation | info | style_only | active | [diag.sql_literal_splice](../../catalog/diagnostics/sql_literal_splice.md) |
 | `sql_select_star` | SELECT * in embedded SQL | info | style_only | active | [diag.sql_select_star](../../catalog/diagnostics/sql_select_star.md) |
 | `sql_suspect_placeholder` | Template marker stacked inside a placeholder | info | style_only | active | [diag.sql_suspect_placeholder](../../catalog/diagnostics/sql_suspect_placeholder.md) |
-| `step_spacing` | STEP keyword with no space before it | warning | tool | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
+| `step_spacing` | STEP keyword with no space before it | warning | style_only | active | [diag.step_spacing](../../catalog/diagnostics/step_spacing.md) |
 | `step_zero_literal` | :FOR loop with a literal zero :STEP | warning | tool | active | [diag.step_zero_literal](../../catalog/diagnostics/step_zero_literal.md) |
-| `trailing_skip_commas` | Trailing skip-commas before a call's closing parenthesis | hint | tool | active | [diag.trailing_skip_commas](../../catalog/diagnostics/trailing_skip_commas.md) |
+| `trailing_skip_commas` | Trailing skip-commas before a call's closing parenthesis | info | style_only | active | [diag.trailing_skip_commas](../../catalog/diagnostics/trailing_skip_commas.md) |
 | `try_requires_handler` | TRY block with neither CATCH nor FINALLY | error | tool | active | [diag.try_requires_handler](../../catalog/diagnostics/try_requires_handler.md) |
 | `try_structure` | TRY body with no statements before its handler | error | tool | active | [diag.try_structure](../../catalog/diagnostics/try_structure.md) |
 | `udobject_array_in_clause` | UDObject property expanded inside a SQL IN clause | warning | tool | active | [diag.udobject_array_in_clause](../../catalog/diagnostics/udobject_array_in_clause.md) |

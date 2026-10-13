@@ -17,15 +17,23 @@ history:
       Introduced from the runtime-verification batch: a literal zero step
       never advances the loop variable, so the loop cannot terminate once
       entered.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Now reads the step from the expression AST instead of the first token
+      after :STEP, which flagged `:STEP 0 + nInc` (step 2). `+0` is no
+      longer accepted as a sign: it does not parse, and unexpected_token
+      already reports it.
 issues: []
 ---
 
 ## Behavior
 
 Flags the step value of a `:FOR` loop whose `:STEP` is a provable literal
-zero: the next significant token after `:STEP` — allowing one leading `+`
-or `-` sign — is a numeric literal whose digits are all zero (`0`, `0.0`,
-`00`, `-0`). A zero step never advances the loop variable, so the loop
+zero: the whole step expression, read from the expression AST, is a
+numeric literal whose digits are all zero (`0`, `0.0`, `00`), optionally
+negated (`-0`). A `+0` step does not parse (SSL has no unary plus), so it
+is reported as `diag.unexpected_token` instead. A zero step never advances the loop variable, so the loop
 cannot terminate once entered. The range covers the numeric literal.
 
 It must NOT flag:
@@ -34,7 +42,8 @@ It must NOT flag:
   negative (`:STEP -1`) steps;
 - a variable or expression step (`:STEP nStep`, `:STEP nA - nB`) — the
   value is not provable from the call site, even when it may be zero at
-  runtime;
+  runtime. That includes an expression that merely starts with a zero
+  literal (`:STEP 0 + nInc`);
 - the `:STEP` spacing concerns of `step_spacing` — separate rule.
 
 ## Examples
@@ -65,6 +74,17 @@ It must NOT flag:
 :PROCEDURE Main;
 	:DECLARE i;
 	:FOR i := 10 :TO 1 :STEP -1;
+	:NEXT;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE i, nInc;
+	nInc := 2;
+	:FOR i := 1 :TO 10 :STEP 0 + nInc;
 	:NEXT;
 :ENDPROC;
 ```

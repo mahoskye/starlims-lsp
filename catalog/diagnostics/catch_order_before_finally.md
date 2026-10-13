@@ -19,7 +19,7 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
-issues: []
+issues: ["#292"]
 ---
 
 ## Behavior
@@ -38,8 +38,8 @@ It must NOT flag:
 
 - the correct order `:TRY ... :CATCH ... :FINALLY ... :ENDTRY`;
 - `:TRY`/`:CATCH` without any `:FINALLY`;
-- a `:CATCH` outside any `:TRY` block — that placement is owned by the
-  block-structure checks, not this ordering rule.
+- a `:CATCH` outside any `:TRY` block — not this ordering rule's concern,
+  and currently reported by no rule (issue #292).
 
 ## Examples
 

@@ -3,7 +3,7 @@ id: diag.single_catch
 title: More than one CATCH in a TRY block
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
 default_severity: error
 severity_overridable: true
@@ -19,7 +19,13 @@ history:
   - date: 2026-04-30
     ref: "PR #3 (v0.4.0, commit d744511)"
     note: Stable diagnostic code assigned; rule behavior unchanged.
-issues: []
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Authority tool -> authoritative to mirror the style-guide record
+      single_catch_per_try. The stray-:CATCH bullet no longer claims an owner
+      that does not exist (issue #292).
+issues: ["#292"]
 ---
 
 ## Behavior
@@ -38,8 +44,8 @@ It must NOT flag:
 - a `:CATCH` that appears after a `:FINALLY` — that clause is reported as
   `diag.catch_order_before_finally` instead, and is deliberately not
   double-counted here;
-- a stray `:CATCH` outside any `:TRY` block (owned by the block-structure
-  checks).
+- a stray `:CATCH` outside any `:TRY` block — not this rule's concern,
+  and currently reported by no rule (issue #292).
 
 ## Examples
 
@@ -95,10 +101,10 @@ nCount := 3;
 
 ## Rationale
 
-The schema's error-handling structure (authoritative, though it has no
-lints slug — hence `authority: tool` for the transcription) states "Only
-one :CATCH block is allowed per :TRY — there is no multi-catch", so a
-second clause is a structural error, matching the error severity. The
+The style-guide record `single_catch_per_try` (level authoritative, from
+the schema's error-handling structure) states "Only one :CATCH block is
+allowed per :TRY; there is no multi-catch", so a second clause is a
+structural error, matching the error severity. The
 catch-after-finally carve-out keeps one malformed clause from producing two
 overlapping diagnostics; the nested-block fence pins the stack-based
 scoping that keeps sibling blocks independent.

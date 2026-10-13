@@ -76,6 +76,13 @@ history:
       with the point, glued to an `e` identifier). A well-formed number
       glued to a stray `E` — `2.0E+nVar`, which used to defer to a rule
       that then stayed silent — is now reported here.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Two refinements from the diagnostics audit: the name in a C-style
+      `PROCEDURE Name(` declaration is deferred to procedure_declaration_syntax
+      (it was reported by both), and a `:FOR` limit glued to `:STEP` gets a
+      hint naming the missing space.
 issues: ["#240", "#244", "#246"]
 ---
 
@@ -102,7 +109,11 @@ The statements in scope are the ones the parser models:
   that departs from that shape is flagged and the message names the
   expected piece (`Unexpected identifier 'nItem' in ':FOR' header -
   expected ':='`). When the loop-variable position holds the word `EACH`
-  the message also says SSL has no `:FOR EACH` form. Block pairing is
+  the message also says SSL has no `:FOR EACH` form. When the limit is
+  glued to `:STEP` (`:TO nMax:STEP 2`), the keyword parses as a member of
+  the limit and the step value is unexpected; the message then asks
+  `(missing space before ':STEP'?)` (`diag.step_spacing` covers the
+  numeric-limit form, where `:STEP` still lexes as the keyword). Block pairing is
   independent of header validity: a malformed header still opens its
   `:FOR` block, so `unclosed_block` and `mismatched_block_end` are
   unaffected.
@@ -149,7 +160,9 @@ It must NOT flag:
   position (`bare_logical_operator`), a colon form that is not an SSL
   keyword (`unknown_keyword` / `endfor_invalid`), the exponent shapes
   `scientific_notation` owns — an identifier glued to a number that has
-  no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — a
+  no decimal point (`7e2`, `9E+1`) or starts with one (`.5e1`) — the
+  name after a bare `PROCEDURE` when a `(` follows it
+  (`procedure_declaration_syntax`), a
   closer with no matching opener (`unmatched_delimiter` /
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file

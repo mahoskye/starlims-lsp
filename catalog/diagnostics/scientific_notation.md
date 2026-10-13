@@ -38,7 +38,13 @@ history:
       author wrote: 9E+1 now suggests 9.0E+1, undoing the #47 sign
       dropping while keeping its point that a suggestion must be valid
       SSL. The decimal-point and leading-digit requirements stand.
-issues: ["#47", "#246"]
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Audit: the warning severity downgrades a parse failure (see Known
+      gaps). The change to error is proposed in issue #291 together with the
+      other warning-severity rules unexpected_token defers to.
+issues: ["#47", "#246", "#291"]
 ---
 
 ## Behavior
@@ -126,12 +132,24 @@ nD := 1.5e+3 * 2;
 
 The schema's numbers section (`require_decimal_for_scientific: true`) lists
 exactly these invalid examples — `7e2`, `.5e1`, `9E+1` — but defines no
-lints slug for them, so the rule is tool-authored. Warning (not error)
-severity because the code still lexes and may even run with the exponent
-part silently misread as an identifier — which is precisely why it deserves
-a loud nudge: `7e2` is almost never an intentional variable reference.
+lints slug for them, so the rule is tool-authored. The severity is
+warning today. That choice assumed the code might still run with the
+exponent part read as an identifier, but the grammar says these shapes do
+not parse; the move to error is tracked in Known gaps (issue #291).
 The fix-it messages themselves suggest only valid SSL (issue #47). An
 explicit `+` exponent sign turned out to be valid (issue #246), contrary
 to the schema clause this entry transcribed, so suggestions keep the sign
 the author wrote: `9E+1` suggests `9.0E+1`. The schema correction is
 ssl-style-guide#73.
+
+## Known gaps
+
+- Severity is proposed to change from warning to error (issue #291). The
+  style-guide grammar defines a number literal as
+  `IntegerPart [DecimalPart [Exponent]]`, so `7e2` is a number followed by
+  a bare identifier, which no statement production accepts. The spaced
+  form `7 e2` is reported as a `diag.unexpected_token` error. The glued
+  form is handed to this rule, so a statement that does not parse is
+  reported as a warning, and `--validate` returns `valid: true` for it.
+  Changing the severity is breaking for CLI consumers, so it is tracked
+  separately rather than made here.

@@ -27,6 +27,12 @@ history:
       the current request as a Server Error when uncaught (the process and
       other requests continue). Behavior and severity unchanged; rationale
       reworded.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Call sites now come from the expression AST (CollectCallsIn) instead
+      of a lexical identifier-then-paren scan, and a qualified
+      `recv:RaiseError(...)` member call no longer flags (D10).
 issues: []
 ---
 
@@ -35,8 +41,8 @@ issues: []
 Flags a `RaiseError(` call whose nearest enclosing `:TRY` section is a
 `:CATCH` block — i.e. the call sits between `:CATCH` and the matching
 `:FINALLY`/`:ENDTRY`, not inside some deeper `:TRY` body nested within
-that handler. The range covers the `RaiseError` identifier. Detection is
-lexical: an identifier `RaiseError` (case-insensitive) followed by `(`.
+that handler. The range covers the `RaiseError` identifier. Call sites come
+from the expression AST: a bare call to `RaiseError` (case-insensitive).
 
 It must NOT flag:
 
@@ -46,7 +52,9 @@ It must NOT flag:
   `/*@private;` helpers are legitimate);
 - `RaiseError` inside the `:TRY` body of a nested `:TRY`/`:CATCH` that
   itself sits inside an outer `:CATCH` — the nested handler catches it;
-- the word RaiseError in comments or strings, or without a call.
+- the word RaiseError in comments or strings, or without a call;
+- a qualified member call `recv:RaiseError(...)` — that is a method of
+  the receiver, not the built-in (D10).
 
 ## Examples
 
@@ -94,6 +102,19 @@ It must NOT flag:
 		:CATCH;
 			LogError(GetLastSSLError());
 		:ENDTRY;
+	:ENDTRY;
+:ENDPROC;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE oLog;
+	:TRY;
+		DoWork();
+	:CATCH;
+		oLog:RaiseError("logged, not raised");
 	:ENDTRY;
 :ENDPROC;
 ```

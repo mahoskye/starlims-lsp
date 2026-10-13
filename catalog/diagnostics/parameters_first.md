@@ -40,6 +40,13 @@ history:
       (55+ corpus files); (2) :BEGININLINECODE ... :ENDINLINECODE is now a
       scope like :PROCEDURE — a named inline-code block's leading
       :PARAMETERS is judged against the block, not the script.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      A second script-level :PARAMETERS now flags. It was silent when it
+      directly followed the first and flagged only when a :DEFAULT or other
+      statement came between them, while the block-level check already
+      treated an earlier :PARAMETERS as a statement.
 issues: []
 ---
 
@@ -57,7 +64,9 @@ Enforces `:PARAMETERS` placement at two levels, one emit site each, both
   `GetInlineCode()` takes its own leading `:PARAMETERS`, judged against
   the block with the analogous message naming `:BEGININLINECODE`.
 - **Script level**: a top-level `:PARAMETERS` flags once any top-level
-  executable statement has been seen. Leading `:PROCEDURE ... :ENDPROC`
+  executable statement has been seen. A previous top-level `:PARAMETERS`
+  counts, as it does at block level, so a second script-level list
+  flags. Leading `:PROCEDURE ... :ENDPROC`
   blocks do not count as top-level statements, so a script may define
   procedures first and still declare its parameters after them (message:
   `Script-level ':PARAMETERS' must appear before top-level statements
@@ -98,6 +107,14 @@ It must NOT flag:
 :DECLARE nCount;
 nCount := 1;
 :PARAMETERS nValue;
+```
+
+### Flags
+
+```ssl
+:PARAMETERS nFirst;
+:PARAMETERS nSecond;
+:RETURN nFirst;
 ```
 
 ### Does not flag

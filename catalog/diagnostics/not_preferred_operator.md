@@ -3,7 +3,7 @@ id: diag.not_preferred_operator
 title: Discouraged inequality operator form
 kind: diagnostic
 status: active
-authority: advisory
+authority: style_only
 schema_ref: lints.not_preferred_operators
 default_severity: info
 config:
@@ -29,6 +29,11 @@ history:
     note: >-
       Extension quick-fix code action keyed on this slug rewrites `<>` / `#`
       to `!=`; message wording is load-bearing for that fix.
+  - date: 2026-10-13
+    ref: "issue #255 (diagnostics audit, batch B)"
+    note: >-
+      Authority corrected advisory -> style_only to mirror the style-guide
+      record's level. Behavior unchanged.
 issues: []
 ---
 
@@ -90,7 +95,8 @@ nCount := 3;
 
 The schema's `lints.not_preferred_operators` list declares `#` and `<>`
 "not preferred" with severity `info` and replacement `!=`; this rule is a
-direct transcription (authority: advisory, severity info — the operators
-work, this is purely a consistency nudge). The extension's quick-fix
+direct transcription (authority: style_only, mirroring the style-guide
+record `not_preferred_operator`; severity info — the operators work, this
+is purely a consistency nudge). The extension's quick-fix
 (vs-code-ssl-formatter PR #58) depends on this slug and on the message
 naming the replacement operator, so both are part of the contract.
