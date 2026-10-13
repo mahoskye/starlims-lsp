@@ -88,14 +88,26 @@ history:
       reading them outside an endpoint does not raise, so D4's
       endpoint-only scoping was amended. Corpus under --strict:
       1,811 -> 829 findings.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      Behavior text corrected: the check was described as per-scope, but
+      it is file-wide, and deliberately so. SSL's caller-scope lookup lets
+      a procedure read its caller's variables, so per-procedure scoping
+      would flag valid code.
 issues: []
 ---
 
 ## Behavior
 
 Opt-in check (default off, per DECISIONS.md D5): flags an identifier used as
-a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration in
-scope, reported once per scope.
+a variable that has no `:DECLARE`/`:PUBLIC`/`:PARAMETERS` declaration, and
+is not created by assignment, anywhere in the file; each name is reported
+once per file. The check is file-wide, not per procedure, on purpose: SSL
+resolves a name through the scopes of the routines on the call stack
+(reference guides/variable-scope.md), so a procedure can read a variable
+its caller declared, and which procedure calls which is not known
+statically (DECISIONS.md D10).
 
 Declarations are read as statements — keyword through the terminating
 `;` — so layout never hides one: `:DECLARE sA, sB;`, a comma list broken
