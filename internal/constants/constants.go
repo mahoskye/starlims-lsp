@@ -123,6 +123,7 @@ var SSLStatusKeywords = []string{
 }
 
 // IsStatusKeyword checks if a string matches a status keyword (case-insensitive).
+// API (no production caller): the lookup that pairs with the exported SSLStatusKeywords table.
 func IsStatusKeyword(s string) bool {
 	upper := strings.ToUpper(s)
 	for _, kw := range SSLStatusKeywords {
@@ -315,11 +316,13 @@ func IsSSLOperator(s string) bool {
 }
 
 // IsSSLLogicalOperator checks if a string is a logical operator.
+// API (no production caller): one of the Is* lookups over the exported operator tables.
 func IsSSLLogicalOperator(s string) bool {
 	return slices.Contains(SSLLogicalOperators, s)
 }
 
 // IsSSLCompoundOperator checks if a string is a compound operator.
+// API (no production caller): one of the Is* lookups over the exported operator tables.
 func IsSSLCompoundOperator(s string) bool {
 	return slices.Contains(SSLCompoundOperators, s)
 }

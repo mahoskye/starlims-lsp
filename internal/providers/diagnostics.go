@@ -1098,21 +1098,6 @@ func checkDotPropertyAccess(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// endsMemberReceiver reports whether a token can end the receiver of a
-// member access: an identifier, a call's `)`, or a subscript's `]`. A
-// `.name` after any of them is dot-style property access
-// (`oObj.Value`, `oObj:Get().Value`, `aRows[1].Value`), which
-// dot_property_access owns and unknown_token leaves alone (issue #255).
-func endsMemberReceiver(t lexer.Token) bool {
-	switch t.Type {
-	case lexer.TokenIdentifier:
-		return true
-	case lexer.TokenPunctuation:
-		return t.Text == ")" || t.Text == "]"
-	}
-	return false
-}
-
 // extractIdentifier extracts the identifier portion from the start of a string.
 func extractIdentifier(s string) string {
 	var result strings.Builder
@@ -5229,39 +5214,6 @@ func expressionEnd(tokens []lexer.Token, startIdx, upperBound, stmtEnd int) int 
 	return previousSignificantTokenIndex(tokens, limit-1)
 }
 
-// inferOperandType classifies the operand on one side of a binary operator.
-// direction = -1 for the left operand (idx is the last token of that operand),
-// direction = +1 for the right operand (idx is the first token).
-// Returns "" when the operand contains indexed access (arr[i]) or member
-// access (obj:foo), since the LSP can't infer the type of an array element
-// or object member from name conventions alone.
-func inferOperandType(tokens []lexer.Token, idx, direction int, typeInfo map[string]string) string {
-	if idx < 0 || idx >= len(tokens) {
-		return ""
-	}
-	tok := tokens[idx]
-	if direction < 0 {
-		if tok.Type == lexer.TokenPunctuation && tok.Text == "]" {
-			return ""
-		}
-		if tok.Type == lexer.TokenIdentifier {
-			prev := previousSignificantTokenIndex(tokens, idx-1)
-			if prev >= 0 && tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
-				return ""
-			}
-		}
-	} else {
-		if tok.Type == lexer.TokenIdentifier {
-			next := nextSignificantTokenIndex(tokens, idx+1)
-			if next >= 0 && tokens[next].Type == lexer.TokenPunctuation &&
-				(tokens[next].Text == "[" || tokens[next].Text == ":") {
-				return ""
-			}
-		}
-	}
-	return inferSimpleType(tokens, idx, typeInfo)
-}
-
 func inferSimpleType(tokens []lexer.Token, idx int, typeInfo map[string]string) string {
 	if idx < 0 || idx >= len(tokens) {
 		return ""
@@ -5990,43 +5942,6 @@ func previousSignificantTokenIndex(tokens []lexer.Token, start int) int {
 		return i
 	}
 	return -1
-}
-
-// isUnarySignPosition reports whether a `+` or `-` at the given operator
-// token is a sign on the following literal rather than a binary operator.
-// SSL has no unary plus, but `+` is included so the arithmetic check stays
-// silent there and leaves the finding to unexpected_token, which owns it.
-//
-// The test is what precedes the sign: a binary operator needs a left
-// operand, so the sign is binary only when the previous significant token
-// can end a value — an identifier, a literal, or a closing bracket.
-// Everything else (an opening bracket, a comma, an assignment, another
-// operator, a keyword, or the start of the file) puts the sign in unary
-// position.
-func isUnarySignPosition(tokens []lexer.Token, token lexer.Token, prevIdx int) bool {
-	if token.Text != "+" && token.Text != "-" {
-		return false
-	}
-	if prevIdx < 0 {
-		return true
-	}
-	prev := tokens[prevIdx]
-	switch prev.Type {
-	case lexer.TokenIdentifier, lexer.TokenNumber, lexer.TokenString:
-		return false
-	case lexer.TokenKeyword:
-		// A literal keyword (NIL, .T., .F.) ends a value; a control
-		// keyword does not.
-		_, isLiteral := constants.CanonicalSSLLiteral(prev.Text)
-		return !isLiteral
-	case lexer.TokenPunctuation:
-		switch prev.Text {
-		case ")", "]", "}":
-			return false
-		}
-		return true
-	}
-	return true
 }
 
 func isEmptyArrayLiteral(tokens []lexer.Token, startIdx, endIdx int) bool {

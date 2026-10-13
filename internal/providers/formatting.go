@@ -1454,11 +1454,6 @@ func isUnaryContext(lastNonWS lexer.Token, lineStart bool) bool {
 	return false
 }
 
-// isBlockEndKeyword checks if a keyword ends a block.
-func isBlockEndKeyword(keyword string) bool {
-	return constants.IsBlockEndKeyword(keyword)
-}
-
 // isOperator checks if a token is an operator that needs spacing.
 // Increment (++) and decrement (--) are excluded — they attach to their operand.
 func isOperator(token lexer.Token) bool {

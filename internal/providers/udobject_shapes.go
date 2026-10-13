@@ -43,6 +43,7 @@ type UDObjectProperty struct {
 //
 // On reassignment, the last write wins. SSL has no static scoping rich
 // enough to disambiguate inside a single file, so this is file-global.
+// API (no production caller): the single-file form of BuildUDObjectShapesWithProcedures, kept for tests and embedders.
 func BuildUDObjectShapes(tokens []lexer.Token) map[string]UDObjectShape {
 	return BuildUDObjectShapesWithProcedures(tokens, nil)
 }

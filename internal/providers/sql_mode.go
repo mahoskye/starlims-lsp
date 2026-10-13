@@ -253,18 +253,6 @@ func maskRange(content string, end int) string {
 	return string(masked) + content[end:]
 }
 
-// IsSQLCommentOnly reports whether data-source content consists solely of
-// terminated SQL comments and whitespace, with at least one comment — the
-// canonical header_comment-only stub (a banner and nothing else). The
-// unterminated SSL comment form never qualifies
-// (feature.diagnostics_pipeline A16, issue #148).
-func IsSQLCommentOnly(content string) bool {
-	if strings.TrimSpace(content) == "" {
-		return false
-	}
-	return strings.TrimSpace(maskLeadingSQLComments(content)) == ""
-}
-
 // SplitDataSourceHeader splits data-source content into a leading header of
 // builder-directive / :PARAMETERS lines and the remaining body. Leading
 // terminated SQL comments (the schema's optional header_comment) are

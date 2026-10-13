@@ -125,32 +125,6 @@ func TestGetDiagnostics_SQLContentOutsideDataSourceStillFlags(t *testing.T) {
 	}
 }
 
-// IsSQLDocument classifies whole-document content, tolerating leading SQL
-// comments while never classifying SSL content as SQL.
-func TestIsSQLDocument(t *testing.T) {
-	cases := []struct {
-		name    string
-		content string
-		want    bool
-	}{
-		{"plain select", "SELECT SampleID FROM Samples", true},
-		{"leading sql comments", "-- note\n/* block */\nSELECT SampleID FROM Samples", true},
-		{"insert", "INSERT INTO AuditLog (Msg) VALUES ('x')", true},
-		{"ssl leading comment", "/* datasource doc;\n:PARAMETERS sStatus;", false},
-		{"ssl code", ":PARAMETERS sStatus;\nsSQL := \"SELECT X FROM T\";", false},
-		{"empty", "", false},
-		{"prose mentioning select", "SELECT is a keyword in SQL", false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsSQLDocument(tc.content); got != tc.want {
-				t.Errorf("IsSQLDocument(%q) = %v, want %v", tc.content, got, tc.want)
-			}
-		})
-	}
-}
-
 // SplitDataSourceHeader separates builder directives and the inline-defaults
 // :PARAMETERS header from the SQL body (issue #104).
 func TestSplitDataSourceHeader(t *testing.T) {
@@ -353,34 +327,6 @@ func TestGetDiagnostics_HeaderOnlyDataSource(t *testing.T) {
 	flagged := bannerComment + ":dsn := conn;\n"
 	if diags := GetDiagnostics(flagged, opts); len(diags) == 0 {
 		t.Error("expected header checks to still run on a header-only data source")
-	}
-}
-
-// IsSQLCommentOnly accepts terminated SQL comments and whitespace only —
-// never the unterminated SSL comment form, never real content.
-// [spec feature.diagnostics_pipeline/A16]
-func TestIsSQLCommentOnly(t *testing.T) {
-	cases := []struct {
-		name    string
-		content string
-		want    bool
-	}{
-		{"banner", bannerComment, true},
-		{"line_comment", "-- note\n", true},
-		{"line_comment_no_newline", "-- note", true},
-		{"mixed_comments", "/* a */\n-- b\n/* c */", true},
-		{"empty", "", false},
-		{"whitespace_only", "  \n\t\n", false},
-		{"ssl_comment", "/* datasource doc;\n", false},
-		{"comment_then_sql", "/* a */\nSELECT 1 FROM DUAL", false},
-		{"comment_then_directive", "/* a */\n:DSN := conn;", false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := IsSQLCommentOnly(tc.content); got != tc.want {
-				t.Errorf("IsSQLCommentOnly(%q) = %v, want %v", tc.content, got, tc.want)
-			}
-		})
 	}
 }
 

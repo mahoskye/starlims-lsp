@@ -133,6 +133,7 @@ func FindDefinition(text string, line, column int, uri string, procedures []pars
 
 // FindReferences finds all references to a symbol.
 // This is a simple text-based search without scope awareness.
+// API (no production caller): the text-input form of FindReferencesWithScope, which the server calls.
 func FindReferences(text string, line, column int, uri string, includeDeclaration bool) []Location {
 	return FindReferencesWithScope(text, line, column, uri, includeDeclaration, nil, nil)
 }
