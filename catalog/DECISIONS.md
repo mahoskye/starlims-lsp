@@ -213,12 +213,37 @@ auto-open, signature help does not re-trigger while it would obscure the
 line. A wrong popup that Enter-corrupts code is worse than requiring
 Ctrl+Space.
 
+*Note (2026-10-13, issue #255):* D6 governs interactive UI only. It does
+not bear on which diagnostics are default-on; that is D5 (as amended) and
+D13.
+
 ## D5 — Noisy checks are opt-in (pre-v0.4, commit a4df25b)
 
 Checks with inherent false-positive exposure (undeclared variables, unused
 variables, SQL parameter mismatch, Hungarian notation) default off and are
 enabled explicitly. Default-on is reserved for rules that are wrong in
 essentially zero legitimate code (compile errors, syntax-level findings).
+
+**Amended 2026-10-13 (issue #255).** Later decisions refined this, and the
+original last sentence no longer describes practice:
+
+- *What default-on means.* A rule ships default-on when its findings are
+  real in essentially every case it reports on the production corpus —
+  compile errors and run-time failures (error), and likely bugs
+  (warning). The bar is the precision of what it reports, measured,
+  not "zero legitimate code could ever trigger it".
+- *Noisy checks stay opt-in at the core, and the audience decides.* The
+  core default stays off for checks with inherent false-positive or
+  volume exposure, so each embedder chooses: the VS Code extension turns
+  the Hungarian checks on for authors writing new SSL; non-interactive
+  consumers enable the undeclared/unused/SQL-parameter trio with
+  `--validate --strict` (v0.24.0), because they only see finished code.
+- *Advisory findings go to the info tier* (D13) rather than to an opt-in
+  boolean per rule.
+- *Severity is never the volume lever.* A rule that is too loud is gated
+  or split (as `hungarian_notation` / `hungarian_type_mismatch` were),
+  never demoted: severity encodes what kind of finding it is (D16 makes
+  raising one to error a breaking change).
 
 ## D4 — Endpoint scripts get runtime ambients (2026-05-14, PR #23, v0.7.7)
 
