@@ -174,6 +174,14 @@ history:
       Multilingual Plane (an emoji) earlier on the line put a range one
       unit too far left. The SQL lexer behind the data-source checks
       counted bytes, which also skewed ranges after accented text.
+  - date: 2026-10-13
+    ref: "issue #258"
+    note: >-
+      The 100-diagnostic cap now applies after sorting by severity, then
+      position (A33). It used to cut the checks' rule-ordered output, so
+      an error reported by a late check could be dropped behind 110
+      warnings that came before it. Endpoint patterns also match the
+      file path, now that every URI is canonicalized to its escaped form.
 issues: []
 ---
 
@@ -186,7 +194,10 @@ rules (those are `diag.*` entries).
   save, and re-published for every open document when the configuration
   changes. There is no debounce; validation runs synchronously on each
   event. At most 100 diagnostics are published per document (fixed
-  MaxNumberOfProblems cap).
+  MaxNumberOfProblems cap). Before the cap applies, the diagnostics are
+  ordered by severity (errors, then warnings, info, and hints) and by
+  position within a severity, so the cap drops the least severe findings
+  and never an error while a warning is kept (issue #258).
 - Every emitted diagnostic MUST carry a stable, machine-readable `Code`
   slug (canonical list in `internal/providers/diagnostic_codes.go`) and
   `Source: "ssl-lsp"`, propagated to the LSP wire.
@@ -219,8 +230,10 @@ rules (those are `diag.*` entries).
   so the user still sees them.
 - Endpoint classification: a document is treated as an SSL endpoint script
   (Request/Response become pre-injected ambients for the rules that care)
-  when its URI contains one of the `ssl.diagnostics.endpointPatterns`
-  substrings (case-insensitive) or a leading-docblock `Endpoint:` marker
+  when its URI, or the file path the URI names (so a pattern with a space
+  matches the `%20`-escaped URI), contains one of the
+  `ssl.diagnostics.endpointPatterns` substrings (case-insensitive) or a
+  leading-docblock `Endpoint:` marker
   appears in the first ~30 lines. The default-empty pattern list means zero
   false positives out of the box; a marker deeper in the file MUST NOT
   activate endpoint mode.
@@ -323,6 +336,7 @@ rules (those are `diag.*` entries).
 - A30: Given a data-source document, when a caller enables `CheckUndeclaredVars`, `CheckUnusedVars`, or `CheckSQLParams`, then none of the three runs — the data-source dialect does not follow SSL scoping (directive values are bare identifiers used as values, `:PARAMETERS` carries inline `:=` defaults, and the SQL body names columns and keywords), and `checkDataSourceUndeclaredPlaceholders` is its placeholder check instead. The same options on an ordinary SSL document still report (issue #249).
 - A31: Given a `.ds` document whose builder-directive / `:PARAMETERS` header is preceded by a banner written in SSL comment style (a `/*` run closed by `;` rather than `*/`), when the header is split, then the banner is masked to blanks like the terminated form and the header scan reaches the directives beneath it — so the body classifies on its own content and a SQL body stays in SQL mode. The leading-unterminated-comment signal decides only the headerless shapes: a comment-only stub and an SSL data source opening with an unterminated comment both still classify as SSL (issue #249, preserving A16/A22).
 - A32: Given a line holding an emoji (one character, two UTF-16 code units) before a flagged construct — an SSL finding such as `!==`, or an undeclared `@name` placeholder in a SQL data-source body — when diagnostics are published, then the range starts and ends at the construct's UTF-16 offsets, not one unit early; a line without such characters is unaffected (issue #307).
+- A33: Given a document producing more than 100 diagnostics, when they are published, then the published 100 are the most severe — errors first, then warnings, info, and hints, each severity in position order — so an error is never dropped while a less severe diagnostic is published, whatever order the checks emitted them in (issue #258).
 
 ## Rationale
 

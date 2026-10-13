@@ -14,7 +14,7 @@ import (
 
 // handleCompletion handles completion requests.
 func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.CompletionParams) (any, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	version := s.documentVersion[uri]
 
 	cache := s.documents.ParseDocument(uri, version)
@@ -321,7 +321,7 @@ func isClassMethodContext(tokens []lexer.Token, procedures []parser.ProcedureInf
 
 // handleHover handles hover requests.
 func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	version := s.documentVersion[uri]
 
 	content, ok := s.documents.GetDocument(uri)
@@ -489,7 +489,7 @@ func (s *SSLServer) handleHover(context *glsp.Context, params *protocol.HoverPar
 
 // handleDefinition handles go-to-definition requests.
 func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.DefinitionParams) (any, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 	version := s.documentVersion[uri]
 
 	content, ok := s.documents.GetDocument(uri)
@@ -528,7 +528,7 @@ func (s *SSLServer) handleDefinition(context *glsp.Context, params *protocol.Def
 // keeps the single-file path, and a nil workspace index reproduces the
 // single-file behavior exactly.
 func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -581,7 +581,7 @@ func (s *SSLServer) handleReferences(context *glsp.Context, params *protocol.Ref
 
 // handleDocumentSymbol handles document symbol requests.
 func (s *SSLServer) handleDocumentSymbol(context *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -799,7 +799,7 @@ func convertDocumentSymbol(m *utf16Mapper, sym providers.DocumentSymbol) protoco
 
 // handleFoldingRange handles folding range requests.
 func (s *SSLServer) handleFoldingRange(context *glsp.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	if _, ok := s.documents.GetDocument(uri); !ok {
 		return nil, nil
@@ -833,7 +833,7 @@ func (s *SSLServer) handleFoldingRange(context *glsp.Context, params *protocol.F
 
 // handleSignatureHelp handles signature help requests.
 func (s *SSLServer) handleSignatureHelp(context *glsp.Context, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	if _, ok := s.documents.GetDocument(uri); !ok {
 		return nil, nil
@@ -890,7 +890,7 @@ func (s *SSLServer) handleSignatureHelp(context *glsp.Context, params *protocol.
 
 // handleFormatting handles document formatting requests.
 func (s *SSLServer) handleFormatting(context *glsp.Context, params *protocol.DocumentFormattingParams) ([]protocol.TextEdit, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -912,7 +912,7 @@ func (s *SSLServer) handleFormatting(context *glsp.Context, params *protocol.Doc
 
 // handleRangeFormatting handles document range formatting requests.
 func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protocol.DocumentRangeFormattingParams) ([]protocol.TextEdit, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -941,7 +941,7 @@ func (s *SSLServer) handleRangeFormatting(context *glsp.Context, params *protoco
 
 // handlePrepareRename handles prepare rename requests.
 func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.PrepareRenameParams) (any, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -978,7 +978,7 @@ func (s *SSLServer) handlePrepareRename(context *glsp.Context, params *protocol.
 // same-file behavior; a nil workspace index reproduces the single-file
 // rename exactly.
 func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {
@@ -1034,7 +1034,7 @@ func (s *SSLServer) handleRename(context *glsp.Context, params *protocol.RenameP
 
 // handleInlayHint handles textDocument/inlayHint requests.
 func (s *SSLServer) handleInlayHint(context *glsp.Context, params *InlayHintParams) ([]InlayHint, error) {
-	uri := params.TextDocument.URI
+	uri := canonicalURI(params.TextDocument.URI)
 
 	content, ok := s.documents.GetDocument(uri)
 	if !ok {

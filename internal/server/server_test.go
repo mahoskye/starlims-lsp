@@ -699,6 +699,11 @@ func TestIsEndpointFile_PatternMatch(t *testing.T) {
 	if isEndpointFile("file:///work/lib/Bar.ssl", "", []string{"/endpoints/"}) {
 		t.Error("did not expect lib/Bar.ssl to match")
 	}
+	// URIs are percent-escaped (issue #258); a pattern written as a path
+	// still matches.
+	if !isEndpointFile("file:///work/Server%20Scripts/API/Foo.srvscr", "", []string{"Server Scripts/API/"}) {
+		t.Error("expected a path pattern with a space to match the escaped URI")
+	}
 }
 
 // [spec feature.diagnostics_pipeline/A8] — leading-docblock Endpoint: marker.
@@ -756,5 +761,96 @@ func TestSignatureHelpAutoTriggerSetting(t *testing.T) {
 	})
 	if !s.settings.SignatureHelpAutoTrigger {
 		t.Error("expected SignatureHelpAutoTrigger=true after opt-in")
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A33] The 100-diagnostic cap keeps the
+// most severe findings: an error below 110 warnings is still published,
+// first (issue #258).
+func TestPublishDiagnostics_CapKeepsErrorsFirst(t *testing.T) {
+	// 110 prefer_exitcase warnings (two lines each), then a
+	// return_in_finally error, which a later check reports.
+	var b strings.Builder
+	b.WriteString(":PROCEDURE Demo;\n:PARAMETERS nVal;\n:BEGINCASE;\n")
+	for i := 0; i < 110; i++ {
+		b.WriteString(":CASE nVal == 1;\n    nVal := 2;\n")
+	}
+	b.WriteString(":OTHERWISE;\n    nVal := 3;\n    :EXITCASE;\n:ENDCASE;\n")
+	b.WriteString(":TRY;\n    nVal := 4;\n:FINALLY;\n    :RETURN nVal;\n:ENDTRY;\n:ENDPROC;\n")
+	content := b.String()
+	errLine := uint32(strings.Count(content[:strings.Index(content, ":RETURN")], "\n"))
+
+	// The fixture must exercise the cap: in collection order, the error
+	// sits past the first 100 diagnostics.
+	raw := providers.GetDiagnostics(content, DefaultSettings().Diagnostics)
+	errAt := -1
+	for i, d := range raw {
+		if d.Severity == providers.SeverityError {
+			errAt = i
+			break
+		}
+	}
+	if errAt < 100 {
+		t.Fatalf("fixture no longer buries the error past the cap (error at %d of %d)", errAt, len(raw))
+	}
+
+	s := newTestServerWithDocument(content)
+	var published protocol.PublishDiagnosticsParams
+	s.validateDocument(&glsp.Context{Notify: func(method string, params any) {
+		if method == protocol.ServerTextDocumentPublishDiagnostics {
+			published = params.(protocol.PublishDiagnosticsParams)
+		}
+	}}, testURI)
+
+	if got := len(published.Diagnostics); got != 100 {
+		t.Fatalf("expected the cap of 100, got %d", got)
+	}
+	first := published.Diagnostics[0]
+	if first.Severity == nil || *first.Severity != protocol.DiagnosticSeverityError {
+		t.Fatalf("expected the error first, got %+v", first)
+	}
+	if first.Range.Start.Line != errLine {
+		t.Errorf("error on line %d, want %d", first.Range.Start.Line, errLine)
+	}
+	// Within a severity, diagnostics run in document order.
+	for i := 2; i < len(published.Diagnostics); i++ {
+		if published.Diagnostics[i].Range.Start.Line < published.Diagnostics[i-1].Range.Start.Line {
+			t.Fatalf("warnings out of position order at %d", i)
+		}
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A33] capDiagnostics orders by
+// severity, then position, and caps.
+func TestCapDiagnostics(t *testing.T) {
+	at := func(sev providers.DiagnosticSeverity, line, char int) providers.Diagnostic {
+		return providers.Diagnostic{Severity: sev, Range: providers.Range{Start: providers.Position{Line: line, Character: char}}}
+	}
+	in := []providers.Diagnostic{
+		at(providers.SeverityHint, 0, 0),
+		at(providers.SeverityWarning, 5, 0),
+		at(providers.SeverityInfo, 1, 0),
+		at(providers.SeverityWarning, 2, 4),
+		at(providers.SeverityError, 9, 0),
+		at(providers.SeverityWarning, 2, 1),
+		at(providers.SeverityError, 3, 0),
+	}
+	got := capDiagnostics(append([]providers.Diagnostic(nil), in...), 5)
+	want := []providers.Diagnostic{
+		at(providers.SeverityError, 3, 0),
+		at(providers.SeverityError, 9, 0),
+		at(providers.SeverityWarning, 2, 1),
+		at(providers.SeverityWarning, 2, 4),
+		at(providers.SeverityWarning, 5, 0),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("capDiagnostics =\n%+v\nwant\n%+v", got, want)
+	}
+	all := capDiagnostics(append([]providers.Diagnostic(nil), in...), 0)
+	if len(all) != len(in) {
+		t.Fatalf("a cap of 0 must keep everything, got %d", len(all))
+	}
+	if all[5].Severity != providers.SeverityInfo || all[6].Severity != providers.SeverityHint {
+		t.Errorf("info must sort before hint, got %+v", all[5:])
 	}
 }

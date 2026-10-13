@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -373,6 +374,9 @@ func TestWorkspaceIndex_ClassSymbolKind(t *testing.T) {
 }
 
 func TestURIPathConversion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix paths; the Windows cases are in uri_test.go")
+	}
 	tests := []struct {
 		path string
 	}{

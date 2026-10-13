@@ -279,6 +279,7 @@ Behavior changes start in the catalog: write or update the entry under [`catalog
 |------|----------|
 | `cmd/starlims-lsp/` | The binary: LSP server and the `--validate` / `--format` / `--export-signatures` CLI modes |
 | `cmd/gen-inventory/`, `cmd/gen-catalog-docs/` | Code and doc generators |
+| `dev/exprcoverage/` | Expression-AST coverage harness, run after grammar work: `go run ./dev/exprcoverage <files>`. The rest of `dev/` is ignored, for local copies of sibling repos |
 | `internal/server/` | LSP handlers, document cache, settings, workspace index, cross-file references and rename |
 | `internal/providers/` | Feature logic: diagnostics, completion, hover, navigation, formatting |
 | `internal/parser/`, `internal/lexer/` | Tokenizer, statement tree, and expression AST |
