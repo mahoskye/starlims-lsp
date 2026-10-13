@@ -145,8 +145,10 @@ renamed).
 
 Cross-file rename (issue #125) inverts references' liberality: a missed
 reference costs a click, a wrong edit corrupts a call site, so only
-unambiguous resolutions are written (D1) and class-file procedures refuse
-the cross-file path outright (D8) — an honest refusal beats a rename that
+unambiguous resolutions are written (plan D1) and class-file procedures refuse
+the cross-file path outright (plan D8; "plan" is
+`docs/plans/2026-07-24-cross-file-references-rename.md` §7, not
+DECISIONS.md) — an honest refusal beats a rename that
 silently breaks every `obj:Method()` caller it cannot see. Edits are always
 recomputed from current content because the index may be stale against
 unsaved or external changes; emitting edits from indexed positions could
@@ -155,7 +157,7 @@ splice the new name into the wrong bytes.
 ## Known gaps
 
 - **Class-method channel.** `obj:Method()` / `Base:Method()` calls into
-  class scripts via bare identifiers are invisible; the D8 gate refuses
+  class scripts via bare identifiers are invisible; the plan-D8 gate refuses
   cross-file rename for class-file procedures rather than break those
   callers. Relaxable if class-method resolution is ever modeled.
 - **Include-spliced 1-part calls.** A 1-part `DoProc("Foo")` in an includer

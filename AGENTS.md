@@ -4,6 +4,8 @@ This document provides essential SSL (STARLIMS Scripting Language) coding conven
 
 When this file conflicts with the upstream sources, they win: [`ssl-style-guide`](https://github.com/mahoskye/ssl-style-guide) for language and style rules, and the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) for element behavior (functions, classes, keywords, operators). Read them upstream, not from a local `dev/` copy, which goes stale.
 
+**Target version:** these conventions describe STARLIMS 12 SSL as verified by the SSL reference (written for STARLIMS 11, verified on STARLIMS 12). Where the two versions are known to differ, write code that works on both; the starlims-lsp diagnostics report what fails on either ([D17](https://github.com/mahoskye/starlims-lsp/blob/main/catalog/DECISIONS.md)).
+
 ---
 
 ## Quick Reference Card
@@ -45,9 +47,9 @@ All SSL keywords must be prefixed with `:` and written in UPPERCASE:
 
 :BEGINCASE;
 :CASE condition;
-    :EXITCASE;
+	:EXITCASE;
 :OTHERWISE;
-    :EXITCASE;
+	:EXITCASE;
 :ENDCASE;
 
 /* Error Handling;
@@ -69,9 +71,9 @@ All SSL keywords must be prefixed with `:` and written in UPPERCASE:
 
 /* Classes - ONE per file, NO :ENDCLASS, extends to EOF;
 :CLASS ClassName;
-:INHERIT BaseClass;
+:INHERIT Category.BaseClass;  /* Parent must be category-qualified (a bare name does not compile);
 
-/* Legacy functional text blocks;
+/* Stored text blocks, read at run time with GetRegion() / GetInlineCode();
 :REGION RegionName;
 :ENDREGION;
 :BEGININLINECODE BlockName;
@@ -96,11 +98,12 @@ SSL uses block comment syntax that terminates with semicolon:
 ```ssl
 /* Single-line comment;
 
-/* Multi-line comment
-   spanning multiple lines
-   still ends with semicolon;
+/*
+Multi-line comment: the opening marker alone on the first line,
+then the text, then the semicolon alone on the last line
+;
 
-/* 
+/*
  * Documentation header style
  * Procedure: DoSomething
  * Parameters: sInput - the input string
@@ -125,7 +128,7 @@ x %= 3;        /* Modulo and assign;
 
 #### Comparison Operators
 ```ssl
-x = y          /* Equality (loose for strings: .T. if right is empty OR left starts with right);
+x = y          /* Equality (loose for strings: .T. if right is empty OR left starts with right, case-sensitive);
 x == y         /* Strict equality (exact match);
 x != y         /* Not equal (negates ==, NOT =);
 x <> y         /* Not equal (same as !=, less preferred);
@@ -187,7 +190,7 @@ bTrue := .T.;
 bFalse := .F.;
 
 /* Null;
-xValue := NIL;
+vValue := NIL;
 
 /* Strings (three quote styles);
 s1 := "double quotes";
@@ -202,7 +205,7 @@ sFirst := aItems[1];  /* Gets "first", NOT aItems[0];
 dDate := DateFromNumbers(2024, 12, 25, 14, 30, 0);
 dToday := Today();
 dNow := Now();
-dParsed := CToD("2024-12-25");
+dParsed := CToD("12/25/2024");  /* Parsed with the session DateFormat (default M/d/yyyy). CToD("2024-12-25") returns an empty date under the default;
 ```
 
 ---
@@ -224,9 +227,9 @@ All variables must use Hungarian notation prefixes to indicate type:
 
 ### Exceptions to Hungarian Notation
 
-1. **Loop counters**: Single letters `i`, `j`, `k`, `x`, `y`, `z` are allowed
+1. **Loop counters**: Single letters `i`, `j`, `k`, `x`, `y`, `z` are allowed when declared (in a script that calls other scripts, prefer a specific name such as `nSampleIdx`)
 2. **Constants**: Use `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_PATH`)
-3. **Special identifiers**: `NIL`, `.T.`, `.F.`, `ID`, `SQL`, `URL`, `XML`
+3. **Literals**: `NIL`, `.T.`, `.F.`. Acronyms inside a name (`sSQL`, `sURL`) keep their casing only where the surrounding codebase already does so
 
 ### Naming Conventions
 
@@ -255,25 +258,25 @@ MyProcedure();
 
 ```ssl
 /* Same file - use DoProc;
-result := DoProc("CalculateTotal", {5, 10});
+vResult := DoProc("CalculateTotal", {5, 10});
 
 /* Different file entry point - use ExecFunction;
-result := ExecFunction("Category.Script", {5, 10});
+vResult := ExecFunction("Category.Script", {5, 10});
 
 /* Different file specific procedure - use ExecFunction;
-result := ExecFunction("Category.Script.CalculateTotal", {5, 10});
+vResult := ExecFunction("Category.Script.CalculateTotal", {5, 10});
 
-/* User-defined functions - use ExecUdf;
-result := ExecUdf("MyUdfName", {param1, param2});
+/* SSL source held in a string - use ExecUdf (arguments arrive through its own :PARAMETERS);
+vResult := ExecUdf(":PARAMETERS a, b; :RETURN a + b;", {2, 3});
 
-/* Dynamic code execution - use Eval;
-result := Eval("1 + 2");
+/* Code block value - use Eval (it runs code blocks, not source text);
+vResult := Eval({|n| n * 2}, 5);
 
-/* Skip parameters with empty array positions;
-result := DoProc("MyProc", {param1,, param3});  /* Skips param2;
+/* Skip parameters with adjacent commas (style rule, a space between them also compiles);
+vResult := DoProc("MyProc", {vArg1,, vArg3});  /* Skips the second argument;
 
 /* Omit trailing optional args entirely;
-result := DoProc("NoArgProc");
+vResult := DoProc("NoArgProc");
 ```
 
 ### ❌ Omitting `:EXITCASE` Unintentionally
@@ -282,9 +285,9 @@ result := DoProc("NoArgProc");
 /* WRONG - missing :EXITCASE can let later matching CASE blocks run;
 :BEGINCASE;
 :CASE nVal == 1;
-    DoSomething();
+	sLabel := "one";
 :CASE nVal == 2;
-    DoOther();
+	sLabel := "two";
 :ENDCASE;
 ```
 
@@ -294,14 +297,14 @@ result := DoProc("NoArgProc");
 /* CORRECT - prefer :EXITCASE unless multi-match behavior is intentional;
 :BEGINCASE;
 :CASE nVal == 1;
-    DoSomething();
-    :EXITCASE;
+	sLabel := "one";
+	:EXITCASE;
 :CASE nVal == 2;
-    DoOther();
-    :EXITCASE;
+	sLabel := "two";
+	:EXITCASE;
 :OTHERWISE;
-    DoDefault();
-    :EXITCASE;
+	sLabel := "other";
+	:EXITCASE;
 :ENDCASE;
 ```
 
@@ -321,7 +324,7 @@ sLast := aItems[Len(aItems)];
 
 /* Looping through array;
 :FOR i := 1 :TO Len(aItems);
-    DoProc("Process", {aItems[i]});
+	DoProc("Process", {aItems[i]});
 :NEXT;
 ```
 
@@ -330,7 +333,7 @@ sLast := aItems[Len(aItems)];
 ```ssl
 /* WRONG - SSL uses colon, not dot;
 oEmail.Subject := "Test";
-nCount := oDataset.RowCount;
+sXml := oDataset.ToXml();
 ```
 
 ### ✅ Correct Property Access
@@ -338,8 +341,8 @@ nCount := oDataset.RowCount;
 ```ssl
 /* CORRECT - use colon notation;
 oEmail:Subject := "Test";
-nCount := oDataset:RowCount;
-sValue := oDataset:GetValue(1, "FieldName");
+sXml := oDataset:ToXml();
+aRows := oDataset:ToArray();
 ```
 
 ### ❌ Wrong Logical Operators
@@ -417,7 +420,7 @@ aResults := SQLExecute(sSQL);
 :DECLARE aStatusCodes;
 aStatusCodes := {"A", "P", "C"};
 sSQL := "SELECT * FROM Samples WHERE Status IN (?aStatusCodes?)";
-/* ?aStatusCodes? becomes ?,?,? automatically;
+/* ?aStatusCodes? becomes ?,?,? automatically (use a local array, a UDO array property raises a run-time error);
 
 /* Object property access;
 sSQL := "SELECT * FROM Users WHERE UserID = ?oUser:ID?";
@@ -426,22 +429,25 @@ sSQL := "SELECT * FROM Users WHERE UserID = ?oUser:ID?";
 sSQL := "SELECT * FROM Samples WHERE CreateDate < ?Today()?";
 ```
 
-### RunSQL, LSearch, GetDataSet — Positional Parameters (`?`)
+### RunSQL, LSearch, LSelect, GetDataSet — Positional Parameters (`?`)
 
-All other database functions use positional `?` placeholders with explicit value arrays:
+`RunSQL`, `LSearch`, the `LSelect` family, and `GetDataSet` use positional `?` placeholders with an explicit value array (`GetSSLDataset` uses `@name` markers with parallel name and value arrays instead). Omit the connection-name argument for the default database:
 
 ```ssl
-:DECLARE sSQL, bSuccess, sResult, aResults;
+:DECLARE sSQL, bSuccess, sResult, aResults, sXml;
 
-/* RunSQL - for INSERT/UPDATE/DELETE, returns boolean;
+/* RunSQL - non-query SQL (INSERT/UPDATE/DELETE/DDL), returns boolean;
 sSQL := "UPDATE Samples SET Status = ? WHERE SampleID = ?";
 bSuccess := RunSQL(sSQL,, {sStatus, sSampleID});
 
 /* LSearch - single value lookup with default;
 sResult := LSearch("SELECT Name FROM Samples WHERE ID = ?", "Unknown",, {sSampleID});
 
-/* LSelect1 - multi-row SELECT returning 2D array;
+/* LSelect1 - multi-row SELECT returning 2D array (values array is the 3rd argument);
 aResults := LSelect1("SELECT * FROM Samples WHERE Status = ?",, {sStatus});
+
+/* LSelect / LSelectC - same result, but the values array is the 4th argument;
+aResults := LSelect("SELECT * FROM Samples WHERE Status = ?",,, {sStatus});
 
 /* GetDataSet - SELECT returning XML dataset;
 sXml := GetDataSet("SELECT * FROM Samples WHERE Status = ?", {sStatus});
@@ -449,28 +455,30 @@ sXml := GetDataSet("SELECT * FROM Samples WHERE Status = ?", {sStatus});
 
 ### Database Function Summary
 
-| Function | Parameter Style | Use Case | Returns |
-|----------|----------------|----------|---------|
-| `SQLExecute` | `?varName?` (named) | Universal - auto-routes | Array, XML, Dataset, or Bool |
-| `RunSQL` | `?` (positional) | **DML only** (INSERT/UPDATE/DELETE) | Boolean |
-| `LSearch` | `?` (positional) | Single value lookup | Value with default |
-| `LSelect` | `?` (positional) | Multi-row SELECT | 2D Array |
-| `LSelect1` | `?` (positional) | Multi-row SELECT | 2D Array |
-| `LSelectC` | `?` (positional) | Multi-row SELECT (delegates to LSelect) | 2D Array |
-| `GetDataSet` | `?` (positional) | SELECT to XML | XML String |
+| Function | Parameter Style | Call shape | Use Case | Returns |
+|----------|----------------|------------|----------|---------|
+| `SQLExecute` | `?varName?` (named) | `SQLExecute(sSQL)` | Universal - auto-routes | Array, XML, Dataset, or Bool |
+| `RunSQL` | `?` (positional) | `RunSQL(sSQL,, aValues)` | **Non-query only** (INSERT/UPDATE/DELETE/DDL; never SELECT) | Boolean |
+| `LSearch` | `?` (positional) | `LSearch(sSQL, vDefault,, aValues)` | Single value lookup | Value with default |
+| `LSelect` | `?` (positional) | `LSelect(sSQL,,, aValues)` | Multi-row SELECT | 2D Array |
+| `LSelect1` | `?` (positional) | `LSelect1(sSQL,, aValues)` | Multi-row SELECT | 2D Array |
+| `LSelectC` | `?` (positional) | `LSelectC(sSQL,,, aValues)` | Multi-row SELECT (delegates to LSelect) | 2D Array |
+| `GetDataSet` | `?` (positional) | `GetDataSet(sSQL, aValues)` | SELECT to XML | XML String |
+
+The skipped arguments are the connection name (and, for `LSelect`/`LSelectC`, an unimplemented field list that must be omitted). Writing `LSelect(sSQL,, aValues)` passes the array as the connection name.
 
 ### ❌ Wrong: Using Named Params with RunSQL
 
 ```ssl
 /* WRONG - RunSQL doesn't support ?varName? syntax;
-RunSQL("INSERT INTO Log VALUES(?sMessage?)", "", {});
+RunSQL("INSERT INTO Log VALUES(?sMessage?)");
 ```
 
 ### ✅ Correct: Positional Params with RunSQL
 
 ```ssl
 /* CORRECT - use positional ? with value array;
-RunSQL("INSERT INTO Log(Message) VALUES(?)", "", {sMessage});
+RunSQL("INSERT INTO Log(Message) VALUES(?)",, {sMessage});
 ```
 
 ---
@@ -489,32 +497,31 @@ RunSQL("INSERT INTO Log(Message) VALUES(?)", "", {sMessage});
  * Returns: description of return value
 ;
 :PROCEDURE ProcedureName;
-:PARAMETERS sInput, nValue;
-:DEFAULT sInput, "";
-:DEFAULT nValue, 0;
-:DECLARE sResult, nCount, aItems;
+	:PARAMETERS sInput, nValue;
+	:DEFAULT sInput, "";
+	:DEFAULT nValue, 0;
+	:DECLARE sResult, nCount, aItems, i;
 
-/* Initialization;
-sResult := "";
-nCount := 0;
+	/* Initialization;
+	sResult := "";
+	nCount := 0;
 
-/* Main logic;
-:TRY;
-    /* Your code here;
-    aItems := SQLExecute("SELECT * FROM Table WHERE Field = ?sInput?");
-    
-    :IF Len(aItems) > 0;
-        :FOR i := 1 :TO Len(aItems);
-            nCount += 1;
-        :NEXT;
-    :ENDIF;
-    
-    sResult := "Processed " + LimsString(nCount) + " items";
-:CATCH;
-    sResult := "Error: " + GetLastSSLError():Description;
-:ENDTRY;
+	/* Main logic;
+	:TRY;
+		aItems := SQLExecute("SELECT ItemID FROM Items WHERE Category = ?sInput?");
 
-:RETURN sResult;
+		:IF Len(aItems) > 0;
+			:FOR i := 1 :TO Len(aItems);
+				nCount += 1;
+			:NEXT;
+		:ENDIF;
+
+		sResult := "Processed " + LimsString(nCount) + " items";
+	:CATCH;
+		sResult := "Error: " + GetLastSSLError():Description;
+	:ENDTRY;
+
+	:RETURN sResult;
 :ENDPROC;
 ```
 
@@ -529,7 +536,7 @@ nCount := 0;
 7. `:ENDPROC;`
 
 Placement rules:
-- Script-level `:PARAMETERS` must appear before top-level executable statements, though leading `:PROCEDURE` blocks may come first
+- Script-level `:PARAMETERS` must be the first statement of the script (an `:INCLUDE` may precede it). The LSP tolerates leading `:PROCEDURE` blocks before it, but the style guide treats that layout as wrong
 - Inside a procedure, `:PARAMETERS` must immediately follow `:PROCEDURE`
 - `:DEFAULT` must immediately follow `:PARAMETERS`
 
@@ -541,8 +548,8 @@ Placement rules:
 
 ```ssl
 /* Built-in SSL classes use curly braces;
-oEmail := Email{};
-oEmail := Email{.T.};  /* With parameter;
+oEmail := Email{};     /* Failures return .F. and set oEmail:Exception;
+oEmail := Email{.F.};  /* Failures raise, handle them with :TRY;
 oRegex := SSLRegex{'\d+'};
 oDataset := SSLDataset{};
 oDict := SSLStringDictionary{};
@@ -551,17 +558,17 @@ oDict := SSLStringDictionary{};
 ### User-Defined Objects (CreateUdObject)
 
 ```ssl
-/* Custom classes use CreateUdObject;
-oCustom := CreateUdObject("MyClass");
-oCustom := CreateUdObject("MyClass", {param1, param2});
+/* Custom classes use CreateUdObject with the category-qualified class name;
+oCustom := CreateUdObject("Category.MyClass");
+oCustom := CreateUdObject("Category.MyClass", {vArg1, vArg2});
 
 /* Empty dynamic object;
 oAnon := CreateUdObject();
-oAnon:Property1 := "value";
-oAnon:Property2 := 123;
+oAnon:property1 := "value";
+oAnon:property2 := 123;
 
 /* Anonymous object with named properties;
-oSeeded := CreateUdObject({{"Property1", "value"}, {"Property2", 123}});
+oSeeded := CreateUdObject({{"property1", "value"}, {"property2", 123}});
 ```
 
 ---
@@ -640,26 +647,27 @@ LIMSDate(vDate);  /* Date formatting (not "LimsDate");
 
 ```ssl
 :TRY;
-    /* Risky operations;
-    aResults := SQLExecute(sSQL);
-    :IF Len(aResults) = 0;
-        RaiseError("No data found");
-    :ENDIF;
+	/* Risky operations;
+	aResults := SQLExecute(sSQL);
+	:IF Len(aResults) = 0;
+		RaiseError("No data found");
+	:ENDIF;
 :CATCH;
-    oErr := GetLastSSLError();
-    sErrMsg := "Error: " + oErr:Description;
-    UsrMes(sErrMsg, "Error");
-    :RETURN .F.;
+	oErr := GetLastSSLError();
+	sErrMsg := "Error: " + oErr:Description;
+	ErrorMes("Error", sErrMsg);  /* Caption first, then message. Writes the server log, not a UI message;
+	:RETURN .F.;
 :FINALLY;
-    /* Cleanup - always runs;
-    :IF .NOT. Empty(oConnection);
-        oConnection := NIL;
-    :ENDIF;
+	/* Cleanup - always runs;
+	:IF .NOT. Empty(oConnection);
+		oConnection := NIL;
+	:ENDIF;
 :ENDTRY;
 ```
 
 Important restrictions:
 - `:TRY` must include at least one statement before `:CATCH` or `:FINALLY`
+- A `:FINALLY` body must also contain at least one statement (a `:CATCH` body may be empty)
 - At least one of `:CATCH` or `:FINALLY` is required
 - `:CATCH` does not bind an exception variable; call `GetLastSSLError()` inside the block
 - `:RETURN`, `:EXITFOR`, `:EXITWHILE`, and `:LOOP` are compile-time errors inside `:FINALLY`
@@ -682,9 +690,9 @@ Important restrictions:
 12. **`:NEXT` not `:ENDFOR`** — FOR loops end with `:NEXT;` (`:ENDFOR` is invalid)
 13. **`:DEFAULT` only with `:PARAMETERS`** — Never on a `:DECLARE` line
 14. **Declared variables start as `""`** — Empty string, not NIL
-15. **Curly braces for built-ins** — `Email{}`, `SSLDataset{}`; never `CreateUdObject("Email")`
+15. **Curly braces for built-ins** — `Email{}`, `SSLDataset{}`; never `CreateUdObject("Email")`. User-defined classes use `CreateUdObject("Category.ClassName")`
 16. **Dates are not brace literals** — `{2024,12,25}` is an array; use `DateFromNumbers()` or `CToD()`
-17. **DoProc is compile error in classes** — Use `Me:Method()` / `Base:Method()` inside `:CLASS`
-18. **Skipped params: adjacent commas** — `DoProc("P", {a,,c})` not `DoProc("P", {a, , c})`
+17. **No bare-name DoProc in classes** — `DoProc("Name")` inside a class method is a compile error; use `Me:Method()` / `Base:Method()` inside `:CLASS`
+18. **Skipped params: adjacent commas** — write `DoProc("P", {a,,c})`, not `DoProc("P", {a, , c})` (both compile; adjacent commas are the style rule)
 19. **Scientific notation needs decimal** — `7.0e2` not `7e2`
 20. **`:FINALLY` restrictions** — No `:RETURN`, `:EXITFOR`, `:EXITWHILE`, `:LOOP` inside `:FINALLY`

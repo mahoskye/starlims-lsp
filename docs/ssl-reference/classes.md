@@ -2,7 +2,7 @@
 
 This document lists the developer-facing built-in classes available in SSL.
 
-**Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/constants.go`
+**Primary Sources:** the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) (authoritative, vendored in `internal/constants/data/`), `internal/constants/canonical.go`, `internal/constants/constants.go`
 
 ---
 
@@ -76,7 +76,7 @@ oExpando:PropertyName := "value";
 oDataset := SSLDataset{};
 
 /* User-defined classes use CreateUdObject;
-oCustom := CreateUdObject("MyClass", {sName, nCount});
+oCustom := CreateUdObject("Category.MyClass", {sName, nCount});
 
 /* Anonymous property bag;
 oAnon := CreateUdObject({{"Name", "value"}, {"Count", 1}});

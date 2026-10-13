@@ -180,7 +180,7 @@ Snippet templates follow the bundled style-guide defaults:
 > A reasonable surface: treat unmatched members on these receivers as
 > "unresolved .NET member" rather than an error, and offer completions
 > only for SSL-side members (the .NET surface is too broad to enumerate).
-> See `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md`
+> See [`agent-guides/ssl_agent_instructions.md`](https://github.com/mahoskye/ssl-style-guide/blob/main/agent-guides/ssl_agent_instructions.md) in the upstream style guide
 > ("`.NET Method Dispatch on Built-in Types`") for the canonical rule.
 > Tracked in [issue #22](https://github.com/mahoskye/starlims-lsp/issues/22).
 

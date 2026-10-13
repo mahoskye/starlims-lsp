@@ -211,7 +211,7 @@ sResult := LSearch("SELECT Name FROM T WHERE ID = ?", "",, {nID});
 ```ssl
 /* WRONG - dot notation doesn't work;
 oEmail.Subject := "Test";
-nCount := oDataset.RowCount;
+sXml := oDataset.ToXml();
 ```
 
 **Solution:** Use colon notation.
@@ -219,8 +219,8 @@ nCount := oDataset.RowCount;
 ```ssl
 /* CORRECT;
 oEmail:Subject := "Test";
-nCount := oDataset:RowCount;
-sValue := oDataset:GetValue(1, "FieldName");
+sXml := oDataset:ToXml();
+aRows := oDataset:ToArray();
 ```
 
 **LSP Support:** Yes — detects dot notation and suggests colon notation.
@@ -387,7 +387,7 @@ oEmail := Email{};
 oRegex := SSLRegex{'\d+'};
 
 /* User-defined classes use CreateUdObject;
-oCustom := CreateUdObject("MyClass", {params});
+oCustom := CreateUdObject("Category.MyClass", {params});
 ```
 
 **LSP Support:** Yes — detects `ClassName()` patterns for built-in classes.

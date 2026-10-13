@@ -1,8 +1,8 @@
 # SSL Built-in Functions
 
-This document lists all **330 developer-facing built-in functions** exposed by the LSP. Signatures are sourced from `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative).
+This document lists all **330 developer-facing built-in functions** exposed by the LSP. Signatures come from the vendored reference data in `internal/constants/data/`, synced from the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) (authoritative).
 
-**Primary Sources:** `dev/ssl-style-guide/agent-guides/ssl_agent_instructions.md` (authoritative), `internal/constants/canonical.go`, `internal/constants/signatures.go`
+**Primary Sources:** the published [`starlims-ssl-reference`](https://github.com/mahoskye/starlims-ssl-reference) (authoritative, vendored in `internal/constants/data/`), `internal/constants/canonical.go`, `internal/constants/signatures.go`
 
 Function names are case-insensitive at runtime, but the LSP presents the canonical casing documented in the style-guide materials. Parameter prefixes: `s` = string, `n` = number, `b` = boolean, `d` = date, `a` = array, `o` = object, `v` = any/variant, `fn` = code block.
 

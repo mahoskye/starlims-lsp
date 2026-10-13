@@ -1,5 +1,10 @@
 # Production-corpus formatting review — 2026-08-28
 
+> **Status (2026-10-13): resolved — historical record.** Every finding was
+> fixed (issues #215–#220, all closed) and shipped in v0.18.0 (2026-08-28).
+> Current formatter behavior is specified by the
+> [`catalog/formatting/`](../../catalog/formatting/) entries.
+
 > Carved into issues (2026-08-28): H1→#215, H2 (+I4 pointer)→#216,
 > H3/H4/H5→#217, H6→#218, H7/H8/C1/C3→#219, I1–I6→#220; upstream
 > C1/C2 reference-doc challenge→ssl-style-guide#61.

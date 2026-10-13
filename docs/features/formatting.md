@@ -228,7 +228,7 @@ sSQL := "
 
 This feature is controlled by `ssl.format.sql.detectSQLStrings` (default: `true`).
 
-The default SQL style is `canonicalCompact`, which matches the compact reference in `dev/ssl-style-guide/ssl-style-guide/sql-canonical-compact-reference.md`:
+The default SQL style is `canonicalCompact`, which matches the compact reference in the upstream style guide, [`sql-canonical-compact-reference.md`](https://github.com/mahoskye/ssl-style-guide/blob/main/ssl-style-guide/sql-canonical-compact-reference.md):
 
 - **Major clauses** (`SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `ORDER BY`, etc.) at column 0 relative to the 4-space SQL indent
 - **SELECT continuations** aligned to first column (col 7 from clause start)
