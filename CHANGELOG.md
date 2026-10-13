@@ -106,6 +106,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assignment as a declaration, but `invalid_sql_param` reported every
   `?sStatus?` marker for it. On the production corpus `--strict` reported
   9,478 of these findings; 540 remain.
+### Breaking
+- **`--validate` rejects unknown flags instead of reading them as file
+  paths.** A dash-prefixed argument `--validate` does not know now exits
+  2, names the flag on stderr, and writes nothing to stdout. Before
+  this, a consumer that passed a flag newer than its pinned binary got
+  a phantom `{"file": "--new-flag", "valid": false}` entry beside a
+  result computed without the flag, and exit 1 told it nothing.
+  **Downstream:** a runner must treat exit 2 as a failed call, with
+  empty stdout and the reason on stderr. A runner that parses stdout
+  unconditionally now sees empty output where it used to see a phantom
+  entry. Guards that look for `--`-prefixed `file` entries, like the one
+  in the MCP server's diagnose runner, still matter for binaries older
+  than this release, but this binary never produces such an entry. Pass
+  `--` before any file whose name starts with a dash. `--format`
+  already rejected unknown flags, and now honors `--` too (#262).
+- **A `--validate` usage error exits 2, not 1.** Calling it with no
+  inputs exits 2, matching `--format`, so exit 1 always means "an input
+  has errors or could not be read", never "the call was wrong" (#262).
+
+### Added
+- **The `--validate` / `--format` CLI contract is written down.**
+  `catalog/features/cli_contract.md` specifies the JSON schema, `valid`
+  semantics, exit codes, `--stdin`, batching order, every flag, and what
+  each profile (`--ds`, `--info`, `--hungarian`, `--hungarian-types`,
+  `--strict`) turns on. These are the details that consumers which gate
+  or score SSL with the CLI depend on and an editor never sees. Fifteen
+  acceptance criteria enforce it, including two pins that fail the
+  build at the moment a breaking change is made: the set of codes that
+  can make `valid` false, and the JSON field sets. DECISIONS.md D16
+  records the versioning policy. A break ships in a minor release under
+  `### Breaking`. A new default-on warning or a profile gaining a check
+  is a minor release with its corpus delta. Added fields, new flags,
+  and false-positive fixes may ship in a patch (#262).
+- **Every `--validate` result carries the tool `version`.** It is the
+  same value `--version` prints, repeated on each per-input object so a
+  consumer's logs show which binary scored them. It is an added field,
+  not a wrapper: the top-level array that consumers index is unchanged
+  (#262).
+- **A false-positive budget for `--strict`, with its first
+  measurement.** The targets are at most 1% misfires, meaning findings
+  that contradict the profile's own semantics, and at most 1.5
+  strict-only findings per document on corpus code that already
+  validates. The current baseline misses both: 3.0 findings per
+  document across 6,166 documents, about 60% of them from two misfire
+  classes. `invalid_sql_param` flags a placeholder whose name the
+  script assigns, a name `undeclared_variable` accepts.
+  `unused_variable` flags a parameter whose only read is a `?name?`
+  placeholder. Without those two classes the residual is 1.21 per
+  document. The contract entry records the numbers and the known gaps
+  (#262).
 
 ## [0.24.0] - 2026-09-21
 

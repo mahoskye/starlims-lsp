@@ -141,13 +141,18 @@ Output is a JSON array with diagnostics per file:
 [
   {
     "file": "script.ssl",
+    "version": "v0.25.0",
     "valid": true,
     "diagnostics": []
   }
 ]
 ```
 
-Exit code `0` means all inputs pass; `1` means errors were found.
+Exit code `0` means all inputs pass; `1` means errors were found; `2` is a
+usage error such as an unknown flag. The full contract for programmatic
+consumers — JSON schema, `valid` semantics, exit codes, every flag and
+profile, and what counts as a breaking change — is
+[`catalog/features/cli_contract.md`](catalog/features/cli_contract.md).
 
 ### VS Code Integration
 

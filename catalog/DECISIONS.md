@@ -4,6 +4,47 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D16 — The CLI is a versioned contract; breaks ship in minor releases under `### Breaking` (2026-10-13, issue #262)
+
+`--validate` and `--format` are consumed by programs that gate or score
+SSL (a pinned MCP server, agents that must pass `--strict` clean,
+evaluation pipelines). The contract they rely on is specified in
+feature.cli_contract. It covers flag names and meanings, the JSON field
+names, types, and nesting, `valid` semantics, exit codes, the
+diagnostic `code` slugs, and which codes can report at error severity
+under each profile. Changes to it fall into three classes:
+
+- **Breaking**: removing or renaming a flag or a code; renaming,
+  retyping, or removing a JSON field, or reshaping the document;
+  changing what `valid` or an exit code means; and a new default-on
+  error-severity code, or raising a default-on code to error, because
+  either can turn valid code invalid with no change on the consumer's
+  side.
+- **Behavior change**: a new default-on warning or hint, a profile
+  gaining a check, or a severity change below error. A gate that
+  requires zero findings feels these, but `valid` does not.
+- **Compatible**: added JSON fields, new flags, new opt-in codes,
+  message text (never part of the contract, so consumers key off
+  `code`), and false-positive fixes.
+
+How releases signal it: the project is pre-1.0, so a **minor** bump is
+the breaking bump. Any release with a breaking change is a minor
+release, never a patch, and its CHANGELOG section carries a
+`### Breaking` subsection that names each break and what a consumer
+changes. Behavior changes also require a minor release and are listed
+under `### Added` / `### Changed` with the measured corpus delta.
+Compatible changes may ship in a patch. Consumers must ignore JSON fields
+they do not recognize. That is what lets an added field count as
+compatible.
+
+Enforcement: two tests turn the policy into a failing build at the
+moment of the change. The set of error-severity codes is pinned in
+`cmd/starlims-lsp/testdata/error_codes.txt`, and the JSON field sets are
+pinned against the entry's tables (feature.cli_contract A13/A14).
+Unknown flags fail loudly (exit 2) instead of being read as file paths,
+so a consumer that runs ahead of its pinned binary gets an error rather
+than a silently different result.
+
 ## D15 — Data-source mode detection tests for SQL-impossible constructs, and defaults to SQL (2026-09-21, issue #249)
 
 Mode detection asks whether a data-source body contains something SQL

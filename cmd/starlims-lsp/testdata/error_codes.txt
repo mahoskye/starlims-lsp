@@ -1,0 +1,66 @@
+# Diagnostic codes whose catalog default severity is `error`: the codes
+# that can make a --validate result `valid: false`.
+#
+# This list is part of the CLI contract (catalog/features/cli_contract.md
+# A13). Adding a code here makes previously valid code invalid, and
+# removing or renaming one breaks consumers that key off it. Either way
+# the change is BREAKING under DECISIONS.md D16: it ships in a minor
+# release with a `### Breaking` CHANGELOG note. Update this file in the
+# same commit as that note.
+bare_logical_operator
+base_outside_class
+base_requires_inherit
+base_standalone
+begincase_requires_case
+branch_target_label
+builder_directive_case
+catch_clause_form
+catch_order_before_finally
+class_instantiation_curly
+class_or_script
+comment_termination
+constructor_return_value
+createudobject_builtin_misuse
+datasource_sql_semicolon
+declare_initializer
+default_after_parameters
+default_on_declare_line
+direct_procedure_call
+doproc_in_class
+dot_property_access
+endfor_invalid
+error_handler_structure
+execfunction_class_target
+execfunction_missing_quotes
+exitfor_in_finally
+exitfor_outside_loop
+exitwhile_in_finally
+exitwhile_outside_loop
+finally_empty
+global_assignment
+inline_code_naming
+invalid_limstypeex_comparison
+invalid_operator_sequence
+keyword_uppercase
+label_keyword_form
+loop_in_finally
+loop_outside_loop
+me_outside_class
+mismatched_block_end
+mismatched_delimiter
+no_default_statements_in_datasource
+one_class_per_file
+parameters_first
+procedure_declaration_syntax
+return_in_finally
+single_catch
+single_finally
+try_requires_handler
+try_structure
+unclosed_block
+unclosed_delimiter
+unexpected_token
+unmatched_block_end
+unmatched_delimiter
+unterminated_string
+zero_based_array_index
