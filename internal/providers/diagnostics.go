@@ -5160,6 +5160,13 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 			continue
 		}
 
+		// A qualified member belongs to its object, even when its name
+		// matches a predefined or configured global (oSummary:pending).
+		if prev := previousSignificantTokenIndex(tokens, i-1); prev >= 0 &&
+			tokens[prev].Type == lexer.TokenPunctuation && tokens[prev].Text == ":" {
+			continue
+		}
+
 		// Declared in this file — the author's own variable, or the
 		// initializer script that creates the global (issue #169).
 		if declaredSet[strings.ToUpper(token.Text)] {

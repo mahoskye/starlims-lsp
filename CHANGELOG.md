@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`global_assignment` no longer flags qualified members.** A property or
+  class field whose name matches a predefined or configured global, such as
+  `oSummary:pending := 0;` (`Pending` is a status global) or
+  `oContext:MYUSERNAME := ...`, belongs to its object, not to the global.
+  It was reported as an error. Members after `:` are now skipped, including
+  nested access and comments or whitespace around the colon. A bare
+  assignment such as `Pending := 2;` is still an error, with the same range.
+
 ## [0.24.0] - 2026-09-21
 
 The strict profile. `--validate --strict` turns on the three checks an

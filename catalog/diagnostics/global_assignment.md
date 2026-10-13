@@ -14,7 +14,14 @@ spec_options:
   global_variables: ["gAppContext"]
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/diagnostics_global_member_test.go
 history:
+  - date: 2026-10-03
+    ref: "purpose-built style calibration"
+    note: >-
+      Qualified object members are excluded even when their names match
+      status constants or configured globals. Bare global assignments
+      retain their existing severity and ranges.
   - date: 2026-01-14
     ref: "commit 567b287"
     note: Introduced for user-configured globals via server settings.
@@ -56,6 +63,8 @@ The checked set is the case-insensitive union of:
 
 It must NOT flag:
 
+- qualified object properties or class fields (`oSummary:pending := 0;`),
+  including nested member access and whitespace/comments around the colon;
 - reads of a global (`sUser := MYUSERNAME;`);
 - assignment to any identifier not in the set — ordinary locals, even
   undeclared ones (that is `undeclared_variable`'s job);
@@ -68,6 +77,15 @@ It must NOT flag:
   `:PUBLIC` line still gets its own `limit_public_vars` warning).
 
 ## Examples
+
+### Does not flag
+
+```ssl
+:DECLARE oSummary;
+oSummary := CreateUdObject();
+oSummary:pending := 0;
+oSummary:active := 0;
+```
 
 ### Flags
 
