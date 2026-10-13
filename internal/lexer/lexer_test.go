@@ -1587,6 +1587,40 @@ func TestLexer_RegionBodyMidLineEndRegionIsText(t *testing.T) {
 	}
 }
 
+// Issue #304: a mid-line `:ENDREGION;` with its semicolon closes the body
+// at the colon — a template whose last line carries the closer
+// (`}:ENDREGION;`) keeps the `}` as payload and the region is closed.
+func TestLexer_RegionBodyMidLineTerminatedEndRegionCloses(t *testing.T) {
+	input := ":REGION Payload;{\n\t\"total\": $nTotal$\n}:ENDREGION;\nnAfter := 1;\n"
+	tokens := NewLexer(input).Tokenize()
+
+	var body *Token
+	var sawEndRegion, sawAfter bool
+	for i := range tokens {
+		tk := &tokens[i]
+		switch {
+		case tk.Type == TokenRegionBody:
+			body = tk
+		case tk.Type == TokenKeyword && strings.EqualFold(tk.Text, ":ENDREGION"):
+			sawEndRegion = true
+		case tk.Type == TokenIdentifier && tk.Text == "nAfter":
+			sawAfter = true
+		}
+	}
+	if body == nil {
+		t.Fatal("expected a TokenRegionBody token")
+	}
+	if want := "{\n\t\"total\": $nTotal$\n}"; body.Text != want {
+		t.Errorf("region body text: want %q got %q", want, body.Text)
+	}
+	if !sawEndRegion {
+		t.Error("expected the mid-line :ENDREGION to lex as a keyword")
+	}
+	if !sawAfter {
+		t.Error("expected code after the region to lex as SSL")
+	}
+}
+
 // Issue #164: an unterminated region consumes to EOF as raw text — the
 // unclosed_block diagnostic (not the lexer) reports the missing closer.
 func TestLexer_RegionBodyUnterminatedRunsToEOF(t *testing.T) {

@@ -61,6 +61,14 @@ history:
       workspace-unique fallback runs (they used to land in an unrelated
       script, which rename then treated as an unambiguous caller). A7
       strengthened; class-only classification gets its criterion (A20).
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      The include closure reports whether it is complete (A21). A
+      document whose :INCLUDE could not be read no longer gets
+      undeclared_variable findings: on the production corpus's
+      unmodified product code, 134 of the 210 --strict findings in files
+      with an :INCLUDE named a variable the included script declares.
 issues: []
 ---
 
@@ -132,10 +140,15 @@ as declared in the including file. The closure is transitive — included
 scripts' own `:INCLUDE`s contribute too — with a visited-set cycle guard,
 and an ambiguous include target contributes the union of all its
 resolution candidates (erring toward fewer false positives). Unresolvable
-targets contribute nothing; without a workspace index, diagnostics behave
-exactly as before (single-file). Open included documents contribute their
+targets contribute nothing. Open included documents contribute their
 live-buffer declarations, consistent with the open-document overlay.
 Consumers: `diag.undeclared_variable` and `diag.invalid_sql_param`.
+The closure also reports whether it is complete: every `:INCLUDE` target
+in it resolved to a readable file. A document with an `:INCLUDE` whose
+closure is incomplete — a target that does not resolve, or no workspace
+index at all, as in `--validate` — gets no `undeclared_variable`
+findings, since the unread script may declare any name (DECISIONS.md
+D10, issue #304). `invalid_sql_param` keeps its single-file behavior.
 
 **Candidate ordering and cap**: anchored canonical-layout matches order
 before flat matches, path-lexicographic within each group, capped at 10.
@@ -174,6 +187,7 @@ buffer drops that candidate entirely.
 - A18: Given file A with `:INCLUDE B;` where B declares `:PUBLIC gShared;` and B itself includes C declaring `:PUBLIC gDeep;`, when A's include declaration closure is computed, then it contains both `gShared` and `gDeep`; a cyclic include chain (C including A) terminates without error.
 - A19: Given an include target resolving to two candidate files with different declarations, when the closure is computed, then it contains the union of both candidates' declared names; an unresolvable include target contributes nothing.
 - A20: Given a dotted dispatch target whose every candidate is a `:CLASS` file, when class-only classification runs, then it is true; when any candidate is an ordinary script, or there is no candidate, then it is false.
+- A21: Given a document with `:INCLUDE B;` and a name declared nowhere, when diagnostics run with undeclared checking on, then `undeclared_variable` flags the name only when B resolves through the workspace index (the closure is complete); when B does not resolve, or there is no workspace index, then the document gets no `undeclared_variable` finding, and a document without an `:INCLUDE` is checked as before (issue #304).
 
 ## Rationale
 

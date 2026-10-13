@@ -892,6 +892,47 @@ validate as `valid: true`. #292: no rule reports a stray `:CATCH`,
 - **Procedure extraction is linear in the document.** Each procedure's
   docblock and visibility lookup scanned every token; a 500-procedure
   document now extracts about three times faster (#258).
+- **A region closed by `}:ENDREGION;` is closed.** Only a line-leading
+  `:ENDREGION` ended a `:REGION` body, so a template whose last line
+  carries the closer ran to the end of the file: `unclosed_block` fired,
+  and the code after it was hidden from every rule and from the
+  formatter. A complete `:ENDREGION;` now closes the body wherever it
+  sits on the line; a mid-line `:ENDREGION` without its `;` is still body
+  text (#304).
+- **`direct_procedure_call` warns, not errors, when a procedure calls its
+  own name.** Shipped product code declares a procedure named after an
+  unpublished built-in and calls the built-in from inside it, which
+  compiles and works. The call may also be recursion written C-style, so
+  it is still reported, at warning, and the message names both readings.
+  Calling another procedure in the file is still an error (#304).
+- **`comment_text_after_terminator` no longer flags an assignment to a
+  keyword-named variable.** After a multi-line comment, a line such as
+  `label := ...;` was read as a doc header cut in half and reported
+  as an error. A keyword-named word followed by `:=` or a compound
+  assignment is a statement (#304).
+- **`zero_based_array_index` no longer reports a `:Tables` chain.**
+  `ds:Tables[0]`, `ds:Tables[0]:Rows[0]` and the like are the .NET
+  DataSet API, which no SSL class shares, and index 0 there is correct.
+  They got the info-tier "verify which one this is" advisory, which was
+  every `--info` finding of this rule on unmodified product code. Other
+  member receivers keep the advisory (#304).
+- **`nil_method_call` follows emptiness checks and early returns.** A use
+  inside `:IF !Empty(v)` (or `.NOT. Empty(v)`, `v != NIL`), or after
+  `!Empty(v) .AND.` in the same condition, was reported although `.AND.`
+  short-circuits. A NIL assignment in a branch that ends in `:RETURN` was
+  treated as reaching the code after the branch, and one in an `:IF`
+  branch as reaching its `:ELSE`. On unmodified product code the rule
+  goes from 5 findings to 1 (#304).
+- **`undeclared_variable` no longer guesses past an unread `:INCLUDE`, or
+  reports a class name.** In a file whose `:INCLUDE` could not be read
+  (always the case under `--validate`, which has no workspace), the
+  included script may declare any name, and most `--strict` findings in
+  such files on unmodified product code were names it does declare. Such
+  a file now gets no findings; in the editor, a workspace that resolves
+  every include still applies the include closure. Separately, a name
+  followed by `{` is a class instantiation (`FormDto{}`), not a variable
+  read. Under `--strict` on unmodified product code: 328 findings to 115
+  (#304).
 
 ## [0.24.0] - 2026-09-21
 

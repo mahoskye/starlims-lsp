@@ -10,6 +10,7 @@ severity_overridable: true
 suppressible: true
 tests:
   - internal/providers/providers_test.go
+  - internal/lexer/lexer_test.go
 history:
   - date: 2026-01-10
     ref: "commit 442fa69 (initial commit)"
@@ -32,6 +33,15 @@ history:
       Catalog audit: `:ENDFOR` now closes its `:FOR` silently. It is not
       SSL and endfor_invalid reports it, but leaving the `:FOR` on the
       stack also reported the loop as unclosed — two errors for one typo.
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      A `:REGION` whose closer shares a line with the end of its payload
+      (`}:ENDREGION;`) is closed. The lexer only accepted a line-leading
+      `:ENDREGION`, so the region swallowed the rest of the file and
+      reported unclosed; shipped product code stores a JSON template in
+      exactly this shape. A mid-line `:ENDREGION` still needs its `;` to
+      close the region (feature.diagnostics_pipeline).
 issues: []
 ---
 
@@ -69,7 +79,10 @@ It must NOT flag:
   `mismatched_block_end`, and no opener is popped;
 - a `:FOR` closed by the invalid `:ENDFOR` — `endfor_invalid` reports the
   typo, and the `:ENDFOR` still closes the loop it was meant to close
-  (issue #255).
+  (issue #255);
+- a `:REGION` closed by a `:ENDREGION;` on the payload's last line
+  (`}:ENDREGION;`): the complete closer ends the body wherever it sits on
+  the line (issue #304, feature.diagnostics_pipeline).
 
 ## Examples
 
@@ -115,6 +128,18 @@ It must NOT flag:
 :DECLARE i;
 :FOR i := 1 :TO 3;
 :ENDFOR;
+```
+
+### Does not flag
+
+```ssl
+:PROCEDURE BuildPayload;
+	:RETURN GetRegion("Payload");
+:ENDPROC;
+
+:REGION Payload;{
+	"total": $nTotal$
+}:ENDREGION;
 ```
 
 ## Rationale

@@ -1004,6 +1004,7 @@ func TestIncludeDeclaredVariables_TransitiveAndCycle(t *testing.T) {
 	opts := providers.DefaultDiagnosticOptions()
 	opts.CheckUndeclaredVars = true
 	opts.IncludeDeclaredVariables = names
+	opts.IncludesResolved = true
 	source = ":INCLUDE LibB;\n:PROCEDURE Demo;\nnTotal := gShared + gDeep + nMissing;\n:ENDPROC;"
 	s.documents.SetDocument(testURI, source, 2)
 	s.documentVersion[testURI] = 2

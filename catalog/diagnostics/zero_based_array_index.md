@@ -14,6 +14,7 @@ spec_options:
   include_info_diagnostics: true
 tests:
   - internal/providers/providers_test.go
+  - internal/providers/fp_triage_304_test.go
 history:
   - date: 2026-02-02
     ref: "commit 7261172"
@@ -55,6 +56,16 @@ history:
       were missed. Authority corrected to authoritative to mirror
       arrays_one_based. Production: default 245 -> 0, --info 245 -> 247
       (two multi-dimensional sites, both info).
+  - date: 2026-10-13
+    ref: "issue #304"
+    note: >-
+      A subscript whose receiver chain passes through a `:Tables` member
+      (`ds:Tables[0]`, `ds:Tables[0]:Rows[0]`) no longer reports, even at
+      the info tier. No SSL built-in class has a Tables member, so the
+      chain is the .NET DataSet API, which the style guide prescribes,
+      and index 0 there is known to be right rather than worth
+      verifying. Every --info finding on unmodified product code was this
+      shape. Other member receivers keep the info advisory.
 issues: []
 ---
 
@@ -91,6 +102,11 @@ The rule is deliberately literal-only and must NOT flag:
   expression (`DoProc("GetRows")[0]`) — what it returns is unknown, and
   unknown is never evidence;
 - the .NET-path sites when the info tier is off (the default);
+- a subscript whose receiver chain passes through a `:Tables` member,
+  at any tier (`ds:Tables[0]`, `ds:Tables[0]:Rows[0]`,
+  `ds:Tables[0]:Columns[0]`): no SSL built-in class has a Tables
+  member, so this is the .NET DataSet and the DataTables reached from
+  it, which are 0-based (issue #304);
 - brackets that are not subscripts — an array literal, a bracket string
   (`[0]` as a value).
 
@@ -106,9 +122,9 @@ sFirst := aItems[0];
 ### Flags
 
 ```ssl
-:DECLARE dataSet, oTable;
-dataSet := GetDataSet();
-oTable := dataSet:Tables[0];
+:DECLARE oList, vFirst;
+oList := LimsNetConnect("mscorlib", "System.Collections.ArrayList");
+vFirst := oList:Items[0];
 ```
 
 ### Flags
@@ -147,6 +163,16 @@ sValue := [0];
 ### Does not flag
 
 ```ssl
+:DECLARE dataSet, oTable, sName, vCell;
+dataSet := LimsNetConnect("System.Data", "System.Data.DataSet");
+oTable := dataSet:Tables[0];
+sName := dataSet:Tables[0]:Columns[0]:ColumnName;
+vCell := dataSet:Tables[0]:Rows[0]:ItemArray[0];
+```
+
+### Does not flag
+
+```ssl
 :DECLARE aItems, sFirst, nIndex;
 sFirst := aItems[nIndex];
 ```
@@ -173,6 +199,9 @@ production files every one of the 245 findings was such a site and a
 default-on warning was firing on the prescribed form. "Verify which one
 this is" is advice, not a likely bug, so it belongs to the advisory tier
 (DECISIONS.md D13), where an LLM consumer still gets the nudge. The
+nudge is dropped where there is nothing to verify: a chain through
+`:Tables` is the DataSet API itself, and every info finding on
+unmodified product code in the corpus was that shape (issue #304). The
 derived-variable extension (issue #166) follows the same reasoning one
 assignment further: 0-vs-1 basing is not statically decidable without
 type flow, so a cheap last-assignment heuristic marks exactly the values

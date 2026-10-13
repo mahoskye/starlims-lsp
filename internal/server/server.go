@@ -585,7 +585,7 @@ func (s *SSLServer) validateDocument(context *glsp.Context, uri string) {
 	opts := s.settings.Diagnostics
 	opts.IsDataSourceFile = isDataSourceURI(uri)
 	opts.IsEndpointFile = isEndpointFile(uri, content, s.settings.EndpointPatterns)
-	opts.IncludeDeclaredVariables = (liveResolver{s}).includeDeclaredVariables(cache.Tokens, uri)
+	opts.IncludeDeclaredVariables, opts.IncludesResolved = (liveResolver{s}).includeClosure(cache.Tokens, uri)
 	if !opts.IsDataSourceFile {
 		opts.ClassFileDispatchTargets = (liveResolver{s}).classFileDispatchTargets(cache.Tokens)
 	}
