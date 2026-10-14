@@ -19,6 +19,12 @@ type SQLFormattingOptions struct {
 	IndentSize       int    // Spaces per indent level
 	MaxLineLength    int    // Max line length for wrapping
 	DetectSQLStrings bool   // Auto-detect SQL in any string literal
+	// TabWidth is the column width of a tab in the SSL indent the SQL
+	// sits at — ssl.format.indentSize, set by the SSL formatter, not a
+	// user setting of its own. 0 means 4. A tab used to count as one
+	// column, so packed lines inside a procedure ran past the limit
+	// (issue #327).
+	TabWidth int
 }
 
 // SQL formatting styles:
@@ -57,7 +63,26 @@ func NewSQLFormatter(opts SQLFormattingOptions) *SQLFormatter {
 }
 
 // FormatSQL formats a SQL string.
+// indentWidth is the column width of an SSL indent string, a tab counting
+// TabWidth columns.
+func (f *SQLFormatter) indentWidth(indent string) int {
+	tab := f.opts.TabWidth
+	if tab <= 0 {
+		tab = 4
+	}
+	w := 0
+	for _, r := range indent {
+		if r == '\t' {
+			w += tab
+		} else {
+			w++
+		}
+	}
+	return w
+}
+
 func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
+	baseW := f.indentWidth(baseIndent) // columns, not bytes (issue #327)
 	if !f.opts.Enabled {
 		return sql
 	}
@@ -88,7 +113,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	isComplex := f.isComplexSQL(nonWSTokens)
 
 	var result strings.Builder
-	currentLineLen := len(baseIndent)
+	currentLineLen := baseW
 	isFirstToken := true
 
 	// State tracking
@@ -101,6 +126,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// token MUST start a new line or it is swallowed into the comment
 	// (issue #218 corpus finding: `-- note` glued to `NOT EXISTS`).
 	pendingLineCommentBreak := false
+	afterBlockComment := false // a /* */ comment was just written
 	// ODBC escape tracking (issue #217): inside `{...}` the content is
 	// ODBC grammar, not schema identifiers — the marker (`fn`, `d`, `ts`,
 	// ...) is canonical lowercase, the scalar-function name after `{fn`
@@ -115,6 +141,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// column stays findable.
 	parenBrokeInside := []bool{}
 	groupJustClosedMultiline := false
+	// inlineGroups marks paren depths whose predicate group fits on its
+	// line, so AND/OR inside it do not break (issue #327).
+	inlineGroups := map[int]bool{}
 	pendingItemBreak := false
 
 	subqueryParenDepths := make(map[int]bool)
@@ -148,8 +177,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// the most recently closed call.
 	var parenFuncCols []int
 	lastClosedCallCol := -1
-	lastTokStartCol := len(baseIndent)
-	lineStartCol := len(baseIndent)
+	lastTokStartCol := baseW
+	lineStartCol := baseW
 
 	// DECODE function tracking (Gap 7)
 	inDecodeCall := false
@@ -232,6 +261,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		if t.Text == "(" {
 			parenDepth++
 		} else if t.Text == ")" {
+			delete(inlineGroups, parenDepth)
 			parenDepth--
 			if parenDepth < 0 {
 				parenDepth = 0
@@ -427,6 +457,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				// Suppress line break for AND that is part of BETWEEN...AND
 				if upperText == "AND" && afterBetween {
 					afterBetween = false
+				} else if (upperText == "AND" || upperText == "OR") && inlineGroups[parenDepth] {
+					// A parenthesized predicate group that fits on its line
+					// stays there (reference §2.3 compound conditions, §2.12
+					// MERGE ON; issue #327).
+					needsBreak = false
 				} else if upperText == "ON" && i+1 < len(nonWSTokens) &&
 					strings.ToUpper(nonWSTokens[i+1].Text) == "OVERFLOW" {
 					// LISTAGG's `ON OVERFLOW` is not a join ON (issue #119).
@@ -455,7 +490,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					// '(' (S45, issue #95).
 					if (upperText == "AND" || upperText == "OR") && parenDepth > 0 &&
 						!subqueryParenDepths[parenDepth] && len(parenOpenCols) > 0 {
-						spaces := parenOpenCols[len(parenOpenCols)-1] - len(baseIndent) - len(f.indentString)*parenDepth
+						spaces := parenOpenCols[len(parenOpenCols)-1] - baseW - len(f.indentString)*parenDepth
 						if spaces < 0 {
 							spaces = 0
 						}
@@ -467,7 +502,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// MERGE sub-statement indentation: UPDATE SET / INSERT / DELETE indented under WHEN
 			if rootCommand == "MERGE" && parenDepth == 0 &&
 				(style == "canonicalCompact" || style == "expanded") {
-				if upperText == "UPDATE" || upperText == "INSERT" || upperText == "DELETE" {
+				if upperText == "UPDATE" || upperText == "INSERT" || upperText == "DELETE" || upperText == "VALUES" {
 					needsBreak = true
 					extraIndent = f.indentString
 				}
@@ -487,7 +522,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
 					if rootCommand == "MERGE" && mergeSetCol >= 0 {
-						spaces := mergeSetCol - len(baseIndent)
+						spaces := mergeSetCol - baseW
 						if spaces < 0 {
 							spaces = 0
 						}
@@ -500,12 +535,19 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// (S34/S35, issue #93): the '(' stays on its keyword's line,
 			// the list starts on the next line indented one level, and the
 			// ')' closes on its own line at the parent indent.
-			if rootCommand != "MERGE" && t.Text == "(" &&
-				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
+			// MERGE's INSERT has no table name — its column list follows the
+			// keyword — and both lists close one level in, under their WHEN
+			// branch (reference §2.12, §7.4; issue #327).
+			mergeList := rootCommand == "MERGE" && (style == "canonicalCompact" || style == "expanded") &&
+				(prevUpper == "VALUES" || prevUpper == "INSERT")
+			if t.Text == "(" && (mergeList || (rootCommand != "MERGE" &&
+				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)))) {
 				subqueryParenDepths[parenDepth] = true
 				closerIndent := ""
 				if insertAll {
 					closerIndent = strings.Repeat(f.indentString, 2) // S37: ')' at 8
+				} else if mergeList {
+					closerIndent = f.indentString
 				}
 				blockParens[parenDepth] = closerIndent
 			}
@@ -617,7 +659,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 					if closerIndent, ok := blockParens[parenDepth]; ok {
 						extraIndent = closerIndent
 					} else if hangCol >= 0 {
-						baseLen := len(baseIndent)
+						baseLen := baseW
 						parenIndentLen := len(f.indentString) * parenDepth
 						spaces := hangCol - baseLen - parenIndentLen
 						if spaces < 0 {
@@ -678,7 +720,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// colIndent turns an absolute output column into the extra
 			// indent the line writer adds after base + paren indentation.
 			colIndent := func(col int) string {
-				spaces := col - len(baseIndent) - len(f.indentString)*parenDepth
+				spaces := col - baseW - len(f.indentString)*parenDepth
 				if spaces < 0 {
 					spaces = 0
 				}
@@ -712,7 +754,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				switch upperText {
 				case "CASE":
 					frame := &sqlCaseFrame{parenDepth: parenDepth, endIdx: findSQLCaseEnd(nonWSTokens, i),
-						flatCol: len(baseIndent) + len(f.indentString)*parenDepth, predThen: -1}
+						flatCol: baseW + len(f.indentString)*parenDepth, predThen: -1}
 					switch {
 					case (top != nil && top.inline) || (inOverClause && parenDepth >= overParenDepth):
 						frame.inline = true
@@ -740,7 +782,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 						if inSelectColumns {
 							wrapExtra = strings.Repeat(" ", 7) // SELECT-list column
 						}
-						wrapCol := len(baseIndent) + len(f.indentString)*parenDepth + len(wrapExtra)
+						wrapCol := baseW + len(f.indentString)*parenDepth + len(wrapExtra)
 						if wrapCol < caseCol &&
 							(caseCol+caseBranchIndent+f.caseHeadWidth(nonWSTokens, i, frame.endIdx) > f.opts.MaxLineLength ||
 								f.caseBreaksThen(nonWSTokens, i, frame.endIdx, caseCol+caseBranchIndent, frame.flatCol) &&
@@ -822,7 +864,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			t.Type == SQLTokenKeyword &&
 			(upperText == "PARTITION" || upperText == "ORDER" || upperText == "ROWS" || upperText == "RANGE") {
 			needsBreak = true
-			spaces := overFuncCol + len(f.indentString) - len(baseIndent) - len(f.indentString)*parenDepth
+			spaces := overFuncCol + len(f.indentString) - baseW - len(f.indentString)*parenDepth
 			if spaces < 0 {
 				spaces = 0
 			}
@@ -836,7 +878,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		if t.Text == ")" && inOverClause && parenDepth == overParenDepth-1 {
 			if overDidBreak {
 				needsBreak = true
-				spaces := overFuncCol - len(baseIndent) - len(f.indentString)*parenDepth
+				spaces := overFuncCol - baseW - len(f.indentString)*parenDepth
 				if spaces < 0 {
 					spaces = 0
 				}
@@ -863,7 +905,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 						// paren-column alignment stays the canonical look.
 						extraIndent = f.indentString
 					} else if len(parenOpenCols) > 0 {
-						spaces := parenOpenCols[len(parenOpenCols)-1] - len(baseIndent) - len(f.indentString)*parenDepth
+						spaces := parenOpenCols[len(parenOpenCols)-1] - baseW - len(f.indentString)*parenDepth
 						if spaces < 0 {
 							spaces = 0
 						}
@@ -898,7 +940,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				result.WriteString(baseIndent)
 				result.WriteString(parenIndent)
 				result.WriteString(extraIndent)
-				currentLineLen = len(baseIndent) + len(parenIndent) + len(extraIndent)
+				currentLineLen = baseW + len(parenIndent) + len(extraIndent)
 				lineStartCol = currentLineLen
 				pendingLineCommentBreak = false
 			} else if !isFirstToken {
@@ -910,6 +952,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			isFirstToken = false
 			if strings.HasPrefix(t.Text, "--") {
 				pendingLineCommentBreak = true
+			} else {
+				afterBlockComment = true
 			}
 			continue
 		}
@@ -947,12 +991,15 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(baseIndent)
 			result.WriteString(parenIndent)
 			result.WriteString(extraIndent)
-			currentLineLen = len(baseIndent) + len(parenIndent) + len(extraIndent)
+			currentLineLen = baseW + len(parenIndent) + len(extraIndent)
 			lineStartCol = currentLineLen
-		} else if prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken) {
+		} else if afterBlockComment || (prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken)) {
+			// A block comment is separated from the code after it — a
+			// leading `/* note */` used to glue to SELECT (issue #327).
 			result.WriteString(" ")
 			currentLineLen++
 		}
+		afterBlockComment = false
 
 		if rootCommand == "MERGE" && prev != nil && strings.ToUpper(prev.Text) == "SET" && parenDepth == 0 {
 			mergeSetCol = currentLineLen
@@ -984,6 +1031,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// the calling function's start column so the OVER anchor resolves to
 		// the outer window function even mid-expression (issue #122).
 		if t.Text == "(" {
+			// A predicate group — a paren that is not a call, a subquery
+			// or a block list — stays on one line when it fits from here.
+			if (prev == nil || (prev.Type != SQLTokenFunction && prev.Type != SQLTokenIdentifier)) &&
+				!isSQLSubqueryOpen(nonWSTokens, i) {
+				if closeIdx := matchingSQLParen(nonWSTokens, i); nonWSTokens[closeIdx].Text == ")" &&
+					f.opts.MaxLineLength > 0 &&
+					currentLineLen+f.projectionRenderLen(nonWSTokens, i+1, closeIdx+1) <= f.opts.MaxLineLength {
+					inlineGroups[parenDepth] = true
+				}
+			}
 			parenBrokeInside = append(parenBrokeInside, false)
 			parenOpenCols = append(parenOpenCols, currentLineLen)
 			funcCol := -1
@@ -1027,6 +1084,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				pushedCase.breakThen = f.caseBreaksThen(nonWSTokens, i, pushedCase.endIdx, pushedCase.branchCol, pushedCase.flatCol)
 			}
 		} else if upperText == "END" && t.Type == SQLTokenKeyword && len(caseStack) > 0 {
+			// A CASE laid out over several lines is a multi-line group:
+			// the SELECT item after it starts a fresh line (C3, issue
+			// #219; reference §2.1), as after a broken paren group.
+			if !caseStack[len(caseStack)-1].inline {
+				groupJustClosedMultiline = true
+			}
 			caseStack = caseStack[:len(caseStack)-1]
 		}
 	}
@@ -1728,6 +1791,11 @@ func IsSQLString(content string) bool {
 // isSQLStatementTokens applies the command-keyword and structure validation
 // of IsSQLString to a pre-filtered token list.
 func isSQLStatementTokens(tokens []SQLToken) bool {
+	// A leading comment or hint (`/* recent */ SELECT ...`) does not hide
+	// the command keyword behind it (issue #327).
+	for len(tokens) > 0 && (tokens[0].Type == SQLTokenComment || tokens[0].Type == SQLTokenHint) {
+		tokens = tokens[1:]
+	}
 	if len(tokens) == 0 {
 		return false
 	}
@@ -1776,7 +1844,10 @@ func hasBareIdentifierRun(tokens []SQLToken, n int) bool {
 // classify as SQL). The English-prose guards stay identifier-only: prose
 // words never lex as functions, so widening them would gain nothing.
 func isSQLNameToken(t SQLToken) bool {
-	return t.Type == SQLTokenIdentifier || t.Type == SQLTokenFunction
+	// A double-quoted span is a quoted identifier in SQL (`FROM "Orders"`);
+	// only single quotes make a literal (issue #327).
+	return t.Type == SQLTokenIdentifier || t.Type == SQLTokenFunction ||
+		(t.Type == SQLTokenString && strings.HasPrefix(t.Text, `"`))
 }
 
 // validateTargetAfter checks that the token following keyword kw looks like

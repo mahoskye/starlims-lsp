@@ -495,6 +495,23 @@ func (l *SQLLexer) readSSLParameter() SQLToken {
 		tempPos++
 	}
 
+	// A complex named placeholder (`?sPrefix + sSuffix?`) holds spaces and
+	// operators, which end the lookahead above. Recognize it by the same
+	// grammar the diagnostics use (ParseSQLPlaceholders, so the
+	// complex_sql_placeholder finding and the formatter agree on its
+	// extent) and keep it one atomic token: SSL binds the interior as an
+	// expression, so respacing it changes what reaches the database
+	// (fmt.sql_in_strings, issue #327).
+	if !foundClosing {
+		if end, _, ok := parseNamedPlaceholder(l.input, l.pos-1); ok {
+			for l.pos <= end {
+				text.WriteByte(l.input[l.pos])
+				l.advance()
+			}
+			return SQLToken{Type: SQLTokenPlaceholder, Text: text.String(), Line: line, Column: col}
+		}
+	}
+
 	if foundClosing {
 		// Consume SSL parameter until closing ? — quoted spans stay opaque
 		// here too, or a ? inside quotes would end the placeholder early.

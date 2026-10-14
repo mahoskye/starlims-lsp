@@ -20,7 +20,10 @@ level and the main SELECT returns to the clause column (reference §2.7,
 	        GROUP BY ordno
 	    )
 	    SELECT ts.ordno, ts.total_tasks,
-	           ROW_NUMBER() OVER (PARTITION BY ts.ordno ORDER BY ts.total_tasks DESC) AS rn
+	           ROW_NUMBER() OVER (
+	               PARTITION BY ts.ordno
+	               ORDER BY ts.total_tasks DESC
+	           ) AS rn
 	    FROM task_summary ts
 	");
 	:RETURN aRows;

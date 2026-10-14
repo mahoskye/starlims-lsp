@@ -15,7 +15,8 @@ a CASE inside an aggregate that fits stays inline (reference §2.7).
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows, bOk;
 	aRows := SQLExecute("
-	    SELECT ordno, testcode, SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done
+	    SELECT ordno, testcode,
+	           SUM(CASE WHEN status = 'Complete' THEN 1 ELSE 0 END) AS done
 	    FROM ordtask
 	    WHERE CASE
 	              WHEN duedate IS NULL THEN 'N'

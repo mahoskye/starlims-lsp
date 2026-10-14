@@ -110,7 +110,47 @@ history:
       as the style guide's §5.2 example does; only an overflowing
       predicate breaks before each AND/OR (Rule B). Corpus: 30 of 6,228
       files format differently, all idempotent.
-issues: ["#81", "#82"]
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A complex placeholder (`?sPrefix + sSuffix?`) is atomic. The SQL
+      lexer's lookahead stopped at the first space or operator, so the
+      reflow respaced its interior (`? sPrefix + sSuffix ?`), changing the
+      expression SSL binds.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      The SQL engine measures the SSL indent it sits at in columns, a tab
+      as ssl.format.indentSize. It counted the indent string's bytes, a
+      tab as one column, so packed SQL lines inside a procedure reached
+      91-94 columns.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      Detection gaps closed: a statement led by a SQL comment or hint, one
+      holding COLLATE (now a keyword, so `col COLLATE name` is no longer a
+      three-bare-word prose run), and one naming double-quoted identifiers
+      (`FROM "Orders"`) are SQL. A block comment stays separated from the
+      code after it. The fits-inline test counts the code that must stay
+      on the line after the string (`");`, up to the first comma or
+      operator break), so a query ending exactly at the limit is reflowed
+      instead of the statement wrapping after ':='.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A multi-line CASE in the SELECT list counts as a multi-line group, so
+      the item after its END starts a fresh continuation line (C3,
+      reference §2.1); it used to stay on the END line.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A parenthesized predicate group that fits on its line keeps its
+      AND/OR inline (`AND (a = 1 OR b = 2)`, MERGE `ON (… AND …)`;
+      reference §2.3, §2.12); one that does not still aligns under its
+      first condition (S45). MERGE's INSERT column list and VALUES list
+      take the block-paren layout, both indented under their WHEN branch
+      (reference §2.12, §7.4); VALUES used to drop to the clause column.
+issues: ["#81", "#82", "#327"]
 ---
 
 ## Behavior
@@ -164,7 +204,12 @@ are considered. Within the exception:
   arrays are byte-preserved even when they look like SQL (issue #82).
 - SQL parameter placeholders (`?param?`) are preserved verbatim — as an
   atomic span whatever the interior holds, quoted content included
-  (`?'<<name>>'?`, a corpus pattern of dubious validity: the formatter
+  (`?'<<name>>'?`), and a complex expression too (`?sPrefix + sSuffix?`,
+  recognized by the same grammar complex_sql_placeholder uses, so the
+  diagnostic and the formatter agree on its extent; issue #327). A
+  positional `?` is never merged with what follows it: an interior holding
+  `=`, `<` or `>` is not a placeholder (`a=?AND b=?`). (`?'<<name>>'?` is
+  a corpus pattern of dubious validity: the formatter
   neither legitimizes nor rewrites it; byte-preservation is the only
   safe treatment for suspect spans, and flagging them is diagnostic
   territory, not layout).
@@ -583,6 +628,27 @@ aRows := SQLExecute("
                ELSE 'normal'
            END AS label
     FROM samples s
+");
+```
+
+A complex placeholder keeps its interior byte for byte (issue #327):
+
+### Before
+
+```ssl
+:DECLARE aRows, sPrefix, sSuffix, nBase;
+aRows := SQLExecute("select ordno, ordkey, ordseq, status from orders where ordkey = ?sPrefix + sSuffix? and ordseq > ?nBase * 2?");
+```
+
+### After
+
+```ssl
+:DECLARE aRows, sPrefix, sSuffix, nBase;
+aRows := SQLExecute("
+    SELECT ordno, ordkey, ordseq, status
+    FROM orders
+    WHERE ordkey = ?sPrefix + sSuffix?
+      AND ordseq > ?nBase * 2?
 ");
 ```
 

@@ -238,17 +238,16 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// block left open at end of input) is left unchanged (issue #325).
 	// The range is formatted dedented, so every width decision the token
 	// formatter makes would measure from column 0 and pack lines wider than
-	// a full format does. Narrow each budget by the base indent the lines
-	// get back, in that budget's own unit: the SSL fit test counts a tab as
-	// indentSize columns, the SQL engine counts its indent string in bytes
-	// (a tab as one — the SQL width defect in issue #327; change this
-	// offset with it) (issue #325).
+	// a full format does. Narrow both budgets by the base indent the lines
+	// get back, in columns — the unit both the SSL fit test and the SQL
+	// engine count indentation in (issues #325, #327).
 	rangeOpts := opts
+	baseWidth := visualWidth(baseIndent, opts)
 	if rangeOpts.MaxLineLength > 0 {
-		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-visualWidth(baseIndent, opts))
+		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-baseWidth)
 	}
 	if rangeOpts.SQL.MaxLineLength > 0 {
-		rangeOpts.SQL.MaxLineLength = max(1, rangeOpts.SQL.MaxLineLength-len(baseIndent))
+		rangeOpts.SQL.MaxLineLength = max(1, rangeOpts.SQL.MaxLineLength-baseWidth)
 	}
 	formatted, ok := formatTokensToFixedPoint(tokens, rangeOpts)
 	if !ok {
@@ -614,9 +613,44 @@ func newFormatState(opts FormattingOptions) *formatState {
 		builder:           &strings.Builder{},
 		opts:              opts,
 		lineStart:         true,
-		sqlFormatter:      NewSQLFormatter(opts.SQL),
+		sqlFormatter:      NewSQLFormatter(sqlOptsFor(opts)),
 		commentBlockStart: -1,
 	}
+}
+
+// trailingCodeWidth is the width of the code that must stay on the line
+// after tokens[i]: everything up to the first point the line wrapper may
+// break — after a comma (the comma stays), or before a binary operator
+// (fmt.max_line_length). So `");` counts, while further arguments, which
+// wrap to the next line, do not. Comments are left out: the wrapper makes
+// room for an end-of-line comment itself.
+func trailingCodeWidth(tokens []lexer.Token, i int) int {
+	w := 0
+	for j := i + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenEOF || (t.Type == lexer.TokenWhitespace && strings.Contains(t.Text, "\n")) {
+			break
+		}
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment {
+			continue
+		}
+		if isContinuationOperator(t) {
+			break
+		}
+		w += len(t.Text)
+		if t.Text == "," {
+			break
+		}
+	}
+	return w
+}
+
+// sqlOptsFor returns the SQL engine options for an SSL format: the SQL
+// engine measures the SSL indent it sits at with the SSL tab width.
+func sqlOptsFor(opts FormattingOptions) SQLFormattingOptions {
+	sql := opts.SQL
+	sql.TabWidth = opts.IndentSize
+	return sql
 }
 
 func (s *formatState) updateForKeyword(token lexer.Token) {
@@ -1321,8 +1355,12 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// surrounding SSL syntax and is undesirable when the original already
 	// fits. Only reflow when wrapping is genuinely necessary.
 	if !strings.ContainsRune(innerContent, '\n') {
+		// The code that follows on the line (`");`, further arguments)
+		// counts too: a string that ends right at the limit used to stay
+		// inline, and the line wrapper then broke the statement after
+		// ':=' instead of the SQL being reflowed (issue #327).
 		fits := s.opts.MaxLineLength <= 0 ||
-			s.currentLineLen+len(token.Text) <= s.opts.MaxLineLength
+			s.currentLineLen+len(token.Text)+trailingCodeWidth(s.tokens, s.tokenIndex) <= s.opts.MaxLineLength
 		if fits {
 			return false
 		}

@@ -59,6 +59,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   On the production corpus 475 of 6,228 files format differently, most
   of them from `! Empty(...)` becoming `!Empty(...)`. No file becomes
   non-idempotent, and formatting adds no errors.
+- **Embedded SQL formatting** (#327):
+  - **Complex placeholders:** `?sPrefix + sSuffix?` keeps its interior
+    byte for byte. The reflow respaced it to `? sPrefix + sSuffix ?`,
+    which changed the expression SSL binds. Positional `?` markers are
+    still never merged.
+  - **Line width:** the SQL engine measures the SSL indent it sits at in
+    columns, a tab counting `indentSize`. It counted a tab as one, so
+    packed lines inside a procedure reached 91–94 columns.
+  - **Detection:** statements led by a SQL comment, holding `COLLATE`, or
+    naming double-quoted identifiers (`FROM "Orders"`) are recognized as
+    SQL and reflowed.
+  - **Queries ending at the limit:** these are reflowed, because the
+    fits-inline test now counts the `");` that must stay on the line. The
+    statement used to wrap after `:=` instead.
+  - **Layout:** these now follow the SQL reference:
+    - the SELECT item after a multi-line CASE starts a fresh line;
+    - a parenthesized predicate group that fits (`AND (a = 1 OR b = 2)`,
+      MERGE `ON (...)`) stays on one line;
+    - MERGE's `INSERT`/`VALUES` lists take the block layout under their
+      `WHEN`.
+
+  On the production corpus 1,024 of 6,228 files format differently, most
+  of them from narrower SQL packing. Lines over 90 columns in those files
+  fall from 21,492 to 18,200. No file becomes non-idempotent, and
+  formatting adds no errors.
 
 ## [0.25.0] - 2026-10-13
 
