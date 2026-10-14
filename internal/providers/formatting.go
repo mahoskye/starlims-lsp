@@ -238,17 +238,16 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// block left open at end of input) is left unchanged (issue #325).
 	// The range is formatted dedented, so every width decision the token
 	// formatter makes would measure from column 0 and pack lines wider than
-	// a full format does. Narrow each budget by the base indent the lines
-	// get back, in that budget's own unit: the SSL fit test counts a tab as
-	// indentSize columns, the SQL engine counts its indent string in bytes
-	// (a tab as one — the SQL width defect in issue #327; change this
-	// offset with it) (issue #325).
+	// a full format does. Narrow both budgets by the base indent the lines
+	// get back, in columns — the unit both the SSL fit test and the SQL
+	// engine count indentation in (issues #325, #327).
 	rangeOpts := opts
+	baseWidth := visualWidth(baseIndent, opts)
 	if rangeOpts.MaxLineLength > 0 {
-		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-visualWidth(baseIndent, opts))
+		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-baseWidth)
 	}
 	if rangeOpts.SQL.MaxLineLength > 0 {
-		rangeOpts.SQL.MaxLineLength = max(1, rangeOpts.SQL.MaxLineLength-len(baseIndent))
+		rangeOpts.SQL.MaxLineLength = max(1, rangeOpts.SQL.MaxLineLength-baseWidth)
 	}
 	formatted, ok := formatTokensToFixedPoint(tokens, rangeOpts)
 	if !ok {
@@ -614,9 +613,17 @@ func newFormatState(opts FormattingOptions) *formatState {
 		builder:           &strings.Builder{},
 		opts:              opts,
 		lineStart:         true,
-		sqlFormatter:      NewSQLFormatter(opts.SQL),
+		sqlFormatter:      NewSQLFormatter(sqlOptsFor(opts)),
 		commentBlockStart: -1,
 	}
+}
+
+// sqlOptsFor returns the SQL engine options for an SSL format: the SQL
+// engine measures the SSL indent it sits at with the SSL tab width.
+func sqlOptsFor(opts FormattingOptions) SQLFormattingOptions {
+	sql := opts.SQL
+	sql.TabWidth = opts.IndentSize
+	return sql
 }
 
 func (s *formatState) updateForKeyword(token lexer.Token) {

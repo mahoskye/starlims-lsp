@@ -117,6 +117,13 @@ history:
       lexer's lookahead stopped at the first space or operator, so the
       reflow respaced its interior (`? sPrefix + sSuffix ?`), changing the
       expression SSL binds.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      The SQL engine measures the SSL indent it sits at in columns, a tab
+      as ssl.format.indentSize. It counted the indent string's bytes, a
+      tab as one column, so packed SQL lines inside a procedure reached
+      91-94 columns.
 issues: ["#81", "#82", "#327"]
 ---
 
