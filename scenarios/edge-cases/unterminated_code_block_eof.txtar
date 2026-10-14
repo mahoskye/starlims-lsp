@@ -1,4 +1,3 @@
-Known failure: range-stable — range formatting the last line after an unterminated code block appends a ';' line (#325)
 A code block literal left open at the end of the file swallows the rest of
 the input; unclosed_delimiter's catalog entry lists this as a known gap.
 -- input.ssl --

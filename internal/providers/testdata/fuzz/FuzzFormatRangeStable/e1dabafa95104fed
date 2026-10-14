@@ -1,0 +1,2 @@
+go test fuzz v1
+string(":REGION Aa;\n000000\n00\n:ENDREGION:REGION A(0000000\n:ENDREGION 00000;00")

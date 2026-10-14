@@ -1,4 +1,4 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
+Known failure: range-stable — a statement left without ";" before :ELSE / :OTHERWISE is terminated by range formatting but not by the full formatter (#326 item 1)
 Known failure: no-gained-errors — an unterminated :EXITCASE before :OTHERWISE stays unterminated, adding exitcase_last_in_branch (#326)
 Lines that finish a statement without `;` get one when the next line
 starts a new statement: after an identifier, number, string, closing

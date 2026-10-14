@@ -1,4 +1,3 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
 A declaration keyword alone on its line (:PARAMETERS, :DECLARE) takes its
 operand list from the following lines: no `;` is forced after the bare
 keyword (fmt.semicolon_enforcement issue #216), including a list with a
