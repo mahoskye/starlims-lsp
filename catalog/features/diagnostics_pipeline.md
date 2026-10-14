@@ -197,6 +197,12 @@ history:
       :PARAMETERS defaults again (datasource_default_required, reinstated
       in #263/#269); the entry still said `:PARAMETERS p1;` was valid and
       the rule removed. A13 no longer calls inline defaults optional.
+  - date: 2026-10-14
+    ref: "style-guide research review"
+    note: >-
+      Suppression comments may give a reason after `--`, `—` or `:`, which
+      matching ignores (D3 amended). The documented form lost its closing
+      `*/`: SSL comments end at `;`, so `; */` left code after the comment.
 issues: []
 ---
 
@@ -231,9 +237,9 @@ rules (those are `diag.*` entries).
   exemption from the info gate (issue #258).
 - Suppression comments in source are honored (grammar pinned in
   DECISIONS.md D3):
-  - `/* @ssl-disable <slug>[, <slug>...]; */` — file scope: drops every
+  - `/* @ssl-disable <slug>[, <slug>...] [-- reason];` — file scope: drops every
     matching diagnostic in the document.
-  - `/* @ssl-disable-next-line <slug>[, <slug>...]; */` — line scope: drops
+  - `/* @ssl-disable-next-line <slug>[, <slug>...] [-- reason];` — line scope: drops
     matching diagnostics on the line immediately following the comment
     (the comment's last line, for multi-line comments).
   - Slug `*` matches any Code in either form. Slugs are matched
@@ -325,9 +331,9 @@ rules (those are `diag.*` entries).
 - A1: Given any SSL document producing diagnostics, when diagnostics are collected, then every diagnostic has a non-empty Code and Source `ssl-lsp`.
 - A2: Given `ssl.diagnostics.rules: {"<slug>": "off"}`, when a document that would emit that slug is checked, then no diagnostic with that Code is produced; given `"info"` or `"hint"`, the diagnostic is produced with Information or Hint severity; and keys and values match case-insensitively (`"Unknown_Token": "OFF"` configures `unknown_token`), like suppression slugs.
 - A3: Given an override map with an unrecognized value (e.g. `"bogus"`), when diagnostics are collected, then the entry is ignored as if absent — the diagnostic passes through unchanged (an unknown value never drops anything) and an info-tier rule is not exempted from the info gate by it.
-- A4: Given a file containing `/* @ssl-disable <slug>; */`, when diagnostics are collected, then no diagnostic with that Code appears anywhere in the file, while the same file without the directive does emit it.
-- A5: Given `/* @ssl-disable-next-line <slug>; */` directly above an offending line, when diagnostics are collected, then that line's matching diagnostic is dropped but the same violation on any other line still flags.
-- A6: Given `/* @ssl-disable *; */`, when diagnostics are collected, then every coded diagnostic in the file is silenced.
+- A4: Given a file containing `/* @ssl-disable <slug>;`, when diagnostics are collected, then no diagnostic with that Code appears anywhere in the file, while the same file without the directive does emit it.
+- A5: Given `/* @ssl-disable-next-line <slug>;` (optionally followed by a reason after `--`, `—` or `:`) directly above an offending line, when diagnostics are collected, then that line's matching diagnostic is dropped but the same violation on any other line still flags.
+- A6: Given `/* @ssl-disable *;`, when diagnostics are collected, then every coded diagnostic in the file is silenced.
 - A7: Given a diagnostic check that panics, when diagnostics are collected, then the panic does not propagate and the result is the diagnostics collected before the panicking check — suppression, overrides, and the info gate applied as usual — plus a single error-severity `internal_error` diagnostic.
 - A8: Given a URI matching an `ssl.diagnostics.endpointPatterns` substring or a file with a leading-docblock `Endpoint:` marker, when the document is classified, then it is treated as an endpoint script; an `Endpoint:` marker past the leading region does NOT activate endpoint mode.
 - A9: Given open documents and a `workspace/didChangeConfiguration` notification, when the new settings are applied, then diagnostics are re-published for every open document.

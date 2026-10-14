@@ -4,6 +4,40 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D18 — Formatter options are for compatibility, not taste; layout changes ship as announced batches (2026-10-14)
+
+The formatter's output is meant to be the one canonical SSL layout. A
+stylistic option splits that layout and moves the style debate into
+settings files; the projects that went furthest with formatters (gofmt,
+Black, Prettier) record options as their main regret.
+
+- **No new stylistic options.** A new formatter option is added only for
+  compatibility (a team standardized on space indentation, `indentStyle` /
+  `indentSize`) or accessibility (`maxLineLength`, for narrow screens and
+  side-by-side diffs). A new layout rule ships default-on.
+- **A whole new pass may get an off switch** (such as
+  `ssl.format.blankLinesBetweenSections`), so a team can adopt it in its
+  own reformatting commit. Such a switch is a server setting; the editor
+  extension does not surface it as a style choice.
+- **Existing options stay.** Removing one would break consumers' settings
+  (D16 applies to the CLI flags). They are not extended.
+- **Layout changes ship as a batch, announced.** A release that changes
+  formatted output says so under a `Formatting changes` heading in the
+  CHANGELOG, with the production-corpus impact (files and lines that
+  change). Consumers then reformat in one isolated commit and list it in
+  `.git-blame-ignore-revs`, so `git blame` skips it. Layout changes are not
+  made in patch releases.
+- **The author's intent is preserved where it carries meaning.** The
+  formatter never joins a line break or removes a blank line the author
+  wrote (fmt.max_line_length, fmt.blank_lines_between_sections), and keeps
+  a `;` written on its own line (fmt.semicolon_enforcement). A new rule
+  keeps to this.
+
+Rationale: the preview review of the first large layout batch (#324,
+#331–#338: 3,642 of 6,228 corpus files change) and the style-guide
+research behind it. Uniform output is worth more than any one preference,
+and consumers can absorb a reformat when it arrives once, announced.
+
 ## D17 — The LSP models STARLIMS 12 as verified by the SSL reference (2026-10-13, issue #261)
 
 The language the LSP models is STARLIMS 12 SSL as verified by the
@@ -261,10 +295,19 @@ typed receivers, hover and completion for `Request`/`Response`.
 
 ## D3 — Suppression comment grammar (2026-05-01, PR #4, v0.5.0)
 
-`/* @ssl-disable <slug>; */` suppresses a rule for the file;
-`/* @ssl-disable-next-line <slug>; */` for the next line; `*` is the
-wildcard slug. Suppression is honored uniformly by the pipeline, so every
-diagnostic entry is `suppressible: true` unless it documents otherwise.
+`/* @ssl-disable <slug>;` suppresses a rule for the file;
+`/* @ssl-disable-next-line <slug>;` for the next line; `*` is the
+wildcard slug, and several slugs are comma-separated. Suppression is
+honored uniformly by the pipeline, so every diagnostic entry is
+`suppressible: true` unless it documents otherwise.
+
+Amended 2026-10-14: the comment ends at its `;` like any SSL comment, so
+the form first documented here, `/* @ssl-disable <slug>; */`, left a
+stray `*/` after the comment that is itself code (and reported as such).
+The rule list may be followed by a reason after `--`, `—` or `:`
+(`/* @ssl-disable-next-line sql_injection -- table name is a constant;`),
+which matching ignores. Style-guide research recommends that suppressions
+say why; a reason is optional so existing comments keep working.
 
 ## D2 — Per-rule severity overrides (2026-05-01, PR #4, v0.5.0)
 
