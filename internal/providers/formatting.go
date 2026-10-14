@@ -1648,18 +1648,13 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 		if nextTok.Type == lexer.TokenKeyword {
 			keyword := strings.ToUpper(strings.TrimPrefix(nextTok.Text, ":"))
 
-			// Keywords that are continuations (don't need semicolon before)
-			continuationKeywords := map[string]bool{
-				"ELSE":      true,
-				"CATCH":     true,
-				"FINALLY":   true,
-				"CASE":      true,
-				"OTHERWISE": true,
-				"TO":        true,
-				"STEP":      true,
-			}
-
-			if continuationKeywords[keyword] {
+			// Only :TO / :STEP continue a statement (a :FOR header split
+			// across lines). The middle keywords :ELSE, :CATCH, :FINALLY,
+			// :CASE and :OTHERWISE begin a clause of their own, so the
+			// statement before them ends here; treating them as
+			// continuations left it unterminated, a compile error the
+			// formatter kept (issue #326).
+			if keyword == "TO" || keyword == "STEP" {
 				return false
 			}
 

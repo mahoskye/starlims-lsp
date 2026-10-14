@@ -55,7 +55,15 @@ history:
       compile error and `:RETURN ⏎ nValue;` into a bare return — the same
       truncation #216 fixed for the declaration keywords. Behavior text
       now also lists the #99 postfix, :BEGINCASE and region-body rules.
-issues: ["#38", "#89"]
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      A statement left without ';' before :ELSE, :CASE, :OTHERWISE,
+      :CATCH or :FINALLY is now terminated. Those keywords were listed as
+      continuations, so the formatter kept the missing ';' — a compile
+      error — and range formatting, which terminated it, disagreed with a
+      full format.
+issues: ["#38", "#89", "#326"]
 ---
 
 ## Behavior
@@ -75,9 +83,11 @@ No semicolon is added when the expression continues past the line break:
 - the line ends with an operator (including `:=`), a comma, or an opening
   delimiter;
 - the line ends inside an unclosed `(` / `{` / `[`;
-- the line ends with `:TO` / `:STEP`, or the next line starts with a
-  continuation keyword (`:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH`,
-  `:FINALLY`, `:TO`, `:STEP`);
+- the line ends with `:TO` / `:STEP`, or the next line starts with
+  `:TO` / `:STEP` (a `:FOR` header split across lines). The middle
+  keywords `:ELSE`, `:CASE`, `:OTHERWISE`, `:CATCH` and `:FINALLY` are not
+  continuations: each begins a clause, so a statement before one is
+  terminated (issue #326);
 - the line ends with a declaration keyword (`:PARAMETERS`, `:DECLARE`,
   `:PUBLIC`, `:DEFAULT`, `:INCLUDE`, `:INHERIT`) — its operand list is on
   the following lines (issue #216);
@@ -234,6 +244,31 @@ sOut := txt:ToString()
 sOut := txt:ToString()
 	:Replace("##TITLE##", sTitle)
 	:Replace("##USER##", sUser);
+```
+
+A statement before a middle keyword is terminated — `:ELSE`, `:CASE`,
+`:OTHERWISE`, `:CATCH` and `:FINALLY` each begin a clause (issue #326):
+
+### Before
+
+```ssl
+:DECLARE bReady, sOut;
+:IF bReady
+sOut := "ready"
+:ELSE
+sOut := "waiting";
+:ENDIF;
+```
+
+### After
+
+```ssl
+:DECLARE bReady, sOut;
+:IF bReady;
+	sOut := "ready";
+:ELSE;
+	sOut := "waiting";
+:ENDIF;
 ```
 
 ## Rationale
