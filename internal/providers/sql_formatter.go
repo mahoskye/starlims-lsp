@@ -127,6 +127,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// (issue #218 corpus finding: `-- note` glued to `NOT EXISTS`).
 	pendingLineCommentBreak := false
 	afterBlockComment := false // a /* */ comment was just written
+	sawCode := false           // a non-comment token has been written
 	// ODBC escape tracking (issue #217): inside `{...}` the content is
 	// ODBC grammar, not schema identifiers — the marker (`fn`, `d`, `ts`,
 	// ...) is canonical lowercase, the scalar-function name after `{fn`
@@ -950,13 +951,17 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(t.Text)
 			currentLineLen += len(t.Text)
 			isFirstToken = false
-			if strings.HasPrefix(t.Text, "--") {
+			// A line comment ends its line; so does a block comment that
+			// leads the statement — a header note above the query, which
+			// then starts on its own line (`/* recent */ ⏎ WITH ...`).
+			if strings.HasPrefix(t.Text, "--") || !sawCode {
 				pendingLineCommentBreak = true
 			} else {
 				afterBlockComment = true
 			}
 			continue
 		}
+		sawCode = true
 
 		// Write output
 		if pendingLineCommentBreak {
