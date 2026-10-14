@@ -876,6 +876,12 @@ func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
 	if !s.pendingStatementBreak || token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
 		return
 	}
+	// An empty statement — a stray ';' after a ';' — stays on its
+	// statement's line (`:IF .T.;;`); breaking before each one turned a
+	// typo into lines holding a lone ';' (issue #326).
+	if token.Text == ";" && s.lastNonWSToken.Text == ";" {
+		return
+	}
 
 	if s.pendingComment != nil {
 		s.builder.WriteString("  ")

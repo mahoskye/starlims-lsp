@@ -63,6 +63,11 @@ history:
       continuations, so the formatter kept the missing ';' — a compile
       error — and range formatting, which terminated it, disagreed with a
       full format.
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      Stray semicolons stay on their statement's line; the statement
+      break after a ';' used to put each extra ';' on a line of its own.
 issues: ["#38", "#89", "#326"]
 ---
 
@@ -101,6 +106,11 @@ No semicolon is added when the expression continues past the line break:
   (`txt:ToString()` then `:Replace(...)`). The lexer reads that colon as
   member access, not a keyword, so the chain is one statement and its
   member names are never recased (issue #240 follow-up).
+
+An empty statement — a stray `;` directly after a `;` — stays on its
+statement's line (`:IF bReady;;` keeps both); the formatter neither
+deletes it nor breaks before it, which used to turn `;;;` into lines
+holding a lone `;` (issue #326).
 
 Semicolons are never inserted inside strings or comments. The check runs at
 every line break and at end-of-file, so a final statement with no trailing
@@ -269,6 +279,15 @@ sOut := "waiting";
 :ELSE;
 	sOut := "waiting";
 :ENDIF;
+```
+
+Stray semicolons stay where they are (issue #326):
+
+### Idempotent
+
+```ssl
+:DECLARE nCount;;
+nCount := 1;;
 ```
 
 ## Rationale

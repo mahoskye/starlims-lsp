@@ -2,7 +2,6 @@ Stray semicolons: a doubled ';;' after statements, a line of nothing but
 semicolons, and a ';' alone. Empty statements are harmless in SSL; the
 scenario records whether the formatter keeps or drops them and that
 nothing else changes.
-Suspected issue: #326 — the formatter moves each extra ';' onto a line of its own (';;;' becomes three lines of ';', and one lands indented inside the :IF body), multiplying empty statements into layout rather than keeping or dropping them; no catalog entry covers empty statements.
 -- input.ssl --
 :DECLARE nCount;;
 nCount := 1;;
@@ -13,19 +12,13 @@ nCount := 1;;
 :ENDIF;;
 :RETURN nCount;
 -- format --
-:DECLARE nCount;
+:DECLARE nCount;;
+nCount := 1;;
+;;;
 ;
-nCount := 1;
-;
-;
-;
-;
-;
-:IF nCount > 0;
-	;
+:IF nCount > 0;;
 	nCount += 1;
-:ENDIF;
-;
+:ENDIF;;
 :RETURN nCount;
 -- diagnostics --
 -- diagnostics [--strict --info] --
