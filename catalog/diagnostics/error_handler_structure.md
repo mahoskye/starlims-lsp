@@ -31,6 +31,13 @@ history:
       private corpus. authority corrected to authoritative: the style-
       guide record error_handler_last_section (level authoritative)
       names this rule in enforced_by, so the guide is not silent.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      Corrected: `:ERROR` in expression position was described as a
+      corpus-observed form. The grammar admits only the statement marker,
+      the production corpus holds no expression use, and unexpected_token
+      reports it; this rule still ignores it.
 issues: []
 ---
 
@@ -57,8 +64,9 @@ and RESUME). Three findings share this code, all at error severity:
   `:RESUME`.
 
 Only the marker-statement forms `:ERROR;` and `:RESUME;` count for the
-placement findings: `:ERROR` also appears in expression position
-(`LimsString(:ERROR)`).
+placement findings. The grammar has no other form (`ErrorMarker ::= ":"
+"ERROR" ";"`): `:ERROR` written as an operand (`LimsString(:ERROR)`) is
+not a handler marker, and `unexpected_token` reports it (issue #328).
 
 It must NOT flag:
 

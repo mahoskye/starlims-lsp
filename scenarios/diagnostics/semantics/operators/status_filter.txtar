@@ -63,7 +63,6 @@ operators, == and != beside them are correct.
 7:7-7:19 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
 7:15-7:16 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
 7:20-7:23 error bare_logical_operator: Use '.AND.' instead of 'AND' for logical operations in SSL
-7:20-7:23 warning undeclared_variable: Variable 'AND' is not declared
 10:7-10:12 info negative_logic: Consider inverting this condition to use positive logic: swap the :IF and :ELSE branches and remove the negation.
 11:43-11:46 info nested_iif: Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.
 11:55-11:57 info not_preferred_operator: Use '!=' instead of '<>' for inequality

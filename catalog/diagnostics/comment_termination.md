@@ -26,6 +26,12 @@ history:
       False positive: fired on a comment-only line following a terminated
       comment; fixed by the paragraph-break suppression (see
       diag.comment_text_after_terminator).
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      On a comment spanning lines the range now ends at the comment's last
+      character, on its last line; it used to end on the first line at the
+      start column plus the whole comment's length, past that line's end.
 issues: []
 ---
 

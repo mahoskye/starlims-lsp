@@ -16,6 +16,12 @@ history:
     note: >-
       Added. c_style_comment_closer covered only the inert `*/;` form;
       the form that actually hides code drew nothing.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      On a comment spanning lines the range now ends at the comment's last
+      character, on its last line; it used to end on the first line at the
+      start column plus the whole comment's length, past that line's end.
 issues:
   - 249
 ---

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"starlims-lsp/internal/constants"
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
 )
@@ -15,6 +16,7 @@ import (
 // operator-level rules that already name the same token.
 func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) []Diagnostic {
 	var diagnostics []Diagnostic
+	reported := map[int]bool{}
 	for i := range stmts {
 		se := &stmts[i]
 		idx := se.Unexpected
@@ -50,6 +52,7 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 			msg += " (missing space before ':STEP'?)"
 		}
 
+		reported[idx] = true
 		r := tokenToRange(tok)
 		if tok.Type == lexer.TokenEOF {
 			r.End.Character = r.Start.Character + 1
@@ -62,7 +65,60 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 			Code:     CodeUnexpectedToken,
 		})
 	}
-	return diagnostics
+	return append(diagnostics, orphanColons(tokens, reported)...)
+}
+
+// orphanColons reports a ':' that starts a statement with nothing to be the
+// member-access receiver before it — `:;`, `: IF x;`, a trailing `:`. The
+// parser forms no statement around it, so no other finding names it
+// (issue #328).
+func orphanColons(tokens []lexer.Token, reported map[int]bool) []Diagnostic {
+	var out []Diagnostic
+	var prev *lexer.Token
+	for i := range tokens {
+		t := tokens[i]
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenEOF {
+			continue
+		}
+		if t.Type == lexer.TokenPunctuation && t.Text == ":" && !reported[i] &&
+			(prev == nil || prev.Text == ";" || prev.Type == lexer.TokenComment) {
+			msg := "Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access"
+			if next := nextSignificant(tokens, i); next != nil && next.Type == lexer.TokenIdentifier && next.Line == t.Line &&
+				isKeywordName(next.Text) {
+				msg += fmt.Sprintf(" (remove the space: ':%s')", strings.ToUpper(next.Text))
+			}
+			out = append(out, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(t),
+				Message:  msg,
+				Source:   "ssl-lsp",
+				Code:     CodeUnexpectedToken,
+			})
+		}
+		if t.Type != lexer.TokenComment || prev == nil || prev.Line != t.Line {
+			prev = &tokens[i]
+		}
+	}
+	return out
+}
+
+// nextSignificant returns the first token after i that is neither
+// whitespace nor a comment, or nil.
+func nextSignificant(tokens []lexer.Token, i int) *lexer.Token {
+	for j := i + 1; j < len(tokens); j++ {
+		if tokens[j].Type == lexer.TokenEOF {
+			return nil
+		}
+		if tokens[j].Type != lexer.TokenWhitespace && tokens[j].Type != lexer.TokenComment {
+			return &tokens[j]
+		}
+	}
+	return nil
+}
+
+// isKeywordName reports whether word, without its colon, is an SSL keyword.
+func isKeywordName(word string) bool {
+	return constants.IsKeyword(strings.ToUpper(word))
 }
 
 // describeToken renders a token for the message as `<class> '<text>'`,

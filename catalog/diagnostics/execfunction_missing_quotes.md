@@ -26,6 +26,11 @@ history:
       dot_property_access no longer also reports the first `.Name`
       fragment of an unquoted dispatch path; this rule's fix-it message
       is the one finding.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      The range spans the whole unquoted path, through its last segment
+      (`Billing.Tax.Rate`); it stopped after the first `.segment.` token.
 issues: []
 ---
 

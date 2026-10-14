@@ -3,7 +3,6 @@ Bare AND/OR/NOT in operator position are not SSL operators
 a parenthesis is still the operator, so it is not also a
 direct_procedure_call, and the operand after a prefix Not is not also an
 unexpected_token (issue #255): one finding per typo.
-Suspected issue: #328 — under strict, undeclared_variable also reports 'AND' (line 3) and 'Not' (line 9) — the catalog says the sibling rules defer so "one typo is one finding" (issue #255); 'or (' and the later 'NOT (' are not reported, so the extra finding is also inconsistent.
 -- input.ssl --
 :PROCEDURE CanRelease;
 	:PARAMETERS bApproved, bPaid, bOnHold;
@@ -41,8 +40,6 @@ Suspected issue: #328 — under strict, undeclared_variable also reports 'AND' (
 12:10-12:13 error bare_logical_operator: Use '.NOT.' instead of 'NOT' for logical operations in SSL
 -- diagnostics [--strict --info] --
 3:16-3:19 error bare_logical_operator: Use '.AND.' instead of 'AND' for logical operations in SSL
-3:16-3:19 warning undeclared_variable: Variable 'AND' is not declared
 6:16-6:18 error bare_logical_operator: Use '.OR.' instead of 'or' for logical operations in SSL
 9:6-9:9 error bare_logical_operator: Use '.NOT.' instead of 'Not' for logical operations in SSL
-9:6-9:9 warning undeclared_variable: Variable 'Not' is not declared
 12:10-12:13 error bare_logical_operator: Use '.NOT.' instead of 'NOT' for logical operations in SSL

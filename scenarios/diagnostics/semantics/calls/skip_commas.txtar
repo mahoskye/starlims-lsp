@@ -4,7 +4,6 @@ diag.spaced_skip_commas; skipped slots that end a call's argument list
 fire diag.trailing_skip_commas, one per call over the whole run. A spaced
 run that also ends the list is reported only as trailing (one finding
 per cause).
-Suspected issue: #328 — DoProc("Helper", {1},,) also fires builtin_excess_arguments (surplus 1 argument "never evaluated") in the default profile, while trailing_skip_commas' catalog says `Foo(a,,)` "is exactly `Foo(a)`", which has no surplus: one cause, two findings with contradictory explanations.
 -- input.ssl --
 :PROCEDURE Skips;
 	:DECLARE vOut;
@@ -24,10 +23,8 @@ Suspected issue: #328 — DoProc("Helper", {1},,) also fires builtin_excess_argu
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --
-5:10-5:16 warning builtin_excess_arguments: 'DoProc' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 -- diagnostics [--strict --info] --
 3:29-3:32 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
 4:58-4:61 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
-5:10-5:16 warning builtin_excess_arguments: 'DoProc' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 5:30-5:32 info trailing_skip_commas: Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them
 6:28-6:31 info trailing_skip_commas: Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them

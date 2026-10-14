@@ -1,7 +1,6 @@
 A lone ':' as a statement, a ':' with a space before a keyword name, and
 a ':' at end of file. The validator must report each without panicking,
 and the formatter must not glue the colon onto a neighboring token.
-Suspected issue: #328 — no diagnostic for ':;', ': IF nCount > 0;' or a trailing ':' (only the then-unmatched :ENDIF is reported); unexpected_token says it flags the first token a statement cannot accept, and a lone ':' can begin no SSL statement.
 -- input.ssl --
 :DECLARE nCount;
 :;
@@ -19,6 +18,12 @@ nCount += 1;
 :ENDIF;
 :
 -- diagnostics --
+2:1-2:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access
+4:1-4:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access (remove the space: ':IF')
 6:1-6:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+7:1-7:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access
 -- diagnostics [--strict --info] --
+2:1-2:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access
+4:1-4:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access (remove the space: ':IF')
 6:1-6:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+7:1-7:2 error unexpected_token: Unexpected ':' - a colon starts a keyword (written with no space, ':IF') or follows the object in a member access

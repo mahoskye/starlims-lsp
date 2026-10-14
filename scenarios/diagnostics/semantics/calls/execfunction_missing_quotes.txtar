@@ -2,7 +2,6 @@ An unquoted dotted path as the first argument of ExecFunction or DoProc
 (diag.execfunction_missing_quotes, error, from the identifier through the
 dotted fragment). dot_property_access stays silent on that fragment
 (issue #255): one finding per defect.
-Suspected issue: #328 — for a three-part path (Billing.Tax.Rate) the range stops after "Billing.Tax." instead of spanning the whole path, and under strict the tail "Rate" (and each leading segment, Billing/Reports) is also reported as an undeclared variable, though the catalog says the range "spans from the first-argument identifier through the dotted fragment" and the defect "reports once, here".
 -- input.ssl --
 :PROCEDURE Dispatch;
 	:DECLARE nOut;
@@ -22,11 +21,8 @@ Suspected issue: #328 — for a three-part path (Billing.Tax.Rate) the range sto
 -- diagnostics --
 3:23-3:42 error execfunction_missing_quotes: Namespace path must be quoted: ExecFunction("Module.Procedure", ...) not ExecFunction(Module.Procedure, ...)
 4:17-4:37 error execfunction_missing_quotes: Namespace path must be quoted: DoProc("Module.Procedure", ...) not DoProc(Module.Procedure, ...)
-5:23-5:35 error execfunction_missing_quotes: Namespace path must be quoted: execfunction("Module.Procedure", ...) not execfunction(Module.Procedure, ...)
+5:23-5:39 error execfunction_missing_quotes: Namespace path must be quoted: execfunction("Module.Procedure", ...) not execfunction(Module.Procedure, ...)
 -- diagnostics [--strict --info] --
 3:23-3:42 error execfunction_missing_quotes: Namespace path must be quoted: ExecFunction("Module.Procedure", ...) not ExecFunction(Module.Procedure, ...)
-3:23-3:30 warning undeclared_variable: Variable 'Billing' is not declared
 4:17-4:37 error execfunction_missing_quotes: Namespace path must be quoted: DoProc("Module.Procedure", ...) not DoProc(Module.Procedure, ...)
-4:17-4:24 warning undeclared_variable: Variable 'Reports' is not declared
-5:23-5:35 error execfunction_missing_quotes: Namespace path must be quoted: execfunction("Module.Procedure", ...) not execfunction(Module.Procedure, ...)
-5:35-5:39 warning undeclared_variable: Variable 'Rate' is not declared
+5:23-5:39 error execfunction_missing_quotes: Namespace path must be quoted: execfunction("Module.Procedure", ...) not execfunction(Module.Procedure, ...)

@@ -39,6 +39,13 @@ history:
       branch or loop body no longer reaches the :ELSE branch, nor code
       after the block when that branch ends in :RETURN. Corpus: 5 -> 1
       finding on unmodified product code.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      The glued `NIL:ToString()` lexes as member access on NIL, so it
+      reports nil_method_call alone; the lexer read `:ToString` as an
+      unknown keyword, adding unknown_keyword and unexpected_token, and
+      the formatter upper-cased it.
 issues: []
 ---
 

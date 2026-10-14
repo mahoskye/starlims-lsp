@@ -25,11 +25,11 @@ call whose first surplus slot is skipped ranges on the name.
 -- diagnostics --
 4:26-4:32 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 5:16-5:17 warning builtin_excess_arguments: 'Today' accepts at most 0 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
-6:26-6:30 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 2 arguments (never evaluated)
+6:26-6:28 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 7:10-7:15 warning builtin_excess_arguments: 'Upper' accepts at most 1 argument(s) - the compiler silently drops the surplus 2 arguments (never evaluated)
 -- diagnostics [--strict --info] --
 4:26-4:32 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 5:16-5:17 warning builtin_excess_arguments: 'Today' accepts at most 0 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
-6:26-6:30 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 2 arguments (never evaluated)
+6:26-6:28 warning builtin_excess_arguments: 'Left' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 6:28-6:30 info trailing_skip_commas: Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them
 7:10-7:15 warning builtin_excess_arguments: 'Upper' accepts at most 1 argument(s) - the compiler silently drops the surplus 2 arguments (never evaluated)

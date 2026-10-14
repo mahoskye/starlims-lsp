@@ -32,6 +32,5 @@ select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU';
 1:41-1:48 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:active' instead of 'object.active'
 1:49-1:50 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
 1:55-1:58 error bare_logical_operator: Use '.AND.' instead of 'and' for logical operations in SSL
-1:55-1:58 warning undeclared_variable: Variable 'and' is not declared
 1:60-1:67 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:region' instead of 'object.region'
 1:68-1:69 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

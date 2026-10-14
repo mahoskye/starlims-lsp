@@ -433,8 +433,11 @@ func (l *Lexer) isKeywordStart(tokens []Token) bool {
 }
 
 // endsReceiver reports whether a token can end a member-access receiver.
+// NIL is a value too: `NIL:ToString()` is a (failing) member call that
+// nil_method_call reports, not an unknown `:ToString` keyword (issue #328).
 func endsReceiver(t Token) bool {
-	return t.Type == TokenIdentifier || (t.Type == TokenPunctuation && (t.Text == ")" || t.Text == "]"))
+	return t.Type == TokenIdentifier || (t.Type == TokenPunctuation && (t.Text == ")" || t.Text == "]")) ||
+		(t.Type == TokenKeyword && strings.EqualFold(t.Text, "NIL"))
 }
 
 // peekWord returns the identifier characters starting `offset` runes

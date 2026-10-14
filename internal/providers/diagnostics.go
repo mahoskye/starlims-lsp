@@ -1863,6 +1863,61 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 	return diagnostics
 }
 
+// unquotedPathEnd returns the index of the last token of an unquoted
+// namespace path whose first `.segment` token is tokens[k]: the path runs
+// on through glued identifiers and `.`-led tokens (`Billing.Tax.Rate`
+// lexes as Billing, `.Tax.`, Rate).
+func unquotedPathEnd(tokens []lexer.Token, k int) int {
+	last := k
+	for j := k + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenIdentifier || (t.Type == lexer.TokenUnknown && strings.HasPrefix(t.Text, ".")) ||
+			(t.Type == lexer.TokenPunctuation && t.Text == ".") {
+			last = j
+			continue
+		}
+		break
+	}
+	return last
+}
+
+// unquotedPathTokens marks the tokens of every unquoted ExecFunction /
+// DoProc namespace path (execfunction_missing_quotes), so other rules
+// leave its segments to that finding — `Billing` and `Rate` in
+// `ExecFunction(Billing.Tax.Rate)` are not undeclared variables
+// (issue #328).
+func unquotedPathTokens(tokens []lexer.Token) map[int]bool {
+	marked := map[int]bool{}
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+		upper := strings.ToUpper(token.Text)
+		if upper != "EXECFUNCTION" && upper != "DOPROC" {
+			continue
+		}
+		j := i + 1
+		for j < len(tokens) && (tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment) {
+			j++
+		}
+		if j >= len(tokens) || tokens[j].Text != "(" {
+			continue
+		}
+		j++
+		for j < len(tokens) && (tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment) {
+			j++
+		}
+		if j+1 >= len(tokens) || tokens[j].Type != lexer.TokenIdentifier ||
+			tokens[j+1].Type != lexer.TokenUnknown || !strings.HasPrefix(tokens[j+1].Text, ".") {
+			continue
+		}
+		for k := j; k <= unquotedPathEnd(tokens, j+1); k++ {
+			marked[k] = true
+		}
+	}
+	return marked
+}
+
 // checkMissingQuotesInExecFunction detects ExecFunction(Module.Proc, ...) patterns
 // where the namespace path is not quoted.
 // Related to Gotcha #8 (dot notation).
@@ -1906,12 +1961,15 @@ func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
 							continue
 						}
 						if tokens[k].Type == lexer.TokenUnknown && strings.HasPrefix(tokens[k].Text, ".") {
-							// Found identifier.something pattern without quotes
+							// Found identifier.something pattern without quotes.
+							// The range runs to the path's last segment
+							// (`Billing.Tax.Rate`, issue #328).
+							last := unquotedPathEnd(tokens, k)
 							diagnostics = append(diagnostics, Diagnostic{
 								Severity: SeverityError,
 								Range: Range{
 									Start: Position{Line: t.Line - 1, Character: t.Column - 1},
-									End:   Position{Line: tokens[k].Line - 1, Character: tokens[k].Column - 1 + len(tokens[k].Text)},
+									End:   Position{Line: tokens[last].Line - 1, Character: tokens[last].Column - 1 + len(tokens[last].Text)},
 								},
 								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
 								Source:  "ssl-lsp",
@@ -3173,17 +3231,26 @@ func isFirstSignificantStatementKeyword(tokens []lexer.Token, keyword string) bo
 }
 
 // tokenToRange converts a token to a range, its end in runes like its
-// start (issue #307).
+// start (issue #307). A token spanning lines (a multi-line comment or
+// string) ends on its last line, after its last character there; it used
+// to end on its first line at the start column plus the whole token's
+// length, past that line's end (issue #328).
 func tokenToRange(token lexer.Token) Range {
+	// A token that runs to end of input carries the final line break; the
+	// range ends at its last character, not on the empty line after it.
+	text := strings.TrimRight(token.Text, "\r\n")
+	if text == "" {
+		text = token.Text
+	}
+	endLine := token.Line - 1
+	endChar := token.Column - 1 + utf8.RuneCountInString(text)
+	if nl := strings.LastIndex(text, "\n"); nl >= 0 {
+		endLine += strings.Count(text, "\n")
+		endChar = utf8.RuneCountInString(text[nl+1:])
+	}
 	return Range{
-		Start: Position{
-			Line:      token.Line - 1,
-			Character: token.Column - 1,
-		},
-		End: Position{
-			Line:      token.Line - 1,
-			Character: token.Column - 1 + utf8.RuneCountInString(token.Text),
-		},
+		Start: Position{Line: token.Line - 1, Character: token.Column - 1},
+		End:   Position{Line: endLine, Character: endChar},
 	}
 }
 
@@ -6456,6 +6523,7 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
 func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
+	pathTokens := unquotedPathTokens(tokens)
 	var diagnostics []Diagnostic
 
 	// Build set of declared variables from the token stream
@@ -6542,6 +6610,21 @@ func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []
 
 		// Skip built-in identifiers (functions, classes, literals, operators)
 		if builtins[upperName] {
+			continue
+		}
+
+		// One typo is one finding (issue #255): a fragment another rule
+		// already reports is not an undeclared variable too (issue #328) —
+		// a bare AND/OR/NOT (bare_logical_operator), the exponent glued to
+		// a number in `7e2` (scientific_notation), a segment of an unquoted
+		// ExecFunction path (execfunction_missing_quotes).
+		if upperName == "AND" || upperName == "OR" || upperName == "NOT" {
+			continue
+		}
+		if i > 0 && tokens[i-1].Type == lexer.TokenNumber && (token.Text[0] == 'e' || token.Text[0] == 'E') {
+			continue
+		}
+		if pathTokens[i] {
 			continue
 		}
 
@@ -6672,9 +6755,16 @@ func checkUnusedVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 
 	// Extract procedures for scope awareness
 	procedures := p.ExtractProcedures(ast)
+	isClass := isFirstSignificantStatementKeyword(tokens, "CLASS")
 
 	// Count usages for each declared variable
 	for _, v := range variables {
+		// A class-level :DECLARE is a field — part of the class's public
+		// interface, read by callers in other files this check cannot see
+		// (issue #328).
+		if isClass && !insideProcedure(v.Line, procedures) {
+			continue
+		}
 		usageCount := countVariableUsages(tokens, v, procedures)
 
 		if usageCount == 0 {
@@ -6769,7 +6859,14 @@ func countSQLMarkerUsages(text, varNameUpper string) int {
 	}
 	n := 0
 	for _, ph := range ParseSQLPlaceholders(text[1 : len(text)-1]) {
-		if !ph.IsNamed || !isSimpleNamedPlaceholder(ph.Name) || strings.Contains(ph.Name, "(") {
+		if !ph.IsNamed {
+			continue
+		}
+		if !isSimpleNamedPlaceholder(ph.Name) || strings.Contains(ph.Name, "(") {
+			// A complex placeholder or call (`?sPrefix + sSuffix?`,
+			// `?Len(aIds)?`) is an SSL expression evaluated at run time:
+			// every variable it names is read (issue #328).
+			n += countExpressionReads(ph.Name, varNameUpper)
 			continue
 		}
 		if strings.ToUpper(extractBaseVarName(ph.Name)) == varNameUpper {
@@ -6777,6 +6874,43 @@ func countSQLMarkerUsages(text, varNameUpper string) int {
 		}
 	}
 	return n
+}
+
+// countExpressionReads counts the reads of a variable in an SSL expression:
+// identifiers that are not a member name (after ':') or a called function
+// (before '(').
+func countExpressionReads(expr, varNameUpper string) int {
+	toks := lexer.NewLexer(expr).Tokenize()
+	var sig []lexer.Token
+	for _, t := range toks {
+		if t.Type != lexer.TokenWhitespace && t.Type != lexer.TokenEOF {
+			sig = append(sig, t)
+		}
+	}
+	n := 0
+	for i, t := range sig {
+		if t.Type != lexer.TokenIdentifier || strings.ToUpper(t.Text) != varNameUpper {
+			continue
+		}
+		if i > 0 && sig[i-1].Text == ":" {
+			continue
+		}
+		if i+1 < len(sig) && sig[i+1].Text == "(" {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+// insideProcedure reports whether a 1-based line falls in a procedure.
+func insideProcedure(line int, procedures []parser.ProcedureInfo) bool {
+	for _, pr := range procedures {
+		if line >= pr.StartLine && line <= pr.EndLine {
+			return true
+		}
+	}
+	return false
 }
 
 // checkSQLParameterValidation checks that SQL parameters (?param?) match declared variables.
@@ -7773,7 +7907,7 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 	// span tracks the first occurrence of each family; -1 means not seen.
 	type span struct{ legacy, structured int }
 	newSpan := func() span { return span{-1, -1} }
-	flush := func(sp span) {
+	flush := func(sp span, where, advice string) {
 		if sp.legacy < 0 || sp.structured < 0 {
 			return
 		}
@@ -7784,7 +7918,7 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
 			Range:    tokenToRange(tokens[later]),
-			Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure",
+			Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in " + where + " - the legacy handler can intercept errors before ':CATCH' sees them; use one family " + advice,
 			Source:   "ssl-lsp",
 			Code:     CodeMixedErrorHandlingFamilies,
 		})
@@ -7806,13 +7940,13 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
 		case "PROCEDURE":
 			if inProc {
-				flush(proc)
+				flush(proc, "the same procedure", "per procedure")
 			}
 			proc = newSpan()
 			inProc = true
 		case "ENDPROC":
 			if inProc {
-				flush(proc)
+				flush(proc, "the same procedure", "per procedure")
 				proc = newSpan()
 			}
 			inProc = false
@@ -7836,9 +7970,10 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 	if inProc {
-		flush(proc)
+		flush(proc, "the same procedure", "per procedure")
 	}
-	flush(topLevel)
+	// The top-level span is the script body, not a procedure (issue #328).
+	flush(topLevel, "the top-level script code", "in the script body")
 
 	return diagnostics
 }

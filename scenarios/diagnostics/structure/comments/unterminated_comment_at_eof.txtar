@@ -16,6 +16,6 @@ nTotal := 2
 /* trailing note that never ends
 nTotal := 2
 -- diagnostics --
-5:1-5:46 error comment_termination: SSL comments must end with a semicolon ';'
+5:1-6:12 error comment_termination: SSL comments must end with a semicolon ';'
 -- diagnostics [--strict --info] --
-5:1-5:46 error comment_termination: SSL comments must end with a semicolon ';'
+5:1-6:12 error comment_termination: SSL comments must end with a semicolon ';'

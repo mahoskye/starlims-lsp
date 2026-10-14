@@ -42,5 +42,4 @@ restriction).
 -- diagnostics --
 7:9-7:15 error doproc_in_class: Unqualified DoProc targets are a compile-time error inside class methods. Use Me:MethodName() / Base:MethodName(), or a fully qualified "Category.Script.Procedure" reference for a deployed procedure.
 -- diagnostics [--strict --info] --
-2:10-2:17 hint unused_variable: Variable 'aErrors' is declared but never used
 7:9-7:15 error doproc_in_class: Unqualified DoProc targets are a compile-time error inside class methods. Use Me:MethodName() / Base:MethodName(), or a fully qualified "Category.Script.Procedure" reference for a deployed procedure.

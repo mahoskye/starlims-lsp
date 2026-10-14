@@ -84,6 +84,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of them from narrower SQL packing. Lines over 90 columns in those files
   fall from 21,492 to 18,200. No file becomes non-idempotent, and
   formatting adds no errors.
+- **Diagnostics** (#328):
+  - **Multi-line comment ranges:** a diagnostic on a multi-line comment or
+    string ends at the token's last character on its last line. It ran
+    past the end of the first line.
+  - **One finding per typo:** `undeclared_variable` no longer repeats a
+    bare `AND`/`OR`/`NOT`, the `e2` of `7e2`, or the segments of an
+    unquoted `ExecFunction` path. `execfunction_missing_quotes` covers the
+    whole path.
+  - **`NIL:ToString()`:** it reports `nil_method_call` alone, not also
+    `unknown_keyword` and `unexpected_token`.
+  - **Trailing skip commas:** `DoProc("P", {1},,)` no longer counts as
+    surplus builtin arguments.
+  - **`unused_variable`:** a variable read only inside a complex SQL
+    placeholder (`?sPrefix + sSuffix?`, `?Val(nAmount)?`) counts as used,
+    and class fields are not reported. Under `--strict` on the production
+    corpus the rule's findings fall from 5,629 to 3,944, and every one
+    removed is a false positive (class fields in 335 files, placeholder
+    reads in 10).
+  - **Stray colon:** a lone `:` that starts a statement (`:;`,
+    `: IF x;`) is reported by `unexpected_token`.
+  - **Script-level message:** `mixed_error_handling_families` names the
+    script body for top-level code.
+  - **`:ERROR` as an operand:** `LimsString(:ERROR)` is not a handler. The
+    catalog no longer calls it a corpus-observed form, and the formatter no
+    longer indents after it.
+
+  The default profile's findings on the corpus are unchanged, and no file
+  formats differently.
 
 ## [0.25.0] - 2026-10-13
 

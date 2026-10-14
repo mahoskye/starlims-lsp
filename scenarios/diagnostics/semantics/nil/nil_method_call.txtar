@@ -2,7 +2,6 @@ Member access on something known to be NIL (diag.nil_method_call,
 warning, ranged on the NIL expression): on the NIL literal itself, and
 on a local whose most recent assignment was NIL. An :OR. guard does not
 protect the use (only a top-level .AND. chain does).
-Suspected issue: #328 — the glued NIL:ToString() also reports unexpected_token (error) and unknown_keyword on ':ToString', though the nil_method_call catalog says the glued form "is recognized as member access" (spaced `NIL : ToString()` gives only nil_method_call).
 -- input.ssl --
 :PROCEDURE Teardown;
 	:PARAMETERS bChanged;
@@ -21,7 +20,7 @@ Suspected issue: #328 — the glued NIL:ToString() also reports unexpected_token
 :PROCEDURE Teardown;
 	:PARAMETERS bChanged;
 	:DECLARE oConn, oPrev, sText;
-	sText := NIL:TOSTRING();
+	sText := NIL:ToString();
 	oConn := CreateUdObject();
 	oConn := NIL;
 	oConn:Close();
@@ -33,13 +32,9 @@ Suspected issue: #328 — the glued NIL:ToString() also reports unexpected_token
 :ENDPROC;
 -- diagnostics --
 4:11-4:14 warning nil_method_call: Calling a method on NIL raises an error. Check for NIL before accessing members.
-4:14-4:23 error unexpected_token: Unexpected keyword ':ToString' - expected an operator or ';'
-4:14-4:23 warning unknown_keyword: Unknown SSL keyword: ':ToString'
 7:2-7:7 warning nil_method_call: Variable 'oConn' may be NIL at this point. Calling methods on NIL raises an error.
 10:3-10:8 warning nil_method_call: Variable 'oPrev' may be NIL at this point. Calling methods on NIL raises an error.
 -- diagnostics [--strict --info] --
 4:11-4:14 warning nil_method_call: Calling a method on NIL raises an error. Check for NIL before accessing members.
-4:14-4:23 error unexpected_token: Unexpected keyword ':ToString' - expected an operator or ';'
-4:14-4:23 warning unknown_keyword: Unknown SSL keyword: ':ToString'
 7:2-7:7 warning nil_method_call: Variable 'oConn' may be NIL at this point. Calling methods on NIL raises an error.
 10:3-10:8 warning nil_method_call: Variable 'oPrev' may be NIL at this point. Calling methods on NIL raises an error.
