@@ -1,0 +1,30 @@
+Semicolons and comment markers inside string literals ("a;b", '/*x;',
+[c;d]), and a comment with a second ';' inside its text: the first ';'
+ends the comment and the rest of the line becomes code (AGENTS.md
+comment rule). The formatter must keep string contents intact and must
+treat the tail as code.
+-- input.ssl --
+:DECLARE sA, sB, sC;
+sA := "a;b;c";
+sB := '/*not a comment;';
+sC := [SELECT * FROM T WHERE X = 'a;b'];
+/* first part; second part looks like code;
+:RETURN sA + sB + sC;
+-- format --
+:DECLARE sA, sB, sC;
+sA := "a;b;c";
+sB := '/*not a comment;';
+sC := [SELECT * FROM T WHERE X = 'a;b'];
+/* first part;
+second part looks like code;
+:RETURN sA + sB + sC;
+-- diagnostics --
+5:1-5:15 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
+5:23-5:27 error unexpected_token: Unexpected identifier 'part' - expected an operator or ';'
+-- diagnostics [--strict --info] --
+5:1-5:15 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
+5:23-5:27 warning undeclared_variable: Variable 'part' is not declared
+5:23-5:27 error unexpected_token: Unexpected identifier 'part' - expected an operator or ';'
+5:28-5:33 warning undeclared_variable: Variable 'looks' is not declared
+5:34-5:38 warning undeclared_variable: Variable 'like' is not declared
+5:39-5:43 warning undeclared_variable: Variable 'code' is not declared

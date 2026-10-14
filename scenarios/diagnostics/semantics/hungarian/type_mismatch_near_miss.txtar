@@ -1,0 +1,52 @@
+Near-misses for diag.hungarian_type_mismatch: matching builtin return
+types, NIL, unknown right-hand sides (user procedure, array element,
+v-prefixed name), unprefixed targets, compound assignment, a member
+target, and an operand pair with no documented result (aList + sText).
+That last line is still diag.mixed_type_operator's finding (array + string)
+under every profile, which is correct for that rule.
+-- input.ssl --
+:PROCEDURE Refresh;
+	:PARAMETERS sText, aList, vAny;
+	:DECLARE nCode, dStart, aNames, oRec, Total, i;
+	nCode := Len(sText);
+	sText := AllTrim(sText);
+	dStart := Today();
+	aNames := {"Ann", "Bob"};
+	oRec := CreateUdObject();
+	sText := NIL;
+	nCode := DoProc("LookupCode", {sText});
+	nCode := aList[1];
+	nCode := vAny;
+	Total := "anything";
+	i := "counter";
+	nCode += 1;
+	oRec:sLabel := 5;
+	nCode := aList + sText;
+	:RETURN {nCode, dStart, aNames, oRec, Total, i};
+:ENDPROC;
+-- diagnostics [--hungarian-types] --
+17:17-17:18 warning mixed_type_operator: Mixed types in '+' operation: array + string. The '+' operator requires both operands to be the same type (both strings or both numeric)
+-- format --
+:PROCEDURE Refresh;
+	:PARAMETERS sText, aList, vAny;
+	:DECLARE nCode, dStart, aNames, oRec, Total, i;
+	nCode := Len(sText);
+	sText := AllTrim(sText);
+	dStart := Today();
+	aNames := {"Ann", "Bob"};
+	oRec := CreateUdObject();
+	sText := NIL;
+	nCode := DoProc("LookupCode", {sText});
+	nCode := aList[1];
+	nCode := vAny;
+	Total := "anything";
+	i := "counter";
+	nCode += 1;
+	oRec:sLabel := 5;
+	nCode := aList + sText;
+	:RETURN {nCode, dStart, aNames, oRec, Total, i};
+:ENDPROC;
+-- diagnostics --
+17:17-17:18 warning mixed_type_operator: Mixed types in '+' operation: array + string. The '+' operator requires both operands to be the same type (both strings or both numeric)
+-- diagnostics [--strict --info] --
+17:17-17:18 warning mixed_type_operator: Mixed types in '+' operation: array + string. The '+' operator requires both operands to be the same type (both strings or both numeric)

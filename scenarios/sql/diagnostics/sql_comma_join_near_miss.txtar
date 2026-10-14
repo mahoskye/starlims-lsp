@@ -1,0 +1,57 @@
+Commas sql_comma_join must not read as joins (diag.sql_comma_join Does
+not flag): an ANSI INNER JOIN, commas in the SELECT list and in function
+arguments, an IN list, a 'a,b' literal, a -- comment holding commas,
+commas inside an inline view in FROM, and a DELETE (no join surface).
+-- input.ssl --
+:PROCEDURE OrderTasks;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("SELECT o.ordno, t.testcode FROM orders o INNER JOIN ordtask t ON o.ordno = t.ordno");
+	aRows := SQLExecute("SELECT ordno, COALESCE(status, 'X') FROM orders WHERE kind IN ('a', 'b') AND note = 'a,b'");
+	aRows := SQLExecute("SELECT ordno, kind FROM orders WHERE ordno = ?sOrdNo? -- t1, t2
+");
+	aRows := SQLExecute("SELECT x.ordno FROM (SELECT ordno, status FROM orders) x WHERE x.status = 'A'");
+	bOk := RunSQL("DELETE FROM ordtask WHERE ordno IN (SELECT ordno FROM orders WHERE status = 'X')");
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE OrderTasks;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("
+	    SELECT o.ordno, t.testcode
+	    FROM orders o
+	    INNER JOIN ordtask t
+	      ON o.ordno = t.ordno
+	");
+	aRows := SQLExecute("
+	    SELECT ordno, COALESCE(status, 'X')
+	    FROM orders
+	    WHERE kind IN ('a', 'b')
+	      AND note = 'a,b'
+	");
+	aRows := SQLExecute("
+	    SELECT ordno, kind
+	    FROM orders
+	    WHERE ordno = ?sOrdNo? -- t1, t2
+	");
+	aRows := SQLExecute("
+	    SELECT x.ordno
+	    FROM (
+	        SELECT ordno, status
+	        FROM orders
+	    ) x
+	    WHERE x.status = 'A'
+	");
+	bOk := RunSQL("
+	    DELETE FROM ordtask
+	    WHERE ordno IN (
+	        SELECT ordno
+	        FROM orders
+	        WHERE status = 'X'
+	    )
+	");
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,362 @@
+A legacy sample-login script written the way old code looks: lowercase
+keywords and built-in names, no Hungarian prefixes, several statements
+crammed on one line, ragged indentation, a :DEFAULT on a declared local,
+string '=' comparisons, a direct procedure call, a dot property access,
+?name? placeholders passed to RunSQL, a :BEGINCASE arm without :EXITCASE
+and a legacy :ERROR handler. The formatter and many diagnostics act on
+it together; the format section shows what the formatter alone repairs.
+The second half adds a lookup procedure with a :PUBLIC flag, an
+'= ""' test, a nested :IF chain that never indents and a call to a
+legacy procedure by bare name.
+-- input.ssl --
+/* sample login - old version;
+:parameters sampleid, matrix, priority;
+:default priority, "N";
+:declare rows, status, ok, cnt, i, logrec;
+:default status, "LOGGED";
+
+sampleid := alltrim(sampleid); matrix := upper(matrix);
+if empty(sampleid); :return .f.; :endif;
+
+rows := sqlexecute("select Status from LabSamples where SampleId = ?sampleid?");
+:if len(rows) > 0
+  :return .F.;
+:endif;
+
+:begincase;
+:case matrix = "W";
+   priority := "H";
+:case matrix = "S";
+   priority := "N";
+   :exitcase;
+:otherwise;
+priority := "L";
+:endcase;
+
+ok := runsql("insert into LabSamples (SampleId, Matrix, Status) values (?sampleid?, ?matrix?, ?status?)");
+  :if .not. ok; ErrorMes("login", "insert failed"); :return .f.; :endif;
+
+cnt := 0;
+:for i := 1 :to len(matrix);
+cnt := cnt + 1;
+:next;
+
+logrec := CreateUdObject();
+logrec.sample := sampleid;
+logrec:count := cnt;
+WriteAudit(logrec);
+DoProc("Notify", {sampleid, priority});
+:return .t.;
+
+:procedure Notify;
+:parameters id, prio;
+:declare msg;
+  msg := "sample " + id + " logged with priority " + prio;
+    usrmes(msg);
+	  :if prio = "H"
+	UsrMes("high priority!");
+	  :endif;
+:error;
+  ErrorMes("Notify", "notify failed");
+:endproc;
+
+:procedure LookupMatrix;
+:parameters code;
+:public lastmatrix;
+:declare desc;
+:if code = ""; :return ""; :endif;
+desc := LSearch("select Description from LabMatrices where Code = ?", "", , {code});
+:if empty(desc)
+:if len(code) > 1
+desc := LookupMatrix(left(code, 1));
+:else
+desc := "unknown";
+:endif
+:endif
+lastmatrix := code;
+:return desc;
+:endproc;
+-- diagnostics [--hungarian] --
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+2:13-2:21 warning hungarian_notation: Variable 'sampleid' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:23-2:29 warning hungarian_notation: Variable 'matrix' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:31-2:39 warning hungarian_notation: Variable 'priority' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+4:1-4:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:10-4:14 warning hungarian_notation: Variable 'rows' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+4:16-4:22 warning hungarian_notation: Variable 'status' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+4:24-4:26 warning hungarian_notation: Variable 'ok' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+4:28-4:31 warning hungarian_notation: Variable 'cnt' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+4:36-4:42 warning hungarian_notation: Variable 'logrec' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+5:1-5:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+5:1-5:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+5:10-5:16 error default_on_declare_line: ':DEFAULT' target 'status' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+8:4-8:9 error unexpected_token: Unexpected identifier 'empty' - expected an operator or ';'
+8:21-8:28 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+8:34-8:40 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+8:34-8:40 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+11:1-11:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+12:3-12:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+12:3-12:10 error unexpected_token: Unexpected keyword ':return' - expected an operator or ';' (is the previous statement missing its ';'?)
+13:1-13:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+16:1-16:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+16:1-16:6 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+18:1-18:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+20:4-20:13 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+21:1-21:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':OTHERWISE'
+21:1-21:11 warning prefer_exitcase: ':OTHERWISE' block should end with ':EXITCASE;'
+23:1-23:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+25:14-25:105 error named_sql_param_unsupported: Named SQL parameter '?sampleid?' not supported by 'runsql'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+26:3-26:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+26:53-26:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+26:66-26:72 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+29:1-29:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+29:13-29:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+31:1-31:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+34:7-34:14 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:sample' instead of 'object.sample'
+36:1-36:11 warning direct_procedure_call: 'WriteAudit' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+38:1-38:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+40:1-40:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+41:1-41:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+41:13-41:15 warning hungarian_notation: Variable 'id' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+41:17-41:21 warning hungarian_notation: Variable 'prio' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+42:1-42:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+42:10-42:13 warning hungarian_notation: Variable 'msg' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+45:4-45:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+46:2-46:8 error unexpected_token: Unexpected identifier 'UsrMes' - expected an operator or ';' (is the previous statement missing its ';'?)
+47:4-47:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+48:1-48:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+48:1-48:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+50:1-50:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+52:1-52:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+53:1-53:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+53:13-53:17 warning hungarian_notation: Variable 'code' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+54:1-54:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PUBLIC'
+54:9-54:19 warning hungarian_notation: Variable 'lastmatrix' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+55:1-55:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+55:10-55:14 warning hungarian_notation: Variable 'desc' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+56:1-56:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+56:5-56:14 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+56:16-56:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+56:28-56:34 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+58:1-58:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error unexpected_token: Unexpected keyword ':if' - expected an operator or ';' (is the previous statement missing its ';'?)
+60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
+60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
+61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- format --
+/* sample login - old version;
+:PARAMETERS sampleid, matrix, priority;
+:DEFAULT priority, "N";
+:DECLARE rows, status, ok, cnt, i, logrec;
+:DEFAULT status, "LOGGED";
+
+sampleid := AllTrim(sampleid);
+matrix := Upper(matrix);
+if Empty(sampleid);
+:RETURN .F.;
+:ENDIF;
+
+rows := SQLExecute("select Status from LabSamples where SampleId = ?sampleid?");
+:IF Len(rows) > 0;
+	:RETURN .F.;
+:ENDIF;
+
+:BEGINCASE;
+:CASE matrix = "W";
+	priority := "H";
+:CASE matrix = "S";
+	priority := "N";
+	:EXITCASE;
+:OTHERWISE;
+	priority := "L";
+:ENDCASE;
+
+ok := RunSQL("
+    INSERT INTO LabSamples (
+        SampleId, Matrix, Status
+    )
+    VALUES (
+        ?sampleid?, ?matrix?, ?status?
+    )
+");
+:IF .NOT. ok;
+	ErrorMes("login", "insert failed");
+	:RETURN .F.;
+:ENDIF;
+
+cnt := 0;
+:FOR i := 1 :TO Len(matrix);
+	cnt := cnt + 1;
+:NEXT;
+
+logrec := CreateUdObject();
+logrec.sample := sampleid;
+logrec:count := cnt;
+WriteAudit(logrec);
+DoProc("Notify", {sampleid, priority});
+:RETURN .T.;
+
+:PROCEDURE Notify;
+	:PARAMETERS id, prio;
+	:DECLARE msg;
+	msg := "sample " + id + " logged with priority " + prio;
+	UsrMes(msg);
+	:IF prio = "H";
+		UsrMes("high priority!");
+	:ENDIF;
+	:ERROR;
+		ErrorMes("Notify", "notify failed");
+:ENDPROC;
+
+:PROCEDURE LookupMatrix;
+	:PARAMETERS code;
+	:PUBLIC lastmatrix;
+	:DECLARE desc;
+	:IF code = "";
+		:RETURN "";
+	:ENDIF;
+	desc := LSearch("select Description from LabMatrices where Code = ?", "",, {code});
+	:IF Empty(desc);
+		:IF Len(code) > 1;
+			desc := LookupMatrix(Left(code, 1));
+		:ELSE;
+			desc := "unknown";
+		:ENDIF;
+	:ENDIF;
+	lastmatrix := code;
+	:RETURN desc;
+:ENDPROC;
+-- diagnostics --
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+4:1-4:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+5:1-5:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+5:1-5:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+5:10-5:16 error default_on_declare_line: ':DEFAULT' target 'status' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+8:4-8:9 error unexpected_token: Unexpected identifier 'empty' - expected an operator or ';'
+8:21-8:28 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+8:34-8:40 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+8:34-8:40 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+11:1-11:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+12:3-12:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+12:3-12:10 error unexpected_token: Unexpected keyword ':return' - expected an operator or ';' (is the previous statement missing its ';'?)
+13:1-13:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+16:1-16:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+16:1-16:6 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+18:1-18:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+20:4-20:13 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+21:1-21:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':OTHERWISE'
+21:1-21:11 warning prefer_exitcase: ':OTHERWISE' block should end with ':EXITCASE;'
+23:1-23:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+25:14-25:105 error named_sql_param_unsupported: Named SQL parameter '?sampleid?' not supported by 'runsql'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+26:3-26:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+26:53-26:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+26:66-26:72 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+29:1-29:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+29:13-29:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+31:1-31:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+34:7-34:14 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:sample' instead of 'object.sample'
+36:1-36:11 warning direct_procedure_call: 'WriteAudit' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+38:1-38:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+40:1-40:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+41:1-41:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+42:1-42:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+45:4-45:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+46:2-46:8 error unexpected_token: Unexpected identifier 'UsrMes' - expected an operator or ';' (is the previous statement missing its ';'?)
+47:4-47:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+48:1-48:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+48:1-48:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+50:1-50:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+52:1-52:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+53:1-53:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+54:1-54:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PUBLIC'
+55:1-55:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+56:1-56:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+56:5-56:14 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+56:16-56:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+56:28-56:34 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+58:1-58:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error unexpected_token: Unexpected keyword ':if' - expected an operator or ';' (is the previous statement missing its ';'?)
+60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
+60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
+61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- diagnostics [--strict --info] --
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+4:1-4:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+5:1-5:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+5:1-5:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+5:10-5:16 error default_on_declare_line: ':DEFAULT' target 'status' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+8:1-8:3 warning undeclared_variable: Variable 'if' is not declared
+8:4-8:9 error unexpected_token: Unexpected identifier 'empty' - expected an operator or ';'
+8:21-8:28 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+8:34-8:40 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+8:34-8:40 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+11:1-11:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+12:3-12:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+12:3-12:10 error unexpected_token: Unexpected keyword ':return' - expected an operator or ';' (is the previous statement missing its ';'?)
+13:1-13:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':BEGINCASE'
+16:1-16:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+16:1-16:6 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+16:14-16:15 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+18:1-18:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CASE'
+18:14-18:15 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+20:4-20:13 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':EXITCASE'
+21:1-21:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':OTHERWISE'
+21:1-21:11 warning prefer_exitcase: ':OTHERWISE' block should end with ':EXITCASE;'
+23:1-23:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDCASE'
+25:14-25:105 error named_sql_param_unsupported: Named SQL parameter '?sampleid?' not supported by 'runsql'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+26:3-26:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+26:53-26:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+26:66-26:72 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+29:1-29:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+29:13-29:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+31:1-31:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+34:7-34:14 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:sample' instead of 'object.sample'
+36:1-36:11 warning direct_procedure_call: 'WriteAudit' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+38:1-38:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+40:1-40:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+41:1-41:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+42:1-42:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+45:4-45:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+45:13-45:14 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+46:2-46:8 error unexpected_token: Unexpected identifier 'UsrMes' - expected an operator or ';' (is the previous statement missing its ';'?)
+47:4-47:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+48:1-48:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+48:1-48:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+50:1-50:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+52:1-52:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+53:1-53:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+54:1-54:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PUBLIC'
+54:1-54:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+55:1-55:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+56:1-56:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+56:5-56:14 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+56:10-56:11 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+56:16-56:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+56:28-56:34 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+57:73-57:76 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+58:1-58:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+59:1-59:4 error unexpected_token: Unexpected keyword ':if' - expected an operator or ';' (is the previous statement missing its ';'?)
+60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
+60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
+61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

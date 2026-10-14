@@ -1,0 +1,18 @@
+SSL-looking text inside line-leading `--` comments (a commented-out
+`:PARAMETERS ... := ...;` and a `:DECLARE`) is never a strong SSL marker
+(feature.diagnostics_pipeline A26): the document classifies as SQL with
+no header, so the body is clean.
+-- input.ds --
+--:PARAMETERS sRegion := '';
+--:DECLARE aRows;
+select depot_id, depot_name
+from depot
+where depot_name like 'N%'
+-- format --
+--:PARAMETERS sRegion := '';
+--:DECLARE aRows;
+select depot_id, depot_name
+from depot
+where depot_name like 'N%'
+-- diagnostics --
+-- diagnostics [--strict --info] --

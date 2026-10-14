@@ -1,0 +1,37 @@
+A .ssl script whose content is a one-line SQL statement. SQL-mode
+classification is scoped to data sources (feature.diagnostics_pipeline
+A12, feature.formatting A11), so this stays SSL: it is formatted as SSL
+(a terminating `;` is added) and the SSL checks run and report on the SQL
+syntax. The flag variants run the same content under `--ds`, which
+declares any input a data source (feature.cli_contract A15): then it is
+SQL, passes through unchanged and reports nothing. Kept to one line: a
+multi-line SQL body in a .ssl file trips the "formatting introduces no
+new error" invariant (each line gains a `;` and becomes its own
+unexpected_token statement), reported separately.
+-- input.ssl --
+select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU'
+-- format [--ds] --
+select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU'
+-- diagnostics [--ds] --
+-- format --
+select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU';
+-- diagnostics --
+1:8-1:9 error unexpected_token: Unexpected identifier 'v' - expected an operator or ';'
+1:9-1:19 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:vendor_id' instead of 'object.vendor_id'
+1:41-1:48 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:active' instead of 'object.active'
+1:55-1:58 error bare_logical_operator: Use '.AND.' instead of 'and' for logical operations in SSL
+1:60-1:67 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:region' instead of 'object.region'
+-- diagnostics [--strict --info] --
+1:1-1:7 warning undeclared_variable: Variable 'select' is not declared
+1:8-1:9 warning undeclared_variable: Variable 'v' is not declared
+1:8-1:9 error unexpected_token: Unexpected identifier 'v' - expected an operator or ';'
+1:9-1:19 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:vendor_id' instead of 'object.vendor_id'
+1:20-1:24 warning undeclared_variable: Variable 'from' is not declared
+1:25-1:31 warning undeclared_variable: Variable 'vendor' is not declared
+1:34-1:39 warning undeclared_variable: Variable 'where' is not declared
+1:41-1:48 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:active' instead of 'object.active'
+1:49-1:50 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+1:55-1:58 error bare_logical_operator: Use '.AND.' instead of 'and' for logical operations in SSL
+1:55-1:58 warning undeclared_variable: Variable 'and' is not declared
+1:60-1:67 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:region' instead of 'object.region'
+1:68-1:69 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

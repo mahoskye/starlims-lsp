@@ -1,0 +1,36 @@
+Base used as a value instead of a member-access head (diag.base_standalone,
+error, in and out of class context alike). Near misses in the same class:
+Base:Init() (well formed, :INHERIT present) and oUri:Base / oUri:Base:Host
+(member named Base on another receiver, D10, issue #258).
+-- input.ssl --
+:CLASS LinkWidget;
+:INHERIT Lab.Control;
+:DECLARE oParent;
+
+:PROCEDURE Init;
+	:PARAMETERS oUri;
+	:DECLARE sRoot, sHost;
+	Base:Init();
+	Me:oParent := Base;
+	sRoot := oUri:Base;
+	sHost := oUri:Base:Host;
+	:RETURN sRoot + sHost;
+:ENDPROC;
+-- format --
+:CLASS LinkWidget;
+:INHERIT Lab.Control;
+:DECLARE oParent;
+
+:PROCEDURE Init;
+	:PARAMETERS oUri;
+	:DECLARE sRoot, sHost;
+	Base:Init();
+	Me:oParent := Base;
+	sRoot := oUri:Base;
+	sHost := oUri:Base:Host;
+	:RETURN sRoot + sHost;
+:ENDPROC;
+-- diagnostics --
+9:16-9:20 error base_standalone: 'Base' must be used as 'Base:MemberName' and cannot stand alone
+-- diagnostics [--strict --info] --
+9:16-9:20 error base_standalone: 'Base' must be used as 'Base:MemberName' and cannot stand alone

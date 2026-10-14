@@ -1,0 +1,49 @@
+Members the reference documents as raising on a value whose type is
+certain from its assignments (diag.invalid_native_member, warning, on
+the member): :Count and :Append() on an array literal, :Split() on a
+string, a case-misspelled date property (:year), an SSL-object member
+on a number (:ToJson()), and -- on a string.
+-- input.ssl --
+:PROCEDURE Probe;
+	:DECLARE aItems, sText, dToday, nNum, vOut;
+	aItems := {1, 2, 3};
+	sText := "a,b";
+	dToday := Today();
+	nNum := 4;
+	vOut := aItems:Count;
+	aItems:Append(4);
+	vOut := sText:Split(",");
+	vOut := dToday:year;
+	vOut := nNum:ToJson();
+	sText--;
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Probe;
+	:DECLARE aItems, sText, dToday, nNum, vOut;
+	aItems := {1, 2, 3};
+	sText := "a,b";
+	dToday := Today();
+	nNum := 4;
+	vOut := aItems:Count;
+	aItems:Append(4);
+	vOut := sText:Split(",");
+	vOut := dToday:year;
+	vOut := nNum:ToJson();
+	sText--;
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+7:17-7:22 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length
+8:9-8:15 warning invalid_native_member: ':Append()' on an array raises at run time: arrays have no Append method; use AAdd()
+9:16-9:21 warning invalid_native_member: ':Split()' on a string raises at run time: the native Split is not reachable; use BuildArray()
+10:17-10:21 warning invalid_native_member: ':year' on a date raises at run time: native members are case-sensitive; write Year
+11:15-11:21 warning invalid_native_member: ':ToJson()' on a number raises at run time: SSL values have no ToJson(); use the ToJson() function
+12:2-12:9 warning invalid_native_member: '--' on a string raises at run time: -- works on numbers and dates only
+-- diagnostics [--strict --info] --
+7:17-7:22 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length
+8:9-8:15 warning invalid_native_member: ':Append()' on an array raises at run time: arrays have no Append method; use AAdd()
+9:16-9:21 warning invalid_native_member: ':Split()' on a string raises at run time: the native Split is not reachable; use BuildArray()
+10:17-10:21 warning invalid_native_member: ':year' on a date raises at run time: native members are case-sensitive; write Year
+11:15-11:21 warning invalid_native_member: ':ToJson()' on a number raises at run time: SSL values have no ToJson(); use the ToJson() function
+12:2-12:9 warning invalid_native_member: '--' on a string raises at run time: -- works on numbers and dates only

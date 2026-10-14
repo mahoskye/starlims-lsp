@@ -1,0 +1,23 @@
+A member-access chain is never split at a `:` boundary when a line
+wraps: the break lands after the comma before the chain and the whole
+`oConfiguration:database:timeout` moves to the continuation line
+(fmt.atomic_property_chains, issue #16).
+-- input.ssl --
+:PROCEDURE Connect;
+:PARAMETERS oConfiguration;
+:DECLARE sValue;
+sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString, oConfiguration:database:timeout);
+:RETURN sValue;
+:ENDPROC;
+-- format --
+:PROCEDURE Connect;
+	:PARAMETERS oConfiguration;
+	:DECLARE sValue;
+	sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString,
+		oConfiguration:database:timeout);
+	:RETURN sValue;
+:ENDPROC;
+-- diagnostics --
+4:11-4:35 warning direct_procedure_call: 'SomeFunctionWithLongName' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+-- diagnostics [--strict --info] --
+4:11-4:35 warning direct_procedure_call: 'SomeFunctionWithLongName' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.

@@ -1,0 +1,61 @@
+Near miss for exitwhile_outside_loop, exitfor_outside_loop and
+loop_outside_loop: a :FOR nested in a :WHILE, with :EXITWHILE inside the
+:FOR (any open :WHILE on the stack satisfies it), :EXITFOR inside the
+:FOR, and :LOOP in both loop kinds. Clean.
+-- input.ssl --
+:PROCEDURE ScanPages;
+	:PARAMETERS aPages;
+	:DECLARE nPage, nLine, nFound;
+	nPage := 0;
+	nFound := 0;
+	:WHILE nPage < Len(aPages);
+		nPage := nPage + 1;
+		:IF Len(aPages[nPage]) == 0;
+			:LOOP;
+		:ENDIF;
+		:FOR nLine := 1 :TO Len(aPages[nPage]);
+			:IF aPages[nPage][nLine] == "";
+				:LOOP;
+			:ENDIF;
+			:IF aPages[nPage][nLine] == "STOP";
+				:EXITWHILE;
+			:ENDIF;
+			:IF aPages[nPage][nLine] == "NEXTPAGE";
+				:EXITFOR;
+			:ENDIF;
+			nFound := nFound + 1;
+		:NEXT;
+	:ENDWHILE;
+	:RETURN nFound;
+:ENDPROC;
+-- format --
+:PROCEDURE ScanPages;
+	:PARAMETERS aPages;
+	:DECLARE nPage, nLine, nFound;
+	nPage := 0;
+	nFound := 0;
+	:WHILE nPage < Len(aPages);
+		nPage := nPage + 1;
+		:IF Len(aPages[nPage]) == 0;
+			:LOOP;
+		:ENDIF;
+
+		:FOR nLine := 1 :TO Len(aPages[nPage]);
+			:IF aPages[nPage][nLine] == "";
+				:LOOP;
+			:ENDIF;
+
+			:IF aPages[nPage][nLine] == "STOP";
+				:EXITWHILE;
+			:ENDIF;
+
+			:IF aPages[nPage][nLine] == "NEXTPAGE";
+				:EXITFOR;
+			:ENDIF;
+			nFound := nFound + 1;
+		:NEXT;
+	:ENDWHILE;
+	:RETURN nFound;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

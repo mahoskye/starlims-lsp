@@ -1,0 +1,28 @@
+A :FOR loop closed with :ENDFOR. endfor_invalid fires on the token with
+the :NEXT fix-it; the scanner pairs the :ENDFOR with its :FOR, so one
+typo stays one finding: no unclosed_block, unknown_keyword or
+unexpected_token (diag.endfor_invalid, diag.unclosed_block issue #255).
+-- input.ssl --
+:PROCEDURE SumWeights;
+	:PARAMETERS aWeights;
+	:DECLARE nIdx, nTotal;
+	nTotal := 0;
+	:FOR nIdx := 1 :TO Len(aWeights);
+		nTotal := nTotal + aWeights[nIdx];
+	:ENDFOR;
+	:RETURN nTotal;
+:ENDPROC;
+-- format --
+:PROCEDURE SumWeights;
+	:PARAMETERS aWeights;
+	:DECLARE nIdx, nTotal;
+	nTotal := 0;
+	:FOR nIdx := 1 :TO Len(aWeights);
+		nTotal := nTotal + aWeights[nIdx];
+		:ENDFOR;
+		:RETURN nTotal;
+	:ENDPROC;
+-- diagnostics --
+7:2-7:9 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
+-- diagnostics [--strict --info] --
+7:2-7:9 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'

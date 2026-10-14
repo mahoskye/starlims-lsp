@@ -1,0 +1,23 @@
+A :DEFAULT separated from :PARAMETERS by a :DECLARE fires
+diag.default_after_parameters (placement). Its target is a real
+parameter, so diag.default_on_declare_line stays quiet.
+-- input.ssl --
+:PROCEDURE FormatWeight;
+	:PARAMETERS nGrams, sUnit;
+	:DECLARE sOut;
+	:DEFAULT sUnit, "g";
+	sOut := LimsString(nGrams) + " " + sUnit;
+	:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE FormatWeight;
+	:PARAMETERS nGrams, sUnit;
+	:DECLARE sOut;
+	:DEFAULT sUnit, "g";
+	sOut := LimsString(nGrams) + " " + sUnit;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+4:2-4:10 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+-- diagnostics [--strict --info] --
+4:2-4:10 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'

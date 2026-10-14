@@ -1,0 +1,36 @@
+MERGE in SSL (reference §2.12, §7.4, sql_merge_layout): MERGE INTO,
+USING, ON and the WHEN branches at the clause column, UPDATE SET /
+INSERT indented 4 under WHEN, the USING inline view laid out flat.
+Suspected issue: #327 — VALUES of the WHEN NOT MATCHED branch dedents to the MERGE clause column instead of sitting under its INSERT, neither list takes the open-paren layout, and the ON condition breaks before AND although it fits; reference §7.4 shows 'ON (tgt.ordno = src.ordno AND tgt.testcode = src.testcode)' inline and 'INSERT (' / 'VALUES (' both indented 4 under WHEN.
+-- input.ssl --
+:PROCEDURE Summarize;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("merge into ordtask_summary tgt using (select ordno, testcode, count(*) as cnt from ordresult where ordno = ? group by ordno, testcode) src on (tgt.ordno = src.ordno and tgt.testcode = src.testcode) when matched then update set tgt.result_count = src.cnt, tgt.updated_date = sysdate when not matched then insert (ordno, testcode, result_count, created_date) values (src.ordno, src.testcode, src.cnt, sysdate)",, {sOrdNo});
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Summarize;
+	:PARAMETERS sOrdNo;
+	:DECLARE bOk;
+	bOk := RunSQL("
+	    MERGE INTO ordtask_summary tgt
+	    USING (
+	        SELECT ordno, testcode, COUNT(*) AS cnt
+	        FROM ordresult
+	        WHERE ordno = ?
+	        GROUP BY ordno, testcode
+	    ) src
+	    ON (tgt.ordno = src.ordno
+	        AND tgt.testcode = src.testcode)
+	    WHEN MATCHED THEN
+	        UPDATE SET tgt.result_count = src.cnt,
+	                   tgt.updated_date = SYSDATE
+	    WHEN NOT MATCHED THEN
+	        INSERT (ordno, testcode, result_count, created_date)
+	    VALUES (src.ordno, src.testcode, src.cnt, SYSDATE)
+	",, {sOrdNo});
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

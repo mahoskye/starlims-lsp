@@ -1,0 +1,35 @@
+`Branch("RETRY")` targets a `:LABEL RETRY;` but omits the LABEL keyword
+that the runtime matches against, so the jump never happens:
+branch_target_label (error) on the string literal. Every :LABEL also
+carries deprecated_keyword (warning) (diag.branch_target_label
+missing-keyword case, diag.deprecated_keyword).
+-- input.ssl --
+:PROCEDURE ConnectWithRetry;
+	:DECLARE nTries, bConnected;
+	nTries := 0;
+	bConnected := .F.;
+	:LABEL RETRY;
+	nTries := nTries + 1;
+	:IF .NOT. bConnected .AND. nTries < 3;
+		Branch("RETRY");
+	:ENDIF;
+	:RETURN bConnected;
+:ENDPROC;
+-- format --
+:PROCEDURE ConnectWithRetry;
+	:DECLARE nTries, bConnected;
+	nTries := 0;
+	bConnected := .F.;
+	:LABEL RETRY;
+	nTries := nTries + 1;
+	:IF .NOT. bConnected .AND. nTries < 3;
+		Branch("RETRY");
+	:ENDIF;
+	:RETURN bConnected;
+:ENDPROC;
+-- diagnostics --
+5:2-5:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:10-8:17 error branch_target_label: Branch target string must include the label token text, such as "LABEL SKIP" or "LABELSKIP"
+-- diagnostics [--strict --info] --
+5:2-5:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+8:10-8:17 error branch_target_label: Branch target string must include the label token text, such as "LABEL SKIP" or "LABELSKIP"

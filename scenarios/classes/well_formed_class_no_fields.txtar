@@ -1,0 +1,23 @@
+A minimal stateless class: no fields, no :INHERIT, one method that only
+uses parameters and locals. Unqualified-field rules have nothing to say
+(no field set). Should be clean.
+-- input.ssl --
+:CLASS TextTools;
+
+:PROCEDURE Shout;
+	:PARAMETERS sText;
+	:DECLARE sOut;
+	sOut := Upper(AllTrim(sText)) + "!";
+	:RETURN sOut;
+:ENDPROC;
+-- format --
+:CLASS TextTools;
+
+:PROCEDURE Shout;
+	:PARAMETERS sText;
+	:DECLARE sOut;
+	sOut := Upper(AllTrim(sText)) + "!";
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

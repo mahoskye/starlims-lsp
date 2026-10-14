@@ -1,0 +1,36 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
+A call whose argument list spans lines inside an unclosed `(` and `{`:
+every continuation line sits exactly one level past the statement line,
+not proportional to paren depth, and the closing `})` that leads its line
+aligns with the statement line itself (fmt.indent_style; no `;` is
+forced inside the open delimiters, fmt.semicolon_enforcement).
+-- input.ssl --
+:PROCEDURE SaveResult;
+:PARAMETERS sSampleId, nValue;
+:DECLARE vResult;
+:IF nValue > 0;
+vResult := ExecFunction("Results.Store",
+{sSampleId,
+nValue,
+Now()
+}
+);
+:ENDIF;
+:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE SaveResult;
+	:PARAMETERS sSampleId, nValue;
+	:DECLARE vResult;
+	:IF nValue > 0;
+		vResult := ExecFunction("Results.Store",
+			{sSampleId,
+			nValue,
+			Now()
+		}
+		);
+	:ENDIF;
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,12 @@
+The accepted consequence of D15: an SSL data source whose body has no
+colon keyword and no `:=` (a bare call after the header) cannot be proven
+SSL and reads as SQL. Expect no edits and no SSL diagnostics, even though
+the body is SSL. Recorded so a change to this trade-off is visible.
+-- input.ds --
+:PARAMETERS sGroup := "ALL";
+GetDataSet("SELECT grp_id, grp_name FROM user_group WHERE grp_code = ?", {sGroup})
+-- format --
+:PARAMETERS sGroup := "ALL";
+GetDataSet("SELECT grp_id, grp_name FROM user_group WHERE grp_code = ?", {sGroup})
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,37 @@
+A UDObject property placeholder directly inside IN (...)
+(diag.udobject_array_in_clause), which fails at run time ("The current
+array has more than 1 dimmension."). Every string literal is scanned, so
+the standalone sSQL assignment fires too; the multi-line NOT IN case must
+be ranged on the placeholder's own line (issue #255).
+-- input.ssl --
+:PROCEDURE ByFilter;
+	:PARAMETERS oFilter;
+	:DECLARE sSQL, aRows;
+	sSQL := "SELECT sampleid FROM samples WHERE sampleid IN (?oFilter:aIds?)";
+	aRows := SQLExecute(sSQL);
+	aRows := SQLExecute("
+	    SELECT sampleid
+	    FROM samples
+	    WHERE status NOT IN ( ?oFilter:aCodes? )
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE ByFilter;
+	:PARAMETERS oFilter;
+	:DECLARE sSQL, aRows;
+	sSQL := "SELECT sampleid FROM samples WHERE sampleid IN (?oFilter:aIds?)";
+	aRows := SQLExecute(sSQL);
+	aRows := SQLExecute("
+	    SELECT sampleid
+	    FROM samples
+	    WHERE status NOT IN (?oFilter:aCodes?)
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+4:59-4:73 warning udobject_array_in_clause: UDObject array property '?oFilter:aIds?' in IN clause causes runtime error 'The current array has more than 1 dimmension.' — copy the array to a local variable first.
+9:28-9:44 warning udobject_array_in_clause: UDObject array property '?oFilter:aCodes?' in IN clause causes runtime error 'The current array has more than 1 dimmension.' — copy the array to a local variable first.
+-- diagnostics [--strict --info] --
+4:59-4:73 warning udobject_array_in_clause: UDObject array property '?oFilter:aIds?' in IN clause causes runtime error 'The current array has more than 1 dimmension.' — copy the array to a local variable first.
+9:28-9:44 warning udobject_array_in_clause: UDObject array property '?oFilter:aCodes?' in IN clause causes runtime error 'The current array has more than 1 dimmension.' — copy the array to a local variable first.

@@ -1,0 +1,35 @@
+A Branch target built at run time, missing the LABEL keyword in the
+computed text. branch_target_label deliberately checks only single string
+literals, so nothing reports the dead jump.
+Known issue: #321 (computed Branch() targets never jump - not yet
+diagnosed).
+-- input.ssl --
+:PROCEDURE JumpByName;
+	:PARAMETERS sStage;
+	:DECLARE sTarget, nVisits;
+	nVisits := 0;
+	sTarget := Upper(sStage);
+	:LABEL FINISH;
+	nVisits := nVisits + 1;
+	:IF nVisits < 2;
+		Branch(sTarget);
+	:ENDIF;
+	:RETURN nVisits;
+:ENDPROC;
+-- format --
+:PROCEDURE JumpByName;
+	:PARAMETERS sStage;
+	:DECLARE sTarget, nVisits;
+	nVisits := 0;
+	sTarget := Upper(sStage);
+	:LABEL FINISH;
+	nVisits := nVisits + 1;
+	:IF nVisits < 2;
+		Branch(sTarget);
+	:ENDIF;
+	:RETURN nVisits;
+:ENDPROC;
+-- diagnostics --
+6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+-- diagnostics [--strict --info] --
+6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code

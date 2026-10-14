@@ -1,0 +1,32 @@
+Near miss for procedure_declaration_syntax and the block scanner: two
+correct procedures, one calling the other through DoProc, with
+:PARAMETERS immediately after :PROCEDURE and :DEFAULT after :PARAMETERS.
+Clean.
+-- input.ssl --
+:PROCEDURE NetAmount;
+	:PARAMETERS nGross, nRate;
+	:DEFAULT nRate, 0.2;
+	:DECLARE nTax;
+	nTax := DoProc("TaxFor", {nGross, nRate});
+	:RETURN nGross - nTax;
+:ENDPROC;
+
+:PROCEDURE TaxFor;
+	:PARAMETERS nGross, nRate;
+	:RETURN Round(nGross * nRate, 2);
+:ENDPROC;
+-- format --
+:PROCEDURE NetAmount;
+	:PARAMETERS nGross, nRate;
+	:DEFAULT nRate, 0.2;
+	:DECLARE nTax;
+	nTax := DoProc("TaxFor", {nGross, nRate});
+	:RETURN nGross - nTax;
+:ENDPROC;
+
+:PROCEDURE TaxFor;
+	:PARAMETERS nGross, nRate;
+	:RETURN Round(nGross * nRate, 2);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

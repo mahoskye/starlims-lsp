@@ -1,0 +1,25 @@
+GetDataSet takes SQL first and the positional value array second; an
+overflowing query with a LEFT OUTER JOIN reflows with ON 2 under the
+join and the array after the closing quote.
+-- input.ssl --
+:PROCEDURE OrderXml;
+	:PARAMETERS sOrdNo;
+	:DECLARE sXml;
+	sXml := GetDataSet("select o.ordno, t.testcode, r.result_value from orders o left outer join ordresult r on r.ordno = o.ordno where o.ordno = ?", {sOrdNo});
+	:RETURN sXml;
+:ENDPROC;
+-- format --
+:PROCEDURE OrderXml;
+	:PARAMETERS sOrdNo;
+	:DECLARE sXml;
+	sXml := GetDataSet("
+	    SELECT o.ordno, t.testcode, r.result_value
+	    FROM orders o
+	    LEFT OUTER JOIN ordresult r
+	      ON r.ordno = o.ordno
+	    WHERE o.ordno = ?
+	", {sOrdNo});
+	:RETURN sXml;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

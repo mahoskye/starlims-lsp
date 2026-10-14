@@ -1,0 +1,35 @@
+Near-misses for diag.invalid_operator_sequence: & and | inside string
+literals and comments, valid comparison operators, and == followed by =
+with whitespace between them is not a glued === (it may be other rules'
+finding, never this one).
+-- input.ssl --
+:PROCEDURE ColorLabel;
+	:PARAMETERS nCode, bFlag;
+	:DECLARE sLabel;
+	/* black & white | grey;
+	sLabel := "black & white | grey";
+	:IF nCode == 1 .AND. bFlag;
+		sLabel := sLabel + " (1)";
+	:ENDIF;
+	:IF nCode != 2 .OR. nCode >= 3;
+		sLabel := sLabel + " (2)";
+	:ENDIF;
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE ColorLabel;
+	:PARAMETERS nCode, bFlag;
+	:DECLARE sLabel;
+	/* black & white | grey;
+	sLabel := "black & white | grey";
+	:IF nCode == 1 .AND. bFlag;
+		sLabel := sLabel + " (1)";
+	:ENDIF;
+
+	:IF nCode != 2 .OR. nCode >= 3;
+		sLabel := sLabel + " (2)";
+	:ENDIF;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

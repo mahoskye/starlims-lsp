@@ -1,0 +1,89 @@
+A legacy-style procedure with everything wrong at once: lowercase and
+CamelCase keywords, lowercase built-ins and dot operators, crammed
+operators and commas, stray spaces before commas and semicolons, random
+indentation, an end-of-line comment glued to code, a statement after a
+standalone comment, and sibling blocks butted together. Exercises the
+token formatter and every post-pass in one file (feature.formatting).
+-- input.ssl --
+:procedure UpdateSampleStatus;
+:parameters sSampleId,sNewStatus ,bForce;
+:default bForce,.f.;
+   :declare sOldStatus,nRows,bOk,oErr;
+bOk:=.f.;
+sOldStatus:=lsearch("SELECT status FROM samples WHERE sampleid = ?","",,{sSampleId});/*current status;
+      :if empty(sOldStatus).and..not.bForce;
+  :return .f.;
+:endif;
+:if sOldStatus==sNewStatus;
+:return .t.;
+    :EndIf;
+/* do the update; :try;
+bOk:=runsql("UPDATE samples SET status = ? WHERE sampleid = ?",,{sNewStatus,sSampleId});
+:catch;
+oErr:=getlastsslerror();
+errormes("UpdateSampleStatus","update failed: "+oErr:Description);
+bOk:=.f.;
+:endtry;
+:return bOk;
+:endproc;
+-- format --
+:PROCEDURE UpdateSampleStatus;
+	:PARAMETERS sSampleId, sNewStatus, bForce;
+	:DEFAULT bForce, .F.;
+	:DECLARE sOldStatus, nRows, bOk, oErr;
+	bOk := .F.;
+	sOldStatus := LSearch("SELECT status FROM samples WHERE sampleid = ?", "",,
+		{sSampleId});  /*current status;
+	:IF Empty(sOldStatus) .AND. .NOT. bForce;
+		:RETURN .F.;
+	:ENDIF;
+
+	:IF sOldStatus == sNewStatus;
+		:RETURN .T.;
+	:ENDIF;
+	/* do the update;
+	:TRY;
+		bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {sNewStatus,
+			sSampleId});
+	:CATCH;
+		oErr := GetLastSSLError();
+		ErrorMes("UpdateSampleStatus", "update failed: " + oErr:Description);
+		bOk := .F.;
+	:ENDTRY;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+4:4-4:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+7:7-7:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+8:3-8:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+10:1-10:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+11:1-11:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+12:5-12:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+13:1-13:18 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
+13:19-13:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+15:1-15:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+19:1-19:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
+20:1-20:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+21:1-21:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- diagnostics [--strict --info] --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+4:4-4:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+4:24-4:29 hint unused_variable: Variable 'nRows' is declared but never used
+7:7-7:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+8:3-8:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+10:1-10:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+11:1-11:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+12:5-12:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+13:1-13:18 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
+13:19-13:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+15:1-15:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+19:1-19:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
+20:1-20:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+21:1-21:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

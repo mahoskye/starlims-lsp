@@ -1,0 +1,23 @@
+Blocks opened and never closed at end of file: a :PROCEDURE whose :IF
+and :WHILE have no closers and no :ENDPROC. Each unclosed opener should
+be reported once; indentation stays nested to the end.
+-- input.ssl --
+:PROCEDURE Unfinished;
+:PARAMETERS nValue;
+:IF nValue > 0;
+:WHILE nValue > 0;
+nValue -= 1;
+-- format --
+:PROCEDURE Unfinished;
+	:PARAMETERS nValue;
+	:IF nValue > 0;
+		:WHILE nValue > 0;
+			nValue -= 1;
+-- diagnostics --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+3:1-3:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+4:1-4:7 error unclosed_block: Unclosed ':WHILE' - expected ':ENDWHILE'
+-- diagnostics [--strict --info] --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+3:1-3:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+4:1-4:7 error unclosed_block: Unclosed ':WHILE' - expected ':ENDWHILE'

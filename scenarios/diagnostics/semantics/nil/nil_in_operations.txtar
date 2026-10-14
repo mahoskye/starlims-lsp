@@ -1,0 +1,41 @@
+The literal NIL as an operand of +, -, * or / is always a runtime error
+(diag.nil_in_operations, warning, on the operator), on either side, and
+under a unary minus.
+-- input.ssl --
+:PROCEDURE Sum;
+	:PARAMETERS nBase;
+	:DECLARE nOut, sMsg;
+	nOut := NIL + 1;
+	nOut := nBase - NIL;
+	nOut := NIL * nBase;
+	nOut := nBase / NIL;
+	sMsg := "Total: " + NIL;
+	nOut := -NIL;
+	:RETURN nOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Sum;
+	:PARAMETERS nBase;
+	:DECLARE nOut, sMsg;
+	nOut := NIL + 1;
+	nOut := nBase - NIL;
+	nOut := NIL * nBase;
+	nOut := nBase / NIL;
+	sMsg := "Total: " + NIL;
+	nOut := -NIL;
+	:RETURN nOut;
+:ENDPROC;
+-- diagnostics --
+4:14-4:15 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+5:16-5:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+6:14-6:15 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+7:16-7:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+8:20-8:21 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+9:10-9:11 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+-- diagnostics [--strict --info] --
+4:14-4:15 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+5:16-5:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+6:14-6:15 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+7:16-7:17 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+8:20-8:21 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+9:10-9:11 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first

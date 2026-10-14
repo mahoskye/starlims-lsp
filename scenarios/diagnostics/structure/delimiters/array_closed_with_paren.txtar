@@ -1,0 +1,19 @@
+An array literal closed with `)` instead of `}`: mismatched_delimiter on
+the `)`, naming the expected closer. The `{` is popped, so nothing
+cascades into unclosed_delimiter (diag.mismatched_delimiter).
+-- input.ssl --
+:PROCEDURE DefaultUnits;
+	:DECLARE aUnits;
+	aUnits := {"mg", "g", "kg");
+	:RETURN aUnits;
+:ENDPROC;
+-- format --
+:PROCEDURE DefaultUnits;
+	:DECLARE aUnits;
+	aUnits := {"mg", "g", "kg");
+	:RETURN aUnits;
+:ENDPROC;
+-- diagnostics --
+3:28-3:29 error mismatched_delimiter: Expected '}' but found ')'
+-- diagnostics [--strict --info] --
+3:28-3:29 error mismatched_delimiter: Expected '}' but found ')'

@@ -1,0 +1,40 @@
+An :EXITCASE directly after a :RETURN in the same branch is unreachable:
+exitcase_after_return fires on the :EXITCASE (hint). The :EXITCASE is
+still the last statement of its branch, so exitcase_last_in_branch must
+not fire (diag.exitcase_after_return, diag.exitcase_last_in_branch).
+-- input.ssl --
+:PROCEDURE PriorityName;
+	:PARAMETERS nLevel;
+	:BEGINCASE;
+	:CASE nLevel > 8;
+		:RETURN "critical";
+		:EXITCASE;
+	:CASE nLevel > 4;
+		:RETURN "elevated";
+		/* reached only by the return above;
+		:EXITCASE;
+	:OTHERWISE;
+		:RETURN "normal";
+	:ENDCASE;
+:ENDPROC;
+-- format --
+:PROCEDURE PriorityName;
+	:PARAMETERS nLevel;
+	:BEGINCASE;
+	:CASE nLevel > 8;
+		:RETURN "critical";
+		:EXITCASE;
+	:CASE nLevel > 4;
+		:RETURN "elevated";
+		/* reached only by the return above;
+		:EXITCASE;
+	:OTHERWISE;
+		:RETURN "normal";
+	:ENDCASE;
+:ENDPROC;
+-- diagnostics --
+6:3-6:12 hint exitcase_after_return: Unreachable ':EXITCASE' - the preceding ':RETURN' already leaves the procedure
+10:3-10:12 hint exitcase_after_return: Unreachable ':EXITCASE' - the preceding ':RETURN' already leaves the procedure
+-- diagnostics [--strict --info] --
+6:3-6:12 hint exitcase_after_return: Unreachable ':EXITCASE' - the preceding ':RETURN' already leaves the procedure
+10:3-10:12 hint exitcase_after_return: Unreachable ':EXITCASE' - the preceding ':RETURN' already leaves the procedure

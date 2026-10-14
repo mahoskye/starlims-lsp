@@ -1,0 +1,61 @@
+Near-misses for diag.negative_logic: a negated guard without :ELSE, a
+negation that is not the leading token, a leading negation that governs
+only the left operand of .AND. (unary binds tighter), and an outer
+negated :IF whose only :ELSE belongs to a nested :IF.
+-- input.ssl --
+:PROCEDURE Settle;
+	:PARAMETERS bDone, bFailed, bReady;
+	:DECLARE nState;
+	:IF .NOT. bReady;
+		:RETURN 0;
+	:ENDIF;
+	:IF bDone .AND. .NOT. bFailed;
+		nState := 1;
+	:ELSE;
+		nState := 2;
+	:ENDIF;
+	:IF .NOT. bDone .AND. bReady;
+		nState := 3;
+	:ELSE;
+		nState := 4;
+	:ENDIF;
+	:IF .NOT. bFailed;
+		:IF bDone;
+			nState := 5;
+		:ELSE;
+			nState := 6;
+		:ENDIF;
+	:ENDIF;
+	:RETURN nState;
+:ENDPROC;
+-- format --
+:PROCEDURE Settle;
+	:PARAMETERS bDone, bFailed, bReady;
+	:DECLARE nState;
+	:IF .NOT. bReady;
+		:RETURN 0;
+	:ENDIF;
+
+	:IF bDone .AND. .NOT. bFailed;
+		nState := 1;
+	:ELSE;
+		nState := 2;
+	:ENDIF;
+
+	:IF .NOT. bDone .AND. bReady;
+		nState := 3;
+	:ELSE;
+		nState := 4;
+	:ENDIF;
+
+	:IF .NOT. bFailed;
+		:IF bDone;
+			nState := 5;
+		:ELSE;
+			nState := 6;
+		:ENDIF;
+	:ENDIF;
+	:RETURN nState;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,41 @@
+No `;` is inserted mid-expression: a line ending with an operator, `:=`,
+a comma or an opening delimiter, or inside an unclosed `(` / `{` / `[`,
+continues on the next line (fmt.semicolon_enforcement, vs-code-ssl-formatter
+v1.1.0 issues #3/#26). Every continuation line here ends in one of those
+forms, so the only `;` added are at real statement ends.
+-- input.ssl --
+:PROCEDURE Guards;
+:PARAMETERS aRows, nIndex;
+:DECLARE bResult, nTotal, aList;
+bResult := nIndex > 0 .AND.
+nIndex <= Len(aRows)
+nTotal := aRows[nIndex] +
+aRows[
+nIndex] *
+2
+aList := {1,
+2,
+DoProc("Third", {
+nIndex})}
+:RETURN nTotal
+:ENDPROC;
+-- format --
+:PROCEDURE Guards;
+	:PARAMETERS aRows, nIndex;
+	:DECLARE bResult, nTotal, aList;
+	bResult := nIndex > 0 .AND.
+		nIndex <= Len(aRows);
+	nTotal := aRows[nIndex] +
+		aRows[
+		nIndex] *
+		2;
+	aList := {1,
+		2,
+		DoProc("Third", {
+		nIndex})};
+	:RETURN nTotal;
+:ENDPROC;
+-- diagnostics --
+6:1-6:7 error unexpected_token: Unexpected identifier 'nTotal' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+6:1-6:7 error unexpected_token: Unexpected identifier 'nTotal' - expected an operator or ';' (is the previous statement missing its ';'?)

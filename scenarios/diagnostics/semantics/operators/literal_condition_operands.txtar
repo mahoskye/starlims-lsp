@@ -1,0 +1,39 @@
+SSL has no truthy/falsy coercion: a literal string, number or NIL as an
+:IF/:WHILE condition, or as the left operand of .AND./.OR., raises at run
+time on v12. Nothing reports these literal cases today; the same
+condition written with a variable is not provable and stays silent by
+design.
+Known issue: #322 (literal non-logical conditions and .AND./.OR. left operands not diagnosed).
+-- input.ssl --
+:PROCEDURE Gate;
+	:PARAMETERS bOpen;
+	:DECLARE bOut;
+	bOut := .F.;
+	:IF "x";
+		bOut := .T.;
+	:ENDIF;
+	:WHILE 1;
+		:EXITWHILE;
+	:ENDWHILE;
+	bOut := "x" .AND. bOpen;
+	bOut := 0 .OR. bOut;
+	:RETURN bOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Gate;
+	:PARAMETERS bOpen;
+	:DECLARE bOut;
+	bOut := .F.;
+	:IF "x";
+		bOut := .T.;
+	:ENDIF;
+
+	:WHILE 1;
+		:EXITWHILE;
+	:ENDWHILE;
+	bOut := "x" .AND. bOpen;
+	bOut := 0 .OR. bOut;
+	:RETURN bOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

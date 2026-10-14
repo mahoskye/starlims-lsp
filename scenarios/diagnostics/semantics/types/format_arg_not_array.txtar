@@ -1,0 +1,41 @@
+String:Format on an s-prefixed template takes the template plus one
+array (diag.format_arg_not_array, warning, on the second argument): a
+scalar second argument of any expression shape fires, and more than two
+arguments fire unconditionally. A composed receiver drops the name from
+the message.
+-- input.ssl --
+:PROCEDURE Greet;
+	:PARAMETERS sFirst, sLast, nCount;
+	:DECLARE sFmt, sMsg;
+	sFmt := "Hello {0} {1}";
+	sMsg := sFmt:Format("{0}", sFirst);
+	sMsg := sFmt:Format("{0} {1}", sFirst, sLast);
+	sMsg := sFmt:Format("{0}", sFirst + sLast);
+	sMsg := sFmt:Format("{0}", nCount > 3);
+	sMsg := AllTrim(sFmt):Format("{0}", Len(sLast));
+	:RETURN sMsg;
+:ENDPROC;
+-- format --
+:PROCEDURE Greet;
+	:PARAMETERS sFirst, sLast, nCount;
+	:DECLARE sFmt, sMsg;
+	sFmt := "Hello {0} {1}";
+	sMsg := sFmt:Format("{0}", sFirst);
+	sMsg := sFmt:Format("{0} {1}", sFirst, sLast);
+	sMsg := sFmt:Format("{0}", sFirst + sLast);
+	sMsg := sFmt:Format("{0}", nCount > 3);
+	sMsg := AllTrim(sFmt):Format("{0}", Len(sLast));
+	:RETURN sMsg;
+:ENDPROC;
+-- diagnostics --
+5:29-5:35 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+6:33-6:39 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+7:29-7:43 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+8:29-8:39 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+9:38-9:48 warning format_arg_not_array: Format takes ONE array holding every replacement value - wrap the values in braces: Format(template, {...})
+-- diagnostics [--strict --info] --
+5:29-5:35 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+6:33-6:39 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+7:29-7:43 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+8:29-8:39 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+9:38-9:48 warning format_arg_not_array: Format takes ONE array holding every replacement value - wrap the values in braces: Format(template, {...})

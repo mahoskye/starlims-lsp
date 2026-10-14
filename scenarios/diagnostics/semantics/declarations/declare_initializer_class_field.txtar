@@ -1,0 +1,23 @@
+Class fields follow the same rule: initialize in the Constructor, not on
+the :DECLARE line (diag.declare_initializer). The Constructor assigning
+through Me: is the correct pattern and does not fire.
+-- input.ssl --
+:CLASS TrayQueue;
+:DECLARE sQueueName := "default";
+:DECLARE nDepth;
+:PROCEDURE Constructor;
+	Me:nDepth := 0;
+	Me:sQueueName := "main";
+:ENDPROC;
+-- format --
+:CLASS TrayQueue;
+:DECLARE sQueueName := "default";
+:DECLARE nDepth;
+:PROCEDURE Constructor;
+	Me:nDepth := 0;
+	Me:sQueueName := "main";
+:ENDPROC;
+-- diagnostics --
+2:21-2:23 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+-- diagnostics [--strict --info] --
+2:21-2:23 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement

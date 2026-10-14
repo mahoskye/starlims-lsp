@@ -1,0 +1,31 @@
+A realistic script-level report where variable rules meet: a :PUBLIC
+(info), an assignment to MYUSERNAME, an undeclared read and an unused
+local (strict), and the predefined CRLF and MYUSERNAME reads, which are
+declared by every base installation.
+-- input.ssl --
+:PARAMETERS sReportName;
+:PUBLIC gReportRuns;
+:DECLARE sHeader, sBody, nLines, sScratch;
+gReportRuns := gReportRuns + 1;
+sHeader := sReportName + " by " + MYUSERNAME + CRLF;
+nLines := nRowCount;
+sBody := sHeader + "lines: " + LimsString(nLines);
+MYUSERNAME := "report-bot";
+:RETURN sBody;
+-- format --
+:PARAMETERS sReportName;
+:PUBLIC gReportRuns;
+:DECLARE sHeader, sBody, nLines, sScratch;
+gReportRuns := gReportRuns + 1;
+sHeader := sReportName + " by " + MYUSERNAME + CRLF;
+nLines := nRowCount;
+sBody := sHeader + "lines: " + LimsString(nLines);
+MYUSERNAME := "report-bot";
+:RETURN sBody;
+-- diagnostics --
+8:1-8:11 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it
+-- diagnostics [--strict --info] --
+2:1-2:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+3:34-3:42 hint unused_variable: Variable 'sScratch' is declared but never used
+6:11-6:20 warning undeclared_variable: Variable 'nRowCount' is not declared
+8:1-8:11 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it

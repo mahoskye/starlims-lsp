@@ -1,0 +1,76 @@
+Near miss for every block-pairing rule: one procedure that opens and
+closes each block kind the scanner tracks (:IF/:ELSE, :WHILE, :FOR with
+:STEP, :BEGINCASE, :TRY/:CATCH/:FINALLY), nested no deeper than the
+default maxBlockDepth of 4. Should be clean apart from strict-profile
+noise (diag.unclosed_block, diag.mismatched_block_end,
+diag.unmatched_block_end, diag.max_block_depth).
+-- input.ssl --
+:PROCEDURE SummarizeBatch;
+	:PARAMETERS aRows;
+	:DECLARE nTotal, nIdx, nRetry, sLabel, oErr;
+	nTotal := 0;
+	nRetry := 3;
+	:TRY;
+		:FOR nIdx := 1 :TO Len(aRows) :STEP 1;
+			nTotal := nTotal + aRows[nIdx];
+		:NEXT;
+	:CATCH;
+		oErr := GetLastSSLError();
+		ErrorMes("SummarizeBatch", oErr:Description);
+	:FINALLY;
+		nRetry := 0;
+	:ENDTRY;
+	:WHILE nRetry > 0;
+		nRetry := nRetry - 1;
+	:ENDWHILE;
+	:IF nTotal > 1000;
+		sLabel := "large";
+	:ELSE;
+		:BEGINCASE;
+		:CASE nTotal == 0;
+			sLabel := "empty";
+			:EXITCASE;
+		:OTHERWISE;
+			sLabel := "small";
+			:EXITCASE;
+		:ENDCASE;
+	:ENDIF;
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE SummarizeBatch;
+	:PARAMETERS aRows;
+	:DECLARE nTotal, nIdx, nRetry, sLabel, oErr;
+	nTotal := 0;
+	nRetry := 3;
+	:TRY;
+		:FOR nIdx := 1 :TO Len(aRows) :STEP 1;
+			nTotal := nTotal + aRows[nIdx];
+		:NEXT;
+	:CATCH;
+		oErr := GetLastSSLError();
+		ErrorMes("SummarizeBatch", oErr:Description);
+	:FINALLY;
+		nRetry := 0;
+	:ENDTRY;
+
+	:WHILE nRetry > 0;
+		nRetry := nRetry - 1;
+	:ENDWHILE;
+
+	:IF nTotal > 1000;
+		sLabel := "large";
+	:ELSE;
+		:BEGINCASE;
+		:CASE nTotal == 0;
+			sLabel := "empty";
+			:EXITCASE;
+		:OTHERWISE;
+			sLabel := "small";
+			:EXITCASE;
+		:ENDCASE;
+	:ENDIF;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

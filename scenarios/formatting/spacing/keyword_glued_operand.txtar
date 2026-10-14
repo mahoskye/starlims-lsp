@@ -1,0 +1,42 @@
+A keyword glued to its operand or to the next keyword: `:RETURN-1`,
+`:IF(...)`, `:STEP-1` and `1:TO`. Records whether the formatter
+separates them. `:TO` / `:STEP` after a closing paren or identifier
+(`Len(aRows):STEP`) lex as member access, not as the keyword, so the
+formatter must not touch them (the input reports that line as an error).
+Suspected issue: #326 — no space is inserted between a keyword and a glued operand or before a glued `:TO` / `:STEP` (`1:TO 5`, `1:STEP-1` stay glued) even though the formatter recognizes them as keywords and recases them, and diag.step_spacing still warns on the formatted output (style guide step_spacing: "Put a space before `:STEP` in `:FOR` headers").
+-- input.ssl --
+:PROCEDURE Loops;
+:PARAMETERS aRows;
+:DECLARE i, j;
+:FOR i:=1:TO Len(aRows):STEP 2;
+:FOR j:=i :to 1:step-1;
+:IF(j > 1);
+aRows[j] := aRows[i];
+:ENDIF;
+:NEXT;
+:NEXT;
+:RETURN-1;
+:ENDPROC;
+-- format --
+:PROCEDURE Loops;
+	:PARAMETERS aRows;
+	:DECLARE i, j;
+	:FOR i := 1:TO Len(aRows):STEP 2;
+		:FOR j := i :TO 1:STEP-1;
+			:IF(j > 1);
+				aRows[j] := aRows[i];
+			:ENDIF;
+		:NEXT;
+	:NEXT;
+	:RETURN-1;
+:ENDPROC;
+-- diagnostics --
+4:30-4:31 error unexpected_token: Unexpected number '2' in ':FOR' header - expected ':STEP' or ';' (missing space before ':STEP'?)
+5:11-5:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+5:16-5:21 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':STEP'
+5:16-5:21 warning step_spacing: ':STEP' should have a space before it: ':FOR i := 1 :TO 10 :STEP 2;'
+-- diagnostics [--strict --info] --
+4:30-4:31 error unexpected_token: Unexpected number '2' in ':FOR' header - expected ':STEP' or ';' (missing space before ':STEP'?)
+5:11-5:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+5:16-5:21 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':STEP'
+5:16-5:21 warning step_spacing: ':STEP' should have a space before it: ':FOR i := 1 :TO 10 :STEP 2;'

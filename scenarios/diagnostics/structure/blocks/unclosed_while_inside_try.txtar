@@ -1,0 +1,35 @@
+A :WHILE loop whose :ENDWHILE was dropped, sitting inside a :TRY body.
+When :CATCH arrives the :WHILE is still open; the scanner must report the
+:WHILE as unclosed (once) and still recognize :CATCH and :ENDTRY as
+belonging to the :TRY, so no stray_block_keyword or try_requires_handler
+noise should appear (diag.unclosed_block, diag.stray_block_keyword).
+-- input.ssl --
+:PROCEDURE DrainQueue;
+	:DECLARE nRemaining, oErr;
+	nRemaining := 5;
+	:TRY;
+		:WHILE nRemaining > 0;
+			nRemaining := nRemaining - 1;
+	:CATCH;
+		oErr := GetLastSSLError();
+		ErrorMes("DrainQueue", oErr:Description);
+	:ENDTRY;
+	:RETURN nRemaining;
+:ENDPROC;
+-- format --
+:PROCEDURE DrainQueue;
+	:DECLARE nRemaining, oErr;
+	nRemaining := 5;
+	:TRY;
+		:WHILE nRemaining > 0;
+			nRemaining := nRemaining - 1;
+		:CATCH;
+			oErr := GetLastSSLError();
+			ErrorMes("DrainQueue", oErr:Description);
+		:ENDTRY;
+		:RETURN nRemaining;
+	:ENDPROC;
+-- diagnostics --
+5:3-5:9 error unclosed_block: Unclosed ':WHILE' - expected ':ENDWHILE'
+-- diagnostics [--strict --info] --
+5:3-5:9 error unclosed_block: Unclosed ':WHILE' - expected ':ENDWHILE'

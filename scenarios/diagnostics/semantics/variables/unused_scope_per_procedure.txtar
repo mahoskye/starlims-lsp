@@ -1,0 +1,29 @@
+Uses count only inside the declaring procedure: nCursor read in Second
+does not use the nCursor declared in First (diag.unused_variable). A
+:PUBLIC name is counted file-wide, so gTrayCount read in Second keeps its
+declaration quiet; the :PUBLIC itself fires diag.limit_public_vars.
+-- input.ssl --
+:PUBLIC gTrayCount;
+:PROCEDURE First;
+	:DECLARE nCursor;
+:ENDPROC;
+:PROCEDURE Second;
+	:DECLARE nCursor;
+	nCursor := gTrayCount + 1;
+	:RETURN nCursor;
+:ENDPROC;
+-- format --
+:PUBLIC gTrayCount;
+:PROCEDURE First;
+	:DECLARE nCursor;
+:ENDPROC;
+
+:PROCEDURE Second;
+	:DECLARE nCursor;
+	nCursor := gTrayCount + 1;
+	:RETURN nCursor;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+3:11-3:18 hint unused_variable: Variable 'nCursor' is declared but never used

@@ -1,0 +1,33 @@
+Near miss for step_spacing and unexpected_token: :STEP preceded by a
+space or a tab, and a negative step. Clean. (A header broken across lines
+before :TO is also valid, but trips a range-formatting invariant, so it is
+left out here.)
+-- input.ssl --
+:PROCEDURE CountBack;
+	:PARAMETERS nFrom;
+	:DECLARE nIdx, sTrail;
+	sTrail := "";
+	:FOR nIdx := nFrom :TO 1 :STEP -1;
+		sTrail := sTrail + LimsString(nIdx);
+	:NEXT;
+	:FOR nIdx := 1 :TO nFrom	:STEP 2;
+		sTrail := sTrail + ".";
+	:NEXT;
+	:RETURN sTrail;
+:ENDPROC;
+-- format --
+:PROCEDURE CountBack;
+	:PARAMETERS nFrom;
+	:DECLARE nIdx, sTrail;
+	sTrail := "";
+	:FOR nIdx := nFrom :TO 1 :STEP -1;
+		sTrail := sTrail + LimsString(nIdx);
+	:NEXT;
+
+	:FOR nIdx := 1 :TO nFrom :STEP 2;
+		sTrail := sTrail + ".";
+	:NEXT;
+	:RETURN sTrail;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

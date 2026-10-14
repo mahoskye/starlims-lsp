@@ -1,0 +1,24 @@
+English prose that contains SQL trigger words is never detected as SQL
+(issue #82): an over-long SELECT-led sentence, an UPDATE/SET sentence,
+a DELETE … FROM sentence followed by prose, and a two-word "Select one"
+are all byte-preserved.
+-- input.ssl --
+:PROCEDURE Messages;
+	:DECLARE sMsg, sHelp, sWarn, sNote;
+	sMsg := "Select the samples from the rack and update the status column before continuing with the run";
+	sHelp := "Update the set of instruments where the calibration has expired";
+	sWarn := "Delete from the list any sample that was already received by the lab";
+	sNote := "Select one";
+	:RETURN {sMsg, sHelp, sWarn, sNote};
+:ENDPROC;
+-- format --
+:PROCEDURE Messages;
+	:DECLARE sMsg, sHelp, sWarn, sNote;
+	sMsg := "Select the samples from the rack and update the status column before continuing with the run";
+	sHelp := "Update the set of instruments where the calibration has expired";
+	sWarn := "Delete from the list any sample that was already received by the lab";
+	sNote := "Select one";
+	:RETURN {sMsg, sHelp, sWarn, sNote};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

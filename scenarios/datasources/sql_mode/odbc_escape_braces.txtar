@@ -1,0 +1,13 @@
+ODBC escapes (`{fn ...}`, `{d ...}`) look exactly like SSL array literals,
+which is why D15 refuses braces as an SSL signal. The document must stay
+SQL: no edits, no diagnostics.
+-- input.ds --
+SELECT {fn UCASE(r.region_name)} AS regionName, r.opened_on
+FROM sales_region r
+WHERE r.opened_on >= {d '2024-01-01'}
+-- format --
+SELECT {fn UCASE(r.region_name)} AS regionName, r.opened_on
+FROM sales_region r
+WHERE r.opened_on >= {d '2024-01-01'}
+-- diagnostics --
+-- diagnostics [--strict --info] --

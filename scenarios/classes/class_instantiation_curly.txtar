@@ -1,0 +1,39 @@
+Built-in classes instantiated with call parentheses inside a class method
+(diag.class_instantiation_curly): Email() and SSLRegex(...) flag, with the
+curly form in the message. Near misses: Email{} and SSLDataset{} (correct
+form) and oSvc:Email("to") (a member call that shares the class name,
+issue #32).
+-- input.ssl --
+:CLASS Notifier;
+:DECLARE oSvc;
+
+:PROCEDURE Send;
+	:PARAMETERS sTo;
+	:DECLARE oMail, oGood, oData, oPattern, vSent;
+	oMail := Email();
+	oPattern := SSLRegex("^[a-z]+$");
+	oGood := Email{};
+	oData := SSLDataset{};
+	vSent := Me:oSvc:Email(sTo);
+	:RETURN vSent;
+:ENDPROC;
+-- format --
+:CLASS Notifier;
+:DECLARE oSvc;
+
+:PROCEDURE Send;
+	:PARAMETERS sTo;
+	:DECLARE oMail, oGood, oData, oPattern, vSent;
+	oMail := Email();
+	oPattern := SSLRegex("^[a-z]+$");
+	oGood := Email{};
+	oData := SSLDataset{};
+	vSent := Me:oSvc:Email(sTo);
+	:RETURN vSent;
+:ENDPROC;
+-- diagnostics --
+7:11-7:16 error class_instantiation_curly: SSL built-in class 'Email' uses curly braces for instantiation: 'Email{}' not 'Email()'
+8:14-8:22 error class_instantiation_curly: SSL built-in class 'SSLRegex' uses curly braces for instantiation: 'SSLRegex{}' not 'SSLRegex()'
+-- diagnostics [--strict --info] --
+7:11-7:16 error class_instantiation_curly: SSL built-in class 'Email' uses curly braces for instantiation: 'Email{}' not 'Email()'
+8:14-8:22 error class_instantiation_curly: SSL built-in class 'SSLRegex' uses curly braces for instantiation: 'SSLRegex{}' not 'SSLRegex()'

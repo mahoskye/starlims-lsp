@@ -1,0 +1,30 @@
+The canonical SQL data source: all four builder directives, a :PARAMETERS
+line with inline defaults, then the query using @name placeholders
+(style guide no_flag_builder_directives, datasource_sql_at_name_placeholders).
+The header keeps its checks and has nothing to report; the SQL body gets
+no diagnostics and the document gets no edits (feature.diagnostics_pipeline
+A13, feature.formatting A9).
+-- input.ds --
+:DSN := DATABASE;
+:TABLENAME := parcelList;
+:NULLASBLANK := true;
+:INVARIANTDATECOLUMNS := received_on, shipped_on;
+:PARAMETERS sDepot := "MAIN", nMinWeight := 0;
+
+SELECT p.parcel_id, p.received_on, p.shipped_on
+FROM parcel p
+WHERE p.depot_code = @sDepot
+  AND p.weight_kg >= @nMinWeight
+-- format --
+:DSN := DATABASE;
+:TABLENAME := parcelList;
+:NULLASBLANK := true;
+:INVARIANTDATECOLUMNS := received_on, shipped_on;
+:PARAMETERS sDepot := "MAIN", nMinWeight := 0;
+
+SELECT p.parcel_id, p.received_on, p.shipped_on
+FROM parcel p
+WHERE p.depot_code = @sDepot
+  AND p.weight_kg >= @nMinWeight
+-- diagnostics --
+-- diagnostics [--strict --info] --

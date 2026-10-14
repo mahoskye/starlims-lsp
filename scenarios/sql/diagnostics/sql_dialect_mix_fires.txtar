@@ -1,0 +1,23 @@
+One embedded SQL string mixing Oracle and SQL Server idioms
+(diag.sql_dialect_mix, info tier): NVL and SYSDATE beside GETDATE and
+ISNULL. The message names the markers on each side.
+-- input.ssl --
+:PROCEDURE Recent;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT ordno, NVL(status, 'X'), ISNULL(kind, 'Y') FROM orders WHERE logdate > GETDATE() - 1 OR duedate < SYSDATE");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Recent;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, NVL(status, 'X'), ISNULL(kind, 'Y')
+	    FROM orders
+	    WHERE logdate > GETDATE() - 1
+	      OR duedate < SYSDATE
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:22-3:136 info sql_dialect_mix: Oracle-only (NVL, SYSDATE) and SQL Server-only (ISNULL, GETDATE) idioms in one statement - STARLIMS environments run one dialect, so one side of this will fail there

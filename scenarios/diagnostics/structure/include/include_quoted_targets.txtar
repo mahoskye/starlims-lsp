@@ -1,0 +1,24 @@
+:INCLUDE targets written as strings in double-quote and bracket form do
+not compile: include_quoted_target (error) on each whole string token,
+with the unquoted statement in the message. The identifier forms after
+them are fine (diag.include_quoted_target).
+-- input.ssl --
+:INCLUDE "Common.StringHelpers";
+:INCLUDE [Common.DateHelpers];
+:INCLUDE Common.MathHelpers;
+:INCLUDE MathHelpers;
+:DECLARE nCount;
+nCount := 0;
+-- format --
+:INCLUDE "Common.StringHelpers";
+:INCLUDE [Common.DateHelpers];
+:INCLUDE Common.MathHelpers;
+:INCLUDE MathHelpers;
+:DECLARE nCount;
+nCount := 0;
+-- diagnostics --
+1:10-1:32 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.StringHelpers;'
+2:10-2:30 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.DateHelpers;'
+-- diagnostics [--strict --info] --
+1:10-1:32 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.StringHelpers;'
+2:10-2:30 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.DateHelpers;'

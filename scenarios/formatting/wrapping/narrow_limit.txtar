@@ -1,0 +1,28 @@
+`--max-line-length 40`: the same statements re-flow under a narrow limit,
+packing greedily after commas and `:=` (fmt.max_line_length, feature.formatting
+A8). Recorded beside the 90-column default for contrast.
+-- input.ssl --
+:PROCEDURE Narrow;
+:PARAMETERS sSampleId, sTestCode;
+:DECLARE vResult;
+vResult := DoProc("LookupResult", {sSampleId, sTestCode, "FINAL", 3});
+:RETURN vResult;
+:ENDPROC;
+-- format [--max-line-length 40] --
+:PROCEDURE Narrow;
+	:PARAMETERS sSampleId, sTestCode;
+	:DECLARE vResult;
+	vResult := DoProc("LookupResult",
+		{sSampleId, sTestCode, "FINAL",
+		3});
+	:RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Narrow;
+	:PARAMETERS sSampleId, sTestCode;
+	:DECLARE vResult;
+	vResult := DoProc("LookupResult", {sSampleId, sTestCode, "FINAL", 3});
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

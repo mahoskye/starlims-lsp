@@ -1,0 +1,34 @@
+Near-misses for diag.builtin_excess_arguments: calls within arity,
+nested builtins, a variadic builtin (Eval), :-qualified methods that
+happen to share a builtin's name, and an unknown function (no arity to
+enforce; direct_procedure_call's territory). A single trailing comma adds
+no argument (trailing_skip_commas, info tier, covers it).
+-- input.ssl --
+:PROCEDURE Clip;
+	:PARAMETERS sText, oDoc, aDocs;
+	:DECLARE sOut, fnAdd, nSum;
+	sOut := Left(sText, 10);
+	sOut := AllTrim(Upper(Left(sText, 10)));
+	fnAdd := {|a, b, c, d, e| a + b + c + d + e};
+	nSum := Eval(fnAdd, 1, 2, 3, 4, 5);
+	sOut := oDoc:Left("a", "b", "c");
+	sOut := aDocs[1]:Left("a", "b", "c");
+	sOut := Left(sText, 10,);
+	:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Clip;
+	:PARAMETERS sText, oDoc, aDocs;
+	:DECLARE sOut, fnAdd, nSum;
+	sOut := Left(sText, 10);
+	sOut := AllTrim(Upper(Left(sText, 10)));
+	fnAdd := {|a, b, c, d, e| a + b + c + d + e};
+	nSum := Eval(fnAdd, 1, 2, 3, 4, 5);
+	sOut := oDoc:Left("a", "b", "c");
+	sOut := aDocs[1]:Left("a", "b", "c");
+	sOut := Left(sText, 10,);
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+10:24-10:25 info trailing_skip_commas: Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them

@@ -1,0 +1,69 @@
+Visibility annotations in a script. The exact form directly above
+:PROCEDURE is effective (visibility_annotation_usage, info tier only).
+Near-miss spellings, a detached annotation (blank line), one followed by a
+:DECLARE, and one sharing a line are inert (diag.visibility_annotation,
+warning). An annotation before an expression statement attaches to nothing
+and gets neither code.
+-- input.ssl --
+/*@private;
+:DECLARE nCount;
+/*@private;
+nCount := 1;
+
+/*@private;
+:PROCEDURE Effective;
+	:RETURN 1;
+:ENDPROC;
+
+/*@Private;
+:PROCEDURE NearMissCase;
+	:RETURN 2;
+:ENDPROC;
+
+/* @protected;
+:PROCEDURE NearMissSpace;
+	:RETURN 3;
+:ENDPROC;
+
+/*@private;
+
+:PROCEDURE Detached;
+	:RETURN 4;
+:ENDPROC;
+-- format --
+/*@private;
+:DECLARE nCount;
+/*@private;
+nCount := 1;
+
+/*@private;
+:PROCEDURE Effective;
+	:RETURN 1;
+:ENDPROC;
+
+/*@Private;
+:PROCEDURE NearMissCase;
+	:RETURN 2;
+:ENDPROC;
+
+/* @protected;
+:PROCEDURE NearMissSpace;
+	:RETURN 3;
+:ENDPROC;
+
+/*@private;
+
+:PROCEDURE Detached;
+	:RETURN 4;
+:ENDPROC;
+-- diagnostics --
+1:1-1:12 warning visibility_annotation: Visibility annotation '/*@private;' should appear on its own line immediately before ':PROCEDURE'
+11:1-11:12 warning visibility_annotation: '/*@Private;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@private;' (lowercase, no spaces)
+16:1-16:15 warning visibility_annotation: '/* @protected;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@protected;' (lowercase, no spaces)
+21:1-21:12 warning visibility_annotation: Visibility annotation '/*@private;' must sit on its own line immediately before ':PROCEDURE' — a blank line, another comment, or a shared line breaks the association, so the procedure stays public
+-- diagnostics [--strict --info] --
+1:1-1:12 warning visibility_annotation: Visibility annotation '/*@private;' should appear on its own line immediately before ':PROCEDURE'
+6:1-6:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated
+11:1-11:12 warning visibility_annotation: '/*@Private;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@private;' (lowercase, no spaces)
+16:1-16:15 warning visibility_annotation: '/* @protected;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@protected;' (lowercase, no spaces)
+21:1-21:12 warning visibility_annotation: Visibility annotation '/*@private;' must sit on its own line immediately before ':PROCEDURE' — a blank line, another comment, or a shared line breaks the association, so the procedure stays public

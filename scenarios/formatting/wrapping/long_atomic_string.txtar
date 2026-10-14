@@ -1,0 +1,21 @@
+An over-long atomic string has no legal break point: the line stays
+over-long, the string is neither split nor moved below its `:=` (the
+issue-#85 no-gain guard), and a second format pass adds nothing
+(fmt.max_line_length, feature.formatting A6). The DoProc line is the
+catalog's own 93-column idempotent example, here indented.
+-- input.ssl --
+:PROCEDURE Notify;
+:DECLARE sMessage;
+sMessage := "This message text is long enough by itself to run past the ninety column limit easily";
+DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNinetyColumns");
+:RETURN sMessage;
+:ENDPROC;
+-- format --
+:PROCEDURE Notify;
+	:DECLARE sMessage;
+	sMessage := "This message text is long enough by itself to run past the ninety column limit easily";
+	DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNinetyColumns");
+	:RETURN sMessage;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

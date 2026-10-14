@@ -1,0 +1,38 @@
+Visibility annotations inside a class (diag.visibility_annotation,
+warning): class methods are always Public|Virtual, so /*@private; and
+/*@protected; are inert there, even in the exact form. The info-tier
+visibility_annotation_usage must not double-report them.
+-- input.ssl --
+:CLASS Renderer;
+:DECLARE sBuffer;
+
+/*@private;
+:PROCEDURE Flush;
+	Me:sBuffer := "";
+:ENDPROC;
+
+/*@protected;
+:PROCEDURE Append;
+	:PARAMETERS sText;
+	Me:sBuffer += sText;
+:ENDPROC;
+-- format --
+:CLASS Renderer;
+:DECLARE sBuffer;
+
+/*@private;
+:PROCEDURE Flush;
+	Me:sBuffer := "";
+:ENDPROC;
+
+/*@protected;
+:PROCEDURE Append;
+	:PARAMETERS sText;
+	Me:sBuffer += sText;
+:ENDPROC;
+-- diagnostics --
+4:1-4:12 warning visibility_annotation: Visibility annotation '/*@private;' has no effect on class methods — class methods are always public/virtual
+9:1-9:14 warning visibility_annotation: Visibility annotation '/*@protected;' has no effect on class methods — class methods are always public/virtual
+-- diagnostics [--strict --info] --
+4:1-4:12 warning visibility_annotation: Visibility annotation '/*@private;' has no effect on class methods — class methods are always public/virtual
+9:1-9:14 warning visibility_annotation: Visibility annotation '/*@protected;' has no effect on class methods — class methods are always public/virtual

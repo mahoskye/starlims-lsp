@@ -1,0 +1,30 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
+Expression continuations that begin with a binary operator (`+`, `.AND.`,
+`$`) take one level of continuation indent past the statement line
+(fmt.indent_style, issue #86); input lines are flush-left or over-indented.
+-- input.ssl --
+:PROCEDURE Describe;
+:PARAMETERS sName, sStatus, nCount;
+:DECLARE sOut, bShow;
+sOut := "Sample " + sName
++ " is " + sStatus
+                + " with " + LimsString(nCount) + " results";
+bShow := nCount > 0
+.AND. "X" $ sStatus
+.OR. Empty(sName);
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Describe;
+	:PARAMETERS sName, sStatus, nCount;
+	:DECLARE sOut, bShow;
+	sOut := "Sample " + sName
+		+ " is " + sStatus
+		+ " with " + LimsString(nCount) + " results";
+	bShow := nCount > 0
+		.AND. "X" $ sStatus
+		.OR. Empty(sName);
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

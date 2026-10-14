@@ -1,0 +1,18 @@
+Expressions nested far deeper than real code: twenty levels of
+parentheses, an array literal nested twelve deep, and a chain of
+subscripts. The expression parser must not overflow or misreport, and
+the formatter must keep every delimiter where it is.
+-- input.ssl --
+:DECLARE nDeep, aDeep, vLeaf;
+nDeep := ((((((((((((((((((((1 + 2))))))))))))))))))));
+aDeep := {{{{{{{{{{{{"leaf"}}}}}}}}}}}};
+vLeaf := aDeep[1][1][1][1][1][1][1][1][1][1][1][1];
+:RETURN vLeaf;
+-- format --
+:DECLARE nDeep, aDeep, vLeaf;
+nDeep := ((((((((((((((((((((1 + 2))))))))))))))))))));
+aDeep := {{{{{{{{{{{{"leaf"}}}}}}}}}}}};
+vLeaf := aDeep[1][1][1][1][1][1][1][1][1][1][1][1];
+:RETURN vLeaf;
+-- diagnostics --
+-- diagnostics [--strict --info] --

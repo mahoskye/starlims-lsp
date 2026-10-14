@@ -1,0 +1,41 @@
+A :FOR header split after a trailing `:TO` or `:STEP`: no `;` is forced
+after the keyword (fmt.semicolon_enforcement "the line ends with :TO /
+:STEP"), and the operand line takes one continuation level, the same
+column as the loop body. The form with `:TO` / `:STEP` leading the next
+line is left out: range-formatting those lines re-indents them, an A2
+invariant failure reported separately.
+-- input.ssl --
+:PROCEDURE SplitFor;
+:PARAMETERS nLimit;
+:DECLARE i, nSum, nDown;
+nSum := 0;
+nDown := -1;
+:FOR i := 1 :TO
+nLimit;
+nSum += i;
+:NEXT;
+:FOR i := nLimit :TO 1 :STEP
+nDown;
+nSum -= i;
+:NEXT;
+:RETURN nSum;
+:ENDPROC;
+-- format --
+:PROCEDURE SplitFor;
+	:PARAMETERS nLimit;
+	:DECLARE i, nSum, nDown;
+	nSum := 0;
+	nDown := -1;
+	:FOR i := 1 :TO
+		nLimit;
+		nSum += i;
+	:NEXT;
+
+	:FOR i := nLimit :TO 1 :STEP
+		nDown;
+		nSum -= i;
+	:NEXT;
+	:RETURN nSum;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

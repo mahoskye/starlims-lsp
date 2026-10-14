@@ -1,0 +1,35 @@
+When the subscripted value is plausibly a 0-based .NET collection —
+reached through a member, or last assigned from a member call or
+LimsNetConnect — diag.zero_based_array_index drops to the info tier with
+a message saying 0 may be valid there. A later reassignment from a
+native value restores the error.
+-- input.ssl --
+:PROCEDURE Bytes;
+	:DECLARE oList, oNum, aBytes, vOut;
+	oList := LimsNetConnect("mscorlib", "System.Collections.ArrayList");
+	vOut := oList:Items[0];
+	oNum := LimsNetConnect("System.Numerics", "System.Numerics.BigInteger");
+	aBytes := oNum:ToByteArray();
+	vOut := aBytes[0];
+	aBytes := {1, 2};
+	vOut := aBytes[0];
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Bytes;
+	:DECLARE oList, oNum, aBytes, vOut;
+	oList := LimsNETConnect("mscorlib", "System.Collections.ArrayList");
+	vOut := oList:Items[0];
+	oNum := LimsNETConnect("System.Numerics", "System.Numerics.BigInteger");
+	aBytes := oNum:ToByteArray();
+	vOut := aBytes[0];
+	aBytes := {1, 2};
+	vOut := aBytes[0];
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+9:17-9:18 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+-- diagnostics [--strict --info] --
+4:22-4:23 info zero_based_array_index: Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is.
+7:17-7:18 info zero_based_array_index: Index 0 on a .NET-derived value may be valid — .NET collections are 0-based. Native SSL arrays are 1-based; verify which one this is.
+9:17-9:18 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.

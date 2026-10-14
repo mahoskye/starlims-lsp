@@ -1,0 +1,37 @@
+Closers with no opener (:ENDIF, :NEXT, :ENDPROC) and a closer that
+mismatches its opener (:ENDWHILE closing an :IF). The formatter must not
+dedent below column 0, and the validator must report each without
+cascading.
+-- input.ssl --
+:DECLARE nCount;
+:ENDIF;
+nCount := 1;
+:NEXT;
+:IF nCount > 0;
+nCount += 1;
+:ENDWHILE;
+:ENDPROC;
+:RETURN nCount;
+-- format --
+:DECLARE nCount;
+:ENDIF;
+nCount := 1;
+:NEXT;
+
+:IF nCount > 0;
+	nCount += 1;
+:ENDWHILE;
+:ENDPROC;
+:RETURN nCount;
+-- diagnostics --
+2:1-2:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+4:1-4:6 error unmatched_block_end: Unexpected ':NEXT' without matching block start
+5:1-5:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+7:1-7:10 error mismatched_block_end: ':ENDWHILE' does not match ':IF'
+8:1-8:9 error mismatched_block_end: ':ENDPROC' does not match ':IF'
+-- diagnostics [--strict --info] --
+2:1-2:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start
+4:1-4:6 error unmatched_block_end: Unexpected ':NEXT' without matching block start
+5:1-5:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+7:1-7:10 error mismatched_block_end: ':ENDWHILE' does not match ':IF'
+8:1-8:9 error mismatched_block_end: ':ENDPROC' does not match ':IF'

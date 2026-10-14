@@ -1,0 +1,92 @@
+A well-formed class that inherits: qualified :INHERIT directly after
+:CLASS, Base: delegation in Constructor and an override, Me: for fields
+and own methods, SSLDataset{} for data. Should be clean under every
+profile.
+-- input.ssl --
+/*
+ * Class: AuditedOrder
+ * Description: An order that records every status change
+;
+:CLASS AuditedOrder;
+:INHERIT Lab.Order;
+:DECLARE aHistory;
+
+/*
+ * Procedure: Constructor
+ * Parameters:
+ *   sOrderNo - the order number
+;
+:PROCEDURE Constructor;
+	:PARAMETERS sOrderNo;
+	Base:Constructor(sOrderNo);
+	Me:aHistory := {};
+:ENDPROC;
+
+/*
+ * Procedure: SetStatus
+ * Parameters:
+ *   sStatus - the new status code
+ * Returns: .T. when the parent accepted the change
+;
+:PROCEDURE SetStatus;
+	:PARAMETERS sStatus;
+	:DECLARE bChanged;
+	bChanged := Base:SetStatus(sStatus);
+	:IF bChanged;
+		AAdd(Me:aHistory, {Now(), sStatus});
+	:ENDIF;
+	:RETURN bChanged;
+:ENDPROC;
+
+/*
+ * Procedure: HistoryCount
+ * Returns: the number of recorded changes
+;
+:PROCEDURE HistoryCount;
+	:RETURN Len(Me:aHistory);
+:ENDPROC;
+-- format --
+/*
+ * Class: AuditedOrder
+ * Description: An order that records every status change
+;
+:CLASS AuditedOrder;
+:INHERIT Lab.Order;
+:DECLARE aHistory;
+
+/*
+ * Procedure: Constructor
+ * Parameters:
+ *   sOrderNo - the order number
+;
+:PROCEDURE Constructor;
+	:PARAMETERS sOrderNo;
+	Base:Constructor(sOrderNo);
+	Me:aHistory := {};
+:ENDPROC;
+
+/*
+ * Procedure: SetStatus
+ * Parameters:
+ *   sStatus - the new status code
+ * Returns: .T. when the parent accepted the change
+;
+:PROCEDURE SetStatus;
+	:PARAMETERS sStatus;
+	:DECLARE bChanged;
+	bChanged := Base:SetStatus(sStatus);
+	:IF bChanged;
+		AAdd(Me:aHistory, {Now(), sStatus});
+	:ENDIF;
+	:RETURN bChanged;
+:ENDPROC;
+
+/*
+ * Procedure: HistoryCount
+ * Returns: the number of recorded changes
+;
+:PROCEDURE HistoryCount;
+	:RETURN Len(Me:aHistory);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

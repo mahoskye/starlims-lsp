@@ -1,0 +1,20 @@
+The original shape behind the slug: :DECLARE and :DEFAULT on one line,
+defaulting the local (diag.default_on_declare_line,
+diag.default_after_parameters).
+-- input.ssl --
+:PROCEDURE PickColor;
+	:DECLARE sColor; :DEFAULT sColor, "red";
+	:RETURN sColor;
+:ENDPROC;
+-- format --
+:PROCEDURE PickColor;
+	:DECLARE sColor;
+	:DEFAULT sColor, "red";
+	:RETURN sColor;
+:ENDPROC;
+-- diagnostics --
+2:19-2:27 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+2:28-2:34 error default_on_declare_line: ':DEFAULT' target 'sColor' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+-- diagnostics [--strict --info] --
+2:19-2:27 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+2:28-2:34 error default_on_declare_line: ':DEFAULT' target 'sColor' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment

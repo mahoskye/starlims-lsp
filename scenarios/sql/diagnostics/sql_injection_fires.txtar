@@ -1,0 +1,43 @@
+Runtime values concatenated into the first argument of a SQL function
+(diag.sql_injection, warning): a quoted splice in SQLExecute, a variable
+SQL prefix with a constant tail in LSearch, a runtime operand after a
+safe BuildStringForIn(...) operand, a leading function call seen
+through, and a RunSQL splice. The info tier adds sql_literal_splice on
+the quoted splice, deliberately.
+-- input.ssl --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, aIds, sAnd;
+	:DECLARE sSQL, aRows, sFound, bOk;
+	sSQL := "SELECT custid FROM customers";
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
+	sFound := LSearch(sSQL + " WHERE status = 'OPEN'", "");
+	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds) + sAnd);
+	aRows := SQLExecute(Upper(sSQL) + " WHERE custname = ?sName?");
+	bOk := RunSQL("DELETE FROM customers WHERE custid = " + LimsString(aIds[1]));
+	:RETURN {aRows, sFound, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Lookup;
+	:PARAMETERS sName, aIds, sAnd;
+	:DECLARE sSQL, aRows, sFound, bOk;
+	sSQL := "SELECT custid FROM customers";
+	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
+	sFound := LSearch(sSQL + " WHERE status = 'OPEN'", "");
+	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds) + sAnd);
+	aRows := SQLExecute(Upper(sSQL) + " WHERE custname = ?sName?");
+	bOk := RunSQL("DELETE FROM customers WHERE custid = " + LimsString(aIds[1]));
+	:RETURN {aRows, sFound, bOk};
+:ENDPROC;
+-- diagnostics --
+5:72-5:73 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+6:25-6:26 warning sql_injection: String concatenation in 'LSearch' argument may cause SQL injection. Use parameterized queries instead.
+7:79-7:80 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+8:34-8:35 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+9:56-9:57 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+-- diagnostics [--strict --info] --
+5:22-5:71 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+5:72-5:73 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+6:25-6:26 warning sql_injection: String concatenation in 'LSearch' argument may cause SQL injection. Use parameterized queries instead.
+7:79-7:80 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+8:34-8:35 warning sql_injection: String concatenation in 'SQLExecute' argument may cause SQL injection. Use parameterized queries instead.
+9:56-9:57 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.

@@ -1,0 +1,26 @@
+A :REGION block holding a JSON payload read back with GetRegion(), with
+the :ENDREGION on the payload's last line (`}:ENDREGION;`). The body is
+opaque text: braces and quotes in it are not delimiters or strings, and
+the complete closer ends the body wherever it sits (issue #304). Clean
+(diag.unclosed_block, diag.unclosed_delimiter).
+-- input.ssl --
+:PROCEDURE BuildPayload;
+	:PARAMETERS nTotal;
+	:RETURN StrTran(GetRegion("Payload"), "$nTotal$", LimsString(nTotal));
+:ENDPROC;
+:REGION Payload;{
+	"total": $nTotal$,
+	"note": "it's (not) code"
+}:ENDREGION;
+-- format --
+:PROCEDURE BuildPayload;
+	:PARAMETERS nTotal;
+	:RETURN StrTran(GetRegion("Payload"), "$nTotal$", LimsString(nTotal));
+:ENDPROC;
+
+:REGION Payload;{
+	"total": $nTotal$,
+	"note": "it's (not) code"
+}:ENDREGION;
+-- diagnostics --
+-- diagnostics [--strict --info] --

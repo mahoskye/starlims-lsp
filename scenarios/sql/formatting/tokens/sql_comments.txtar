@@ -1,0 +1,31 @@
+SQL comments inside embedded SQL: a -- line comment always ends its
+output line so the next token cannot be swallowed (issue #218), and a
+/* … */ block comment survives the reflow. The SQL lexer keeps the SSL
+comment rule out: the string holds no SSL ';'.
+-- input.ssl --
+:PROCEDURE Commented;
+	:PARAMETERS sSite;
+	:DECLARE aRows;
+	aRows := SQLExecute("select r.ruleid, r.name from rules r where r.active = 1 -- only live rules
+ and not exists (select m.ruleid from mappings m where m.ruleid = r.ruleid) /* unmapped */ and r.site = ?sSite?");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Commented;
+	:PARAMETERS sSite;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT r.ruleid, r.name
+	    FROM rules r
+	    WHERE r.active = 1 -- only live rules
+	      AND NOT EXISTS (
+	        SELECT m.ruleid
+	        FROM mappings m
+	        WHERE m.ruleid = r.ruleid
+	    ) /* unmapped */
+	      AND r.site = ?sSite?
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

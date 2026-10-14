@@ -1,0 +1,30 @@
+Procedure separation is normalized, not additive: butted procedures gain
+one blank line, and a three-blank-line gap shrinks to one
+(fmt.blank_lines_between_procs default 1, issue #33).
+-- input.ssl --
+:PROCEDURE First;
+:RETURN 1;
+:ENDPROC;
+:PROCEDURE Second;
+:RETURN 2;
+:ENDPROC;
+
+
+
+:PROCEDURE Third;
+:RETURN 3;
+:ENDPROC;
+-- format --
+:PROCEDURE First;
+	:RETURN 1;
+:ENDPROC;
+
+:PROCEDURE Second;
+	:RETURN 2;
+:ENDPROC;
+
+:PROCEDURE Third;
+	:RETURN 3;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

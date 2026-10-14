@@ -1,0 +1,26 @@
+Past 20 parameters the message cites the platform's own threshold
+(diag.max_params_warning, upper tier). The list is wrapped across lines
+with inline comments, which must not change the count.
+-- input.ssl --
+:PROCEDURE ImportRow;
+	:PARAMETERS vCol01, vCol02, vCol03, vCol04, vCol05, /* identity block;
+		vCol06, vCol07, vCol08, vCol09, vCol10,
+		vCol11, vCol12, vCol13, vCol14, vCol15, /* measurement block;
+		vCol16, vCol17, vCol18, vCol19, vCol20,
+		vCol21;
+	:RETURN {vCol01, vCol02, vCol03, vCol04, vCol05, vCol06, vCol07, vCol08, vCol09, vCol10, vCol11, vCol12, vCol13, vCol14, vCol15, vCol16, vCol17, vCol18, vCol19, vCol20, vCol21};
+:ENDPROC;
+-- format --
+:PROCEDURE ImportRow;
+	:PARAMETERS vCol01, vCol02, vCol03, vCol04, vCol05,  /* identity block;
+	            vCol06, vCol07, vCol08, vCol09, vCol10,
+	            vCol11, vCol12, vCol13, vCol14, vCol15,  /* measurement block;
+	            vCol16, vCol17, vCol18, vCol19, vCol20,
+	            vCol21;
+	:RETURN {vCol01, vCol02, vCol03, vCol04, vCol05, vCol06, vCol07, vCol08, vCol09,
+		vCol10, vCol11, vCol12, vCol13, vCol14, vCol15, vCol16, vCol17, vCol18, vCol19,
+		vCol20, vCol21};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:12-1:21 info max_params_warning: Procedure 'ImportRow' has 21 parameters; procedures with more than 20 parameters should be refactored

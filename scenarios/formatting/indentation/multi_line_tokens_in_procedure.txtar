@@ -1,0 +1,34 @@
+Known failure: range-stable — range formatting indents the interior lines of a multi-line string, comment, region body or code block inside a block, changing a string's value (feature.formatting A13; #325)
+Multi-line tokens inside a procedure: a string, a comment, a :REGION body
+and a code block keep their interior lines verbatim under full formatting
+(fmt.indent_style, fmt.code_block_literals, feature.formatting A3).
+-- input.ssl --
+:PROCEDURE Demo;
+:DECLARE sText, fnDouble;
+sText := "alpha
+beta";
+/* first line
+second line;
+:REGION Payload;
+SELECT a FROM t
+  WHERE b = 1
+:ENDREGION;
+fnDouble := {|nX| nX +
+2};
+:ENDPROC;
+-- format --
+:PROCEDURE Demo;
+	:DECLARE sText, fnDouble;
+	sText := "alpha
+beta";
+	/* first line
+second line;
+	:REGION Payload;
+SELECT a FROM t
+  WHERE b = 1
+	:ENDREGION;
+	fnDouble := {|nX| nX +
+2};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

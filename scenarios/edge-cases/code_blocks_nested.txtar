@@ -1,0 +1,25 @@
+Code-block literals nested inside calls and arrays, with parameters,
+an embedded array, and a block inside a block. Code-block bodies are
+expressions; the formatter must preserve them and spacing inside {| |}
+must stay stable across runs.
+Suspected issue: #326 — the formatter rewrites {|aRow| aRow[2]} as {|aRow| aRow [2]}, inserting a space before a subscript inside a single-level code-block body; fmt.code_block_literals says the body takes the same canonical forms as any statement, and a statement keeps aRow[2].
+-- input.ssl --
+:DECLARE aRows, fnPick, fnOuter, aOut;
+aRows := {{1, "a"}, {2, "b"}, {3, "c"}};
+fnPick := {|aRow| aRow[2]};
+fnOuter := {|aList| AEval(aList, {|aRow, nIdx| aRow[1] := aRow[1] * nIdx})};
+aOut := {};
+AEval(aRows, {|aRow| AAdd(aOut, Eval(fnPick, aRow))});
+Eval(fnOuter, aRows);
+:RETURN aOut;
+-- format --
+:DECLARE aRows, fnPick, fnOuter, aOut;
+aRows := {{1, "a"}, {2, "b"}, {3, "c"}};
+fnPick := {|aRow| aRow [2]};
+fnOuter := {|aList| AEval(aList, {|aRow, nIdx| aRow[1] := aRow[1] * nIdx})};
+aOut := {};
+AEval(aRows, {|aRow| AAdd(aOut, Eval(fnPick, aRow))});
+Eval(fnOuter, aRows);
+:RETURN aOut;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,25 @@
+Near miss for region_end_mismatch: nested region pairs closed
+innermost-first, with trailing prose on the outer endregion (prose does
+not participate in pairing), and an unclosed region at the end that
+folds to end of file by design. Clean (diag.region_end_mismatch "must NOT
+flag").
+-- input.ssl --
+/* region Setup;
+/* region Constants;
+:DECLARE nMaxRows;
+nMaxRows := 500;
+/* endregion;
+/* endregion Setup is done here;
+/* region Tail;
+nMaxRows := nMaxRows + 0;
+-- format --
+/* region Setup;
+/* region Constants;
+:DECLARE nMaxRows;
+nMaxRows := 500;
+/* endregion;
+/* endregion Setup is done here;
+/* region Tail;
+nMaxRows := nMaxRows + 0;
+-- diagnostics --
+-- diagnostics [--strict --info] --

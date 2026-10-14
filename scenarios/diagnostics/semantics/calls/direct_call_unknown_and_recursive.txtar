@@ -1,0 +1,27 @@
+Warning tier of diag.direct_procedure_call (issues #167, #304): an
+unknown bare callable may be a vendor built-in missing from the
+inventory, and a call to the enclosing procedure's own name may be
+recursion or a wrapper around a same-named built-in. Both messages name
+both readings.
+-- input.ssl --
+:PROCEDURE ReadSetting;
+	:PARAMETERS sKey;
+	:DECLARE sValue;
+	sValue := ReadSetting(Upper(sKey));
+	SetSiteClock(sValue);
+	:RETURN sValue;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadSetting;
+	:PARAMETERS sKey;
+	:DECLARE sValue;
+	sValue := ReadSetting(Upper(sKey));
+	SetSiteClock(sValue);
+	:RETURN sValue;
+:ENDPROC;
+-- diagnostics --
+4:12-4:23 warning direct_procedure_call: 'ReadSetting' is called inside its own procedure. If this is recursion, dispatch it via DoProc("ReadSetting", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
+5:2-5:14 warning direct_procedure_call: 'SetSiteClock' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+-- diagnostics [--strict --info] --
+4:12-4:23 warning direct_procedure_call: 'ReadSetting' is called inside its own procedure. If this is recursion, dispatch it via DoProc("ReadSetting", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
+5:2-5:14 warning direct_procedure_call: 'SetSiteClock' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.

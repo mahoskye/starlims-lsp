@@ -1,0 +1,29 @@
+Redeclaring a name in the same scope is a no-op (diag.redeclare_is_noop),
+including :DECLARE of a parameter; the message names the first
+declaration's line. Names compare case-insensitively.
+-- input.ssl --
+:DECLARE nRound;
+:DECLARE NROUND;
+:PROCEDURE Merge;
+	:PARAMETERS aLeft, aRight;
+	:DECLARE aMerged, aRight;
+	aMerged := aLeft;
+	:RETURN aMerged;
+:ENDPROC;
+nRound := 1;
+-- format --
+:DECLARE nRound;
+:DECLARE NROUND;
+:PROCEDURE Merge;
+	:PARAMETERS aLeft, aRight;
+	:DECLARE aMerged, aRight;
+	aMerged := aLeft;
+	:RETURN aMerged;
+:ENDPROC;
+nRound := 1;
+-- diagnostics --
+2:10-2:16 hint redeclare_is_noop: Variable 'NROUND' is already declared (first declared at line 1). Re-declaration is silently ignored at runtime.
+5:20-5:26 hint redeclare_is_noop: Variable 'aRight' is already declared (first declared at line 4). Re-declaration is silently ignored at runtime.
+-- diagnostics [--strict --info] --
+2:10-2:16 hint redeclare_is_noop: Variable 'NROUND' is already declared (first declared at line 1). Re-declaration is silently ignored at runtime.
+5:20-5:26 hint redeclare_is_noop: Variable 'aRight' is already declared (first declared at line 4). Re-declaration is silently ignored at runtime.

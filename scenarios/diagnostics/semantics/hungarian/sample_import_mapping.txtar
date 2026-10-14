@@ -1,0 +1,42 @@
+A realistic import mapper on a codebase that mostly follows the
+convention: two unprefixed names (rowData, Total) for --hungarian, and
+prefixes contradicted by their values (a string into nRow, a number into
+sCode) for --hungarian-types. A loop counter and a constant are exempt.
+-- input.ssl --
+:PROCEDURE MapImport;
+	:PARAMETERS aSource, sDelimiter;
+	:DECLARE rowData, nRow, sCode, Total, i, MAX_COLS;
+	MAX_COLS := 12;
+	Total := 0;
+	:FOR i := 1 :TO Len(aSource);
+		rowData := BuildArray(aSource[i], sDelimiter);
+		nRow := LimsString(i);
+		sCode := Len(rowData);
+		Total := Total + Min(Len(rowData), MAX_COLS);
+	:NEXT;
+	:RETURN {nRow, sCode, Total};
+:ENDPROC;
+-- diagnostics [--hungarian] --
+3:11-3:18 warning hungarian_notation: Variable 'rowData' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+3:33-3:38 warning hungarian_notation: Variable 'Total' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+8:3-8:24 warning hungarian_type_mismatch: 'nRow' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
+9:3-9:24 warning hungarian_type_mismatch: 'sCode' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
+-- diagnostics [--hungarian-types] --
+8:3-8:24 warning hungarian_type_mismatch: 'nRow' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
+9:3-9:24 warning hungarian_type_mismatch: 'sCode' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
+-- format --
+:PROCEDURE MapImport;
+	:PARAMETERS aSource, sDelimiter;
+	:DECLARE rowData, nRow, sCode, Total, i, MAX_COLS;
+	MAX_COLS := 12;
+	Total := 0;
+	:FOR i := 1 :TO Len(aSource);
+		rowData := BuildArray(aSource[i], sDelimiter);
+		nRow := LimsString(i);
+		sCode := Len(rowData);
+		Total := Total + Min(Len(rowData), MAX_COLS);
+	:NEXT;
+	:RETURN {nRow, sCode, Total};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

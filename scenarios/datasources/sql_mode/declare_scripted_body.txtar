@@ -1,0 +1,19 @@
+A SQL body that DECLAREs its own variables is scripted SQL where @name may
+be a local, so datasource_undeclared_placeholder bows out entirely
+(feature.diagnostics_pipeline A21). Uppercase DECLARE without a leading
+colon is SQL, not the SSL :DECLARE keyword, so the document stays SQL.
+Statement separators are avoided so datasource_sql_semicolon stays out.
+-- input.ds --
+DECLARE @nLimit INT
+SET @nLimit = 50
+SELECT TOP (@nLimit) audit_id, audit_note
+FROM audit_entry
+WHERE audit_note LIKE @sPattern
+-- format --
+DECLARE @nLimit INT
+SET @nLimit = 50
+SELECT TOP (@nLimit) audit_id, audit_note
+FROM audit_entry
+WHERE audit_note LIKE @sPattern
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,28 @@
+An :IF opened at script level does not contain an :ELSE inside a
+procedure: the owning-block search stops at the enclosing :PROCEDURE,
+because a procedure compiles on its own. The :ELSE is stray even though an
+:IF is open further out (diag.stray_block_keyword, fourth Flags fence).
+-- input.ssl --
+:DECLARE bVerbose;
+bVerbose := .T.;
+:IF bVerbose;
+:PROCEDURE LogLine;
+	:PARAMETERS sText;
+:ELSE;
+	sText := "";
+:ENDPROC;
+:ENDIF;
+-- format --
+:DECLARE bVerbose;
+bVerbose := .T.;
+:IF bVerbose;
+	:PROCEDURE LogLine;
+		:PARAMETERS sText;
+	:ELSE;
+		sText := "";
+	:ENDPROC;
+:ENDIF;
+-- diagnostics --
+6:1-6:6 error stray_block_keyword: ':ELSE' is outside any ':IF' block
+-- diagnostics [--strict --info] --
+6:1-6:6 error stray_block_keyword: ':ELSE' is outside any ':IF' block

@@ -1,0 +1,34 @@
+Text sql_legacy_outer_join must not take for the (+) marker
+(diag.sql_legacy_outer_join Does not flag): an ANSI LEFT JOIN, the
+arithmetic (qty + 1), a '(+)' character literal, and (+) inside a SQL
+comment.
+-- input.ssl --
+:PROCEDURE Outer;
+	:PARAMETERS nOrd;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT o.ordno, r.result_value FROM orders o LEFT JOIN ordresult r ON o.ordno = r.ordno");
+	aRows := SQLExecute("SELECT (qty + 1) AS nextqty FROM orders WHERE ordno = ?nOrd?");
+	aRows := SQLExecute("SELECT ordno FROM orders WHERE note = '(+)' -- no (+) here
+");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Outer;
+	:PARAMETERS nOrd;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT o.ordno, r.result_value
+	    FROM orders o
+	    LEFT JOIN ordresult r
+	      ON o.ordno = r.ordno
+	");
+	aRows := SQLExecute("SELECT (qty + 1) AS nextqty FROM orders WHERE ordno = ?nOrd?");
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE note = '(+)' -- no (+) here
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

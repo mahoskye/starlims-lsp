@@ -1,0 +1,25 @@
+A subscript is never split: the break moves to the comma before the
+argument group containing `[nChildIndex]`, and the nested call stays
+whole (fmt.max_line_length "Wrapping never happens: inside [...]
+subscripts").
+-- input.ssl --
+:PROCEDURE BuildChild;
+:PARAMETERS oParentObject, nChildIndex, sConfigurationKey;
+:DECLARE vRes;
+vRes := CreateUdObject("Common.ChildRecord", {oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+vRes := DoProc("Wrapper", {aLookupTable[DoProc("ResolveIndex", {sConfigurationKey, nChildIndex})]});
+:RETURN vRes;
+:ENDPROC;
+-- format --
+:PROCEDURE BuildChild;
+	:PARAMETERS oParentObject, nChildIndex, sConfigurationKey;
+	:DECLARE vRes;
+	vRes := CreateUdObject("Common.ChildRecord",
+		{oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+	vRes := DoProc("Wrapper",
+		{aLookupTable[DoProc("ResolveIndex", {sConfigurationKey, nChildIndex})]});
+	:RETURN vRes;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+5:28-5:40 warning undeclared_variable: Variable 'aLookupTable' is not declared

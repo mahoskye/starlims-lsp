@@ -1,0 +1,29 @@
+Near miss for step_spacing: with an identifier limit (`nMax:STEP 2`) the
+glued :STEP parses as member access on the limit, so step_spacing must
+NOT fire and unexpected_token reports the header with the hint
+"(missing space before ':STEP'?)". The :FOR block still opens, so no
+block-pairing noise follows (diag.step_spacing, diag.unexpected_token).
+-- input.ssl --
+:PROCEDURE OddTotal;
+	:PARAMETERS nMax;
+	:DECLARE nIdx, nTotal;
+	nTotal := 0;
+	:FOR nIdx := 1 :TO nMax:STEP 2;
+		nTotal := nTotal + nIdx;
+	:NEXT;
+	:RETURN nTotal;
+:ENDPROC;
+-- format --
+:PROCEDURE OddTotal;
+	:PARAMETERS nMax;
+	:DECLARE nIdx, nTotal;
+	nTotal := 0;
+	:FOR nIdx := 1 :TO nMax:STEP 2;
+		nTotal := nTotal + nIdx;
+	:NEXT;
+	:RETURN nTotal;
+:ENDPROC;
+-- diagnostics --
+5:31-5:32 error unexpected_token: Unexpected number '2' in ':FOR' header - expected ':STEP' or ';' (missing space before ':STEP'?)
+-- diagnostics [--strict --info] --
+5:31-5:32 error unexpected_token: Unexpected number '2' in ':FOR' header - expected ':STEP' or ';' (missing space before ':STEP'?)

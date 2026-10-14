@@ -1,0 +1,20 @@
+Near-misses for diag.declare_initializer: := inside a string literal or
+a comment, and assignments on the lines after the :DECLARE.
+-- input.ssl --
+:PROCEDURE DescribeRule;
+	:DECLARE sRule, nLimit;
+	sRule := "nLimit := 5";
+	/* the rule text above reads nLimit := 5;
+	nLimit := 5;
+	:RETURN sRule + LimsString(nLimit);
+:ENDPROC;
+-- format --
+:PROCEDURE DescribeRule;
+	:DECLARE sRule, nLimit;
+	sRule := "nLimit := 5";
+	/* the rule text above reads nLimit := 5;
+	nLimit := 5;
+	:RETURN sRule + LimsString(nLimit);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

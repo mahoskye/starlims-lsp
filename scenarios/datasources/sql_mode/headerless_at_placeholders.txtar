@@ -1,0 +1,20 @@
+In the whole-document SQL shape there is no :PARAMETERS header, so every
+@name placeholder is undeclared and warns (datasource_undeclared_placeholder,
+feature.diagnostics_pipeline A21), ranged over the full @name span. The
+SQL itself gets no SSL diagnostics and no formatting.
+-- input.ds --
+select shipment_id, carrier_code
+from shipment
+where carrier_code = @sCarrier
+  and ship_date >= @dFrom
+-- format --
+select shipment_id, carrier_code
+from shipment
+where carrier_code = @sCarrier
+  and ship_date >= @dFrom
+-- diagnostics --
+3:22-3:31 warning datasource_undeclared_placeholder: SQL data-source placeholder '@sCarrier' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.
+4:20-4:26 warning datasource_undeclared_placeholder: SQL data-source placeholder '@dFrom' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.
+-- diagnostics [--strict --info] --
+3:22-3:31 warning datasource_undeclared_placeholder: SQL data-source placeholder '@sCarrier' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.
+4:20-4:26 warning datasource_undeclared_placeholder: SQL data-source placeholder '@dFrom' has no matching :PARAMETERS declaration — it is not substituted and fails when the query executes.

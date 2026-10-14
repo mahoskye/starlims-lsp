@@ -1,0 +1,22 @@
+Boundary near-misses for diag.identifier_too_long: an effective name of
+exactly 20 characters after stripping the s prefix (raw length 21), and a
+procedure name of exactly 30 characters. A name whose character after
+the would-be prefix is lowercase (notesForTheShiftHandover) is measured
+whole: 24 characters, so it fires.
+-- input.ssl --
+:PROCEDURE ArchiveCompletedWorkOrderBatch;
+	:DECLARE sAbcdefghijklmnopqrst, notesForTheShiftHandover;
+	sAbcdefghijklmnopqrst := "x";
+	notesForTheShiftHandover := sAbcdefghijklmnopqrst;
+	:RETURN notesForTheShiftHandover;
+:ENDPROC;
+-- format --
+:PROCEDURE ArchiveCompletedWorkOrderBatch;
+	:DECLARE sAbcdefghijklmnopqrst, notesForTheShiftHandover;
+	sAbcdefghijklmnopqrst := "x";
+	notesForTheShiftHandover := sAbcdefghijklmnopqrst;
+	:RETURN notesForTheShiftHandover;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+2:34-2:58 info identifier_too_long: Variable name 'notesForTheShiftHandover' exceeds 20-character limit (effective length 24 excluding prefix)

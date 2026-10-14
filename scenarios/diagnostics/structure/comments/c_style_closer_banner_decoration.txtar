@@ -1,0 +1,16 @@
+Near miss for comment_swallows_code: a `*/` followed only by banner
+decoration (`*`, `=`, `-`) before the terminator does not hide code. The
+comment ends at the decoration line's `;` (diag.comment_swallows_code
+second bullet).
+-- input.ssl --
+/* Section: totals */
+=========================================;
+:DECLARE nCount;
+nCount := 0;
+-- format --
+/* Section: totals */
+=========================================;
+:DECLARE nCount;
+nCount := 0;
+-- diagnostics --
+-- diagnostics [--strict --info] --

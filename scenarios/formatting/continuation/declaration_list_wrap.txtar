@@ -1,0 +1,36 @@
+Declaration lists the author wrapped after a trailing comma (:DECLARE,
+:PARAMETERS, :PUBLIC): the trailing comma keeps the statement open and
+the continuation keeps its indent across passes (fmt.max_line_length
+issue #218 note on wrapped :DECLARE lists; fmt.indent_style). Records
+where continuation items land.
+-- input.ssl --
+:PARAMETERS sSampleId, sTestCode,
+sAnalyst, dRunDate;
+:DEFAULT sAnalyst, "";
+:PUBLIC gnSessionCount,
+gsSessionUser;
+:DECLARE sStatus, nAttempt,
+         bDone,
+  aRows;
+sStatus := "";
+-- format --
+:PARAMETERS sSampleId, sTestCode,
+            sAnalyst, dRunDate;
+:DEFAULT sAnalyst, "";
+:PUBLIC gnSessionCount,
+        gsSessionUser;
+:DECLARE sStatus, nAttempt,
+         bDone,
+         aRows;
+sStatus := "";
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:13-1:22 hint unused_variable: Variable 'sSampleId' is declared but never used
+1:24-1:33 hint unused_variable: Variable 'sTestCode' is declared but never used
+2:11-2:19 hint unused_variable: Variable 'dRunDate' is declared but never used
+4:1-4:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+4:9-4:23 hint unused_variable: Variable 'gnSessionCount' is declared but never used
+5:1-5:14 hint unused_variable: Variable 'gsSessionUser' is declared but never used
+6:19-6:27 hint unused_variable: Variable 'nAttempt' is declared but never used
+7:10-7:15 hint unused_variable: Variable 'bDone' is declared but never used
+8:3-8:8 hint unused_variable: Variable 'aRows' is declared but never used

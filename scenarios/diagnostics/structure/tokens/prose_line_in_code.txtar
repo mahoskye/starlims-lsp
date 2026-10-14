@@ -1,0 +1,33 @@
+A line of plain prose pasted among statements (no comment marker). The
+apostrophe in "doesn't" opens a string literal that runs to end of file:
+unterminated_string on the `'`, and nothing after the opener is checked.
+The statement's parse already fails at the second word, before the
+string, so unexpected_token still reports that token; it defers only
+when the token it stops on is the unterminated string itself
+(diag.unterminated_string second Flags fence, diag.unexpected_token).
+-- input.ssl --
+:DECLARE nCount;
+nCount := 1;
+This line was pasted from the ticket, but it doesn't belong here.
+nCount := 2;
+-- format --
+:DECLARE nCount;
+nCount := 1;
+This line was pasted from the ticket, but it doesn't belong here.
+nCount := 2;
+-- diagnostics --
+3:6-3:10 error unexpected_token: Unexpected identifier 'line' - expected an operator or ';'
+3:51-3:52 error unterminated_string: Unterminated string literal - expected a closing ''' before end of file
+-- diagnostics [--strict --info] --
+3:1-3:5 warning undeclared_variable: Variable 'This' is not declared
+3:6-3:10 warning undeclared_variable: Variable 'line' is not declared
+3:6-3:10 error unexpected_token: Unexpected identifier 'line' - expected an operator or ';'
+3:11-3:14 warning undeclared_variable: Variable 'was' is not declared
+3:15-3:21 warning undeclared_variable: Variable 'pasted' is not declared
+3:22-3:26 warning undeclared_variable: Variable 'from' is not declared
+3:27-3:30 warning undeclared_variable: Variable 'the' is not declared
+3:31-3:37 warning undeclared_variable: Variable 'ticket' is not declared
+3:39-3:42 warning undeclared_variable: Variable 'but' is not declared
+3:43-3:45 warning undeclared_variable: Variable 'it' is not declared
+3:46-3:51 warning undeclared_variable: Variable 'doesn' is not declared
+3:51-3:52 error unterminated_string: Unterminated string literal - expected a closing ''' before end of file

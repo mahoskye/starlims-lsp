@@ -1,0 +1,27 @@
+Near miss for keyword_uppercase and unknown_keyword: keyword names used
+without a leading colon (`next`, `case`, `step` as variable names) are
+identifiers, and member access on an object (`oCursor:Next()`,
+`oCursor:Reset()`) never forms a keyword token, even when the method is
+named like a keyword. Clean.
+-- input.ssl --
+:PROCEDURE WalkCursor;
+	:PARAMETERS oCursor;
+	:DECLARE next, case, step;
+	step := 1;
+	case := "open";
+	next := oCursor:Next();
+	oCursor:Reset();
+	:RETURN next;
+:ENDPROC;
+-- format --
+:PROCEDURE WalkCursor;
+	:PARAMETERS oCursor;
+	:DECLARE next, case, step;
+	step := 1;
+	case := "open";
+	next := oCursor:Next();
+	oCursor:Reset();
+	:RETURN next;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

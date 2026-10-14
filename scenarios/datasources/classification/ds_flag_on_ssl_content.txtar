@@ -1,0 +1,23 @@
+The `--ds` flag on a .ssl-named input whose content carries SSL markers:
+classification is still by content, so it is an SSL-mode data source and
+the data-source rules apply (no_default_statements_in_datasource on the
+:DEFAULT line, plus datasource_default_required on the defaultless name).
+Without `--ds` the same file is an ordinary script and the :DEFAULT layout
+is correct.
+-- input.ssl --
+:PARAMETERS sCode;
+:DEFAULT sCode, "NONE";
+:RETURN Upper(sCode);
+-- format [--ds] --
+:PARAMETERS sCode;
+:DEFAULT sCode, "NONE";
+:RETURN Upper(sCode);
+-- diagnostics [--ds] --
+1:13-1:18 error datasource_default_required: Data source parameter 'sCode' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+2:1-2:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements
+-- format --
+:PARAMETERS sCode;
+:DEFAULT sCode, "NONE";
+:RETURN Upper(sCode);
+-- diagnostics --
+-- diagnostics [--strict --info] --

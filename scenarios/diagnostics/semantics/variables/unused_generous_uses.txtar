@@ -1,0 +1,28 @@
+The generous notion of use: a ?name? SQLExecute marker (issue #270), a
+property marker using its base variable, and a same-named member on
+another object all count as uses (diag.unused_variable near-miss).
+-- input.ssl --
+:PROCEDURE LoadShipment;
+	:PARAMETERS sShipId, oCarrier;
+	:DECLARE aRows, nWeight, oManifest;
+	oManifest := CreateUdObject();
+	aRows := SQLExecute("SELECT id, weight FROM shipments WHERE id = ?sShipId? AND carrier = ?oCarrier:code?");
+	oManifest:nWeight := Len(aRows);
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE LoadShipment;
+	:PARAMETERS sShipId, oCarrier;
+	:DECLARE aRows, nWeight, oManifest;
+	oManifest := CreateUdObject();
+	aRows := SQLExecute("
+	    SELECT id, weight
+	    FROM shipments
+	    WHERE id = ?sShipId?
+	      AND carrier = ?oCarrier:code?
+	");
+	oManifest:nWeight := Len(aRows);
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

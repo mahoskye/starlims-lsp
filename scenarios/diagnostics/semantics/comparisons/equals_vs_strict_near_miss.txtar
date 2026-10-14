@@ -1,0 +1,30 @@
+Near-misses for diag.equals_vs_strict_equals: !=, # and <> are exact
+inequality (issues #14, #260; # and <> are still not_preferred_operator's
+info finding), == is exact, = between numbers, and = between two
+string-typed names (no literal, so no evidence).
+-- input.ssl --
+:PROCEDURE StatusIs;
+	:PARAMETERS sStatus, sOther, nCode;
+	:DECLARE bHit;
+	bHit := sStatus != "Log";
+	bHit := bHit .AND. sStatus # "Log" .AND. sStatus <> "Log";
+	bHit := bHit .OR. sStatus == "Done";
+	bHit := bHit .OR. nCode = 3;
+	bHit := bHit .OR. sStatus = sOther;
+	:RETURN bHit;
+:ENDPROC;
+-- format --
+:PROCEDURE StatusIs;
+	:PARAMETERS sStatus, sOther, nCode;
+	:DECLARE bHit;
+	bHit := sStatus != "Log";
+	bHit := bHit .AND. sStatus # "Log" .AND. sStatus <> "Log";
+	bHit := bHit .OR. sStatus == "Done";
+	bHit := bHit .OR. nCode = 3;
+	bHit := bHit .OR. sStatus = sOther;
+	:RETURN bHit;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+5:29-5:30 info not_preferred_operator: Use '!=' instead of '#' for inequality
+5:51-5:53 info not_preferred_operator: Use '!=' instead of '<>' for inequality

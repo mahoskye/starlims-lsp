@@ -1,0 +1,40 @@
+Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
+An :IF condition the author split before `.AND.` / `.OR.`: each
+continuation sits one level past the :IF line, the same column as the
+body, the leading operator telling them apart (fmt.indent_style; style
+guide continuation_line_breaks). A :WHILE condition behaves the same.
+-- input.ssl --
+:PROCEDURE CheckLimits;
+:PARAMETERS nLow, nHigh, sMode;
+:DECLARE bOk;
+bOk := .F.;
+:IF nLow > 1
+.AND. nHigh < 50
+.AND. sMode == "STRICT";
+bOk := .T.;
+:ENDIF;
+:WHILE nLow < nHigh
+  .OR. bOk;
+nLow += 1;
+:ENDWHILE;
+:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckLimits;
+	:PARAMETERS nLow, nHigh, sMode;
+	:DECLARE bOk;
+	bOk := .F.;
+	:IF nLow > 1
+		.AND. nHigh < 50
+		.AND. sMode == "STRICT";
+		bOk := .T.;
+	:ENDIF;
+
+	:WHILE nLow < nHigh
+		.OR. bOk;
+		nLow += 1;
+	:ENDWHILE;
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

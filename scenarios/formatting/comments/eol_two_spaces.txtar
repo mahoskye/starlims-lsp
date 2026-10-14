@@ -1,0 +1,22 @@
+End-of-line comments stay on their statement's line, separated by
+exactly two spaces whatever the source spacing (none, one, many, a tab),
+and are not separately indented (fmt.indent_style). The comment text
+itself is byte-identical (feature.formatting A3).
+-- input.ssl --
+:PROCEDURE Demo;
+:DECLARE nA, nB, nC;
+nA := 1;/*glued;
+nB := 2; /* one space;
+nC := 3;                     /* far away   with   inner   spacing;
+:RETURN nA + nB + nC;	/* tab separated;
+:ENDPROC;
+-- format --
+:PROCEDURE Demo;
+	:DECLARE nA, nB, nC;
+	nA := 1;  /*glued;
+	nB := 2;  /* one space;
+	nC := 3;  /* far away   with   inner   spacing;
+	:RETURN nA + nB + nC;  /* tab separated;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

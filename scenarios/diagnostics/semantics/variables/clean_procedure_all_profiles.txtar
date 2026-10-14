@@ -1,0 +1,62 @@
+A procedure written to the conventions (AGENTS.md section 5 template):
+parameters, defaults, declarations, TRY/CATCH, SQLExecute markers,
+1-based loops, == comparisons, DoProc dispatch. It must validate clean
+under every profile including the opt-in Hungarian checks — a false
+positive on idiomatic code is a regression.
+-- input.ssl --
+/*
+ * Procedure: CountOpenLots
+ * Returns: a short summary string
+;
+:PROCEDURE CountOpenLots;
+	:PARAMETERS sSite, nLimit;
+	:DEFAULT sSite, "MAIN";
+	:DEFAULT nLimit, 50;
+	:DECLARE sResult, nCount, aRows, i, oErr;
+	sResult := "";
+	nCount := 0;
+	:TRY;
+		aRows := SQLExecute("SELECT lot_id, state FROM lots WHERE site = ?sSite?");
+		:FOR i := 1 :TO Min(Len(aRows), nLimit);
+			:IF aRows[i][2] == "OPEN" .AND. .NOT. Empty(aRows[i][1]);
+				nCount += 1;
+			:ENDIF;
+		:NEXT;
+		sResult := "Open lots: " + LimsString(nCount);
+	:CATCH;
+		oErr := GetLastSSLError();
+		sResult := "Error: " + oErr:Description;
+		DoProc("ReportFailure", {sSite, sResult});
+	:ENDTRY;
+	:RETURN sResult;
+:ENDPROC;
+-- diagnostics [--hungarian] --
+-- format --
+/*
+ * Procedure: CountOpenLots
+ * Returns: a short summary string
+;
+:PROCEDURE CountOpenLots;
+	:PARAMETERS sSite, nLimit;
+	:DEFAULT sSite, "MAIN";
+	:DEFAULT nLimit, 50;
+	:DECLARE sResult, nCount, aRows, i, oErr;
+	sResult := "";
+	nCount := 0;
+	:TRY;
+		aRows := SQLExecute("SELECT lot_id, state FROM lots WHERE site = ?sSite?");
+		:FOR i := 1 :TO Min(Len(aRows), nLimit);
+			:IF aRows[i][2] == "OPEN" .AND. .NOT. Empty(aRows[i][1]);
+				nCount += 1;
+			:ENDIF;
+		:NEXT;
+		sResult := "Open lots: " + LimsString(nCount);
+	:CATCH;
+		oErr := GetLastSSLError();
+		sResult := "Error: " + oErr:Description;
+		DoProc("ReportFailure", {sSite, sResult});
+	:ENDTRY;
+	:RETURN sResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

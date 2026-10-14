@@ -1,0 +1,30 @@
+Declarations are read as whole statements, so a comma list broken across
+lines and a bare :DECLARE with its names on later lines still declare
+every name (diag.undeclared_variable near-miss). Nothing fires under any
+profile; every name is also used, so diag.unused_variable stays quiet.
+(A leading-comma continuation, `, sSuffix;` on its own line, was dropped
+from this input: range-formatting the line before it appends a `;`.)
+-- input.ssl --
+:PROCEDURE JoinLabels;
+	:PARAMETERS sPrefix, sStem,
+		sSuffix;
+	:DECLARE
+		sJoined,
+		sSeparator;
+	sSeparator := "-";
+	sJoined := sPrefix + sSeparator + sStem + sSeparator + sSuffix;
+	:RETURN sJoined;
+:ENDPROC;
+-- format --
+:PROCEDURE JoinLabels;
+	:PARAMETERS sPrefix, sStem,
+	            sSuffix;
+	:DECLARE
+	sJoined,
+		sSeparator;
+	sSeparator := "-";
+	sJoined := sPrefix + sSeparator + sStem + sSeparator + sSuffix;
+	:RETURN sJoined;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

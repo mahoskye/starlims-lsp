@@ -1,0 +1,38 @@
+Indentation mixing tabs and spaces on different lines and within one
+line. The formatter normalizes every line to the configured style (tabs
+by default, spaces in the variant).
+-- input.ssl --
+:PROCEDURE Mixed;
+    :PARAMETERS nValue;
+	:DECLARE sOut;
+  	  :IF nValue > 0;
+	        sOut := "positive";
+    	:ELSE;
+		    sOut := "other";
+ 	:ENDIF;
+        :RETURN sOut;
+:ENDPROC;
+-- format [--indent-style space --indent-size 4] --
+:PROCEDURE Mixed;
+    :PARAMETERS nValue;
+    :DECLARE sOut;
+    :IF nValue > 0;
+        sOut := "positive";
+    :ELSE;
+        sOut := "other";
+    :ENDIF;
+    :RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Mixed;
+	:PARAMETERS nValue;
+	:DECLARE sOut;
+	:IF nValue > 0;
+		sOut := "positive";
+	:ELSE;
+		sOut := "other";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

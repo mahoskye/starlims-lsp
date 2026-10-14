@@ -1,0 +1,186 @@
+A complete request-dispatch script written to AGENTS.md conventions: a
+BEGINCASE on an action code that routes to same-file procedures through
+DoProc, to an external script through ExecFunction, and builds a reply
+with sFmt:Format; GetDataSet with a positional value array, LSearch with
+a default, and SSLRegex{} validation. Expected nearly clean under every
+profile.
+-- input.ssl --
+/*
+ * Script: RequestDispatcher
+ * Description: Routes a web request action to the procedure that serves it
+ * Parameters:
+ *   sAction - the action code
+ *   aArgs - the action arguments
+ * Returns: {bSuccess, vPayload}
+;
+:PARAMETERS sAction, aArgs;
+:DEFAULT sAction, "";
+:DEFAULT aArgs, {};
+:DECLARE vPayload, bSuccess, oErr;
+
+bSuccess := .T.;
+:TRY;
+	:BEGINCASE;
+	:CASE sAction == "PING";
+		vPayload := "pong";
+		:EXITCASE;
+	:CASE sAction == "SAMPLE";
+		vPayload := DoProc("SampleXml", {aArgs});
+		:EXITCASE;
+	:CASE sAction == "OWNER";
+		vPayload := DoProc("OwnerName", {aArgs});
+		:EXITCASE;
+	:CASE sAction == "AUDIT";
+		vPayload := ExecFunction("Lab.AuditTrail.Recent", {aArgs});
+		:EXITCASE;
+	:OTHERWISE;
+		bSuccess := .F.;
+		vPayload := DoProc("UnknownAction", {sAction});
+		:EXITCASE;
+	:ENDCASE;
+:CATCH;
+	oErr := GetLastSSLError();
+	bSuccess := .F.;
+	vPayload := oErr:Description;
+:ENDTRY;
+
+:RETURN {bSuccess, vPayload};
+
+/*
+ * Procedure: SampleXml
+ * Parameters:
+ *   aArgs - {sSampleId}
+ * Returns: the sample row as dataset XML
+;
+:PROCEDURE SampleXml;
+	:PARAMETERS aArgs;
+	:DECLARE sSampleId, oPattern;
+	sSampleId := AllTrim(aArgs[1]);
+	oPattern := SSLRegex{"^[A-Z]{2}[0-9]{6}$"};
+	:IF .NOT. oPattern:IsMatch(sSampleId);
+		RaiseError("Malformed sample id: " + sSampleId);
+	:ENDIF;
+	:RETURN GetDataSet("SELECT SampleId, Status, LoggedOn FROM LabSamples WHERE SampleId = ?", {sSampleId});
+:ENDPROC;
+
+/*
+ * Procedure: OwnerName
+ * Parameters:
+ *   aArgs - {sSampleId}
+ * Returns: the owning user's display name, or "Unassigned"
+;
+:PROCEDURE OwnerName;
+	:PARAMETERS aArgs;
+	:DECLARE sSampleId;
+	sSampleId := AllTrim(aArgs[1]);
+	:RETURN LSearch("SELECT u.DisplayName FROM LabSamples s JOIN LabUsers u ON u.UserId = s.OwnerId WHERE s.SampleId = ?", "Unassigned",, {sSampleId});
+:ENDPROC;
+
+/*
+ * Procedure: UnknownAction
+ * Parameters:
+ *   sAction - the action code that matched nothing
+ * Returns: an explanation for the caller
+;
+:PROCEDURE UnknownAction;
+	:PARAMETERS sAction;
+	:DECLARE sFmt;
+	sFmt := "Unknown action '{0}'";
+	:RETURN sFmt:Format({sAction});
+:ENDPROC;
+-- format --
+/*
+ * Script: RequestDispatcher
+ * Description: Routes a web request action to the procedure that serves it
+ * Parameters:
+ *   sAction - the action code
+ *   aArgs - the action arguments
+ * Returns: {bSuccess, vPayload}
+;
+:PARAMETERS sAction, aArgs;
+:DEFAULT sAction, "";
+:DEFAULT aArgs, {};
+:DECLARE vPayload, bSuccess, oErr;
+
+bSuccess := .T.;
+:TRY;
+	:BEGINCASE;
+	:CASE sAction == "PING";
+		vPayload := "pong";
+		:EXITCASE;
+	:CASE sAction == "SAMPLE";
+		vPayload := DoProc("SampleXml", {aArgs});
+		:EXITCASE;
+	:CASE sAction == "OWNER";
+		vPayload := DoProc("OwnerName", {aArgs});
+		:EXITCASE;
+	:CASE sAction == "AUDIT";
+		vPayload := ExecFunction("Lab.AuditTrail.Recent", {aArgs});
+		:EXITCASE;
+	:OTHERWISE;
+		bSuccess := .F.;
+		vPayload := DoProc("UnknownAction", {sAction});
+		:EXITCASE;
+	:ENDCASE;
+:CATCH;
+	oErr := GetLastSSLError();
+	bSuccess := .F.;
+	vPayload := oErr:Description;
+:ENDTRY;
+
+:RETURN {bSuccess, vPayload};
+
+/*
+ * Procedure: SampleXml
+ * Parameters:
+ *   aArgs - {sSampleId}
+ * Returns: the sample row as dataset XML
+;
+:PROCEDURE SampleXml;
+	:PARAMETERS aArgs;
+	:DECLARE sSampleId, oPattern;
+	sSampleId := AllTrim(aArgs[1]);
+	oPattern := SSLRegex{"^[A-Z]{2}[0-9]{6}$"};
+	:IF .NOT. oPattern:IsMatch(sSampleId);
+		RaiseError("Malformed sample id: " + sSampleId);
+	:ENDIF;
+	:RETURN GetDataSet("
+	    SELECT SampleId, Status, LoggedOn
+	    FROM LabSamples
+	    WHERE SampleId = ?
+	", {sSampleId});
+:ENDPROC;
+
+/*
+ * Procedure: OwnerName
+ * Parameters:
+ *   aArgs - {sSampleId}
+ * Returns: the owning user's display name, or "Unassigned"
+;
+:PROCEDURE OwnerName;
+	:PARAMETERS aArgs;
+	:DECLARE sSampleId;
+	sSampleId := AllTrim(aArgs[1]);
+	:RETURN LSearch("
+	    SELECT u.DisplayName
+	    FROM LabSamples s
+	    JOIN LabUsers u
+	      ON u.UserId = s.OwnerId
+	    WHERE s.SampleId = ?
+	", "Unassigned",, {sSampleId});
+:ENDPROC;
+
+/*
+ * Procedure: UnknownAction
+ * Parameters:
+ *   sAction - the action code that matched nothing
+ * Returns: an explanation for the caller
+;
+:PROCEDURE UnknownAction;
+	:PARAMETERS sAction;
+	:DECLARE sFmt;
+	sFmt := "Unknown action '{0}'";
+	:RETURN sFmt:Format({sAction});
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,35 @@
+Three statements each missing a required piece: an empty right-hand side
+(`nTotal := ;`, the `;` is unexpected), an empty :IF condition, and the
+non-existent `**=` compound assignment (issue #260). One unexpected_token
+per statement, no cascade; the :IF block still pairs
+(diag.unexpected_token).
+-- input.ssl --
+:PROCEDURE BrokenMath;
+	:DECLARE nTotal, nBase;
+	nBase := 2;
+	nTotal := ;
+	:IF;
+		nTotal := 1;
+	:ENDIF;
+	nBase **= 3;
+	:RETURN nTotal;
+:ENDPROC;
+-- format --
+:PROCEDURE BrokenMath;
+	:DECLARE nTotal, nBase;
+	nBase := 2;
+	nTotal :=;
+	:IF;
+		nTotal := 1;
+	:ENDIF;
+	nBase ** = 3;
+	:RETURN nTotal;
+:ENDPROC;
+-- diagnostics --
+4:12-4:13 error unexpected_token: Unexpected ';' - expected an expression
+5:5-5:6 error unexpected_token: Unexpected ';' - expected a condition
+8:10-8:11 error unexpected_token: Unexpected operator '=' - expected an expression
+-- diagnostics [--strict --info] --
+4:12-4:13 error unexpected_token: Unexpected ';' - expected an expression
+5:5-5:6 error unexpected_token: Unexpected ';' - expected a condition
+8:10-8:11 error unexpected_token: Unexpected operator '=' - expected an expression

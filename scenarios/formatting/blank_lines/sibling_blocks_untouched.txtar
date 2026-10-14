@@ -1,0 +1,44 @@
+No blank line is inserted where fmt.blank_line_between_blocks says not
+to: siblings already separated (one existing blank line stays one),
+a block followed by a statement or preceded by one, a closer followed by
+its parent's closer, and a nested opener right after its parent opener.
+-- input.ssl --
+:PROCEDURE Untouched;
+:PARAMETERS nValue;
+:DECLARE sOut;
+:IF nValue > 0;
+:IF nValue > 5;
+sOut := "big";
+:ENDIF;
+:ENDIF;
+
+:WHILE nValue > 0;
+nValue -= 1;
+:ENDWHILE;
+sOut := "done";
+:IF Empty(sOut);
+sOut := "none";
+:ENDIF;
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Untouched;
+	:PARAMETERS nValue;
+	:DECLARE sOut;
+	:IF nValue > 0;
+		:IF nValue > 5;
+			sOut := "big";
+		:ENDIF;
+	:ENDIF;
+
+	:WHILE nValue > 0;
+		nValue -= 1;
+	:ENDWHILE;
+	sOut := "done";
+	:IF Empty(sOut);
+		sOut := "none";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

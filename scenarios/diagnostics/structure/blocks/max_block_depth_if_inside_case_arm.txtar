@@ -1,0 +1,46 @@
+An :IF inside a :CASE arm of a :BEGINCASE that is already at depth 4.
+The :IF adds a level (depth 5) and is reported under --info; the
+:BEGINCASE itself is not (diag.max_block_depth, last Flags fence).
+-- input.ssl --
+:PROCEDURE RouteSample;
+	:PARAMETERS sType, nPriority;
+	:DECLARE sQueue;
+	:IF .NOT. Empty(sType);
+		:IF nPriority > 0;
+			:BEGINCASE;
+			:CASE sType == "BLOOD";
+				:IF nPriority > 5;
+					sQueue := "STAT";
+				:ENDIF;
+				:EXITCASE;
+			:OTHERWISE;
+				sQueue := "ROUTINE";
+				:EXITCASE;
+			:ENDCASE;
+		:ENDIF;
+	:ENDIF;
+	:RETURN sQueue;
+:ENDPROC;
+-- format --
+:PROCEDURE RouteSample;
+	:PARAMETERS sType, nPriority;
+	:DECLARE sQueue;
+	:IF .NOT. Empty(sType);
+		:IF nPriority > 0;
+			:BEGINCASE;
+			:CASE sType == "BLOOD";
+				:IF nPriority > 5;
+					sQueue := "STAT";
+				:ENDIF;
+				:EXITCASE;
+			:OTHERWISE;
+				sQueue := "ROUTINE";
+				:EXITCASE;
+			:ENDCASE;
+		:ENDIF;
+	:ENDIF;
+	:RETURN sQueue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+8:1-8:1 info max_block_depth: Block nesting depth (5) exceeds maximum (4)

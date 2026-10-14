@@ -1,0 +1,28 @@
+Near miss for comment_text_after_terminator: region / endregion markers
+whose `;` is intentional, stacked single-line comments, and an ordinary
+comment followed by code on the next line. Clean (catalog "Does not
+flag" fences).
+-- input.ssl --
+/* region Helpers;
+/* first comment block;
+/* second comment block;
+:PROCEDURE Helper;
+	:DECLARE nCount;
+	/* explains the assignment below;
+	nCount := 1;
+	:RETURN nCount;
+:ENDPROC;
+/* endregion;
+-- format --
+/* region Helpers;
+/* first comment block;
+/* second comment block;
+:PROCEDURE Helper;
+	:DECLARE nCount;
+	/* explains the assignment below;
+	nCount := 1;
+	:RETURN nCount;
+:ENDPROC;
+/* endregion;
+-- diagnostics --
+-- diagnostics [--strict --info] --

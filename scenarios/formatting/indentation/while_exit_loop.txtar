@@ -1,0 +1,53 @@
+:WHILE bodies with :EXITWHILE and :LOOP inside nested :IF blocks, and a
+:FOR with :STEP and :EXITFOR. The loop-control statements are ordinary
+statements and take the body indent (fmt.indent_style).
+-- input.ssl --
+:PROCEDURE ScanValues;
+:PARAMETERS aValues;
+:DECLARE nIndex, nFound, i;
+nIndex := 0;
+nFound := 0;
+:WHILE .T.;
+nIndex += 1;
+:IF nIndex > Len(aValues);
+:EXITWHILE;
+:ENDIF;
+:IF Empty(aValues[nIndex]);
+:LOOP;
+:ENDIF;
+nFound += 1;
+:ENDWHILE;
+:FOR i := Len(aValues) :TO 1 :STEP -1;
+:IF aValues[i] == "STOP";
+:EXITFOR;
+:ENDIF;
+:NEXT;
+:RETURN nFound;
+:ENDPROC;
+-- format --
+:PROCEDURE ScanValues;
+	:PARAMETERS aValues;
+	:DECLARE nIndex, nFound, i;
+	nIndex := 0;
+	nFound := 0;
+	:WHILE .T.;
+		nIndex += 1;
+		:IF nIndex > Len(aValues);
+			:EXITWHILE;
+		:ENDIF;
+
+		:IF Empty(aValues[nIndex]);
+			:LOOP;
+		:ENDIF;
+		nFound += 1;
+	:ENDWHILE;
+
+	:FOR i := Len(aValues) :TO 1 :STEP -1;
+		:IF aValues[i] == "STOP";
+			:EXITFOR;
+		:ENDIF;
+	:NEXT;
+	:RETURN nFound;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

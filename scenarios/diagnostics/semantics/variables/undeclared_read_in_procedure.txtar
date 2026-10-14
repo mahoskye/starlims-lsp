@@ -1,0 +1,29 @@
+An undeclared name read in a procedure body (diag.undeclared_variable).
+The check is opt-in, so it appears only under the strict profile, once
+per name per file even when the name is read twice. A name created by
+assignment (nShipped) is not undeclared.
+-- input.ssl --
+:PROCEDURE TallyCrates;
+	:PARAMETERS nPerCrate;
+	:DECLARE nTotal;
+	nTotal := nCrateCount * nPerCrate;
+	nShipped := nTotal;
+	:IF nCrateCount > 10;
+		nTotal := nTotal + 1;
+	:ENDIF;
+	:RETURN nTotal + nShipped;
+:ENDPROC;
+-- format --
+:PROCEDURE TallyCrates;
+	:PARAMETERS nPerCrate;
+	:DECLARE nTotal;
+	nTotal := nCrateCount * nPerCrate;
+	nShipped := nTotal;
+	:IF nCrateCount > 10;
+		nTotal := nTotal + 1;
+	:ENDIF;
+	:RETURN nTotal + nShipped;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:12-4:23 warning undeclared_variable: Variable 'nCrateCount' is not declared

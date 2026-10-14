@@ -1,0 +1,56 @@
+Near miss for mixed_error_handling_families: the two families in
+different procedures of the same file, plus `LimsString(:ERROR)` in
+expression position inside a :CATCH (only the marker statement `:ERROR;`
+starts a legacy handler). Only deprecated_keyword fires
+(diag.mixed_error_handling_families "must NOT flag").
+Suspected issue: #328 — unexpected_token rejects `LimsString(:ERROR)` as a parse error, while diag.mixed_error_handling_families and diag.error_handler_structure describe `:ERROR` in expression position as a corpus-observed form ("`:ERROR` also appears in expression position (`LimsString(:ERROR)`)").
+-- input.ssl --
+:PROCEDURE LegacyLoad;
+	:DECLARE nLoaded;
+	nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
+	:RETURN nLoaded;
+	:ERROR;
+	nLoaded := -1;
+	:RESUME;
+:ENDPROC;
+
+:PROCEDURE ModernLoad;
+	:DECLARE nLoaded, sResult;
+	:TRY;
+		nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
+	:CATCH;
+		sResult := "Error: " + LimsString(:ERROR);
+		ErrorMes("ModernLoad", sResult);
+	:ENDTRY;
+	:RETURN nLoaded;
+:ENDPROC;
+-- format --
+:PROCEDURE LegacyLoad;
+	:DECLARE nLoaded;
+	nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
+	:RETURN nLoaded;
+	:ERROR;
+		nLoaded := -1;
+	:RESUME;
+:ENDPROC;
+
+:PROCEDURE ModernLoad;
+	:DECLARE nLoaded, sResult;
+	:TRY;
+		nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
+	:CATCH;
+		sResult := "Error: " + LimsString(:ERROR);
+			ErrorMes("ModernLoad", sResult);
+	:ENDTRY;
+	:RETURN nLoaded;
+:ENDPROC;
+-- diagnostics --
+5:2-5:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+7:2-7:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:37-15:43 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:37-15:43 error unexpected_token: Unexpected keyword ':ERROR' - expected an expression
+-- diagnostics [--strict --info] --
+5:2-5:8 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+7:2-7:9 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:37-15:43 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+15:37-15:43 error unexpected_token: Unexpected keyword ':ERROR' - expected an expression

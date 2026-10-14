@@ -1,0 +1,37 @@
+The SQL fits-inline test follows --max-line-length: at the default 90
+this query is left inline, at 60 it overflows and reflows to rule F;
+--max-line-length 0 disables wrapping, which also leaves it inline.
+-- input.ssl --
+:PROCEDURE Width;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, status from orders where status = ?sStatus?");
+	:RETURN aRows;
+:ENDPROC;
+-- format [--max-line-length 60] --
+:PROCEDURE Width;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, status
+	    FROM orders
+	    WHERE status = ?sStatus?
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- format [--max-line-length 0] --
+:PROCEDURE Width;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, status from orders where status = ?sStatus?");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Width;
+	:PARAMETERS sStatus;
+	:DECLARE aRows;
+	aRows := SQLExecute("select ordno, status from orders where status = ?sStatus?");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

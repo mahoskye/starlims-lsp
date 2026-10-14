@@ -1,0 +1,39 @@
+Near miss for exitfor_in_finally: :EXITFOR in the :TRY body and in the
+:CATCH handler of a :TRY inside a :FOR loop is legal; :CATCH ends any
+FINALLY region. Clean (diag.exitfor_in_finally "must NOT flag").
+-- input.ssl --
+:PROCEDURE FirstParsable;
+	:PARAMETERS aTexts;
+	:DECLARE nIdx, nValue;
+	nValue := 0;
+	:FOR nIdx := 1 :TO Len(aTexts);
+		:TRY;
+			nValue := Val(aTexts[nIdx]);
+			:IF nValue > 0;
+				:EXITFOR;
+			:ENDIF;
+		:CATCH;
+			:EXITFOR;
+		:ENDTRY;
+	:NEXT;
+	:RETURN nValue;
+:ENDPROC;
+-- format --
+:PROCEDURE FirstParsable;
+	:PARAMETERS aTexts;
+	:DECLARE nIdx, nValue;
+	nValue := 0;
+	:FOR nIdx := 1 :TO Len(aTexts);
+		:TRY;
+			nValue := Val(aTexts[nIdx]);
+			:IF nValue > 0;
+				:EXITFOR;
+			:ENDIF;
+		:CATCH;
+			:EXITFOR;
+		:ENDTRY;
+	:NEXT;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

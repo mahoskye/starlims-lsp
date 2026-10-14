@@ -1,0 +1,54 @@
+A realistic dispatcher mixing every CASE-family shape: one branch ending
+in :RETURN, one branch ending in :EXITCASE, one deliberately falling
+through (prefer_exitcase warning, no exemption for intentional
+multi-match), and an :OTHERWISE. Checks that the CASE rules do not pile
+up on each other (diag.prefer_exitcase, diag.missing_otherwise,
+diag.exitcase_after_return, diag.exitcase_last_in_branch).
+-- input.ssl --
+:PROCEDURE DispatchAction;
+	:PARAMETERS sAction, nQty;
+	:DECLARE nScore, sLog;
+	nScore := 0;
+	sLog := "";
+	:BEGINCASE;
+	:CASE sAction == "CANCEL";
+		:RETURN -1;
+	:CASE sAction == "HOLD";
+		sLog := sLog + "hold;";
+		nScore := nScore + 1;
+	:CASE nQty > 10;
+		sLog := sLog + "bulk;";
+		nScore := nScore + 10;
+		:EXITCASE;
+	:OTHERWISE;
+		sLog := sLog + "default;";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nScore;
+:ENDPROC;
+-- format --
+:PROCEDURE DispatchAction;
+	:PARAMETERS sAction, nQty;
+	:DECLARE nScore, sLog;
+	nScore := 0;
+	sLog := "";
+	:BEGINCASE;
+	:CASE sAction == "CANCEL";
+		:RETURN -1;
+	:CASE sAction == "HOLD";
+		sLog := sLog + "hold;";
+		nScore := nScore + 1;
+	:CASE nQty > 10;
+		sLog := sLog + "bulk;";
+		nScore := nScore + 10;
+		:EXITCASE;
+	:OTHERWISE;
+		sLog := sLog + "default;";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN nScore;
+:ENDPROC;
+-- diagnostics --
+9:2-9:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'
+-- diagnostics [--strict --info] --
+9:2-9:7 warning prefer_exitcase: ':CASE' block should end with ':EXITCASE;'

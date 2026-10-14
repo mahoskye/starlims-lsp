@@ -1,0 +1,15 @@
+An Oracle-style bind after an operator (`= :default`, `= :status`) is not a
+statement-leading colon keyword, so it is not SSL evidence (D15): the
+document stays SQL, is not re-cased by the formatter, and reports nothing.
+-- input.ds --
+select item_id, item_name
+from catalog_item
+where item_class = :default
+  and item_state = :status
+-- format --
+select item_id, item_name
+from catalog_item
+where item_class = :default
+  and item_state = :status
+-- diagnostics --
+-- diagnostics [--strict --info] --

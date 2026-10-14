@@ -1,0 +1,28 @@
+An :ENDCLASS terminator ported from other languages
+(diag.endclass_invalid, error): SSL classes run to the end of the file.
+The member call oList:EndClass() is the near miss (no keyword token after
+a receiver).
+-- input.ssl --
+:CLASS Queue;
+:DECLARE aItems, oList;
+
+:PROCEDURE Push;
+	:PARAMETERS vItem;
+	AAdd(Me:aItems, vItem);
+	Me:oList:EndClass();
+:ENDPROC;
+:ENDCLASS;
+-- format --
+:CLASS Queue;
+:DECLARE aItems, oList;
+
+:PROCEDURE Push;
+	:PARAMETERS vItem;
+	AAdd(Me:aItems, vItem);
+	Me:oList:EndClass();
+:ENDPROC;
+:ENDCLASS;
+-- diagnostics --
+9:1-9:10 error endclass_invalid: ':ENDCLASS' is not valid — a class extends to the end of its file and has no closing keyword
+-- diagnostics [--strict --info] --
+9:1-9:10 error endclass_invalid: ':ENDCLASS' is not valid — a class extends to the end of its file and has no closing keyword

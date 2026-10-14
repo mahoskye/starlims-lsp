@@ -1,0 +1,30 @@
+The scope-based :ERROR / :RESUME handler: both indent their bodies like a
+block, with :RESUME acting as a middle keyword at the :ERROR column
+(fmt.indent_style: "the scope-based :ERROR / :RESUME also indent their
+bodies"). Input mixes a stray space indent with flush-left lines.
+-- input.ssl --
+:PROCEDURE LegacyUpdate;
+:PARAMETERS sSampleId;
+:DECLARE bOk;
+bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {"X", sSampleId});
+  :RETURN bOk;
+:ERROR;
+ErrorMes("LegacyUpdate", "update failed");
+:RESUME;
+:ENDPROC;
+-- format --
+:PROCEDURE LegacyUpdate;
+	:PARAMETERS sSampleId;
+	:DECLARE bOk;
+	bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {"X", sSampleId});
+	:RETURN bOk;
+	:ERROR;
+		ErrorMes("LegacyUpdate", "update failed");
+	:RESUME;
+:ENDPROC;
+-- diagnostics --
+6:1-6:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+8:1-8:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+-- diagnostics [--strict --info] --
+6:1-6:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+8:1-8:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

@@ -1,0 +1,36 @@
+Near miss for every delimiter rule: nested mixed kinds, a code-block
+literal (lexed as one token), bracket strings holding parentheses and
+braces, and delimiter characters in comments and strings. Clean
+(diag.mismatched_delimiter, diag.unclosed_delimiter,
+diag.unmatched_delimiter "Does not flag").
+-- input.ssl --
+:PROCEDURE ScaleAll;
+	:PARAMETERS aValues, nFactor;
+	:DECLARE fnScale, aScaled, sNote, nIdx;
+	/* a stray ( or } in a comment is just text;
+	sNote := "a stray ) or ] in a string is just text";
+	fnScale := {|n| (n * nFactor) + 0};
+	aScaled := {};
+	:FOR nIdx := 1 :TO Len(aValues);
+		AAdd(aScaled, Eval(fnScale, aValues[nIdx]));
+	:NEXT;
+	sNote := [ratio (a/b) and set {x} stay text];
+	:RETURN {aScaled[1], (aScaled[Len(aScaled)] + 0), sNote};
+:ENDPROC;
+-- format --
+:PROCEDURE ScaleAll;
+	:PARAMETERS aValues, nFactor;
+	:DECLARE fnScale, aScaled, sNote, nIdx;
+	/* a stray ( or } in a comment is just text;
+	sNote := "a stray ) or ] in a string is just text";
+	fnScale := {|n| (n * nFactor) + 0};
+	aScaled := {};
+	:FOR nIdx := 1 :TO Len(aValues);
+		AAdd(aScaled, Eval(fnScale, aValues[nIdx]));
+	:NEXT;
+	sNote := [ratio (a/b) and set {x} stay text];
+	:RETURN {aScaled[1], (aScaled[Len(aScaled)] + 0), sNote};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+2:23-2:30 hint unused_variable: Variable 'nFactor' is declared but never used

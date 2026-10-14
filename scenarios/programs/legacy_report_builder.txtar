@@ -1,0 +1,228 @@
+A legacy report builder: procedures defined before the script's
+:PARAMETERS, procedures called directly by name instead of through
+DoProc, a :DECLARE after executable code, an empty :CATCH that swallows
+errors, a :FINALLY holding a :RETURN, LSelect with its value array in the
+connection position, string building with '+' and a hand-rolled
+LimsString loop, and inconsistent keyword case throughout.
+The second half adds a summary procedure that mixes :TRY and :ERROR in
+one procedure, splices a value into SQL by concatenation inside the call
+(sql_injection), selects '*', compares against "" with '=', and nests
+IIF calls.
+-- input.ssl --
+:procedure header;
+:parameters title;
+:return "== " + title + " ==";
+:endproc;
+
+:procedure line;
+:parameters cols;
+:declare out, c;
+out := "";
+:for c := 1 :to len(cols);
+out := out + limsstring(cols[c]) + ";";
+:next;
+:return out;
+:endproc;
+
+:PARAMETERS grp, fromdate;
+:DECLARE rows, txt, i;
+txt := header("Group " + grp);
+rows := LSelect("select SampleId, Status, LoggedOn from LabSamples where LabGroup = ? and LoggedOn >= ?",, {grp, fromdate});
+:DECLARE cnt;
+cnt := 0;
+:TRY;
+:for i := 1 :to len(rows);
+txt := txt + Chr(10) + line(rows[i]);
+cnt++;
+:next;
+:CATCH;
+:FINALLY;
+:return txt;
+:ENDTRY;
+txt := txt + Chr(10) + "rows: " + limsstring(cnt);
+:return txt;
+
+:procedure summary;
+:parameters grp;
+:declare total, open, ratio, label;
+:try;
+total := LSearch("select count(*) from LabSamples where LabGroup = '" + grp + "'", 0);
+open := LSearch("select count(*) from LabSamples where LabGroup = ? and Status = ?", 0,, {grp, "OPEN"});
+:catch;
+total := 0;
+:endtry;
+:if grp = "";
+:return "no group";
+:endif;
+ratio := iif(total > 0, open / total, 0);
+label := iif(ratio > 0.5, "busy", iif(ratio > 0.1, "normal", "quiet"));
+:return grp + ": " + label;
+:error;
+ErrorMes("summary", "summary failed");
+:endproc;
+
+:procedure dump;
+:parameters grp;
+:declare all;
+all := SQLExecute("select * from LabSamples where LabGroup = ?grp?");
+:return len(all);
+:endproc;
+-- format --
+:PROCEDURE header;
+	:PARAMETERS title;
+	:RETURN "== " + title + " ==";
+:ENDPROC;
+
+:PROCEDURE line;
+	:PARAMETERS cols;
+	:DECLARE out, c;
+	out := "";
+	:FOR c := 1 :TO Len(cols);
+		out := out + LimsString(cols[c]) + ";";
+	:NEXT;
+	:RETURN out;
+:ENDPROC;
+
+:PARAMETERS grp, fromdate;
+:DECLARE rows, txt, i;
+txt := header("Group " + grp);
+rows := LSelect("
+    SELECT SampleId, Status, LoggedOn
+    FROM LabSamples
+    WHERE LabGroup = ?
+      AND LoggedOn >= ?
+",, {grp, fromdate});
+:DECLARE cnt;
+cnt := 0;
+:TRY;
+	:FOR i := 1 :TO Len(rows);
+		txt := txt + Chr(10) + line(rows[i]);
+		cnt++;
+	:NEXT;
+:CATCH;
+:FINALLY;
+	:RETURN txt;
+:ENDTRY;
+txt := txt + Chr(10) + "rows: " + LimsString(cnt);
+:RETURN txt;
+
+:PROCEDURE summary;
+	:PARAMETERS grp;
+	:DECLARE total, open, ratio, label;
+	:TRY;
+		total := LSearch("select count(*) from LabSamples where LabGroup = '" + grp + "'",
+			0);
+		open := LSearch("
+		    SELECT COUNT(*)
+		    FROM LabSamples
+		    WHERE LabGroup = ?
+		      AND Status = ?
+		", 0,, {grp, "OPEN"});
+	:CATCH;
+		total := 0;
+	:ENDTRY;
+
+	:IF grp = "";
+		:RETURN "no group";
+	:ENDIF;
+	ratio := IIf(total > 0, open / total, 0);
+	label := IIf(ratio > 0.5, "busy", IIf(ratio > 0.1, "normal", "quiet"));
+	:RETURN grp + ": " + label;
+	:ERROR;
+		ErrorMes("summary", "summary failed");
+:ENDPROC;
+
+:PROCEDURE dump;
+	:PARAMETERS grp;
+	:DECLARE all;
+	all := SQLExecute("select * from LabSamples where LabGroup = ?grp?");
+	:RETURN Len(all);
+:ENDPROC;
+-- diagnostics --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+4:1-4:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+6:1-6:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+7:1-7:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+8:1-8:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+10:1-10:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+10:13-10:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+12:1-12:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+13:1-13:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+14:1-14:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+18:8-18:14 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("header", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
+23:1-23:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+23:13-23:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+24:24-24:28 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("line", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
+26:1-26:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+29:1-29:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+29:1-29:8 error return_in_finally: ':RETURN' inside a ':FINALLY' block is a compile-time error
+32:1-32:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+34:1-34:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+35:1-35:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+36:1-36:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+37:1-37:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+38:71-38:72 warning sql_injection: String concatenation in 'LSearch' argument may cause SQL injection. Use parameterized queries instead.
+40:1-40:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+42:1-42:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
+43:1-43:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+43:5-43:13 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+44:1-44:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+45:1-45:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+48:1-48:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+49:1-49:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+49:1-49:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+49:1-49:7 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+51:1-51:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+53:1-53:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+54:1-54:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+55:1-55:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+57:1-57:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+58:1-58:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+-- diagnostics [--strict --info] --
+1:1-1:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+2:1-2:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+3:1-3:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+4:1-4:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+6:1-6:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+7:1-7:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+8:1-8:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+10:1-10:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+10:13-10:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+12:1-12:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+13:1-13:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+14:1-14:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+18:8-18:14 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("header", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
+23:1-23:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+23:13-23:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+24:24-24:28 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("line", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
+26:1-26:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+29:1-29:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+29:1-29:8 error return_in_finally: ':RETURN' inside a ':FINALLY' block is a compile-time error
+32:1-32:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+34:1-34:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+35:1-35:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+36:1-36:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+37:1-37:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
+38:18-38:70 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+38:71-38:72 warning sql_injection: String concatenation in 'LSearch' argument may cause SQL injection. Use parameterized queries instead.
+40:1-40:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
+42:1-42:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
+43:1-43:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+43:5-43:13 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+43:9-43:10 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+44:1-44:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+45:1-45:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+47:35-47:38 info nested_iif: Nested IIF() reduces readability. Consider using :BEGINCASE/:CASE or :IF/:ELSE instead.
+48:1-48:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+49:1-49:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+49:1-49:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ERROR'
+49:1-49:7 warning mixed_error_handling_families: Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure
+51:1-51:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
+53:1-53:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PROCEDURE'
+54:1-54:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+55:1-55:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+56:19-56:68 info sql_select_star: SELECT * in embedded SQL - an explicit column list survives schema changes and documents what the code consumes
+57:1-57:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+58:1-58:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

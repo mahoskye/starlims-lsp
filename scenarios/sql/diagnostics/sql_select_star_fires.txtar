@@ -1,0 +1,36 @@
+SELECT * projections (diag.sql_select_star, info tier): a bare *, an
+alias.* after DISTINCT, a * inside an IN subquery, and a * in the second
+branch of a UNION. One finding per string.
+-- input.ssl --
+:PROCEDURE Everything;
+	:PARAMETERS nOrd;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT * FROM orders WHERE ordno = ?nOrd?");
+	aRows := SQLExecute("SELECT DISTINCT o.* FROM orders o");
+	aRows := SQLExecute("SELECT ordno FROM orders WHERE ordno IN (SELECT * FROM open_orders)");
+	aRows := SQLExecute("SELECT ordno FROM orders UNION SELECT * FROM orders_archive");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Everything;
+	:PARAMETERS nOrd;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT * FROM orders WHERE ordno = ?nOrd?");
+	aRows := SQLExecute("SELECT DISTINCT o.* FROM orders o");
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE ordno IN (
+	        SELECT *
+	        FROM open_orders
+	    )
+	");
+	aRows := SQLExecute("SELECT ordno FROM orders UNION SELECT * FROM orders_archive");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+4:22-4:65 info sql_select_star: SELECT * in embedded SQL - an explicit column list survives schema changes and documents what the code consumes
+5:22-5:57 info sql_select_star: SELECT alias.* in embedded SQL - an explicit column list survives schema changes and documents what the code consumes
+6:22-6:91 info sql_select_star: SELECT * in embedded SQL - an explicit column list survives schema changes and documents what the code consumes
+7:22-7:83 info sql_select_star: SELECT * in embedded SQL - an explicit column list survives schema changes and documents what the code consumes

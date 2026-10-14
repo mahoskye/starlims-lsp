@@ -1,0 +1,23 @@
+Me in a script with top-level code (diag.me_outside_class, error tier).
+Near misses: a member named Me on another receiver (oConfig:Me, issue
+#32) and "me" inside a string or a longer identifier (sMessage).
+-- input.ssl --
+:PARAMETERS oConfig;
+:DECLARE sMessage, vOwner, vSelf;
+sMessage := "call me back";
+vOwner := oConfig:Me;
+vSelf := Me;
+:RETURN Me:sName;
+-- format --
+:PARAMETERS oConfig;
+:DECLARE sMessage, vOwner, vSelf;
+sMessage := "call me back";
+vOwner := oConfig:Me;
+vSelf := Me;
+:RETURN Me:sName;
+-- diagnostics --
+5:10-5:12 error me_outside_class: 'Me' can only be used inside a ':CLASS' definition
+6:9-6:11 error me_outside_class: 'Me' can only be used inside a ':CLASS' definition
+-- diagnostics [--strict --info] --
+5:10-5:12 error me_outside_class: 'Me' can only be used inside a ':CLASS' definition
+6:9-6:11 error me_outside_class: 'Me' can only be used inside a ':CLASS' definition

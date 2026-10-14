@@ -1,0 +1,20 @@
+A procedure declared C-style: no colon on PROCEDURE or ENDPROC and a
+parenthesized parameter list. procedure_declaration_syntax fires once on
+the bare PROCEDURE token (missing-colon path); the same construct is not
+also direct_procedure_call or unexpected_token. Records what the bare
+ENDPROC line produces (diag.procedure_declaration_syntax).
+-- input.ssl --
+PROCEDURE CalcTax(nAmount);
+	:RETURN nAmount * 0.2;
+ENDPROC;
+-- format --
+PROCEDURE CalcTax(nAmount);
+:RETURN nAmount * 0.2;
+ENDPROC;
+-- diagnostics --
+1:1-1:10 error procedure_declaration_syntax: Procedure declarations require a leading colon. Use ":PROCEDURE Name;" (no parentheses; declare arguments via ":PARAMETERS").
+-- diagnostics [--strict --info] --
+1:1-1:10 error procedure_declaration_syntax: Procedure declarations require a leading colon. Use ":PROCEDURE Name;" (no parentheses; declare arguments via ":PARAMETERS").
+1:1-1:10 warning undeclared_variable: Variable 'PROCEDURE' is not declared
+1:19-1:26 warning undeclared_variable: Variable 'nAmount' is not declared
+3:1-3:8 warning undeclared_variable: Variable 'ENDPROC' is not declared

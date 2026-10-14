@@ -1,0 +1,17 @@
+A line carrying several consecutive end-of-line comments keeps all of
+them, in order (feature.formatting A3, issue #215: all but the last used
+to be deleted).
+-- input.ssl --
+:PROCEDURE Demo;
+:DECLARE nValue;
+nValue := 1;  /* first note;  /* second note; /* third note;
+:RETURN nValue;
+:ENDPROC;
+-- format --
+:PROCEDURE Demo;
+	:DECLARE nValue;
+	nValue := 1;  /* first note;  /* second note;  /* third note;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

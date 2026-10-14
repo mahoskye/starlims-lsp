@@ -1,0 +1,19 @@
+A quoted :INCLUDE inside a procedure body: both the target form
+(include_quoted_target, error) and the placement (include_in_procedure,
+warning) are wrong, and each should be reported once on its own range.
+-- input.ssl --
+:PROCEDURE LoadHelpers;
+	:INCLUDE 'Common.StringHelpers';
+	:RETURN .T.;
+:ENDPROC;
+-- format --
+:PROCEDURE LoadHelpers;
+	:INCLUDE 'Common.StringHelpers';
+	:RETURN .T.;
+:ENDPROC;
+-- diagnostics --
+2:2-2:10 warning include_in_procedure: ':INCLUDE' inside a procedure body is not supported
+2:11-2:33 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.StringHelpers;'
+-- diagnostics [--strict --info] --
+2:2-2:10 warning include_in_procedure: ':INCLUDE' inside a procedure body is not supported
+2:11-2:33 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.StringHelpers;'

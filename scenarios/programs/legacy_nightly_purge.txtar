@@ -1,0 +1,239 @@
+A legacy nightly purge job: everything at column 0, keywords in mixed
+case, a :WHILE driven by a manual counter with crammed body lines, an
+:ENDFOR where :NEXT belongs, logical operators missing their periods
+(AND), zero-based array indexing (a literal [0] and a loop from 0), bare RunSQL string building by
+concatenation, and an :ERROR / :RESUME pair. Formatting plus the full
+diagnostic picture of an old maintenance script.
+Also carries a :FOR typed without its colon (For k ...) and a :WHILE
+missing its ';', as hand-edited legacy code does.
+Suspected issue: #326 — the validator pairs :ENDFOR with its :FOR (no unclosed_block; the later :NEXT is unmatched_block_end), but the formatter does not treat :ENDFOR as a closer, so every following line, the :PROCEDURE included, is indented one level too deep until a :NEXT.
+The second half adds an archive procedure that sends a SELECT through
+RunSQL (runsql_non_dml), compares strings with '= ""', declares a
+:PUBLIC counter, and crams a :FOR loop body onto its header line.
+-- input.ssl --
+:PARAMETERS days;
+:DECLARE cutoff, tables, t, n, sql, ok, deleted, purged;
+:IF empty(days); days := 30; :ENDIF;
+cutoff := DateAdd(Today(), -days, "dd");
+tables := {"LabAuditLog", "LabTempResults", "LabSessionLog"};
+purged := {};
+UsrMes("first table: " + tables[0]);
+n := 1;
+:While n <= Len(tables)
+t := tables[n];
+sql := "delete from " + t + " where CreatedOn < ?";
+ok := RunSQL(sql, , {cutoff});
+:If ok AND n > 0; AAdd(purged, t); :EndIf;
+n := n + 1;
+:EndWhile;
+
+:For n := 0 :To Len(purged) - 1;
+deleted := purged[n];
+UsrMes("purged " + deleted);
+:EndFor;
+
+:IF len(purged) == len(tables);
+:RETURN "all purged";
+:ENDIF;
+
+DoProc("ReportPartial", {purged});
+:RETURN "partial";
+
+:PROCEDURE ReportPartial;
+:PARAMETERS done;
+:DECLARE msg, k;
+msg := "";
+For k := 1 :TO Len(done); msg := msg + done[k] + " "; :NEXT;
+ErrorMes("purge", "partial: " + msg);
+:ERROR;
+ErrorMes("purge", "ReportPartial failed");
+:RESUME;
+:ENDPROC;
+
+:PROCEDURE Archive;
+:PARAMETERS tbl, before;
+:PUBLIC archived;
+:DECLARE cnt, rows, j, ok;
+:IF tbl = ""; :RETURN 0; :ENDIF;
+cnt := RunSQL("select count(*) from LabArchiveQueue where TableName = ?", , {tbl});
+rows := LSelect1("select RowKey from LabArchiveQueue where TableName = ? and QueuedOn < ?",, {tbl, before});
+:FOR j := 1 :TO Len(rows); ok := RunSQL("delete from LabArchiveQueue where RowKey = ?",, {rows[j][1]}); :NEXT;
+archived := Len(rows);
+:RETURN archived;
+:ENDPROC;
+
+:PROCEDURE Vacuum;
+:PARAMETERS tbls;
+:DECLARE x, res;
+res := "";
+:FOR x := 1 :TO Len(tbls)
+:IF tbls[x] == "LabAuditLog"; :LOOP; :ENDIF;
+res := res + tbls[x] + ",";
+:IF Len(res) > 200; :EXITFOR; :ENDIF;
+:NEXT;
+:RETURN Left(res, Len(res) - 1);
+:ENDPROC;
+-- diagnostics [--hungarian] --
+1:13-1:17 warning hungarian_notation: Variable 'days' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:10-2:16 warning hungarian_notation: Variable 'cutoff' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:18-2:24 warning hungarian_notation: Variable 'tables' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:26-2:27 warning hungarian_notation: Variable 't' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:29-2:30 warning hungarian_notation: Variable 'n' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:32-2:35 warning hungarian_notation: Variable 'sql' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:37-2:39 warning hungarian_notation: Variable 'ok' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:41-2:48 warning hungarian_notation: Variable 'deleted' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+2:50-2:56 warning hungarian_notation: Variable 'purged' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+7:33-7:34 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':WHILE'
+10:1-10:2 error unexpected_token: Unexpected identifier 't' - expected an operator or ';' (is the previous statement missing its ';'?)
+10:3-10:5 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
+13:1-13:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+13:8-13:11 error bare_logical_operator: Use '.AND.' instead of 'AND' for logical operations in SSL
+13:36-13:42 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDWHILE'
+17:1-17:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+17:13-17:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+20:1-20:8 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
+30:13-30:17 warning hungarian_notation: Variable 'done' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+31:10-31:13 warning hungarian_notation: Variable 'msg' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+33:5-33:6 error unexpected_token: Unexpected identifier 'k' - expected an operator or ';'
+33:55-33:60 error unmatched_block_end: Unexpected ':NEXT' without matching block start
+35:1-35:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+37:1-37:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+41:13-41:16 warning hungarian_notation: Variable 'tbl' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+41:18-41:24 warning hungarian_notation: Variable 'before' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+42:9-42:17 warning hungarian_notation: Variable 'archived' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+43:10-43:13 warning hungarian_notation: Variable 'cnt' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+43:15-43:19 warning hungarian_notation: Variable 'rows' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+43:24-43:26 warning hungarian_notation: Variable 'ok' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+44:5-44:13 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+45:15-45:73 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+53:13-53:17 warning hungarian_notation: Variable 'tbls' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+54:13-54:16 warning hungarian_notation: Variable 'res' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+57:1-57:4 error unexpected_token: Unexpected keyword ':IF' in ':FOR' header - expected ':STEP' or ';' (is the previous statement missing its ';'?)
+-- format --
+:PARAMETERS days;
+:DECLARE cutoff, tables, t, n, sql, ok, deleted, purged;
+:IF Empty(days);
+	days := 30;
+:ENDIF;
+cutoff := DateAdd(Today(), -days, "dd");
+tables := {"LabAuditLog", "LabTempResults", "LabSessionLog"};
+purged := {};
+UsrMes("first table: " + tables[0]);
+n := 1;
+:WHILE n <= Len(tables);
+	t := tables[n];
+	sql := "delete from " + t + " where CreatedOn < ?";
+	ok := RunSQL(sql,, {cutoff});
+	:IF ok AND n > 0;
+		AAdd(purged, t);
+	:ENDIF;
+	n := n + 1;
+:ENDWHILE;
+
+:FOR n := 0 :TO Len(purged) - 1;
+	deleted := purged[n];
+	UsrMes("purged " + deleted);
+	:ENDFOR;
+
+	:IF Len(purged) == Len(tables);
+		:RETURN "all purged";
+	:ENDIF;
+
+	DoProc("ReportPartial", {purged});
+	:RETURN "partial";
+
+	:PROCEDURE ReportPartial;
+		:PARAMETERS done;
+		:DECLARE msg, k;
+		msg := "";
+		For k := 1 :TO Len(done);
+		msg := msg + done[k] + " ";
+	:NEXT;
+	ErrorMes("purge", "partial: " + msg);
+	:ERROR;
+		ErrorMes("purge", "ReportPartial failed");
+	:RESUME;
+:ENDPROC;
+
+:PROCEDURE Archive;
+	:PARAMETERS tbl, before;
+	:PUBLIC archived;
+	:DECLARE cnt, rows, j, ok;
+	:IF tbl = "";
+		:RETURN 0;
+	:ENDIF;
+	cnt := RunSQL("select count(*) from LabArchiveQueue where TableName = ?",, {tbl});
+	rows := LSelect1("
+	    SELECT RowKey
+	    FROM LabArchiveQueue
+	    WHERE TableName = ?
+	      AND QueuedOn < ?
+	",, {tbl, before});
+	:FOR j := 1 :TO Len(rows);
+		ok := RunSQL("delete from LabArchiveQueue where RowKey = ?",, {rows[j][1]});
+	:NEXT;
+	archived := Len(rows);
+	:RETURN archived;
+:ENDPROC;
+
+:PROCEDURE Vacuum;
+	:PARAMETERS tbls;
+	:DECLARE x, res;
+	res := "";
+	:FOR x := 1 :TO Len(tbls);
+		:IF tbls[x] == "LabAuditLog";
+			:LOOP;
+		:ENDIF;
+		res := res + tbls[x] + ",";
+		:IF Len(res) > 200;
+			:EXITFOR;
+		:ENDIF;
+	:NEXT;
+	:RETURN Left(res, Len(res) - 1);
+:ENDPROC;
+-- diagnostics --
+7:33-7:34 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':WHILE'
+10:1-10:2 error unexpected_token: Unexpected identifier 't' - expected an operator or ';' (is the previous statement missing its ';'?)
+10:3-10:5 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
+13:1-13:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+13:8-13:11 error bare_logical_operator: Use '.AND.' instead of 'AND' for logical operations in SSL
+13:36-13:42 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDWHILE'
+17:1-17:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+17:13-17:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+20:1-20:8 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
+33:5-33:6 error unexpected_token: Unexpected identifier 'k' - expected an operator or ';'
+33:55-33:60 error unmatched_block_end: Unexpected ':NEXT' without matching block start
+35:1-35:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+37:1-37:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+44:5-44:13 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+45:15-45:73 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+57:1-57:4 error unexpected_token: Unexpected keyword ':IF' in ':FOR' header - expected ':STEP' or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+7:33-7:34 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+9:1-9:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':WHILE'
+10:1-10:2 error unexpected_token: Unexpected identifier 't' - expected an operator or ';' (is the previous statement missing its ';'?)
+10:3-10:5 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
+12:17-12:20 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+13:1-13:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+13:8-13:11 error bare_logical_operator: Use '.AND.' instead of 'AND' for logical operations in SSL
+13:8-13:11 warning undeclared_variable: Variable 'AND' is not declared
+13:36-13:42 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+15:1-15:10 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDWHILE'
+17:1-17:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+17:13-17:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+20:1-20:8 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
+33:1-33:4 warning undeclared_variable: Variable 'For' is not declared
+33:5-33:6 error unexpected_token: Unexpected identifier 'k' - expected an operator or ';'
+33:55-33:60 error unmatched_block_end: Unexpected ':NEXT' without matching block start
+35:1-35:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+37:1-37:8 warning deprecated_keyword: ':RESUME' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'
+42:1-42:8 info limit_public_vars: ':PUBLIC' variables persist across procedures and risk namespace pollution. Prefer ':DECLARE' with parameter passing
+44:5-44:13 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+44:9-44:10 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+45:15-45:73 warning runsql_non_dml: RunSQL is for DML statements - this 'SELECT' query returns a result RunSQL discards. Use a result-returning API (LSearch, LSelect, GetDataSet, ...) instead
+45:73-45:76 info spaced_skip_commas: Spaced skip-commas - write the skip form with adjacent commas (',,') so the skipped argument reads as deliberate
+57:1-57:4 error unexpected_token: Unexpected keyword ':IF' in ':FOR' header - expected ':STEP' or ';' (is the previous statement missing its ';'?)

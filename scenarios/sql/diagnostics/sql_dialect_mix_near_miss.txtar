@@ -1,0 +1,38 @@
+Single-dialect statements sql_dialect_mix must leave alone
+(diag.sql_dialect_mix Does not flag): Oracle-only, SQL Server-only, a
+dialect-neutral ODBC escape, and a marker name that appears only inside
+a character literal or a SQL comment.
+-- input.ssl --
+:PROCEDURE Recent;
+	:DECLARE aRows;
+	aRows := SQLExecute("SELECT ordno, NVL(status, 'X') FROM orders WHERE logdate > SYSDATE - 1");
+	aRows := SQLExecute("SELECT ordno, ISNULL(status, 'X') FROM orders WHERE logdate > DATEADD(day, -1, GETDATE())");
+	aRows := SQLExecute("SELECT ordno, {fn IFNULL(status, 'X')} FROM orders");
+	aRows := SQLExecute("SELECT ordno FROM orders WHERE note = 'GETDATE' AND logdate > SYSDATE -- not getdate()
+");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Recent;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT ordno, NVL(status, 'X')
+	    FROM orders
+	    WHERE logdate > SYSDATE - 1
+	");
+	aRows := SQLExecute("
+	    SELECT ordno, ISNULL(status, 'X')
+	    FROM orders
+	    WHERE logdate > DATEADD(DAY, -1, GETDATE())
+	");
+	aRows := SQLExecute("SELECT ordno, {fn IFNULL(status, 'X')} FROM orders");
+	aRows := SQLExecute("
+	    SELECT ordno
+	    FROM orders
+	    WHERE note = 'GETDATE'
+	      AND logdate > SYSDATE -- not getdate()
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

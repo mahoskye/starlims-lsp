@@ -1,0 +1,29 @@
+Dot notation for properties is not SSL (diag.dot_property_access, error,
+on the .name fragment): after a variable, a call result and a subscript
+(issue #255).
+-- input.ssl --
+:PROCEDURE ReadSubject;
+	:DECLARE oMail, aRows, vOut;
+	oMail := Email{};
+	vOut := oMail.Subject;
+	vOut := aRows[1].Name;
+	vOut := Today().Year;
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadSubject;
+	:DECLARE oMail, aRows, vOut;
+	oMail := Email{};
+	vOut := oMail.Subject;
+	vOut := aRows[1].Name;
+	vOut := Today().Year;
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+4:15-4:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Subject' instead of 'object.Subject'
+5:18-5:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Name' instead of 'object.Name'
+6:17-6:22 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Year' instead of 'object.Year'
+-- diagnostics [--strict --info] --
+4:15-4:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Subject' instead of 'object.Subject'
+5:18-5:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Name' instead of 'object.Name'
+6:17-6:22 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:Year' instead of 'object.Year'

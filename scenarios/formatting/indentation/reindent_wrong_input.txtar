@@ -1,0 +1,41 @@
+The configured indentation is applied whatever the file already uses
+(fmt.indent_style: "there is no detection of an existing space-indented
+file"). Input is over-indented with spaces, closers sit deeper than their
+openers, and a :CASE is indented past its :BEGINCASE; every line is
+re-indented from block depth alone.
+-- input.ssl --
+      :PROCEDURE Classify;
+          :PARAMETERS nScore;
+          :DECLARE sGrade;
+              :BEGINCASE;
+                  :CASE nScore >= 90;
+                  sGrade := "A";
+                  :EXITCASE;
+                      :CASE nScore >= 75;
+              sGrade := "B";
+                  :EXITCASE;
+          :OTHERWISE;
+                          sGrade := "C";
+                  :EXITCASE;
+                              :ENDCASE;
+   :RETURN sGrade;
+                :ENDPROC;
+-- format --
+:PROCEDURE Classify;
+	:PARAMETERS nScore;
+	:DECLARE sGrade;
+	:BEGINCASE;
+	:CASE nScore >= 90;
+		sGrade := "A";
+		:EXITCASE;
+	:CASE nScore >= 75;
+		sGrade := "B";
+		:EXITCASE;
+	:OTHERWISE;
+		sGrade := "C";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sGrade;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

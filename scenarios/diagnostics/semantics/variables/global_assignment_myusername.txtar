@@ -1,0 +1,34 @@
+Assigning the predefined global MYUSERNAME or a STARLIMS status keyword
+(Pending) silently changes what every later reader sees
+(diag.global_assignment). Reads and comparisons of the same names do not
+fire.
+-- input.ssl --
+:PROCEDURE ImpersonateRunner;
+	:PARAMETERS sRunner;
+	:DECLARE sPrevious, bIsPending, sStatus;
+	sPrevious := MYUSERNAME;
+	MYUSERNAME := sRunner;
+	Pending := "Waiting";
+	bIsPending := sStatus == Pending;
+	MYUSERNAME := sPrevious;
+	:RETURN bIsPending;
+:ENDPROC;
+-- format --
+:PROCEDURE ImpersonateRunner;
+	:PARAMETERS sRunner;
+	:DECLARE sPrevious, bIsPending, sStatus;
+	sPrevious := MYUSERNAME;
+	MYUSERNAME := sRunner;
+	Pending := "Waiting";
+	bIsPending := sStatus == Pending;
+	MYUSERNAME := sPrevious;
+	:RETURN bIsPending;
+:ENDPROC;
+-- diagnostics --
+5:2-5:12 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it
+6:2-6:9 warning global_assignment: Assignment to global variable 'Pending' changes it for every routine that reads it
+8:2-8:12 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it
+-- diagnostics [--strict --info] --
+5:2-5:12 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it
+6:2-6:9 warning global_assignment: Assignment to global variable 'Pending' changes it for every routine that reads it
+8:2-8:12 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it

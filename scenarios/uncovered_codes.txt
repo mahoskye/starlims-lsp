@@ -1,0 +1,5 @@
+# Active diagnostic codes that no scenario's expected diagnostics contain.
+# TestScenarioCoverage keeps this list exact; add a scenario, then rerun
+# go test ./cmd/starlims-lsp -run TestScenario -update to shrink it.
+execfunction_class_target
+internal_error

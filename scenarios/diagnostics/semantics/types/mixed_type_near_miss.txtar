@@ -1,0 +1,38 @@
+Near-misses for diag.mixed_type_operator: same-type +, date + number, an
+acronym whose capital first letter only resembles a prefix
+(DCUlabel), loop counters and UPPER_SNAKE constants, indexed and member
+operands, and a mismatch nested inside a call argument.
+-- input.ssl --
+:PROCEDURE Assemble;
+	:PARAMETERS sFirst, sLast, dDue, nDays, aCols, MAX_ROWS, oFmt;
+	:DECLARE sFull, dNext, DCUlabel, X, sCols;
+	sFull := sFirst + " " + sLast;
+	dNext := dDue + nDays;
+	DCUlabel := "cat";
+	sFull := DCUlabel + "." + "leaf";
+	sCols := "";
+	:FOR X := 1 :TO MAX_ROWS;
+		sCols := sCols + aCols[X] + " end";
+	:NEXT;
+	sFull := sFull + oFmt:Suffix + "Limit: " + MAX_ROWS;
+	sFull := SubStr(sFull, 1, Len(sFull) - 1);
+	:RETURN sFull + sCols + LimsString(dNext);
+:ENDPROC;
+-- format --
+:PROCEDURE Assemble;
+	:PARAMETERS sFirst, sLast, dDue, nDays, aCols, MAX_ROWS, oFmt;
+	:DECLARE sFull, dNext, DCUlabel, X, sCols;
+	sFull := sFirst + " " + sLast;
+	dNext := dDue + nDays;
+	DCUlabel := "cat";
+	sFull := DCUlabel + "." + "leaf";
+	sCols := "";
+	:FOR X := 1 :TO MAX_ROWS;
+		sCols := sCols + aCols[X] + " end";
+	:NEXT;
+	sFull := sFull + oFmt:Suffix + "Limit: " + MAX_ROWS;
+	sFull := SubStr(sFull, 1, Len(sFull) - 1);
+	:RETURN sFull + sCols + LimsString(dNext);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

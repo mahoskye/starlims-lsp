@@ -1,0 +1,35 @@
+A :RETURN inside :FINALLY, a compile-time error. return_in_finally fires
+on the :RETURN; the :RETURN in the :CATCH and the one after :ENDTRY are
+legal (diag.return_in_finally).
+-- input.ssl --
+:PROCEDURE FetchCount;
+	:PARAMETERS sRegion;
+	:DECLARE nCount;
+	nCount := 0;
+	:TRY;
+		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
+	:CATCH;
+		:RETURN -1;
+	:FINALLY;
+		:RETURN nCount;
+	:ENDTRY;
+	:RETURN nCount;
+:ENDPROC;
+-- format --
+:PROCEDURE FetchCount;
+	:PARAMETERS sRegion;
+	:DECLARE nCount;
+	nCount := 0;
+	:TRY;
+		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
+	:CATCH;
+		:RETURN -1;
+	:FINALLY;
+		:RETURN nCount;
+	:ENDTRY;
+	:RETURN nCount;
+:ENDPROC;
+-- diagnostics --
+10:3-10:10 error return_in_finally: ':RETURN' inside a ':FINALLY' block is a compile-time error
+-- diagnostics [--strict --info] --
+10:3-10:10 error return_in_finally: ':RETURN' inside a ':FINALLY' block is a compile-time error

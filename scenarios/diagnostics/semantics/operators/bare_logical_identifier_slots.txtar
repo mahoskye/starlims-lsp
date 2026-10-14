@@ -1,0 +1,28 @@
+Near-misses for diag.bare_logical_operator (issue #165): And/Or/Not in
+identifier slots — a :DECLARE list, an assignment target, member access
+on a proxy object — and inside SQL string text and comments. The
+correct dotted operators never fire.
+-- input.ssl --
+:PROCEDURE ProxyFlags;
+	:PARAMETERS oProxy, bLeft, bRight;
+	:DECLARE And, sSql, bBoth;
+	/* AND OR NOT in a comment are prose;
+	And := oProxy:And;
+	oProxy:Or := 1;
+	sSql := "SELECT id FROM lots WHERE a = 1 AND NOT b = 2 OR c = 3";
+	bBoth := bLeft .AND. .NOT. bRight .OR. And == 1;
+	:RETURN {sSql, bBoth};
+:ENDPROC;
+-- format --
+:PROCEDURE ProxyFlags;
+	:PARAMETERS oProxy, bLeft, bRight;
+	:DECLARE And, sSql, bBoth;
+	/* AND OR NOT in a comment are prose;
+	And := oProxy:And;
+	oProxy:Or := 1;
+	sSql := "SELECT id FROM lots WHERE a = 1 AND NOT b = 2 OR c = 3";
+	bBoth := bLeft .AND. .NOT. bRight .OR. And == 1;
+	:RETURN {sSql, bBoth};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

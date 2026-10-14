@@ -1,0 +1,25 @@
+A <<template>> marker stacked inside a ?…? placeholder
+(diag.sql_suspect_placeholder, info tier): two substitution layers whose
+combined resolution is unverified.
+-- input.ssl --
+:PROCEDURE Stamp;
+	:DECLARE aRows;
+	aRows := SQLExecute("INSERT INTO auditlog (who, what) VALUES (?'<<username>>'?, 'login')");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Stamp;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    INSERT INTO auditlog (
+	        who, what
+	    )
+	    VALUES (
+	        ?'<<username>>'?, 'login'
+	    )
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:22-3:91 info sql_suspect_placeholder: Placeholder ?'<<username>>'? stacks a <<...>> template substitution inside ?...? - verify both layers actually resolve; a plain ?name? placeholder avoids the ambiguity

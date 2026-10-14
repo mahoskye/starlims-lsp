@@ -1,0 +1,24 @@
+:DECLARE accepts only a name list; each inline := initializer fires
+diag.declare_initializer on its operator, one per initializer.
+-- input.ssl --
+:PROCEDURE SeedCounters;
+	:DECLARE nOpened := 0;
+	:DECLARE nClosed := 0, sLabel := "none", nSkipped;
+	nSkipped := nOpened + nClosed;
+	:RETURN sLabel;
+:ENDPROC;
+-- format --
+:PROCEDURE SeedCounters;
+	:DECLARE nOpened := 0;
+	:DECLARE nClosed := 0, sLabel := "none", nSkipped;
+	nSkipped := nOpened + nClosed;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+2:19-2:21 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:19-3:21 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:32-3:34 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+-- diagnostics [--strict --info] --
+2:19-2:21 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:19-3:21 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:32-3:34 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement

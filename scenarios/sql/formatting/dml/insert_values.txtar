@@ -1,0 +1,36 @@
+INSERT … VALUES: the column list and the values list each open '(' on
+their keyword line, indent the items 4, and close ')' at the clause
+column (reference §2.9, sql_insert_layout). Positional and named
+placeholders mix with literals and SYSDATE.
+-- input.ssl --
+:PROCEDURE Log;
+	:PARAMETERS sOrdNo, sUser;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("insert into auditlog (log_id, ordno, action, username, log_date) values (seq_audit.nextval, ?sOrdNo?, 'UPDATE', ?sUser?, sysdate)");
+	bOk := RunSQL("insert into ordresult (ordno, testcode, result_value, status, logdate, completed_by) values (?, ?, ?, 'Complete', sysdate, ?)",, {sOrdNo, "pH", 7.2, sUser});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- format --
+:PROCEDURE Log;
+	:PARAMETERS sOrdNo, sUser;
+	:DECLARE aRows, bOk;
+	aRows := SQLExecute("
+	    INSERT INTO auditlog (
+	        log_id, ordno, action, username, log_date
+	    )
+	    VALUES (
+	        seq_audit.NEXTVAL, ?sOrdNo?, 'UPDATE', ?sUser?, SYSDATE
+	    )
+	");
+	bOk := RunSQL("
+	    INSERT INTO ordresult (
+	        ordno, testcode, result_value, status, logdate, completed_by
+	    )
+	    VALUES (
+	        ?, ?, ?, 'Complete', SYSDATE, ?
+	    )
+	",, {sOrdNo, "pH", 7.2, sUser});
+	:RETURN {aRows, bOk};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

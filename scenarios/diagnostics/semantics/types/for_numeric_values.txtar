@@ -1,0 +1,48 @@
+:FOR start, limit and step must be numbers (diag.for_numeric_values,
+warning, ranged on each offending part): a string limit, a string step,
+and a string-prefixed loop variable started from a string. One finding
+per offending part.
+-- input.ssl --
+:PROCEDURE Walk;
+	:PARAMETERS sStart;
+	:DECLARE nIdx, sName, nSum;
+	nSum := 0;
+	:FOR nIdx := 1 :TO "ten";
+		nSum := nSum + nIdx;
+	:NEXT;
+	:FOR nIdx := 1 :TO 10 :STEP "2";
+		nSum := nSum + nIdx;
+	:NEXT;
+	:FOR sName := sStart :TO 10;
+		nSum := nSum + 1;
+	:NEXT;
+	:RETURN nSum;
+:ENDPROC;
+-- format --
+:PROCEDURE Walk;
+	:PARAMETERS sStart;
+	:DECLARE nIdx, sName, nSum;
+	nSum := 0;
+	:FOR nIdx := 1 :TO "ten";
+		nSum := nSum + nIdx;
+	:NEXT;
+
+	:FOR nIdx := 1 :TO 10 :STEP "2";
+		nSum := nSum + nIdx;
+	:NEXT;
+
+	:FOR sName := sStart :TO 10;
+		nSum := nSum + 1;
+	:NEXT;
+	:RETURN nSum;
+:ENDPROC;
+-- diagnostics --
+5:21-5:26 warning for_numeric_values: ':FOR' limit value should be numeric
+8:30-8:33 warning for_numeric_values: ':FOR' step value should be numeric
+11:7-11:12 warning for_numeric_values: ':FOR' loop variable should be numeric
+11:16-11:22 warning for_numeric_values: ':FOR' start value should be numeric
+-- diagnostics [--strict --info] --
+5:21-5:26 warning for_numeric_values: ':FOR' limit value should be numeric
+8:30-8:33 warning for_numeric_values: ':FOR' step value should be numeric
+11:7-11:12 warning for_numeric_values: ':FOR' loop variable should be numeric
+11:16-11:22 warning for_numeric_values: ':FOR' start value should be numeric

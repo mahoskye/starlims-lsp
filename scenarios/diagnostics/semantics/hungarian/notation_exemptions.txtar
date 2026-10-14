@@ -1,0 +1,34 @@
+Near-misses for diag.hungarian_notation: every documented prefix in its
+proper shape, loop counters (i, x), an UPPER_SNAKE constant, and leading
+underscores before a valid prefix.
+-- input.ssl --
+:PROCEDURE Survey;
+	:PARAMETERS aRows, bStrict, dFrom, fnPick, nLimit, oSink, sTag, vExtra;
+	:DECLARE i, x, MAX_PASSES, _sScratch;
+	MAX_PASSES := 3;
+	_sScratch := sTag;
+	:FOR i := 1 :TO Len(aRows);
+		x := Eval(fnPick, aRows[i]);
+		:IF bStrict .AND. x > nLimit;
+			oSink:Add(x);
+		:ENDIF;
+	:NEXT;
+	:RETURN {dFrom, vExtra, MAX_PASSES, _sScratch};
+:ENDPROC;
+-- diagnostics [--hungarian] --
+-- format --
+:PROCEDURE Survey;
+	:PARAMETERS aRows, bStrict, dFrom, fnPick, nLimit, oSink, sTag, vExtra;
+	:DECLARE i, x, MAX_PASSES, _sScratch;
+	MAX_PASSES := 3;
+	_sScratch := sTag;
+	:FOR i := 1 :TO Len(aRows);
+		x := Eval(fnPick, aRows[i]);
+		:IF bStrict .AND. x > nLimit;
+			oSink:Add(x);
+		:ENDIF;
+	:NEXT;
+	:RETURN {dFrom, vExtra, MAX_PASSES, _sScratch};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

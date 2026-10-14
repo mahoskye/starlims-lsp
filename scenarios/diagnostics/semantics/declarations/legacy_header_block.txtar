@@ -1,0 +1,37 @@
+A realistic legacy procedure header where declaration rules meet: a
+:DECLARE before :PARAMETERS, inline initializers, a :DEFAULT on a local
+after the :DECLARE, a redeclared parameter, and a local nobody uses
+(strict). Each finding names a different defect in the same five lines.
+-- input.ssl --
+:PROCEDURE ReceiveLot;
+	:DECLARE nReceived := 0, sBin;
+	:PARAMETERS sLotNo, nQty;
+	:DEFAULT nQty, 1;
+	:DEFAULT sBin, "DOCK";
+	:DECLARE sLotNo, sUnused;
+	nReceived := nReceived + nQty;
+	sBin := "RACK-" + sLotNo;
+	:RETURN {sBin, nReceived};
+:ENDPROC;
+-- format --
+:PROCEDURE ReceiveLot;
+	:DECLARE nReceived := 0, sBin;
+	:PARAMETERS sLotNo, nQty;
+	:DEFAULT nQty, 1;
+	:DEFAULT sBin, "DOCK";
+	:DECLARE sLotNo, sUnused;
+	nReceived := nReceived + nQty;
+	sBin := "RACK-" + sLotNo;
+	:RETURN {sBin, nReceived};
+:ENDPROC;
+-- diagnostics --
+2:21-2:23 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:2-3:13 error parameters_first: ':PARAMETERS' must appear immediately after ':PROCEDURE'
+5:11-5:15 error default_on_declare_line: ':DEFAULT' target 'sBin' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+6:11-6:17 hint redeclare_is_noop: Variable 'sLotNo' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+-- diagnostics [--strict --info] --
+2:21-2:23 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:2-3:13 error parameters_first: ':PARAMETERS' must appear immediately after ':PROCEDURE'
+5:11-5:15 error default_on_declare_line: ':DEFAULT' target 'sBin' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+6:11-6:17 hint redeclare_is_noop: Variable 'sLotNo' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+6:19-6:26 hint unused_variable: Variable 'sUnused' is declared but never used

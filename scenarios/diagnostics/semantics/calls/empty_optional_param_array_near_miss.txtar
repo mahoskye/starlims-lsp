@@ -1,0 +1,28 @@
+Near-misses for diag.empty_optional_param_array: omitted array, a
+non-empty array, {} followed by a further argument (a positional
+placeholder, here GetDataSet's bIncludeSchema; the catalog fence uses
+ExecFunction, whose signature takes only two arguments, so
+builtin_excess_arguments would fire there), and {} passed to another
+function or in another position.
+-- input.ssl --
+:PROCEDURE Fetch;
+	:DECLARE vOut, aEmpty;
+	vOut := DoProc("Refresh");
+	vOut := DoProc("Refresh", {1, 2});
+	vOut := GetDataSet("SELECT id FROM lots", {}, .T.);
+	aEmpty := {};
+	vOut := Len({});
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Fetch;
+	:DECLARE vOut, aEmpty;
+	vOut := DoProc("Refresh");
+	vOut := DoProc("Refresh", {1, 2});
+	vOut := GetDataSet("SELECT id FROM lots", {}, .T.);
+	aEmpty := {};
+	vOut := Len({});
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

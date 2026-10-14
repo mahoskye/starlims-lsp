@@ -1,0 +1,42 @@
+Near-misses for diag.direct_procedure_call: built-in functions, the
+dispatch functions (DoProc, ExecFunction, ExecUdf, Eval), a method call
+through a colon, and a bare reference without parentheses (under strict
+that bare procedure name is an undeclared variable, which it is).
+-- input.ssl --
+:PROCEDURE Run;
+	:PARAMETERS sText, oSvc, fnStep;
+	:DECLARE nLen, vOut, vRef;
+	nLen := Len(AllTrim(sText));
+	vOut := DoProc("Helper", {nLen});
+	vOut := ExecFunction("Tools.Report.Render", {vOut});
+	vOut := ExecUdf(":PARAMETERS a; :RETURN a * 2;", {nLen});
+	vOut := Eval(fnStep, vOut);
+	oSvc:Notify(vOut);
+	vRef := Helper;
+	:RETURN vRef;
+:ENDPROC;
+:PROCEDURE Helper;
+	:PARAMETERS nIn;
+	:RETURN nIn + 1;
+:ENDPROC;
+-- format --
+:PROCEDURE Run;
+	:PARAMETERS sText, oSvc, fnStep;
+	:DECLARE nLen, vOut, vRef;
+	nLen := Len(AllTrim(sText));
+	vOut := DoProc("Helper", {nLen});
+	vOut := ExecFunction("Tools.Report.Render", {vOut});
+	vOut := ExecUdf(":PARAMETERS a; :RETURN a * 2;", {nLen});
+	vOut := Eval(fnStep, vOut);
+	oSvc:Notify(vOut);
+	vRef := Helper;
+	:RETURN vRef;
+:ENDPROC;
+
+:PROCEDURE Helper;
+	:PARAMETERS nIn;
+	:RETURN nIn + 1;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+10:10-10:16 warning undeclared_variable: Variable 'Helper' is not declared

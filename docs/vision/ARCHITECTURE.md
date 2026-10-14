@@ -355,11 +355,18 @@ is a data source (by extension) and whether it is an endpoint script
   failing until its gap is fixed.
 - **Formatter idempotence** over a corpus in
   `internal/providers/testdata/idempotence/`.
+- **Scenario suite** ([`scenarios/`](../../scenarios/README.md)): realistic
+  inputs with their expected formatted output and diagnostics, checked
+  through the CLI's own format and validate paths, plus invariants
+  (idempotence, whitespace-only changes, no gained errors, range
+  formatting) on every input. `scenarios/uncovered_codes.txt` ratchets
+  diagnostic-code coverage.
 - **CI** (`.github/workflows/test.yml`): gofmt, `go vet`, the
   generated-constants freshness check, and `go test ./...`.
 
 `make test` runs everything; `make catalog-check` runs the catalog tests
-alone; `make generate-docs` regenerates the catalog-derived docs after a
+alone; `make scenarios` / `make scenarios-update` check or regenerate the
+scenario suite; `make generate-docs` regenerates the catalog-derived docs after a
 catalog edit.
 
 ---

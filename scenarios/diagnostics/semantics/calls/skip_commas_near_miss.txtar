@@ -1,0 +1,28 @@
+Near-misses for diag.spaced_skip_commas and diag.trailing_skip_commas:
+adjacent interior skips (the preferred form), ordinary separators,
+empty parens, a trailing comma inside an array literal (that changes the
+array's length), and a trailing skip on a :-qualified member call (D10).
+-- input.ssl --
+:PROCEDURE Skips;
+	:PARAMETERS sValue;
+	:DECLARE vOut, aSlots;
+	vOut := LSelect("SELECT id FROM lots WHERE kind = ?",,, {"A"});
+	vOut := DoProc("Helper", {1,, 3});
+	vOut := Today();
+	aSlots := {1, 2,};
+	vOut := sValue:Substring(1,);
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Skips;
+	:PARAMETERS sValue;
+	:DECLARE vOut, aSlots;
+	vOut := LSelect("SELECT id FROM lots WHERE kind = ?",,, {"A"});
+	vOut := DoProc("Helper", {1,, 3});
+	vOut := Today();
+	aSlots := {1, 2,};
+	vOut := sValue:Substring(1,);
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

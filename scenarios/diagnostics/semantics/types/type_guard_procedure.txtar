@@ -1,0 +1,73 @@
+A realistic value-normalizing guard where type checks meet: a misspelled
+LimsTypeEx result, a code block compared with ==, a number tested with
+$, a string literal = (info), and :Format with a scalar second argument
+instead of an array. The NUMERIC branch with the {} Format form is
+correct.
+-- input.ssl --
+:PROCEDURE NormalizeValue;
+	:PARAMETERS vValue, fnDefault, nCode;
+	:DECLARE sFmt, sOut;
+	sFmt := "value={0}";
+	:BEGINCASE;
+	:CASE LimsTypeEx(vValue) == "NUMERIC";
+		sOut := sFmt:Format("n={0}", {LimsString(vValue)});
+		:EXITCASE;
+	:CASE LimsTypeEx(vValue) == "STRING";
+		sOut := sFmt:Format("s={0}", AllTrim(vValue));
+		:EXITCASE;
+	:CASE LimsTypeEx(vValue) == "BOOLEAN";
+		sOut := IIF(vValue, "yes", "no");
+		:EXITCASE;
+	:OTHERWISE;
+		:IF fnDefault == NIL .OR. nCode $ "123";
+			sOut := "";
+		:ELSE;
+			sOut := Eval(fnDefault, vValue);
+		:ENDIF;
+		:EXITCASE;
+	:ENDCASE;
+	:IF sOut = "value";
+		sOut := sOut + "=";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE NormalizeValue;
+	:PARAMETERS vValue, fnDefault, nCode;
+	:DECLARE sFmt, sOut;
+	sFmt := "value={0}";
+	:BEGINCASE;
+	:CASE LimsTypeEx(vValue) == "NUMERIC";
+		sOut := sFmt:Format("n={0}", {LimsString(vValue)});
+		:EXITCASE;
+	:CASE LimsTypeEx(vValue) == "STRING";
+		sOut := sFmt:Format("s={0}", AllTrim(vValue));
+		:EXITCASE;
+	:CASE LimsTypeEx(vValue) == "BOOLEAN";
+		sOut := IIf(vValue, "yes", "no");
+		:EXITCASE;
+	:OTHERWISE;
+		:IF fnDefault == NIL .OR. nCode $ "123";
+			sOut := "";
+		:ELSE;
+			sOut := Eval(fnDefault, vValue);
+		:ENDIF;
+		:EXITCASE;
+	:ENDCASE;
+
+	:IF sOut = "value";
+		sOut := sOut + "=";
+	:ENDIF;
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+10:32-10:47 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+12:30-12:39 error invalid_limstypeex_comparison: LimsTypeEx never returns "BOOLEAN" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+16:17-16:19 warning code_block_comparison: Code blocks (lambdas) cannot be compared with '=='. This causes an error
+16:35-16:36 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
+-- diagnostics [--strict --info] --
+10:32-10:47 warning format_arg_not_array: sFmt:Format takes ONE array holding every replacement value - wrap the values in braces: sFmt:Format(template, {...})
+12:30-12:39 error invalid_limstypeex_comparison: LimsTypeEx never returns "BOOLEAN" - this comparison can never be true. Valid results (uppercase, compared case-sensitively): NIL, STRING, NUMERIC, LOGIC, DATE, ARRAY, CODEBLOCK, OBJECT, SSLVALUE
+16:17-16:19 warning code_block_comparison: Code blocks (lambdas) cannot be compared with '=='. This causes an error
+16:35-16:36 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
+23:11-23:12 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

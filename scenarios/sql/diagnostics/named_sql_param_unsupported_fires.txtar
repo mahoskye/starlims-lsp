@@ -1,0 +1,38 @@
+Named ?name? placeholders passed to the positional-only family
+(diag.named_sql_param_unsupported, error): RunSQL, LSearch, LSelect1,
+LSelect and GetDataSet each get one; the function name match is
+case-insensitive (lsearch). At most one finding per string.
+-- input.ssl --
+:PROCEDURE UpdateStatus;
+	:PARAMETERS sStatus, sOrdNo;
+	:DECLARE bOk, sName, aRows, aAll, sXml;
+	bOk := RunSQL("UPDATE orders SET status = ?sStatus? WHERE ordno = ?sOrdNo?");
+	sName := lsearch("SELECT custname FROM orders WHERE ordno = ?sOrdNo?", "");
+	aRows := LSelect1("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	aAll := LSelect("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	sXml := GetDataSet("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	:RETURN {bOk, sName, aRows, aAll, sXml};
+:ENDPROC;
+-- format --
+:PROCEDURE UpdateStatus;
+	:PARAMETERS sStatus, sOrdNo;
+	:DECLARE bOk, sName, aRows, aAll, sXml;
+	bOk := RunSQL("UPDATE orders SET status = ?sStatus? WHERE ordno = ?sOrdNo?");
+	sName := LSearch("SELECT custname FROM orders WHERE ordno = ?sOrdNo?", "");
+	aRows := LSelect1("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	aAll := LSelect("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	sXml := GetDataSet("SELECT ordno FROM orders WHERE status = ?sStatus?");
+	:RETURN {bOk, sName, aRows, aAll, sXml};
+:ENDPROC;
+-- diagnostics --
+4:16-4:77 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'RunSQL'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+5:19-5:71 error named_sql_param_unsupported: Named SQL parameter '?sOrdNo?' not supported by 'lsearch'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+6:20-6:71 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'LSelect1'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+7:18-7:69 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'LSelect'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+8:21-8:72 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'GetDataSet'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+-- diagnostics [--strict --info] --
+4:16-4:77 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'RunSQL'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+5:19-5:71 error named_sql_param_unsupported: Named SQL parameter '?sOrdNo?' not supported by 'lsearch'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+6:20-6:71 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'LSelect1'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+7:18-7:69 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'LSelect'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.
+8:21-8:72 error named_sql_param_unsupported: Named SQL parameter '?sStatus?' not supported by 'GetDataSet'. Use positional '?' with value array, or use 'SQLExecute' for named parameters.

@@ -1,0 +1,19 @@
+datasource_default_required in an SSL-mode data source, including a
+lowercase `:parameters` keyword: the keyword is matched in any case, so
+its defaultless name reports alongside keyword_uppercase.
+-- input.ds --
+:parameters sLane, nDepth := 3;
+:DECLARE sKey;
+sKey := sLane + LimsString(nDepth);
+:RETURN sKey;
+-- format --
+:PARAMETERS sLane, nDepth := 3;
+:DECLARE sKey;
+sKey := sLane + LimsString(nDepth);
+:RETURN sKey;
+-- diagnostics --
+1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+1:13-1:18 error datasource_default_required: Data source parameter 'sLane' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
+-- diagnostics [--strict --info] --
+1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+1:13-1:18 error datasource_default_required: Data source parameter 'sLane' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)

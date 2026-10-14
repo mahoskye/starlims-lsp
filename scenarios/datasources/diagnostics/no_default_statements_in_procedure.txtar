@@ -1,0 +1,28 @@
+A :DEFAULT inside a procedure defined in an SSL data source.
+no_default_statements_in_datasource flags it: the catalog says the rule
+"Flags every :DEFAULT keyword token in the file". Procedure signatures in
+a data source cannot take inline defaults either (they are ordinary
+signatures, per diag.datasource_default_required), so as recorded a
+procedure inside a data source has no unflagged way to default a
+parameter.
+Suspected issue: #328 — datasource_default_required treats a nested procedure's :PARAMETERS as "an ordinary procedure signature, not the data source's interface", yet no_default_statements_in_datasource flags that procedure's ordinary :DEFAULT line; the two rules disagree on the scope of a nested procedure.
+-- input.ds --
+:PARAMETERS sAisle := "A";
+:PROCEDURE Pad;
+:PARAMETERS sText, nWidth;
+:DEFAULT nWidth, 4;
+:RETURN Right(Replicate("0", nWidth) + sText, nWidth);
+:ENDPROC;
+:RETURN DoProc("Pad", {sAisle});
+-- format --
+:PARAMETERS sAisle := "A";
+:PROCEDURE Pad;
+	:PARAMETERS sText, nWidth;
+	:DEFAULT nWidth, 4;
+	:RETURN Right(Replicate("0", nWidth) + sText, nWidth);
+:ENDPROC;
+:RETURN DoProc("Pad", {sAisle});
+-- diagnostics --
+4:1-4:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements
+-- diagnostics [--strict --info] --
+4:1-4:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements

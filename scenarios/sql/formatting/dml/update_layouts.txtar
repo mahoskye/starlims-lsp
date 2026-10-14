@@ -1,0 +1,37 @@
+UPDATE … SET puts each assignment on its own line 4 past UPDATE, with
+trailing commas and WHERE/AND below (reference §2.10,
+sql_update_layout); a correlated subquery as a SET value opens on the
+assignment line.
+-- input.ssl --
+:PROCEDURE Refresh;
+	:PARAMETERS sOrdNo, sUser;
+	:DECLARE bOk;
+	bOk := RunSQL("update ordtask set status = 'Complete', completed_date = sysdate, completed_by = ? where ordno = ? and testcode = 'pH'",, {sUser, sOrdNo});
+	bOk := RunSQL("update orders o set o.task_count = (select count(*) from ordtask t where t.ordno = o.ordno) where o.status = 'Active'");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Refresh;
+	:PARAMETERS sOrdNo, sUser;
+	:DECLARE bOk;
+	bOk := RunSQL("
+	    UPDATE ordtask SET
+	        status = 'Complete',
+	        completed_date = SYSDATE,
+	        completed_by = ?
+	    WHERE ordno = ?
+	      AND testcode = 'pH'
+	",, {sUser, sOrdNo});
+	bOk := RunSQL("
+	    UPDATE orders o SET
+	        o.task_count = (
+	        SELECT COUNT(*)
+	        FROM ordtask t
+	        WHERE t.ordno = o.ordno
+	    )
+	    WHERE o.status = 'Active'
+	");
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

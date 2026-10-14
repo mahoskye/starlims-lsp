@@ -1,0 +1,25 @@
+GetSSLDataset is in the formatter's SQL-function set: its first argument
+reflows, with @name markers kept intact, while the parallel name and
+value arrays stay on the closing line.
+-- input.ssl --
+:PROCEDURE SampleSet;
+	:PARAMETERS sStatus, sSite;
+	:DECLARE oDs;
+	oDs := GetSSLDataset("select sampleid, status, site from samples where status = @sStatus and site = @sSite order by sampleid",, {"@sStatus", "@sSite"}, {sStatus, sSite});
+	:RETURN oDs;
+:ENDPROC;
+-- format --
+:PROCEDURE SampleSet;
+	:PARAMETERS sStatus, sSite;
+	:DECLARE oDs;
+	oDs := GetSSLDataset("
+	    SELECT sampleid, status, site
+	    FROM samples
+	    WHERE status = @sStatus
+	      AND site = @sSite
+	    ORDER BY sampleid
+	",, {"@sStatus", "@sSite"}, {sStatus, sSite});
+	:RETURN oDs;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

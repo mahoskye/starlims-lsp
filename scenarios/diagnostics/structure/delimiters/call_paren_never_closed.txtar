@@ -1,0 +1,29 @@
+A call whose closing `)` was dropped. unclosed_delimiter reports the
+opener (where the fix belongs). The catalog says such an opener swallows
+the rest of the file into that statement, so unexpected_token must defer
+for everything after it; records whether block pairing downstream is
+disturbed (diag.unclosed_delimiter, diag.unexpected_token deferral).
+-- input.ssl --
+:PROCEDURE NoteLength;
+	:PARAMETERS sNote;
+	:DECLARE nLen;
+	nLen := Len(AllTrim(sNote);
+	:IF nLen > 200;
+		nLen := 200;
+	:ENDIF;
+	:RETURN nLen;
+:ENDPROC;
+-- format --
+:PROCEDURE NoteLength;
+	:PARAMETERS sNote;
+	:DECLARE nLen;
+	nLen := Len(AllTrim(sNote);
+		:IF nLen > 200;
+		nLen := 200;
+		:ENDIF;
+		:RETURN nLen;
+		:ENDPROC;
+-- diagnostics --
+4:13-4:14 error unclosed_delimiter: Unclosed '('
+-- diagnostics [--strict --info] --
+4:13-4:14 error unclosed_delimiter: Unclosed '('

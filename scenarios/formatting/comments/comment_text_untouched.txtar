@@ -1,0 +1,20 @@
+Comment content is never recased, respaced or re-terminated: keyword,
+operator and built-in text inside comments stays as written
+(feature.formatting A3, fmt.keyword_case D7, fmt.builtin_function_case
+issue #34).
+-- input.ssl --
+:PROCEDURE Demo;
+:DECLARE nValue;
+/* :if nil .and. x:=len(y) .t.;
+nValue := len("x");  /* call upper(x)   then  :endif;
+:RETURN nValue;
+:ENDPROC;
+-- format --
+:PROCEDURE Demo;
+	:DECLARE nValue;
+	/* :if nil .and. x:=len(y) .t.;
+	nValue := Len("x");  /* call upper(x)   then  :endif;
+	:RETURN nValue;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,25 @@
+:INHERIT after a field :DECLARE (diag.inherit_position, error): SSL only
+accepts :INHERIT directly after the class declaration. The misplaced
+:INHERIT is not class_member_order's finding (issue #255 split).
+-- input.ssl --
+:CLASS Widget;
+:DECLARE nWidth;
+:INHERIT Lab.Control;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:nWidth := 100;
+:ENDPROC;
+-- format --
+:CLASS Widget;
+:DECLARE nWidth;
+:INHERIT Lab.Control;
+
+:PROCEDURE Init;
+	Base:Init();
+	Me:nWidth := 100;
+:ENDPROC;
+-- diagnostics --
+3:1-3:9 error inherit_position: ':INHERIT' must directly follow the ':CLASS' statement
+-- diagnostics [--strict --info] --
+3:1-3:9 error inherit_position: ':INHERIT' must directly follow the ':CLASS' statement

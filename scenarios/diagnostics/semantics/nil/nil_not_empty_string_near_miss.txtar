@@ -1,0 +1,27 @@
+Near-misses for diag.nil_not_empty_string: NIL against a variable or a
+non-default literal, a variable against "" (the normal initialized-value
+test), != with NIL, and NIL assignment.
+-- input.ssl --
+:PROCEDURE Probe;
+	:PARAMETERS vValue, sName;
+	:DECLARE bA;
+	bA := vValue = NIL;
+	bA := bA .OR. NIL == 5;
+	bA := bA .OR. sName == "";
+	bA := bA .OR. NIL != "";
+	vValue := NIL;
+	:RETURN bA;
+:ENDPROC;
+-- format --
+:PROCEDURE Probe;
+	:PARAMETERS vValue, sName;
+	:DECLARE bA;
+	bA := vValue = NIL;
+	bA := bA .OR. NIL == 5;
+	bA := bA .OR. sName == "";
+	bA := bA .OR. NIL != "";
+	vValue := NIL;
+	:RETURN bA;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

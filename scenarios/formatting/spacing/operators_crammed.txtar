@@ -1,0 +1,37 @@
+Crammed legacy expressions: every binary operator — `:=`, compound
+assignments, comparisons (`==`, `!=`, `<>`, `#`, `<=`, `>=`), arithmetic
+(`+ - * / % ^ **`), `$` and the dot logicals — gets exactly one space on
+each side, and runs of spaces collapse to one (fmt.operator_spacing).
+-- input.ssl --
+:PROCEDURE Crammed;
+:PARAMETERS nA,nB,sText;
+:DECLARE nR,bR;
+nR:=nA+nB*2-nA/4%3;
+nR+=nA^2;nR-=1;
+nR*=nB**2;
+nR   /=    2;
+nR%=7;
+bR:=nA==nB.OR.nA!=nB.AND.nA<>nB;
+bR:=nA#nB.OR.nA<=nB.OR.nA>=nB;
+bR:="x"$sText;
+:RETURN nR;
+:ENDPROC;
+-- format --
+:PROCEDURE Crammed;
+	:PARAMETERS nA, nB, sText;
+	:DECLARE nR, bR;
+	nR := nA + nB * 2 - nA / 4 % 3;
+	nR += nA ^ 2;
+	nR -= 1;
+	nR *= nB ** 2;
+	nR /= 2;
+	nR %= 7;
+	bR := nA == nB .OR. nA != nB .AND. nA <> nB;
+	bR := nA # nB .OR. nA <= nB .OR. nA >= nB;
+	bR := "x" $ sText;
+	:RETURN nR;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+9:28-9:30 info not_preferred_operator: Use '!=' instead of '<>' for inequality
+10:7-10:8 info not_preferred_operator: Use '!=' instead of '#' for inequality

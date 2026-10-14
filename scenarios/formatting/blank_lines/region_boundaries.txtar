@@ -1,0 +1,36 @@
+A procedure and an adjacent region are separated by one blank line in
+either order, and two regions in a row likewise (fmt.blank_lines_between_procs:
+"any of the four pairings"). Region bodies stay verbatim.
+-- input.ssl --
+:PROCEDURE First;
+:RETURN 1;
+:ENDPROC;
+:REGION Payload;
+raw text
+:ENDREGION;
+:REGION Second;
+more raw text
+:ENDREGION;
+
+
+:PROCEDURE Last;
+:RETURN 2;
+:ENDPROC;
+-- format --
+:PROCEDURE First;
+	:RETURN 1;
+:ENDPROC;
+
+:REGION Payload;
+raw text
+:ENDREGION;
+
+:REGION Second;
+more raw text
+:ENDREGION;
+
+:PROCEDURE Last;
+	:RETURN 2;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

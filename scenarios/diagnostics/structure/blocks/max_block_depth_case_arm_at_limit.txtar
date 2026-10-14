@@ -1,0 +1,58 @@
+Near miss for max_block_depth: a :BEGINCASE at depth 4 whose arms hold
+plain statements. Arms sit at their :BEGINCASE's depth, so nothing exceeds
+the default maximum of 4, and :ELSE/:CATCH/:FINALLY bodies add no level
+either (diag.max_block_depth "Does not flag").
+-- input.ssl --
+:PROCEDURE ClassifyReading;
+	:PARAMETERS nValue, bCalibrated;
+	:DECLARE sClass, oErr;
+	:TRY;
+		:IF bCalibrated;
+			:BEGINCASE;
+			:CASE nValue < 0;
+				sClass := "invalid";
+				:EXITCASE;
+			:CASE nValue < 50;
+				sClass := "low";
+				:EXITCASE;
+			:OTHERWISE;
+				sClass := "high";
+				:EXITCASE;
+			:ENDCASE;
+		:ELSE;
+			sClass := "uncalibrated";
+		:ENDIF;
+	:CATCH;
+		oErr := GetLastSSLError();
+		sClass := oErr:Description;
+	:ENDTRY;
+	:RETURN sClass;
+:ENDPROC;
+-- format --
+:PROCEDURE ClassifyReading;
+	:PARAMETERS nValue, bCalibrated;
+	:DECLARE sClass, oErr;
+	:TRY;
+		:IF bCalibrated;
+			:BEGINCASE;
+			:CASE nValue < 0;
+				sClass := "invalid";
+				:EXITCASE;
+			:CASE nValue < 50;
+				sClass := "low";
+				:EXITCASE;
+			:OTHERWISE;
+				sClass := "high";
+				:EXITCASE;
+			:ENDCASE;
+		:ELSE;
+			sClass := "uncalibrated";
+		:ENDIF;
+	:CATCH;
+		oErr := GetLastSSLError();
+		sClass := oErr:Description;
+	:ENDTRY;
+	:RETURN sClass;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

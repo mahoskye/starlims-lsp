@@ -1,0 +1,31 @@
+Stray separators in the header region of a SQL-mode data source. A banner
+closed with `*/;` (the SSL-mode idiom) still lets the header split, so no
+SSL diagnostic reaches the body (feature.diagnostics_pipeline A24), but
+its `;` has no statement before it, and STARLIMS rejects the document, so
+datasource_sql_semicolon fires on it. The doubled `;;` after :DSN is the
+same case between directives; the scan continues past it, so the
+:PARAMETERS line is still header and the body stays SQL (catalog
+diag.datasource_sql_semicolon, issue #249). Directive terminators never
+flag.
+-- input.ds --
+/* Data source: active couriers */;
+:DSN := DATABASE;;
+:PARAMETERS sZone := "N";
+
+select c.courier_id, c.courier_name
+from courier c
+where c.zone_code = @sZone and c.active = 'Y'
+-- format --
+/* Data source: active couriers */;
+:DSN := DATABASE;;
+:PARAMETERS sZone := "N";
+
+select c.courier_id, c.courier_name
+from courier c
+where c.zone_code = @sZone and c.active = 'Y'
+-- diagnostics --
+1:35-1:36 error datasource_sql_semicolon: Misplaced semicolon in a SQL data source. Nothing precedes it, so it is a stray statement separator - the body runs as a single SQL command and STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it. (A ';' is required only after an SSL comment, and only in SSL documents.)
+2:18-2:19 error datasource_sql_semicolon: Misplaced semicolon in a SQL data source. Nothing precedes it, so it is a stray statement separator - the body runs as a single SQL command and STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it. (A ';' is required only after an SSL comment, and only in SSL documents.)
+-- diagnostics [--strict --info] --
+1:35-1:36 error datasource_sql_semicolon: Misplaced semicolon in a SQL data source. Nothing precedes it, so it is a stray statement separator - the body runs as a single SQL command and STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it. (A ';' is required only after an SSL comment, and only in SSL documents.)
+2:18-2:19 error datasource_sql_semicolon: Misplaced semicolon in a SQL data source. Nothing precedes it, so it is a stray statement separator - the body runs as a single SQL command and STARLIMS rejects the document with "Invalid SQL statement: remove any misplaced semicolons(;)". Delete it. (A ';' is required only after an SSL comment, and only in SSL documents.)

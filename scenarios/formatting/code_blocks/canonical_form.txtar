@@ -1,0 +1,32 @@
+Code-block literals canonicalize to `{|params| expression}`: parameters
+trimmed and comma-space separated, one space after the closing `|`, the
+body spaced like any expression, unary signs glued, and an empty body
+written `{|params|}` (fmt.code_block_literals, issue #91). The
+parameterless `{||Now()}` does not compile (diag.code_block_structure)
+but is still normalized.
+-- input.ssl --
+:PROCEDURE Blocks;
+:DECLARE fnAdd, fnPred, fnNeg, fnNone, fnNoArgs, aSorted;
+fnAdd := {| a ,b |a+b};
+fnPred := {|x|x>=10.AND.x<=20};
+fnNeg := {|n|   -n};
+fnNone := {|x|};
+fnNoArgs := {||Now()};
+aSorted := DoProc("SortRows", {{3, 1, 2},,{|a,b|a<b}});
+:RETURN Eval(fnAdd, 1, 2);
+:ENDPROC;
+-- format --
+:PROCEDURE Blocks;
+	:DECLARE fnAdd, fnPred, fnNeg, fnNone, fnNoArgs, aSorted;
+	fnAdd := {|a, b| a + b};
+	fnPred := {|x| x >= 10 .AND. x <= 20};
+	fnNeg := {|n| -n};
+	fnNone := {|x|};
+	fnNoArgs := {|| Now()};
+	aSorted := DoProc("SortRows", {{3, 1, 2},, {|a, b| a < b}});
+	:RETURN Eval(fnAdd, 1, 2);
+:ENDPROC;
+-- diagnostics --
+7:13-7:22 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile
+-- diagnostics [--strict --info] --
+7:13-7:22 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile

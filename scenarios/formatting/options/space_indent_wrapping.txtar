@@ -1,0 +1,51 @@
+`--indent-style space` with the default size 4 and a narrower
+`--max-line-length 60`, together: block indent, continuation indent and
+wrap accounting all use four spaces per level (fmt.indent_style,
+fmt.max_line_length, feature.formatting A8).
+-- input.ssl --
+:PROCEDURE Combined;
+:PARAMETERS aRows;
+:DECLARE i, vResult;
+:FOR i := 1 :TO Len(aRows);
+:IF .NOT. Empty(aRows[i]);
+vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", i});
+:ENDIF;
+:NEXT;
+:RETURN vResult;
+:ENDPROC;
+-- format [--indent-style space --max-line-length 60] --
+:PROCEDURE Combined;
+    :PARAMETERS aRows;
+    :DECLARE i, vResult;
+    :FOR i := 1 :TO Len(aRows);
+        :IF .NOT. Empty(aRows[i]);
+            vResult := DoProc("StoreRow", {aRows[i],
+                "SAMPLE", "RESULT", i});
+        :ENDIF;
+    :NEXT;
+    :RETURN vResult;
+:ENDPROC;
+-- format [--indent-style space] --
+:PROCEDURE Combined;
+    :PARAMETERS aRows;
+    :DECLARE i, vResult;
+    :FOR i := 1 :TO Len(aRows);
+        :IF .NOT. Empty(aRows[i]);
+            vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", i});
+        :ENDIF;
+    :NEXT;
+    :RETURN vResult;
+:ENDPROC;
+-- format --
+:PROCEDURE Combined;
+	:PARAMETERS aRows;
+	:DECLARE i, vResult;
+	:FOR i := 1 :TO Len(aRows);
+		:IF .NOT. Empty(aRows[i]);
+			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", i});
+		:ENDIF;
+	:NEXT;
+	:RETURN vResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

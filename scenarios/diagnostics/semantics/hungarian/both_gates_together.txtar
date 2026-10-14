@@ -1,0 +1,26 @@
+The two Hungarian checks are separate findings with separate gates. The
+CLI's --hungarian enables both (hungarian_notation on the unprefixed
+Count, hungarian_type_mismatch on sLabel := 0); --hungarian-types enables
+only the type check (validate.go: CheckHungarianTypes = hungarian ||
+hungarianTypes). Neither fires by default.
+-- input.ssl --
+:PROCEDURE Mark;
+	:DECLARE Count, sLabel;
+	Count := 1;
+	sLabel := 0;
+	:RETURN sLabel + LimsString(Count);
+:ENDPROC;
+-- diagnostics [--hungarian] --
+2:11-2:16 warning hungarian_notation: Variable 'Count' should use a Hungarian notation prefix (a, b, d, fn, n, o, s, v)
+4:2-4:13 warning hungarian_type_mismatch: 'sLabel' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
+-- diagnostics [--hungarian-types] --
+4:2-4:13 warning hungarian_type_mismatch: 'sLabel' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
+-- format --
+:PROCEDURE Mark;
+	:DECLARE Count, sLabel;
+	Count := 1;
+	sLabel := 0;
+	:RETURN sLabel + LimsString(Count);
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,16 @@
+Near miss for procedure_declaration_syntax: a bare `PROCEDURE Name;`
+without `(` is not provably a declaration attempt, so this rule must NOT
+fire. The statement still does not parse and unexpected_token reports it
+(diag.procedure_declaration_syntax second bullet).
+-- input.ssl --
+PROCEDURE CalcDiscount;
+:RETURN .T.;
+-- format --
+PROCEDURE CalcDiscount;
+:RETURN .T.;
+-- diagnostics --
+1:11-1:23 error unexpected_token: Unexpected identifier 'CalcDiscount' - expected an operator or ';'
+-- diagnostics [--strict --info] --
+1:1-1:10 warning undeclared_variable: Variable 'PROCEDURE' is not declared
+1:11-1:23 warning undeclared_variable: Variable 'CalcDiscount' is not declared
+1:11-1:23 error unexpected_token: Unexpected identifier 'CalcDiscount' - expected an operator or ';'

@@ -1,0 +1,35 @@
+x = "" is a prefix match that is true for every string
+(diag.equals_empty_string, warning, on the comparison), for all three
+quote styles and on array elements. A string literal operand of = is
+also diag.equals_vs_strict_equals (info tier).
+-- input.ssl --
+:PROCEDURE Blank;
+	:PARAMETERS sStatus, aRow;
+	:DECLARE bBlank;
+	:IF sStatus = "";
+		sStatus := "Logged";
+	:ENDIF;
+	bBlank := aRow[2] = '' .OR. aRow[3] = [];
+	:RETURN bBlank;
+:ENDPROC;
+-- format --
+:PROCEDURE Blank;
+	:PARAMETERS sStatus, aRow;
+	:DECLARE bBlank;
+	:IF sStatus = "";
+		sStatus := "Logged";
+	:ENDIF;
+	bBlank := aRow[2] = '' .OR. aRow[3] = [];
+	:RETURN bBlank;
+:ENDPROC;
+-- diagnostics --
+4:6-4:18 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+7:12-7:24 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+7:30-7:42 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+-- diagnostics [--strict --info] --
+4:6-4:18 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+4:14-4:15 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+7:12-7:24 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+7:20-7:21 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+7:30-7:42 warning equals_empty_string: '= ""' is always true for a string: '=' is a prefix match and every string starts with the empty string. Use Empty(x) or x == "" to test for an empty value
+7:38-7:39 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

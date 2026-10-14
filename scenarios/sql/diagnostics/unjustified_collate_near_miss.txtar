@@ -1,0 +1,31 @@
+COLLATE shapes unjustified_collate must accept (diag.unjustified_collate
+Does not flag): a COLLATE whose statement has a comment directly above
+it, COLLATERAL (word boundary), COLLATE inside a character literal and a
+SQL comment, and COLLATE in a non-SQL string.
+-- input.ssl --
+:PROCEDURE Names;
+	:DECLARE aRows, sMsg;
+	/* the server default is case-sensitive, so this report sorts case-insensitively;
+	aRows := SQLExecute("SELECT custname FROM customers ORDER BY custname COLLATE Latin1_General_CI_AS");
+	aRows := SQLExecute("SELECT custname FROM customers WHERE kind = 'COLLATERAL'");
+	aRows := SQLExecute("SELECT custname FROM customers WHERE kind = 'COLLATE' -- collate not needed here
+");
+	sMsg := "Select a collate order for the report";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- format --
+:PROCEDURE Names;
+	:DECLARE aRows, sMsg;
+	/* the server default is case-sensitive, so this report sorts case-insensitively;
+	aRows := SQLExecute("SELECT custname FROM customers ORDER BY custname COLLATE Latin1_General_CI_AS");
+	aRows := SQLExecute("SELECT custname FROM customers WHERE kind = 'COLLATERAL'");
+	aRows := SQLExecute("
+	    SELECT custname
+	    FROM customers
+	    WHERE kind = 'COLLATE' -- collate not needed here
+	");
+	sMsg := "Select a collate order for the report";
+	:RETURN {aRows, sMsg};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

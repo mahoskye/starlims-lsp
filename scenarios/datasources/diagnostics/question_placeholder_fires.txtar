@@ -1,0 +1,22 @@
+datasource_sql_question_placeholder: a `?name?` marker in the body of a
+SQL-mode data source is SQLExecute syntax that the builder never
+substitutes, so the query runs with the marker text in it. Each marker
+reports an error on its span; the @name placeholder beside them is fine.
+-- input.ds --
+:DSN := DATABASE;
+:PARAMETERS sDock := "D1", nBay := 0;
+
+select bay_id from dock_bay
+where dock_code = ?sDock? and bay_no > ?nBay? and dock_code <> @sDock
+-- format --
+:DSN := DATABASE;
+:PARAMETERS sDock := "D1", nBay := 0;
+
+select bay_id from dock_bay
+where dock_code = ?sDock? and bay_no > ?nBay? and dock_code <> @sDock
+-- diagnostics --
+5:19-5:26 error datasource_sql_question_placeholder: A SQL data source references parameters as '@sDock'; the '?sDock?' marker is SQLExecute's and is not substituted here
+5:40-5:46 error datasource_sql_question_placeholder: A SQL data source references parameters as '@nBay'; the '?nBay?' marker is SQLExecute's and is not substituted here
+-- diagnostics [--strict --info] --
+5:19-5:26 error datasource_sql_question_placeholder: A SQL data source references parameters as '@sDock'; the '?sDock?' marker is SQLExecute's and is not substituted here
+5:40-5:46 error datasource_sql_question_placeholder: A SQL data source references parameters as '@nBay'; the '?nBay?' marker is SQLExecute's and is not substituted here

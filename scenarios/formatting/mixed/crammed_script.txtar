@@ -1,0 +1,55 @@
+A top-level script written as crammed one-liners: several statements and
+whole :IF blocks on one line, missing semicolons at line ends, and a
+:FOR loop on one line. Records how the formatter splits and indents
+them (style guide one_statement_per_line, fmt.semicolon_enforcement,
+fmt.indent_style).
+-- input.ssl --
+:parameters sMode;:default sMode,"FULL";:declare aRows,i,nCount
+nCount:=0;aRows:={"a","b","c"}
+:if sMode=="FULL";nCount:=Len(aRows);:else;nCount:=1;:endif
+:for i:=1 :to nCount;DoProc("Touch",{aRows[i]});:next
+:return nCount
+-- format --
+:PARAMETERS sMode;
+:DEFAULT sMode, "FULL";
+:DECLARE aRows, i, nCount;
+nCount := 0;
+aRows := {"a", "b", "c"};
+:IF sMode == "FULL";
+	nCount := Len(aRows);
+:ELSE;
+	nCount := 1;
+:ENDIF;
+
+:FOR i := 1 :TO nCount;
+	DoProc("Touch", {aRows[i]});
+:NEXT;
+:RETURN nCount;
+-- diagnostics --
+1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+1:19-1:27 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+1:41-1:49 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+2:1-2:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 1). Re-declaration is silently ignored at runtime.
+2:7-2:9 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:1-3:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+3:1-3:4 error unexpected_token: Unexpected keyword ':if' - expected an operator or ';' (is the previous statement missing its ';'?)
+3:38-3:43 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+3:54-3:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+4:1-4:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+4:11-4:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+4:49-4:54 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+5:1-5:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+-- diagnostics [--strict --info] --
+1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
+1:19-1:27 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
+1:41-1:49 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'
+2:1-2:7 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 1). Re-declaration is silently ignored at runtime.
+2:7-2:9 error declare_initializer: ':DECLARE' accepts only a comma-separated list of variable names - assign the value in a separate statement
+3:1-3:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
+3:1-3:4 error unexpected_token: Unexpected keyword ':if' - expected an operator or ';' (is the previous statement missing its ';'?)
+3:38-3:43 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+3:54-3:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+4:1-4:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+4:11-4:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
+4:49-4:54 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
+5:1-5:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'

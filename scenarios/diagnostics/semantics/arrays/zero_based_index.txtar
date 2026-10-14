@@ -1,0 +1,33 @@
+SSL arrays are 1-based: a literal 0 subscript on a bare variable is an
+error (diag.zero_based_array_index, on the 0), in any dimension and in
+both subscript forms.
+-- input.ssl --
+:PROCEDURE FirstCell;
+	:DECLARE aRows, vOut;
+	aRows := {{1, 2}, {3, 4}};
+	vOut := aRows[0];
+	vOut := aRows[1][0];
+	vOut := aRows[1, 0];
+	vOut := aRows[0, 1];
+	:RETURN vOut;
+:ENDPROC;
+-- format --
+:PROCEDURE FirstCell;
+	:DECLARE aRows, vOut;
+	aRows := {{1, 2}, {3, 4}};
+	vOut := aRows[0];
+	vOut := aRows[1][0];
+	vOut := aRows[1, 0];
+	vOut := aRows[0, 1];
+	:RETURN vOut;
+:ENDPROC;
+-- diagnostics --
+4:16-4:17 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+5:19-5:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+6:19-6:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+7:16-7:17 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+-- diagnostics [--strict --info] --
+4:16-4:17 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+5:19-5:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+6:19-6:20 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+7:16-7:17 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.

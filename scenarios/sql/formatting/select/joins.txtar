@@ -1,0 +1,32 @@
+INNER, LEFT OUTER and CROSS joins each start at the clause column, ON
+indents 2 under its JOIN, and an extra join condition sits under ON
+(reference §2.2, sql_on_indent).
+-- input.ssl --
+:PROCEDURE Joined;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("select o.ordno, t.testcode, r.result_value, s.spec_value, l.label from orders o inner join ordtask t on t.ordno = o.ordno left outer join ordresult r on r.ordno = t.ordno and r.testcode = t.testcode inner join specifications s on s.testcode = t.testcode cross join labels l where o.ordno = ?sOrdNo? and t.testcode = 'pH'");
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE Joined;
+	:PARAMETERS sOrdNo;
+	:DECLARE aRows;
+	aRows := SQLExecute("
+	    SELECT o.ordno, t.testcode, r.result_value, s.spec_value, l.label
+	    FROM orders o
+	    INNER JOIN ordtask t
+	      ON t.ordno = o.ordno
+	    LEFT OUTER JOIN ordresult r
+	      ON r.ordno = t.ordno
+	      AND r.testcode = t.testcode
+	    INNER JOIN specifications s
+	      ON s.testcode = t.testcode
+	    CROSS JOIN labels l
+	    WHERE o.ordno = ?sOrdNo?
+	      AND t.testcode = 'pH'
+	");
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

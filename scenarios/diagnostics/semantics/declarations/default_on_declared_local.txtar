@@ -1,0 +1,28 @@
+:DEFAULT only supplies a fallback for a parameter of its scope. Defaulting
+a :DECLAREd local fires diag.default_on_declare_line on the target name;
+it is also misplaced, so diag.default_after_parameters fires on the same
+statement (the two report different defects).
+-- input.ssl --
+:PROCEDURE CountBins;
+	:PARAMETERS sAisle;
+	:DEFAULT sAisle, "A";
+	:DECLARE nBins;
+	:DEFAULT nBins, 0;
+	nBins := Len(sAisle);
+	:RETURN nBins;
+:ENDPROC;
+-- format --
+:PROCEDURE CountBins;
+	:PARAMETERS sAisle;
+	:DEFAULT sAisle, "A";
+	:DECLARE nBins;
+	:DEFAULT nBins, 0;
+	nBins := Len(sAisle);
+	:RETURN nBins;
+:ENDPROC;
+-- diagnostics --
+5:2-5:10 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+5:11-5:16 error default_on_declare_line: ':DEFAULT' target 'nBins' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
+-- diagnostics [--strict --info] --
+5:2-5:10 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
+5:11-5:16 error default_on_declare_line: ':DEFAULT' target 'nBins' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment

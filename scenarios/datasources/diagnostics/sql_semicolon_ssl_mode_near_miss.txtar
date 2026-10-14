@@ -1,0 +1,18 @@
+Near miss for datasource_sql_semicolon: in an SSL-mode data source the
+`*/;` banner closer and statement semicolons are SSL syntax, and the rule
+never runs outside SQL mode.
+-- input.ds --
+/* Data source: gate usage (SSL) */;
+:PARAMETERS sGate := "G1";
+:DECLARE nUses;
+nUses := LSearch("SELECT COUNT(*) FROM gate_pass WHERE gate_code = ?", 0,, {sGate});
+:RETURN nUses;
+-- format --
+/* Data source: gate usage (SSL) */;
+:PARAMETERS sGate := "G1";
+:DECLARE nUses;
+nUses := LSearch("SELECT COUNT(*) FROM gate_pass WHERE gate_code = ?", 0,, {sGate});
+:RETURN nUses;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:37 info c_style_comment_closer: SSL comments end at ';' - the '*/' before it is literal comment text, not a closer (valid; stylistic)

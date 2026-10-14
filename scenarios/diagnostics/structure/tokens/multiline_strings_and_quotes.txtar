@@ -1,0 +1,34 @@
+Near miss for unterminated_string: a closed SQL string spanning lines,
+the other quote kind inside a string, a bracket string with one nested
+span, and a quote inside a comment are all fine (diag.unterminated_string
+"Does not flag"). Clean.
+-- input.ssl --
+:PROCEDURE ListOpen;
+	:DECLARE sSQL, sA, sB, sC, aRows;
+	/* don't flag a quote in a comment;
+	sSQL := "SELECT ITEMID, DISPLAYTEXT
+		FROM ITEMS
+		WHERE DONE = '0'";
+	sA := "it's";
+	sB := 'say "hi"';
+	sC := [it's "quoted" [and nested]];
+	aRows := SQLExecute(sSQL);
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE ListOpen;
+	:DECLARE sSQL, sA, sB, sC, aRows;
+	/* don't flag a quote in a comment;
+	sSQL := "
+	    SELECT ITEMID, DISPLAYTEXT
+	    FROM ITEMS
+	    WHERE DONE = '0'
+	";
+	sA := "it's";
+	sB := 'say "hi"';
+	sC := [it's "quoted" [and nested]];
+	aRows := SQLExecute(sSQL);
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,14 @@
+Whitespace only: spaces, tabs and blank lines with no tokens. The
+formatter trims trailing whitespace; no diagnostics.
+-- input.ssl --
+   
+		
+
+  	 
+-- format --
+
+
+
+
+-- diagnostics --
+-- diagnostics [--strict --info] --

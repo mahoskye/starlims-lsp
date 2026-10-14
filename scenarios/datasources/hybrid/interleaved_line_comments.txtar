@@ -1,0 +1,25 @@
+Header statements interleaved with `--` line comments: every header
+statement is included in the split and the comment lines report nothing
+(feature.diagnostics_pipeline A25). The `:nullasblank` directive is
+lowercase so a header check is visibly reached after the comments
+(builder_directive_case).
+-- input.ds --
+-- connection
+:DSN := DATABASE;
+-- null handling
+:nullasblank := true;
+-- inputs
+:PARAMETERS sSku := "";
+select sku_code, sku_desc from sku_master where sku_code = @sSku
+-- format --
+-- connection
+:DSN := DATABASE;
+-- null handling
+:nullasblank := true;
+-- inputs
+:PARAMETERS sSku := "";
+select sku_code, sku_desc from sku_master where sku_code = @sSku
+-- diagnostics --
+4:1-4:13 error builder_directive_case: Builder directives must be uppercase: use ':NULLASBLANK'
+-- diagnostics [--strict --info] --
+4:1-4:13 error builder_directive_case: Builder directives must be uppercase: use ':NULLASBLANK'

@@ -1,0 +1,127 @@
+A complete, well-formed standalone class following every convention:
+banner, fields before methods, Constructor with :DEFAULT, Me: field
+access, Me: method calls instead of DoProc, built-ins with curly braces,
+TRY/CATCH with GetLastSSLError. Should be clean under every profile; any
+finding is worth scrutiny.
+-- input.ssl --
+/*
+ * Class: SampleBatch
+ * Description: Collects sample identifiers and summarizes them
+;
+:CLASS SampleBatch;
+:DECLARE aSampleIds, sBatchName, nLimit;
+
+/*
+ * Procedure: Constructor
+ * Parameters:
+ *   sName - the batch display name
+ *   nMax - the most samples the batch accepts
+;
+:PROCEDURE Constructor;
+	:PARAMETERS sName, nMax;
+	:DEFAULT sName, "Batch";
+	:DEFAULT nMax, 50;
+	Me:sBatchName := sName;
+	Me:nLimit := nMax;
+	Me:aSampleIds := {};
+:ENDPROC;
+
+/*
+ * Procedure: Add
+ * Parameters:
+ *   sSampleId - the sample to add
+ * Returns: .T. when the sample was added
+;
+:PROCEDURE Add;
+	:PARAMETERS sSampleId;
+	:IF Me:IsFull();
+		:RETURN .F.;
+	:ENDIF;
+	AAdd(Me:aSampleIds, AllTrim(sSampleId));
+	:RETURN .T.;
+:ENDPROC;
+
+/*
+ * Procedure: IsFull
+ * Returns: .T. when no more samples fit
+;
+:PROCEDURE IsFull;
+	:RETURN Len(Me:aSampleIds) >= Me:nLimit;
+:ENDPROC;
+
+/*
+ * Procedure: Summary
+ * Returns: a one-line description of the batch
+;
+:PROCEDURE Summary;
+	:DECLARE sFmt, sResult;
+	sFmt := "{0}: {1} samples";
+	:TRY;
+		sResult := sFmt:Format({Me:sBatchName, LimsString(Len(Me:aSampleIds))});
+	:CATCH;
+		sResult := "Error: " + GetLastSSLError():Description;
+	:ENDTRY;
+	:RETURN sResult;
+:ENDPROC;
+-- format --
+/*
+ * Class: SampleBatch
+ * Description: Collects sample identifiers and summarizes them
+;
+:CLASS SampleBatch;
+:DECLARE aSampleIds, sBatchName, nLimit;
+
+/*
+ * Procedure: Constructor
+ * Parameters:
+ *   sName - the batch display name
+ *   nMax - the most samples the batch accepts
+;
+:PROCEDURE Constructor;
+	:PARAMETERS sName, nMax;
+	:DEFAULT sName, "Batch";
+	:DEFAULT nMax, 50;
+	Me:sBatchName := sName;
+	Me:nLimit := nMax;
+	Me:aSampleIds := {};
+:ENDPROC;
+
+/*
+ * Procedure: Add
+ * Parameters:
+ *   sSampleId - the sample to add
+ * Returns: .T. when the sample was added
+;
+:PROCEDURE Add;
+	:PARAMETERS sSampleId;
+	:IF Me:IsFull();
+		:RETURN .F.;
+	:ENDIF;
+	AAdd(Me:aSampleIds, AllTrim(sSampleId));
+	:RETURN .T.;
+:ENDPROC;
+
+/*
+ * Procedure: IsFull
+ * Returns: .T. when no more samples fit
+;
+:PROCEDURE IsFull;
+	:RETURN Len(Me:aSampleIds) >= Me:nLimit;
+:ENDPROC;
+
+/*
+ * Procedure: Summary
+ * Returns: a one-line description of the batch
+;
+:PROCEDURE Summary;
+	:DECLARE sFmt, sResult;
+	sFmt := "{0}: {1} samples";
+	:TRY;
+		sResult := sFmt:Format({Me:sBatchName, LimsString(Len(Me:aSampleIds))});
+	:CATCH;
+		sResult := "Error: " + GetLastSSLError():Description;
+	:ENDTRY;
+	:RETURN sResult;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

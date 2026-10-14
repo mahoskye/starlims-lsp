@@ -1,0 +1,79 @@
+Deeply nested control flow (procedure > :WHILE > :TRY > :BEGINCASE > :IF
+> :FOR), flush-left, with blank lines in the source between some blocks
+and not others: block indentation at every depth, middle keywords at
+their opener's column, sibling-block blank lines only at equal depth
+(fmt.indent_style, fmt.blank_line_between_blocks).
+-- input.ssl --
+:PROCEDURE ReviewBatch;
+:PARAMETERS aBatch;
+:DECLARE nIndex, nPassed, oErr, i;
+nIndex := 0;
+nPassed := 0;
+:WHILE nIndex < Len(aBatch);
+nIndex += 1;
+:TRY;
+:BEGINCASE;
+:CASE aBatch[nIndex] == "SKIP";
+:EXITCASE;
+:CASE aBatch[nIndex] == "CHECK";
+:IF nPassed > 0;
+:FOR i := 1 :TO nPassed;
+DoProc("Recheck", {i});
+:NEXT;
+:FOR i := nPassed :TO 1 :STEP -1;
+DoProc("Rollback", {i});
+:NEXT;
+:ENDIF;
+
+:EXITCASE;
+:OTHERWISE;
+nPassed += 1;
+:EXITCASE;
+:ENDCASE;
+:CATCH;
+oErr := GetLastSSLError();
+ErrorMes("ReviewBatch", oErr:Description);
+:ENDTRY;
+:ENDWHILE;
+:RETURN nPassed;
+:ENDPROC;
+-- format --
+:PROCEDURE ReviewBatch;
+	:PARAMETERS aBatch;
+	:DECLARE nIndex, nPassed, oErr, i;
+	nIndex := 0;
+	nPassed := 0;
+	:WHILE nIndex < Len(aBatch);
+		nIndex += 1;
+		:TRY;
+			:BEGINCASE;
+			:CASE aBatch[nIndex] == "SKIP";
+				:EXITCASE;
+			:CASE aBatch[nIndex] == "CHECK";
+				:IF nPassed > 0;
+					:FOR i := 1 :TO nPassed;
+						DoProc("Recheck", {i});
+					:NEXT;
+
+					:FOR i := nPassed :TO 1 :STEP -1;
+						DoProc("Rollback", {i});
+					:NEXT;
+				:ENDIF;
+
+				:EXITCASE;
+			:OTHERWISE;
+				nPassed += 1;
+				:EXITCASE;
+			:ENDCASE;
+		:CATCH;
+			oErr := GetLastSSLError();
+			ErrorMes("ReviewBatch", oErr:Description);
+		:ENDTRY;
+	:ENDWHILE;
+	:RETURN nPassed;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+13:1-13:1 info max_block_depth: Block nesting depth (5) exceeds maximum (4)
+14:1-14:1 info max_block_depth: Block nesting depth (6) exceeds maximum (4)
+17:1-17:1 info max_block_depth: Block nesting depth (6) exceeds maximum (4)

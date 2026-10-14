@@ -1,0 +1,39 @@
+Near-misses for diag.assignment_in_condition (issue #255): the
+parenthesized assign-and-test idiom, := inside a call argument, the
+:FOR loop initializer, and ordinary comparisons.
+-- input.ssl --
+:PROCEDURE NextBatch;
+	:PARAMETERS nLimit;
+	:DECLARE nBatch, i, nTotal;
+	nTotal := 0;
+	:IF (nBatch := DoProc("FetchBatch")) > 0;
+		nTotal := nBatch;
+	:ENDIF;
+	:FOR i := 1 :TO nLimit;
+		nTotal := nTotal + i;
+	:NEXT;
+	:WHILE nTotal == nLimit .OR. nTotal = 0;
+		nTotal := nTotal + 1;
+	:ENDWHILE;
+	:RETURN nTotal;
+:ENDPROC;
+-- format --
+:PROCEDURE NextBatch;
+	:PARAMETERS nLimit;
+	:DECLARE nBatch, i, nTotal;
+	nTotal := 0;
+	:IF (nBatch := DoProc("FetchBatch")) > 0;
+		nTotal := nBatch;
+	:ENDIF;
+
+	:FOR i := 1 :TO nLimit;
+		nTotal := nTotal + i;
+	:NEXT;
+
+	:WHILE nTotal == nLimit .OR. nTotal = 0;
+		nTotal := nTotal + 1;
+	:ENDWHILE;
+	:RETURN nTotal;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,29 @@
+A whole file that is one statement after its declaration: a nested array
+literal spread over many lines by hand, the closer on the last element's
+line. The formatter must keep it one statement, indent the continuation
+lines and keep the nesting. (The same literal with '};' alone on its own
+line trips a range-formatting invariant failure; see the suite report.)
+-- input.ssl --
+:DECLARE aMatrix;
+aMatrix := {
+{"A1", "Alpha", 1, .T., {"x", "y"}},
+{"A2", "Beta", 2, .F., {"x", "y"}},
+{"A3", "Gamma", 3, .T., {"x", "y"}},
+{"A4", "Delta", 4, .F., {"x", "y"}},
+{"A5", "Epsilon", 5, .T., {"x", "y"}},
+{"A6", "Zeta", 6, .F., {"x", "y"}},
+{"A7", "Eta", 7, .T., {"x", "y"}},
+{"A8", "Theta", 8, .F., {"x", "y"}}};
+-- format --
+:DECLARE aMatrix;
+aMatrix := {
+	{"A1", "Alpha", 1, .T., {"x", "y"}},
+	{"A2", "Beta", 2, .F., {"x", "y"}},
+	{"A3", "Gamma", 3, .T., {"x", "y"}},
+	{"A4", "Delta", 4, .F., {"x", "y"}},
+	{"A5", "Epsilon", 5, .T., {"x", "y"}},
+	{"A6", "Zeta", 6, .F., {"x", "y"}},
+	{"A7", "Eta", 7, .T., {"x", "y"}},
+	{"A8", "Theta", 8, .F., {"x", "y"}}};
+-- diagnostics --
+-- diagnostics [--strict --info] --

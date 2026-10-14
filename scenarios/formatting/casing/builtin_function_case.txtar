@@ -1,0 +1,36 @@
+Built-in call sites take the inventory's canonical casing (default
+PascalCase, fmt.builtin_function_case), including the documented
+exceptions `_AND`, `_OR`, `_XOR`, `_NOT`, `DOW`, `DOY`, `LIMSDate`,
+`SQLExecute` and `AScanExact`. User procedures, a non-call use of a
+built-in name, and a member call named like a built-in keep their case;
+so does a built-in name inside a string.
+-- input.ssl --
+:PROCEDURE Casing;
+:PARAMETERS sInput, dDate, aItems, oText;
+:DECLARE nFlags, nDay, sOut, len;
+nFlags := _and(5, 3) + _or(1, 2) + _xor(6, 3) + _not(0);
+nDay := dow(dDate) + doy(dDate);
+sOut := limsdate(dDate) + alltrim(upper(sInput)) + limsstring(nDay);
+nDay := ascanexact(aItems, "X") + alen(aItems) + LEN(sOut);
+aItems := sqlexecute("SELECT 1 FROM dual");
+len := 3;
+sOut := oText:upper() + "call upper(x) first";
+nDay := datediff(dDate, today(), "dd");
+:RETURN sOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Casing;
+	:PARAMETERS sInput, dDate, aItems, oText;
+	:DECLARE nFlags, nDay, sOut, len;
+	nFlags := _AND(5, 3) + _OR(1, 2) + _XOR(6, 3) + _NOT(0);
+	nDay := DOW(dDate) + DOY(dDate);
+	sOut := LIMSDate(dDate) + AllTrim(Upper(sInput)) + LimsString(nDay);
+	nDay := AScanExact(aItems, "X") + ALen(aItems) + Len(sOut);
+	aItems := SQLExecute("SELECT 1 FROM dual");
+	len := 3;
+	sOut := oText:upper() + "call upper(x) first";
+	nDay := DateDiff(dDate, Today(), "dd");
+	:RETURN sOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

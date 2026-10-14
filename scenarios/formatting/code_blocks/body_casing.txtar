@@ -1,0 +1,24 @@
+A code-block body takes the full casing surface: dot operators and
+literals, `nil`, `me:` receivers and built-in call casing; string
+content inside the body stays verbatim (fmt.code_block_literals,
+fmt.keyword_case, fmt.builtin_function_case issue #255).
+-- input.ssl --
+:CLASS Filter;
+:PROCEDURE Build;
+:DECLARE fnReady, fnLen, fnText;
+fnReady := {|o|me:IsReady(o).and.o!=nil.or..f.};
+fnLen := {|s|len(alltrim(s))>0};
+fnText := {|s|s+" .and. nil len(x)"};
+:RETURN fnReady;
+:ENDPROC;
+-- format --
+:CLASS Filter;
+:PROCEDURE Build;
+	:DECLARE fnReady, fnLen, fnText;
+	fnReady := {|o| Me:IsReady(o) .AND. o != NIL .OR. .F.};
+	fnLen := {|s| Len(AllTrim(s)) > 0};
+	fnText := {|s| s + " .and. nil len(x)"};
+	:RETURN fnReady;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

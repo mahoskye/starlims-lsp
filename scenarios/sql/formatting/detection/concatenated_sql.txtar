@@ -1,0 +1,25 @@
+Concatenated SQL: each string piece is judged on its own. A constant
+SQL head joined to a variable tail stays as written when the line fits;
+an overflowing head piece reflows to rule F and the concatenation
+follows its closing quote.
+-- input.ssl --
+:PROCEDURE Build;
+	:PARAMETERS sWhere;
+	:DECLARE sSQL, sLong;
+	sSQL := "select ordno, status from orders " + sWhere;
+	sLong := "select ordno, custid, logdate, duedate, status, site, priority from orders o " + sWhere;
+	:RETURN {sSQL, sLong};
+:ENDPROC;
+-- format --
+:PROCEDURE Build;
+	:PARAMETERS sWhere;
+	:DECLARE sSQL, sLong;
+	sSQL := "select ordno, status from orders " + sWhere;
+	sLong := "
+	    SELECT ordno, custid, logdate, duedate, status, site, priority
+	    FROM orders o
+	" + sWhere;
+	:RETURN {sSQL, sLong};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

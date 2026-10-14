@@ -1,0 +1,34 @@
+diag.hungarian_type_mismatch (opt-in, --hungarian-types): a prefixed
+target assigned a value of a different definite type — a string builtin
+into n, a number literal into s, a string into a, a string into b, and a
+:DEFAULT of a string onto a numeric parameter. Off by default.
+-- input.ssl --
+:PROCEDURE ParseCode;
+	:PARAMETERS sText, nWidth;
+	:DEFAULT nWidth, "4";
+	:DECLARE nCode, sTotal, aNames, bReady;
+	nCode := SubStr(sText, 1, nWidth);
+	sTotal := 0;
+	aNames := "Ann,Bob";
+	bReady := "Y";
+	:RETURN {nCode, sTotal, aNames, bReady};
+:ENDPROC;
+-- diagnostics [--hungarian-types] --
+3:11-3:22 warning hungarian_type_mismatch: 'nWidth' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
+5:2-5:35 warning hungarian_type_mismatch: 'nCode' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
+6:2-6:13 warning hungarian_type_mismatch: 'sTotal' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
+7:2-7:21 warning hungarian_type_mismatch: 'aNames' promises a array by its prefix, but this expression produces a string - rename the variable or fix the expression
+8:2-8:15 warning hungarian_type_mismatch: 'bReady' promises a boolean by its prefix, but this expression produces a string - rename the variable or fix the expression
+-- format --
+:PROCEDURE ParseCode;
+	:PARAMETERS sText, nWidth;
+	:DEFAULT nWidth, "4";
+	:DECLARE nCode, sTotal, aNames, bReady;
+	nCode := SubStr(sText, 1, nWidth);
+	sTotal := 0;
+	aNames := "Ann,Bob";
+	bReady := "Y";
+	:RETURN {nCode, sTotal, aNames, bReady};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

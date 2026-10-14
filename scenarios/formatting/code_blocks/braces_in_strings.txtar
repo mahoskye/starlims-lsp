@@ -1,0 +1,22 @@
+Braces inside a string literal in a code-block body neither open nor
+close the literal: `"{"` does not swallow the rest of the file and `"}"`
+does not end the block early; the statement after the literal still
+formats (fmt.code_block_literals issue #255).
+-- input.ssl --
+:PROCEDURE Braces;
+:DECLARE fnOpen, fnClose, aPair;
+fnOpen := {|s|s+"{"};
+fnClose := {|s|"}"+s};
+aPair := {1,2};
+:RETURN aPair;
+:ENDPROC;
+-- format --
+:PROCEDURE Braces;
+	:DECLARE fnOpen, fnClose, aPair;
+	fnOpen := {|s| s + "{"};
+	fnClose := {|s| "}" + s};
+	aPair := {1, 2};
+	:RETURN aPair;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

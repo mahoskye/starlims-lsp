@@ -1,0 +1,33 @@
+:EXITWHILE used to leave a :FOR loop. An enclosing :FOR does not satisfy
+:EXITWHILE: exitwhile_outside_loop (diag.exitwhile_outside_loop second
+Flags fence).
+-- input.ssl --
+:PROCEDURE FindIndex;
+	:PARAMETERS aKeys, sWanted;
+	:DECLARE nIdx, nFound;
+	nFound := 0;
+	:FOR nIdx := 1 :TO Len(aKeys);
+		:IF aKeys[nIdx] == sWanted;
+			nFound := nIdx;
+			:EXITWHILE;
+		:ENDIF;
+	:NEXT;
+	:RETURN nFound;
+:ENDPROC;
+-- format --
+:PROCEDURE FindIndex;
+	:PARAMETERS aKeys, sWanted;
+	:DECLARE nIdx, nFound;
+	nFound := 0;
+	:FOR nIdx := 1 :TO Len(aKeys);
+		:IF aKeys[nIdx] == sWanted;
+			nFound := nIdx;
+			:EXITWHILE;
+		:ENDIF;
+	:NEXT;
+	:RETURN nFound;
+:ENDPROC;
+-- diagnostics --
+8:4-8:14 error exitwhile_outside_loop: ':EXITWHILE' must be inside a ':WHILE' loop
+-- diagnostics [--strict --info] --
+8:4-8:14 error exitwhile_outside_loop: ':EXITWHILE' must be inside a ':WHILE' loop

@@ -1,0 +1,28 @@
+A code block needs at least one bound variable: {|| ...} and the
+whitespace-only {| | ...} do not compile (diag.code_block_structure,
+error, ranged on the whole block). {|x| ...} and array literals do not
+fire.
+-- input.ssl --
+:PROCEDURE Blocks;
+	:DECLARE fnConst, fnSpaced, fnDouble, aList;
+	fnConst := {|| 42};
+	fnSpaced := {| | 42};
+	fnDouble := {|x| x * 2};
+	aList := {1, 2, 3};
+	:RETURN {fnConst, fnSpaced, fnDouble, aList, {}};
+:ENDPROC;
+-- format --
+:PROCEDURE Blocks;
+	:DECLARE fnConst, fnSpaced, fnDouble, aList;
+	fnConst := {|| 42};
+	fnSpaced := {|| 42};
+	fnDouble := {|x| x * 2};
+	aList := {1, 2, 3};
+	:RETURN {fnConst, fnSpaced, fnDouble, aList, {}};
+:ENDPROC;
+-- diagnostics --
+3:13-3:20 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile
+4:14-4:22 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile
+-- diagnostics [--strict --info] --
+3:13-3:20 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile
+4:14-4:22 error code_block_structure: Code blocks require at least one bound variable between the pipes: {|x| expr} - '{|| ...}' does not compile

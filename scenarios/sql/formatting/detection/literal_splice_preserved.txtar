@@ -1,0 +1,28 @@
+Pieces with an odd single-quote count are concatenation fragments and
+are byte-preserved even when detected as SQL (issue #216): a {d '…'}
+date escape continued across '+' and an IN (' … ') pattern. Kept short
+so the statements do not wrap at '+'.
+-- input.ssl --
+:PROCEDURE Splice;
+	:PARAMETERS sDate, sList;
+	:DECLARE bOk;
+	bOk := RunSQL("update runs set fromd = {d '" + sDate + "'} where id = 1");
+	bOk := RunSQL("delete from qd where product not in('" + sList + "')");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE Splice;
+	:PARAMETERS sDate, sList;
+	:DECLARE bOk;
+	bOk := RunSQL("update runs set fromd = {d '" + sDate + "'} where id = 1");
+	bOk := RunSQL("delete from qd where product not in('" + sList + "')");
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+4:47-4:48 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+5:56-5:57 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+-- diagnostics [--strict --info] --
+4:16-4:46 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+4:47-4:48 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.
+5:16-5:55 info sql_literal_splice: SQL character literal spliced across string concatenation - prefer a ?param? placeholder: splices are fragile to format, invisible to the parameter APIs, and the classic injection surface
+5:56-5:57 warning sql_injection: String concatenation in 'RunSQL' argument may cause SQL injection. Use parameterized queries instead.

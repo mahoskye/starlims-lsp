@@ -1,0 +1,51 @@
+Near miss for exitcase_last_in_branch and prefer_exitcase: an inner
+:BEGINCASE inside an outer branch ends its own branch with :EXITCASE, the
+outer branch then ends with its own :EXITCASE after the inner :ENDCASE,
+and a comment after the last :EXITCASE is not a statement. Clean
+(diag.exitcase_last_in_branch "Does not flag" fence).
+-- input.ssl --
+:PROCEDURE PackagingCode;
+	:PARAMETERS nKind, bFragile;
+	:DECLARE sCode;
+	:BEGINCASE;
+	:CASE nKind == 1;
+		:BEGINCASE;
+		:CASE bFragile;
+			sCode := "BOX-F";
+			:EXITCASE;
+		:OTHERWISE;
+			sCode := "BOX";
+			:EXITCASE;
+		:ENDCASE;
+		:EXITCASE;
+	:OTHERWISE;
+		sCode := "BAG";
+		:EXITCASE;
+		/* bags are the fallback for every other kind;
+	:ENDCASE;
+	:RETURN sCode;
+:ENDPROC;
+-- format --
+:PROCEDURE PackagingCode;
+	:PARAMETERS nKind, bFragile;
+	:DECLARE sCode;
+	:BEGINCASE;
+	:CASE nKind == 1;
+		:BEGINCASE;
+		:CASE bFragile;
+			sCode := "BOX-F";
+			:EXITCASE;
+		:OTHERWISE;
+			sCode := "BOX";
+			:EXITCASE;
+		:ENDCASE;
+		:EXITCASE;
+	:OTHERWISE;
+		sCode := "BAG";
+		:EXITCASE;
+		/* bags are the fallback for every other kind;
+	:ENDCASE;
+	:RETURN sCode;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

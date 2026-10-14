@@ -1,0 +1,25 @@
+builder_directive_outside_datasource: in an ordinary .ssl script every
+builder directive, in any case, is an error (a script containing one does
+not compile), and unknown_keyword does not also fire on it. Both an
+uppercase and a lowercase directive are here; the lowercase one must not
+pick up a second, case-related finding instead.
+-- input.ssl --
+:DSN := DATABASE;
+:nullasblank := true;
+:DECLARE aRows;
+aRows := RunDS("Stock.ByBin", {"A1"});
+:RETURN aRows;
+-- format --
+:DSN := DATABASE;
+:NULLASBLANK := true;
+:DECLARE aRows;
+aRows := RunDS("Stock.ByBin", {"A1"});
+:RETURN aRows;
+-- diagnostics --
+1:1-1:5 error builder_directive_outside_datasource: ':DSN' is a data source builder directive and is valid only in a data source file
+2:1-2:13 error builder_directive_outside_datasource: ':nullasblank' is a data source builder directive and is valid only in a data source file
+-- diagnostics [--strict --info] --
+1:1-1:5 error builder_directive_outside_datasource: ':DSN' is a data source builder directive and is valid only in a data source file
+1:9-1:17 warning undeclared_variable: Variable 'DATABASE' is not declared
+2:1-2:13 error builder_directive_outside_datasource: ':nullasblank' is a data source builder directive and is valid only in a data source file
+2:17-2:21 warning undeclared_variable: Variable 'true' is not declared

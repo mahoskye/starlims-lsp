@@ -1,0 +1,24 @@
+A bracket-quoted SQL string whose `]` was lost. `[` after `:=` opens a
+string, so this is unterminated_string naming `]`, not
+unclosed_delimiter (diag.unterminated_string bracket rules).
+-- input.ssl --
+:PROCEDURE OpenOrders;
+	:DECLARE sSQL, aRows;
+	sSQL := [SELECT ORDERID FROM ORDERS WHERE STATUS = 'OPEN';
+	aRows := SQLExecute(sSQL);
+	:RETURN aRows;
+:ENDPROC;
+-- format --
+:PROCEDURE OpenOrders;
+	:DECLARE sSQL, aRows;
+	sSQL := [SELECT ORDERID FROM ORDERS WHERE STATUS = 'OPEN';
+	aRows := SQLExecute(sSQL);
+	:RETURN aRows;
+:ENDPROC;
+-- diagnostics --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+3:10-3:11 error unterminated_string: Unterminated string literal - expected a closing ']' before end of file
+-- diagnostics [--strict --info] --
+1:1-1:11 error unclosed_block: Unclosed ':PROCEDURE' - expected ':ENDPROC'
+2:17-2:22 hint unused_variable: Variable 'aRows' is declared but never used
+3:10-3:11 error unterminated_string: Unterminated string literal - expected a closing ']' before end of file

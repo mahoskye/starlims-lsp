@@ -1,0 +1,36 @@
+:CATCH placed after :FINALLY in the same :TRY. catch_order_before_finally
+fires on the misplaced :CATCH; it is not also counted by single_catch
+(diag.catch_order_before_finally, diag.single_catch).
+-- input.ssl --
+:PROCEDURE CloseLedger;
+	:PARAMETERS nLedgerId;
+	:DECLARE bClosed;
+	bClosed := .F.;
+	:TRY;
+		bClosed := RunSQL("UPDATE LEDGERS SET CLOSED = 'Y' WHERE LEDGERID = ?",, {nLedgerId});
+	:FINALLY;
+		ErrorMes("CloseLedger", "attempted close");
+	:CATCH;
+		bClosed := .F.;
+	:ENDTRY;
+	:RETURN bClosed;
+:ENDPROC;
+-- format --
+:PROCEDURE CloseLedger;
+	:PARAMETERS nLedgerId;
+	:DECLARE bClosed;
+	bClosed := .F.;
+	:TRY;
+		bClosed := RunSQL("UPDATE LEDGERS SET CLOSED = 'Y' WHERE LEDGERID = ?",,
+			{nLedgerId});
+	:FINALLY;
+		ErrorMes("CloseLedger", "attempted close");
+	:CATCH;
+		bClosed := .F.;
+	:ENDTRY;
+	:RETURN bClosed;
+:ENDPROC;
+-- diagnostics --
+9:2-9:8 error catch_order_before_finally: ':CATCH' must appear before ':FINALLY' in a ':TRY' block
+-- diagnostics [--strict --info] --
+9:2-9:8 error catch_order_before_finally: ':CATCH' must appear before ':FINALLY' in a ':TRY' block

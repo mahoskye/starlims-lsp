@@ -1,0 +1,19 @@
+A whole-document SQL data source with no header: qualified table.column
+names, lowercase and/or, no statement semicolons. D15 defaults marker-free
+data-source content to SQL, so the formatter returns it unchanged
+(feature.formatting A9) and no SSL diagnostic fires on it
+(feature.diagnostics_pipeline A10, A14).
+-- input.ds --
+select o.order_no, o.status, c.cust_name
+from shop_order o
+join shop_customer c on c.cust_id = o.cust_id
+where o.status = 'OPEN' and o.total > 0 or o.priority = 1
+order by o.order_no
+-- format --
+select o.order_no, o.status, c.cust_name
+from shop_order o
+join shop_customer c on c.cust_id = o.cust_id
+where o.status = 'OPEN' and o.total > 0 or o.priority = 1
+order by o.order_no
+-- diagnostics --
+-- diagnostics [--strict --info] --

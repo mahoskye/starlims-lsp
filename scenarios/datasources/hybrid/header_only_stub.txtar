@@ -1,0 +1,17 @@
+A recognized header (after a terminated banner) with no SQL body at all
+keeps header-only diagnostics and reports nothing about the comment
+(feature.diagnostics_pipeline A18). The header is clean: `False` is
+accepted by nullasblank_value because true/false match without regard to
+case, so the result is empty.
+-- input.ds --
+/* query pending review */
+:DSN := DATABASE;
+:NULLASBLANK := False;
+:PARAMETERS sBatch := "";
+-- format --
+/* query pending review */
+:DSN := DATABASE;
+:NULLASBLANK := False;
+:PARAMETERS sBatch := "";
+-- diagnostics --
+-- diagnostics [--strict --info] --

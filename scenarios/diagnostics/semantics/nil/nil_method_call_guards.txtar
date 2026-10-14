@@ -1,0 +1,75 @@
+Near-misses for diag.nil_method_call (issues #207, #304): reassignment
+after NIL, a non-emptiness guard in the enclosing :IF and in an earlier
+.AND. operand, the :ELSE branch of the :IF that assigned NIL, code after
+a branch ending in :RETURN, a Me:-qualified member, and a NIL assigned in
+another procedure.
+-- input.ssl --
+:PROCEDURE Cleanup;
+	:DECLARE oStream;
+	oStream := NIL;
+	:RETURN oStream;
+:ENDPROC;
+:PROCEDURE Work;
+	:PARAMETERS bAbort, bFresh;
+	:DECLARE oStream, oPrev, oCache;
+	oStream := DoProc("OpenStream");
+	oStream:Write("x");
+	oPrev := NIL;
+	:IF !Empty(oPrev);
+		oPrev:Reset();
+	:ENDIF;
+	:IF bFresh .AND. oPrev != NIL .AND. oPrev:Name != "";
+		oPrev:Reset();
+	:ENDIF;
+	:IF bFresh;
+		oCache := NIL;
+	:ELSE;
+		oCache:Flush();
+	:ENDIF;
+	:IF bAbort;
+		oStream := NIL;
+		:RETURN .F.;
+	:ENDIF;
+	oStream:Close();
+	oPrev := CreateUdObject();
+	oPrev:Reset();
+	:RETURN .T.;
+:ENDPROC;
+-- format --
+:PROCEDURE Cleanup;
+	:DECLARE oStream;
+	oStream := NIL;
+	:RETURN oStream;
+:ENDPROC;
+
+:PROCEDURE Work;
+	:PARAMETERS bAbort, bFresh;
+	:DECLARE oStream, oPrev, oCache;
+	oStream := DoProc("OpenStream");
+	oStream:Write("x");
+	oPrev := NIL;
+	:IF !Empty(oPrev);
+		oPrev:Reset();
+	:ENDIF;
+
+	:IF bFresh .AND. oPrev != NIL .AND. oPrev:Name != "";
+		oPrev:Reset();
+	:ENDIF;
+
+	:IF bFresh;
+		oCache := NIL;
+	:ELSE;
+		oCache:Flush();
+	:ENDIF;
+
+	:IF bAbort;
+		oStream := NIL;
+		:RETURN .F.;
+	:ENDIF;
+	oStream:Close();
+	oPrev := CreateUdObject();
+	oPrev:Reset();
+	:RETURN .T.;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

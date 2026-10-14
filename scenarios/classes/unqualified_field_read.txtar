@@ -1,0 +1,50 @@
+Bare reads of class fields inside methods (diag.unqualified_field_read,
+warning): a :RETURN value, an :IF condition, a call argument, a subscript
+and a member-access receiver. A name followed by ( is a call and must not
+flag.
+-- input.ssl --
+:CLASS Gate;
+:DECLARE bReady, aSlots, nPos, oOwner;
+
+:PROCEDURE Check;
+	:IF bReady;
+		UsrMes("ready");
+	:ENDIF;
+	:RETURN aSlots[nPos];
+:ENDPROC;
+
+:PROCEDURE OwnerName;
+	:DECLARE sName;
+	sName := oOwner:GetName();
+	UsrMes(LimsString(Len(aSlots)));
+	:RETURN sName;
+:ENDPROC;
+-- format --
+:CLASS Gate;
+:DECLARE bReady, aSlots, nPos, oOwner;
+
+:PROCEDURE Check;
+	:IF bReady;
+		UsrMes("ready");
+	:ENDIF;
+	:RETURN aSlots[nPos];
+:ENDPROC;
+
+:PROCEDURE OwnerName;
+	:DECLARE sName;
+	sName := oOwner:GetName();
+	UsrMes(LimsString(Len(aSlots)));
+	:RETURN sName;
+:ENDPROC;
+-- diagnostics --
+5:6-5:12 warning unqualified_field_read: Bare 'bReady' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [bReady] is undefined!' when none exists. Use 'Me:bReady'
+8:10-8:16 warning unqualified_field_read: Bare 'aSlots' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [aSlots] is undefined!' when none exists. Use 'Me:aSlots'
+8:17-8:21 warning unqualified_field_read: Bare 'nPos' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [nPos] is undefined!' when none exists. Use 'Me:nPos'
+13:11-13:17 warning unqualified_field_read: Bare 'oOwner' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [oOwner] is undefined!' when none exists. Use 'Me:oOwner'
+14:24-14:30 warning unqualified_field_read: Bare 'aSlots' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [aSlots] is undefined!' when none exists. Use 'Me:aSlots'
+-- diagnostics [--strict --info] --
+5:6-5:12 warning unqualified_field_read: Bare 'bReady' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [bReady] is undefined!' when none exists. Use 'Me:bReady'
+8:10-8:16 warning unqualified_field_read: Bare 'aSlots' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [aSlots] is undefined!' when none exists. Use 'Me:aSlots'
+8:17-8:21 warning unqualified_field_read: Bare 'nPos' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [nPos] is undefined!' when none exists. Use 'Me:nPos'
+13:11-13:17 warning unqualified_field_read: Bare 'oOwner' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [oOwner] is undefined!' when none exists. Use 'Me:oOwner'
+14:24-14:30 warning unqualified_field_read: Bare 'aSlots' inside a class method does not read the class field — it resolves to a local, a caller's variable, or a public, and raises 'Variable [aSlots] is undefined!' when none exists. Use 'Me:aSlots'

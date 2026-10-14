@@ -1,0 +1,62 @@
+Lines that finish a statement without `;` get one when the next line
+starts a new statement: after an identifier, number, string, closing
+delimiter, postfix `++` (issue #99), a code-block literal and a keyword
+(fmt.semicolon_enforcement); the :DECLARE line is terminated so the
+diagnostics stay readable. `:BEGINCASE` always ends with `;`. Every
+statement before a middle keyword (:CASE, :OTHERWISE) is already
+terminated here: an unterminated `:EXITCASE` before `:OTHERWISE` is left
+unterminated and trips the invariants (reported separately).
+-- input.ssl --
+:PROCEDURE Terminate
+:PARAMETERS nValue
+:DECLARE sLabel, aList, fnDouble, nCount;
+nCount := 0
+sLabel := "start"
+aList := {1, 2}
+fnDouble := {|n| n * 2}
+nCount++
+:BEGINCASE
+:CASE nValue == 1;
+sLabel := Upper(sLabel)
+:EXITCASE;
+:OTHERWISE;
+sLabel := ""
+:EXITCASE;
+:ENDCASE
+:RETURN sLabel
+:ENDPROC
+-- format --
+:PROCEDURE Terminate;
+	:PARAMETERS nValue;
+	:DECLARE sLabel, aList, fnDouble, nCount;
+	nCount := 0;
+	sLabel := "start";
+	aList := {1, 2};
+	fnDouble := {|n| n * 2};
+	nCount++;
+	:BEGINCASE;
+	:CASE nValue == 1;
+		sLabel := Upper(sLabel);
+		:EXITCASE;
+	:OTHERWISE;
+		sLabel := "";
+		:EXITCASE;
+	:ENDCASE;
+	:RETURN sLabel;
+:ENDPROC;
+-- diagnostics --
+3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:35-3:41 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:1-5:7 error unexpected_token: Unexpected identifier 'sLabel' - expected an operator or ';' (is the previous statement missing its ';'?)
+12:1-12:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)
+15:1-15:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+3:35-3:41 hint redeclare_is_noop: Variable 'nCount' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
+5:1-5:7 error unexpected_token: Unexpected identifier 'sLabel' - expected an operator or ';' (is the previous statement missing its ';'?)
+12:1-12:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)
+15:1-15:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)

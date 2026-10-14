@@ -1,0 +1,25 @@
+Near-misses for diag.code_block_comparison: comparing the results of
+evaluating code blocks, comparing unknown values, a member read, and
+assigning a code-block literal.
+-- input.ssl --
+:PROCEDURE SameResult;
+	:PARAMETERS fnLeft, fnRight, vA, oRule;
+	:DECLARE bSame, fnLocal;
+	fnLocal := {|x| x * 3};
+	bSame := Eval(fnLeft, 1) == Eval(fnRight, 1);
+	bSame := bSame .AND. vA == oRule:fnCheck;
+	bSame := bSame .AND. Eval(fnLocal, 2) == 6;
+	:RETURN bSame;
+:ENDPROC;
+-- format --
+:PROCEDURE SameResult;
+	:PARAMETERS fnLeft, fnRight, vA, oRule;
+	:DECLARE bSame, fnLocal;
+	fnLocal := {|x| x * 3};
+	bSame := Eval(fnLeft, 1) == Eval(fnRight, 1);
+	bSame := bSame .AND. vA == oRule:fnCheck;
+	bSame := bSame .AND. Eval(fnLocal, 2) == 6;
+	:RETURN bSame;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

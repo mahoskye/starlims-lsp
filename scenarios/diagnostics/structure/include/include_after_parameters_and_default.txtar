@@ -1,0 +1,22 @@
+Near miss for include_early: :INCLUDE preceded only by a comment,
+:PARAMETERS, :DEFAULT and another :INCLUDE, then :DECLARE after it. The
+recommended order, clean even under --info (diag.include_early "must NOT
+flag").
+-- input.ssl --
+/* Nightly export entry point;
+:PARAMETERS sTarget;
+:DEFAULT sTarget, "ARCHIVE";
+:INCLUDE Common.StringHelpers;
+:INCLUDE Common.DateHelpers;
+:DECLARE nCount;
+nCount := Len(sTarget);
+-- format --
+/* Nightly export entry point;
+:PARAMETERS sTarget;
+:DEFAULT sTarget, "ARCHIVE";
+:INCLUDE Common.StringHelpers;
+:INCLUDE Common.DateHelpers;
+:DECLARE nCount;
+nCount := Len(sTarget);
+-- diagnostics --
+-- diagnostics [--strict --info] --

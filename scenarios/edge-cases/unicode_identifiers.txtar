@@ -1,0 +1,34 @@
+Identifiers with non-ASCII letters (accented Latin and CJK). Whether SSL
+accepts them is not documented; the scenario records how the lexer
+tokenizes them and holds the robustness invariants (no panic, stable
+formatting, only whitespace changes).
+-- input.ssl --
+:DECLARE sNaïve, n数量;
+sNaïve := "ok";
+n数量 := 3;
+:RETURN sNaïve + LimsString(n数量);
+-- format --
+:DECLARE sNaïve, n数量;
+sNaïve := "ok";
+n数量 := 3;
+:RETURN sNaïve + LimsString(n数量);
+-- diagnostics --
+1:13-1:14 error unknown_token: Unknown token: 'ï'
+1:19-1:20 error unknown_token: Unknown token: '数'
+1:20-1:21 error unknown_token: Unknown token: '量'
+2:4-2:5 error unknown_token: Unknown token: 'ï'
+3:2-3:3 error unknown_token: Unknown token: '数'
+3:3-3:4 error unknown_token: Unknown token: '量'
+4:12-4:13 error unknown_token: Unknown token: 'ï'
+4:30-4:31 error unknown_token: Unknown token: '数'
+4:31-4:32 error unknown_token: Unknown token: '量'
+-- diagnostics [--strict --info] --
+1:13-1:14 error unknown_token: Unknown token: 'ï'
+1:19-1:20 error unknown_token: Unknown token: '数'
+1:20-1:21 error unknown_token: Unknown token: '量'
+2:4-2:5 error unknown_token: Unknown token: 'ï'
+3:2-3:3 error unknown_token: Unknown token: '数'
+3:3-3:4 error unknown_token: Unknown token: '量'
+4:12-4:13 error unknown_token: Unknown token: 'ï'
+4:30-4:31 error unknown_token: Unknown token: '数'
+4:31-4:32 error unknown_token: Unknown token: '量'

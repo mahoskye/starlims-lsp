@@ -1,0 +1,25 @@
+A :TRY whose protected body holds only a comment before :CATCH.
+try_structure fires once on the :TRY when the :CATCH is reached; the
+empty-looking :CATCH body is legal and must not be flagged
+(diag.try_structure).
+-- input.ssl --
+:PROCEDURE NotifyOwner;
+	:PARAMETERS sOwner;
+	:TRY;
+		/* send the notification here;
+	:CATCH;
+	:ENDTRY;
+:ENDPROC;
+-- format --
+:PROCEDURE NotifyOwner;
+	:PARAMETERS sOwner;
+	:TRY;
+		/* send the notification here;
+	:CATCH;
+	:ENDTRY;
+:ENDPROC;
+-- diagnostics --
+3:2-3:6 error try_structure: ':TRY' requires at least one statement before ':CATCH' or ':FINALLY'
+-- diagnostics [--strict --info] --
+2:14-2:20 hint unused_variable: Variable 'sOwner' is declared but never used
+3:2-3:6 error try_structure: ':TRY' requires at least one statement before ':CATCH' or ':FINALLY'

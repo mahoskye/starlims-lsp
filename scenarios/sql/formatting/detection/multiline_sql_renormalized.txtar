@@ -1,0 +1,37 @@
+SQL that already spans lines is renormalized to the canonical layout
+whatever its original indentation or casing (fmt.sql_in_strings), and a
+string already in canonical form is a fixed point.
+-- input.ssl --
+:PROCEDURE Again;
+	:PARAMETERS sStatus;
+	:DECLARE aRows, aSame;
+	aRows := SQLExecute("select sample_id
+from samples
+        where sample_status = ?sStatus?
+  and site = 'LAB1'");
+	aSame := SQLExecute("
+	    SELECT sample_id
+	    FROM samples
+	    WHERE sample_status = ?sStatus?
+	");
+	:RETURN {aRows, aSame};
+:ENDPROC;
+-- format --
+:PROCEDURE Again;
+	:PARAMETERS sStatus;
+	:DECLARE aRows, aSame;
+	aRows := SQLExecute("
+	    SELECT sample_id
+	    FROM samples
+	    WHERE sample_status = ?sStatus?
+	      AND site = 'LAB1'
+	");
+	aSame := SQLExecute("
+	    SELECT sample_id
+	    FROM samples
+	    WHERE sample_status = ?sStatus?
+	");
+	:RETURN {aRows, aSame};
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

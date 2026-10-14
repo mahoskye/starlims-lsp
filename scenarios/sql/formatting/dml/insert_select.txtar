@@ -1,0 +1,24 @@
+INSERT … SELECT: the target column list takes the INSERT layout and the
+SELECT that feeds it returns to the clause column (reference §2.9).
+-- input.ssl --
+:PROCEDURE ArchiveTasks;
+	:DECLARE bOk;
+	bOk := RunSQL("insert into ordtask_archive (ordno, testcode, status, logdate) select ordno, testcode, status, logdate from ordtask where status = 'Complete' and logdate < sysdate - 365");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE ArchiveTasks;
+	:DECLARE bOk;
+	bOk := RunSQL("
+	    INSERT INTO ordtask_archive (
+	        ordno, testcode, status, logdate
+	    )
+	    SELECT ordno, testcode, status, logdate
+	    FROM ordtask
+	    WHERE status = 'Complete'
+	      AND logdate < SYSDATE - 365
+	");
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

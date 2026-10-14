@@ -1,0 +1,17 @@
+A code block whose body spans lines passes through byte-for-byte at top
+level (fmt.code_block_literals "a multi-line body ... passes through
+byte-for-byte"): no spacing or `;` is added inside it, and the next
+statement formats normally. (Inside a procedure the same literal trips
+the range-formatting invariant, reported separately.)
+-- input.ssl --
+:DECLARE fnMulti, vResult;
+fnMulti := {|x|x+
+1};
+vResult:=Eval(fnMulti,1);
+-- format --
+:DECLARE fnMulti, vResult;
+fnMulti := {|x|x+
+1};
+vResult := Eval(fnMulti, 1);
+-- diagnostics --
+-- diagnostics [--strict --info] --

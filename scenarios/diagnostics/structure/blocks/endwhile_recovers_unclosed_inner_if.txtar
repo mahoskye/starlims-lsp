@@ -1,0 +1,31 @@
+Near miss for mismatched_block_end: a :WHILE holding an :IF that lost its
+:ENDIF, then the :ENDWHILE. A matching opener sits deeper in the stack,
+so the scanner recovers: the :IF is unclosed_block and the :ENDWHILE
+closes the loop. mismatched_block_end must NOT fire (catalog fence,
+commit be7a174).
+-- input.ssl --
+:PROCEDURE CountDown;
+	:PARAMETERS nStart;
+	:DECLARE nCurrent;
+	nCurrent := nStart;
+	:WHILE nCurrent > 0;
+		:IF nCurrent % 2 == 0;
+			nCurrent := nCurrent - 2;
+	:ENDWHILE;
+	:RETURN nCurrent;
+:ENDPROC;
+-- format --
+:PROCEDURE CountDown;
+	:PARAMETERS nStart;
+	:DECLARE nCurrent;
+	nCurrent := nStart;
+	:WHILE nCurrent > 0;
+		:IF nCurrent % 2 == 0;
+			nCurrent := nCurrent - 2;
+		:ENDWHILE;
+		:RETURN nCurrent;
+	:ENDPROC;
+-- diagnostics --
+6:3-6:6 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+-- diagnostics [--strict --info] --
+6:3-6:6 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'

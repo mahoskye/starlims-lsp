@@ -1,0 +1,38 @@
+A class that calls Base: without declaring an :INHERIT: every Base:
+reference flags (diag.base_requires_inherit). Me: references in the same
+methods are fine, and the standalone/outside-class Base codes must not
+also fire on the same token.
+-- input.ssl --
+:CLASS ReportWriter;
+:DECLARE sTitle;
+
+:PROCEDURE Constructor;
+	Base:Constructor();
+	Me:sTitle := "Untitled";
+:ENDPROC;
+
+:PROCEDURE Render;
+	:DECLARE sOut;
+	sOut := Base:Render();
+	:RETURN Me:sTitle + sOut;
+:ENDPROC;
+-- format --
+:CLASS ReportWriter;
+:DECLARE sTitle;
+
+:PROCEDURE Constructor;
+	Base:Constructor();
+	Me:sTitle := "Untitled";
+:ENDPROC;
+
+:PROCEDURE Render;
+	:DECLARE sOut;
+	sOut := Base:Render();
+	:RETURN Me:sTitle + sOut;
+:ENDPROC;
+-- diagnostics --
+5:2-5:6 error base_requires_inherit: 'Base:MemberName' requires ':INHERIT' in the current ':CLASS' definition
+11:10-11:14 error base_requires_inherit: 'Base:MemberName' requires ':INHERIT' in the current ':CLASS' definition
+-- diagnostics [--strict --info] --
+5:2-5:6 error base_requires_inherit: 'Base:MemberName' requires ':INHERIT' in the current ':CLASS' definition
+11:10-11:14 error base_requires_inherit: 'Base:MemberName' requires ':INHERIT' in the current ':CLASS' definition

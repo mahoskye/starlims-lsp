@@ -1,0 +1,28 @@
+Near miss for inline_code_naming: one block named with a bare identifier
+and one with a quoted string, the two forms the style guide allows, with
+a comment line between the keyword and the name (skipped when
+matching). Clean.
+-- input.ssl --
+:BEGININLINECODE
+/* the default greeting;
+Greeting;
+:DECLARE sGreeting;
+sGreeting := "hello";
+:ENDINLINECODE;
+:BEGININLINECODE "Farewell";
+:DECLARE sFarewell;
+sFarewell := "goodbye";
+:ENDINLINECODE;
+-- format --
+:BEGININLINECODE
+	/* the default greeting;
+	Greeting;
+	:DECLARE sGreeting;
+	sGreeting := "hello";
+:ENDINLINECODE;
+:BEGININLINECODE "Farewell";
+	:DECLARE sFarewell;
+	sFarewell := "goodbye";
+:ENDINLINECODE;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -1,0 +1,25 @@
+Near misses for the SQL-body placeholder rules in one hybrid data source.
+datasource_undeclared_placeholder must not flag: a placeholder matching a
+declared name in another casing (`@NBINID`), `@@ROWCOUNT` / `@@SPID`
+system functions, `@name` text in a string literal or a `--` comment, or
+the declared-but-unused nSpare (no unused-parameter diagnostic).
+datasource_sql_question_placeholder must not flag `?nBinId?` in a string
+literal or a comment. Expect an empty result.
+-- input.ds --
+:DSN := DATABASE;
+:PARAMETERS nBinId := 0, nSpare := 0;
+
+select @@ROWCOUNT as affected, @@SPID as sessionId, '?nBinId?' as literalText
+from storage_bin
+where bin_id = @NBINID
+  and bin_note <> '@nOther' -- mentions @nMissing and ?nBinId?
+-- format --
+:DSN := DATABASE;
+:PARAMETERS nBinId := 0, nSpare := 0;
+
+select @@ROWCOUNT as affected, @@SPID as sessionId, '?nBinId?' as literalText
+from storage_bin
+where bin_id = @NBINID
+  and bin_note <> '@nOther' -- mentions @nMissing and ?nBinId?
+-- diagnostics --
+-- diagnostics [--strict --info] --

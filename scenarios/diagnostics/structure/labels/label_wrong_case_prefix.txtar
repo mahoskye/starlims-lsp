@@ -1,0 +1,46 @@
+Compact labels written with a wrong-case prefix (`:labelRetry`,
+`:LabelRetry`) are not recognized as labels at run time:
+label_keyword_form (error) over the whole token. The correct compact
+`:LABELRetry` (only the prefix is case-checked) and a plain
+`sLabelText` identifier do not flag (diag.label_keyword_form). Records
+how the Branch literals against these labels are judged.
+-- input.ssl --
+:PROCEDURE ReadLoop;
+	:DECLARE nRound, sLabelText;
+	nRound := 0;
+	sLabelText := "caption";
+	:labelRetry;
+	:LabelAgain;
+	:LABELRetry;
+	nRound := nRound + 1;
+	:IF nRound < 3;
+		Branch("LABELRetry");
+	:ENDIF;
+	:RETURN nRound;
+:ENDPROC;
+-- format --
+:PROCEDURE ReadLoop;
+	:DECLARE nRound, sLabelText;
+	nRound := 0;
+	sLabelText := "caption";
+	:labelRetry;
+	:LabelAgain;
+	:LABELRetry;
+	nRound := nRound + 1;
+	:IF nRound < 3;
+		Branch("LABELRetry");
+	:ENDIF;
+	:RETURN nRound;
+:ENDPROC;
+-- diagnostics --
+5:2-5:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+5:2-5:13 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'
+6:2-6:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:2-6:13 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'
+7:2-7:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+-- diagnostics [--strict --info] --
+5:2-5:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+5:2-5:13 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'
+6:2-6:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+6:2-6:13 error label_keyword_form: SSL label keyword forms are case-sensitive: use ':LABEL Name;' or ':LABELName;'
+7:2-7:13 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code

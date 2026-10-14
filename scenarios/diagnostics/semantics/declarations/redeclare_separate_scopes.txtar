@@ -1,0 +1,34 @@
+Near-miss for diag.redeclare_is_noop: the same name in two procedures, and
+a procedure reusing a script-level name (procedure scopes start empty).
+Repeated assignments are not declarations.
+-- input.ssl --
+:DECLARE nCounter;
+nCounter := 1;
+nCounter := 2;
+:PROCEDURE First;
+	:DECLARE nCounter;
+	nCounter := 3;
+	:RETURN nCounter;
+:ENDPROC;
+:PROCEDURE Second;
+	:DECLARE nCounter;
+	nCounter := 4;
+	:RETURN nCounter;
+:ENDPROC;
+-- format --
+:DECLARE nCounter;
+nCounter := 1;
+nCounter := 2;
+:PROCEDURE First;
+	:DECLARE nCounter;
+	nCounter := 3;
+	:RETURN nCounter;
+:ENDPROC;
+
+:PROCEDURE Second;
+	:DECLARE nCounter;
+	nCounter := 4;
+	:RETURN nCounter;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

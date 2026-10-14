@@ -1,0 +1,26 @@
+Script code before :CLASS: a file is a class or a script, never both
+(diag.class_or_script, error, on the :CLASS token). The leading comment
+is not script code; the :DECLARE is.
+-- input.ssl --
+/* Order helper;
+:DECLARE nVersion;
+:CLASS OrderHelper;
+:DECLARE sOrderNo;
+
+:PROCEDURE Describe;
+	:RETURN "Order " + Me:sOrderNo;
+:ENDPROC;
+-- format --
+/* Order helper;
+:DECLARE nVersion;
+:CLASS OrderHelper;
+:DECLARE sOrderNo;
+
+:PROCEDURE Describe;
+	:RETURN "Order " + Me:sOrderNo;
+:ENDPROC;
+-- diagnostics --
+3:1-3:7 error class_or_script: A file is either a ':CLASS' definition or a script; ':CLASS' must be the first significant statement
+-- diagnostics [--strict --info] --
+2:10-2:18 hint unused_variable: Variable 'nVersion' is declared but never used
+3:1-3:7 error class_or_script: A file is either a ':CLASS' definition or a script; ':CLASS' must be the first significant statement

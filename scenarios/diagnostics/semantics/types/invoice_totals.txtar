@@ -1,0 +1,55 @@
+A realistic totals routine where type rules meet: a string prefix
+concatenated with a number, NIL in arithmetic, a string :FOR limit, a
+literal-zero index, an array :Count, and a date offset written number
+first. The date + number, string + string and LimsString() forms beside
+them are correct and stay quiet.
+-- input.ssl --
+:PROCEDURE InvoiceTotals;
+	:PARAMETERS aLines, dIssued, sCurrency;
+	:DECLARE nSum, nIdx, sSummary, dDue, aTaxRates, nRate;
+	nSum := 0;
+	aTaxRates := {0.2, 0.1};
+	:FOR nIdx := 1 :TO "12";
+		nSum := nSum + aLines[nIdx];
+	:NEXT;
+	nRate := aTaxRates[0];
+	nSum := nSum * (1 + nRate) + NIL;
+	dDue := 30 + dIssued;
+	dDue := dIssued + 30;
+	sSummary := "Total " + nSum;
+	sSummary := "Total " + LimsString(nSum) + " " + sCurrency;
+	sSummary := sSummary + " (" + LimsString(aTaxRates:Count) + " rates)";
+	:RETURN sSummary + " due " + DToC(dDue);
+:ENDPROC;
+-- format --
+:PROCEDURE InvoiceTotals;
+	:PARAMETERS aLines, dIssued, sCurrency;
+	:DECLARE nSum, nIdx, sSummary, dDue, aTaxRates, nRate;
+	nSum := 0;
+	aTaxRates := {0.2, 0.1};
+	:FOR nIdx := 1 :TO "12";
+		nSum := nSum + aLines[nIdx];
+	:NEXT;
+	nRate := aTaxRates[0];
+	nSum := nSum * (1 + nRate) + NIL;
+	dDue := 30 + dIssued;
+	dDue := dIssued + 30;
+	sSummary := "Total " + nSum;
+	sSummary := "Total " + LimsString(nSum) + " " + sCurrency;
+	sSummary := sSummary + " (" + LimsString(aTaxRates:Count) + " rates)";
+	:RETURN sSummary + " due " + DToC(dDue);
+:ENDPROC;
+-- diagnostics --
+6:21-6:25 warning for_numeric_values: ':FOR' limit value should be numeric
+9:21-9:22 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+10:29-10:30 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+11:13-11:14 warning mixed_type_operator: Mixed types in '+' operation: numeric + date. The '+' operator requires both operands to be the same type (both strings or both numeric)
+13:23-13:24 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+15:53-15:58 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length
+-- diagnostics [--strict --info] --
+6:21-6:25 warning for_numeric_values: ':FOR' limit value should be numeric
+9:21-9:22 error zero_based_array_index: SSL arrays are 1-based; index 0 is invalid. Use index 1 for the first element.
+10:29-10:30 warning nil_in_operations: Using NIL in arithmetic or string operations causes error. Use Empty() to check for NIL first
+11:13-11:14 warning mixed_type_operator: Mixed types in '+' operation: numeric + date. The '+' operator requires both operands to be the same type (both strings or both numeric)
+13:23-13:24 warning mixed_type_operator: Mixed types in '+' operation: string + numeric. The '+' operator requires both operands to be the same type (both strings or both numeric)
+15:53-15:58 warning invalid_native_member: ':Count' on an array raises at run time: arrays have no Count property; use ALen() or :Length

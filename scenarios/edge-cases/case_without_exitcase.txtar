@@ -1,0 +1,48 @@
+Keywords in the wrong context: :CASE and :OTHERWISE outside any
+:BEGINCASE, :EXITCASE inside a :WHILE, :LOOP outside a loop, and
+:ELSE after :ENDIF. Structural rules must report each once and the
+formatter must still produce stable indentation.
+-- input.ssl --
+:DECLARE nCount;
+nCount := 1;
+:CASE nCount == 1;
+nCount := 2;
+:OTHERWISE;
+:WHILE nCount < 5;
+nCount += 1;
+:EXITCASE;
+:ENDWHILE;
+:LOOP;
+:IF nCount > 1;
+nCount := 0;
+:ENDIF;
+:ELSE;
+:RETURN nCount;
+-- format --
+:DECLARE nCount;
+nCount := 1;
+:CASE nCount == 1;
+	nCount := 2;
+:OTHERWISE;
+	:WHILE nCount < 5;
+		nCount += 1;
+		:EXITCASE;
+	:ENDWHILE;
+	:LOOP;
+	:IF nCount > 1;
+		nCount := 0;
+	:ENDIF;
+:ELSE;
+	:RETURN nCount;
+-- diagnostics --
+3:1-3:6 error stray_block_keyword: ':CASE' is outside any ':BEGINCASE' block
+5:1-5:11 error stray_block_keyword: ':OTHERWISE' is outside any ':BEGINCASE' block
+8:1-8:10 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+10:1-10:6 error loop_outside_loop: ':LOOP' must be inside a ':WHILE' or ':FOR' loop
+14:1-14:6 error stray_block_keyword: ':ELSE' is outside any ':IF' block
+-- diagnostics [--strict --info] --
+3:1-3:6 error stray_block_keyword: ':CASE' is outside any ':BEGINCASE' block
+5:1-5:11 error stray_block_keyword: ':OTHERWISE' is outside any ':BEGINCASE' block
+8:1-8:10 error exitcase_last_in_branch: ':EXITCASE' outside a ':BEGINCASE' branch does not compile
+10:1-10:6 error loop_outside_loop: ':LOOP' must be inside a ':WHILE' or ':FOR' loop
+14:1-14:6 error stray_block_keyword: ':ELSE' is outside any ':IF' block

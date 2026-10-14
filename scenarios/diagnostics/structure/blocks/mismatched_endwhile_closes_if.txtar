@@ -1,0 +1,24 @@
+An :ENDWHILE that closes an :IF when no :WHILE is open anywhere: the
+truly-crossed case of mismatched_block_end, ranged on the :ENDWHILE. The
+:IF stays on the stack and is reported as unclosed_block at end of file
+(diag.mismatched_block_end, diag.unclosed_block).
+-- input.ssl --
+:DECLARE bReady, nCount;
+bReady := .T.;
+nCount := 0;
+:IF bReady;
+	nCount := 1;
+:ENDWHILE;
+-- format --
+:DECLARE bReady, nCount;
+bReady := .T.;
+nCount := 0;
+:IF bReady;
+	nCount := 1;
+:ENDWHILE;
+-- diagnostics --
+4:1-4:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+6:1-6:10 error mismatched_block_end: ':ENDWHILE' does not match ':IF'
+-- diagnostics [--strict --info] --
+4:1-4:4 error unclosed_block: Unclosed ':IF' - expected ':ENDIF'
+6:1-6:10 error mismatched_block_end: ':ENDWHILE' does not match ':IF'

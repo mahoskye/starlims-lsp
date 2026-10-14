@@ -1,0 +1,43 @@
+Five levels of nesting inside a procedure: :PROCEDURE, :FOR, :IF, :WHILE,
+:IF. The procedure body counts as a level, so the innermost :IF sits at
+depth 5 and is reported (info tier, so only under --info) as a zero-width
+range at column 0 of its line (diag.max_block_depth).
+-- input.ssl --
+:PROCEDURE ScanMatrix;
+	:PARAMETERS aGrid;
+	:DECLARE nRow, nCol, nHits;
+	nHits := 0;
+	:FOR nRow := 1 :TO Len(aGrid);
+		:IF Len(aGrid[nRow]) > 0;
+			nCol := 1;
+			:WHILE nCol <= Len(aGrid[nRow]);
+				:IF aGrid[nRow][nCol] > 0;
+					nHits := nHits + 1;
+				:ENDIF;
+				nCol := nCol + 1;
+			:ENDWHILE;
+		:ENDIF;
+	:NEXT;
+	:RETURN nHits;
+:ENDPROC;
+-- format --
+:PROCEDURE ScanMatrix;
+	:PARAMETERS aGrid;
+	:DECLARE nRow, nCol, nHits;
+	nHits := 0;
+	:FOR nRow := 1 :TO Len(aGrid);
+		:IF Len(aGrid[nRow]) > 0;
+			nCol := 1;
+			:WHILE nCol <= Len(aGrid[nRow]);
+				:IF aGrid[nRow][nCol] > 0;
+					nHits := nHits + 1;
+				:ENDIF;
+				nCol := nCol + 1;
+			:ENDWHILE;
+		:ENDIF;
+	:NEXT;
+	:RETURN nHits;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+9:1-9:1 info max_block_depth: Block nesting depth (5) exceeds maximum (4)

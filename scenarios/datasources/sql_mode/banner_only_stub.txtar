@@ -1,0 +1,15 @@
+A data source holding only terminated SQL comments and whitespace is SQL
+mode and produces no diagnostics (feature.diagnostics_pipeline A16): a
+banner-only stub is valid.
+-- input.ds --
+/* ********************************************
+   Placeholder data source, query added later
+   ******************************************** */
+-- owner: inventory team
+-- format --
+/* ********************************************
+   Placeholder data source, query added later
+   ******************************************** */
+-- owner: inventory team
+-- diagnostics --
+-- diagnostics [--strict --info] --

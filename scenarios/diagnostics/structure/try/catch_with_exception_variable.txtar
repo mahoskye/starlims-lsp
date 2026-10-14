@@ -1,0 +1,32 @@
+The C#/JavaScript porting mistake `:CATCH oEx;`. catch_clause_form fires
+on the would-be exception variable and points at GetLastSSLError(); the
+:TRY block itself is otherwise well formed (diag.catch_clause_form).
+-- input.ssl --
+:PROCEDURE SafeDivide;
+	:PARAMETERS nNumerator, nDenominator;
+	:DECLARE nResult;
+	:TRY;
+		nResult := nNumerator / nDenominator;
+	:CATCH oEx;
+		nResult := 0;
+		ErrorMes("SafeDivide", oEx:Description);
+	:ENDTRY;
+	:RETURN nResult;
+:ENDPROC;
+-- format --
+:PROCEDURE SafeDivide;
+	:PARAMETERS nNumerator, nDenominator;
+	:DECLARE nResult;
+	:TRY;
+		nResult := nNumerator / nDenominator;
+	:CATCH oEx;
+		nResult := 0;
+		ErrorMes("SafeDivide", oEx:Description);
+	:ENDTRY;
+	:RETURN nResult;
+:ENDPROC;
+-- diagnostics --
+6:9-6:12 error catch_clause_form: ':CATCH' does not take an exception variable; call 'GetLastSSLError()' inside the block instead
+-- diagnostics [--strict --info] --
+6:9-6:12 error catch_clause_form: ':CATCH' does not take an exception variable; call 'GetLastSSLError()' inside the block instead
+6:9-6:12 warning undeclared_variable: Variable 'oEx' is not declared

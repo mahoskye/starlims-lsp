@@ -1,0 +1,21 @@
+A comment with no terminating semicolon runs to the end of the file and
+swallows everything after it (comment_termination). Formatting must leave
+the swallowed text alone.
+-- input.ssl --
+:PROCEDURE Demo;
+:DECLARE nTotal;
+nTotal := 1;
+:ENDPROC;
+/* trailing note that never ends
+nTotal := 2
+-- format --
+:PROCEDURE Demo;
+	:DECLARE nTotal;
+	nTotal := 1;
+:ENDPROC;
+/* trailing note that never ends
+nTotal := 2
+-- diagnostics --
+5:1-5:46 error comment_termination: SSL comments must end with a semicolon ';'
+-- diagnostics [--strict --info] --
+5:1-5:46 error comment_termination: SSL comments must end with a semicolon ';'

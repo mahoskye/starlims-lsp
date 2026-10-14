@@ -1,0 +1,33 @@
+A :FINALLY holding only a placeholder comment. Comments are not
+statements, so finally_empty fires on :FINALLY (error, compile-time
+requirement). The :CATCH before it is fine (diag.finally_empty).
+-- input.ssl --
+:PROCEDURE SendReport;
+	:PARAMETERS sRecipient;
+	:DECLARE oMail, oErr;
+	:TRY;
+		oMail := Email{.F.};
+		oMail:To := sRecipient;
+	:CATCH;
+		oErr := GetLastSSLError();
+	:FINALLY;
+		/* release the mail object here once the API supports it;
+	:ENDTRY;
+:ENDPROC;
+-- format --
+:PROCEDURE SendReport;
+	:PARAMETERS sRecipient;
+	:DECLARE oMail, oErr;
+	:TRY;
+		oMail := Email{.F.};
+		oMail:To := sRecipient;
+	:CATCH;
+		oErr := GetLastSSLError();
+	:FINALLY;
+		/* release the mail object here once the API supports it;
+	:ENDTRY;
+:ENDPROC;
+-- diagnostics --
+9:2-9:10 error finally_empty: ':FINALLY' must contain at least one statement
+-- diagnostics [--strict --info] --
+9:2-9:10 error finally_empty: ':FINALLY' must contain at least one statement
