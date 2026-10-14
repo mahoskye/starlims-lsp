@@ -38,6 +38,13 @@ history:
       no_default_statements_in_datasource at error, and
       inline_default_outside_datasource now covers the opposite direction
       in ordinary scripts.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      Documented: a procedure nested in a data source defaults its
+      parameters inline, which neither this rule nor
+      datasource_default_required flags; a :DEFAULT there is still
+      flagged, the ban covering the whole file.
 issues: []
 ---
 
@@ -60,6 +67,11 @@ It must NOT flag:
   this one);
 - a `:PARAMETERS` statement whose parameters carry no defaults at all
   (again `datasource_default_required`'s finding, not this rule's);
+- an inline `:=` default on a procedure nested in the data source
+  (`:PROCEDURE Widen; :PARAMETERS nWidth := 4;`). The ban covers the
+  whole file, so the inline form is how a nested procedure defaults a
+  parameter too; `datasource_default_required` exempts that procedure's
+  `:PARAMETERS` and does not require one (issue #328);
 - anything in ordinary (non-data-source) SSL files, where `:DEFAULT`
   statements are the normal way to set parameter defaults — the check
   simply does not run outside data source files.
@@ -81,6 +93,14 @@ It must NOT flag:
 
 ```ssl
 :PARAMETERS dtStart, sStatus;
+```
+
+```ssl
+:PARAMETERS sStatus := "A";
+:PROCEDURE Widen;
+	:PARAMETERS nWidth := 4;
+	:RETURN nWidth * 2;
+:ENDPROC;
 ```
 
 ## Rationale
