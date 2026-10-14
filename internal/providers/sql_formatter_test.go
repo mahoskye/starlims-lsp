@@ -1587,7 +1587,8 @@ func TestSQLFormatter_MergeIntoOnOneLine(t *testing.T) {
 			"USING source src\n" +
 			"ON tgt.id = src.id\n" +
 			"WHEN MATCHED THEN\n" +
-			"    UPDATE SET tgt.status = src.status",
+			"    UPDATE SET\n" +
+			"        tgt.status = src.status",
 	}})
 }
 
@@ -2657,8 +2658,9 @@ func TestSQLFormatter_MergeOnAndSetAlignment(t *testing.T) {
 		"USING samples_source s\n" +
 		"ON (t.sample_id = s.sample_id AND t.site_code = s.site_code)\n" +
 		"WHEN MATCHED THEN\n" +
-		"    UPDATE SET t.sample_status = s.sample_status,\n" +
-		"               t.modified_on = s.modified_on"
+		"    UPDATE SET\n" +
+		"        t.sample_status = s.sample_status,\n" +
+		"        t.modified_on = s.modified_on"
 	if got != want {
 		t.Errorf("MERGE alignment:\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
@@ -2669,7 +2671,8 @@ func TestSQLFormatter_MergeOnAndSetAlignment(t *testing.T) {
 		"    AND t.site_code = s.site_code\n" +
 		"    AND t.collection_date = s.collection_date)\n" +
 		"WHEN MATCHED THEN\n" +
-		"    UPDATE SET t.sample_status = s.sample_status"
+		"    UPDATE SET\n" +
+		"        t.sample_status = s.sample_status"
 	if got != want {
 		t.Errorf("MERGE long ON alignment:\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}

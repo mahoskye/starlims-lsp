@@ -16,7 +16,8 @@ SELECT that leads a concatenation. Its result set is silently discarded.
 	:DECLARE bOk;
 	bOk := RunSQL("SELECT status FROM orders WHERE ordno = ?",, {sOrdNo});
 	bOk := RunSQL("
-	    /* recent orders */ WITH recent AS (
+	    /* recent orders */
+	    WITH recent AS (
 	        SELECT ordno
 	        FROM orders
 	    )

@@ -150,6 +150,21 @@ history:
       first condition (S45). MERGE's INSERT column list and VALUES list
       take the block-paren layout, both indented under their WHEN branch
       (reference §2.12, §7.4); VALUES used to drop to the clause column.
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      A comment that leads the statement sits on its own line and the
+      statement starts on the next (`/* recent */ ⏎ WITH ...`), like a
+      line comment does; it used to stay on the first code line. A
+      comment inside the statement still stays inline.
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      MERGE's UPDATE SET takes the same layout as a plain UPDATE: SET ends
+      its line and each assignment starts its own line one level in. The
+      first assignment used to stay on the UPDATE SET line with the rest
+      aligned under it (reference §2.12/§7.4, to be updated to match
+      §2.10).
 issues: ["#81", "#82", "#327"]
 ---
 
@@ -649,6 +664,55 @@ aRows := SQLExecute("
     FROM orders
     WHERE ordkey = ?sPrefix + sSuffix?
       AND ordseq > ?nBase * 2?
+");
+```
+
+A comment that leads the statement sits on its own line:
+
+### Before
+
+```ssl
+:DECLARE bOk;
+bOk := RunSQL("/* recent orders */ WITH recent AS (SELECT ordno FROM orders) SELECT ordno FROM recent");
+```
+
+### After
+
+```ssl
+:DECLARE bOk;
+bOk := RunSQL("
+    /* recent orders */
+    WITH recent AS (
+        SELECT ordno
+        FROM orders
+    )
+    SELECT ordno
+    FROM recent
+");
+```
+
+MERGE's `UPDATE SET` lays out like a plain `UPDATE`: `SET` ends its
+line and each assignment starts its own line:
+
+### Before
+
+```ssl
+:DECLARE bOk;
+bOk := RunSQL("merge into ordtask_summary tgt using source src on (tgt.ordno = src.ordno) when matched then update set tgt.result_count = src.cnt, tgt.updated_date = sysdate");
+```
+
+### After
+
+```ssl
+:DECLARE bOk;
+bOk := RunSQL("
+    MERGE INTO ordtask_summary tgt
+    USING source src
+    ON (tgt.ordno = src.ordno)
+    WHEN MATCHED THEN
+        UPDATE SET
+            tgt.result_count = src.cnt,
+            tgt.updated_date = SYSDATE
 ");
 ```
 

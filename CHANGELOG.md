@@ -69,10 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     packed lines inside a procedure reached 91–94 columns.
   - **Detection:** statements led by a SQL comment, holding `COLLATE`, or
     naming double-quoted identifiers (`FROM "Orders"`) are recognized as
-    SQL and reflowed.
+    SQL and reflowed. A comment that leads the statement sits on its own
+    line, with the statement starting on the next.
   - **Queries ending at the limit:** these are reflowed, because the
     fits-inline test now counts the `");` that must stay on the line. The
     statement used to wrap after `:=` instead.
+  - **MERGE `UPDATE SET`:** it lays out like a plain `UPDATE`, with `SET`
+    ending its line and each assignment on its own line.
   - **Layout:** these now follow the SQL reference:
     - the SELECT item after a multi-line CASE starts a fresh line;
     - a parenthesized predicate group that fits (`AND (a = 1 OR b = 2)`,

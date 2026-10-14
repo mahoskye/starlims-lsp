@@ -16,7 +16,8 @@ line after ':=' instead of the SQL engine reflowing it.
 :PROCEDURE Edges;
 	:DECLARE aRows;
 	aRows := SQLExecute("
-	    /* recent */ SELECT ordno, custid, logdate, status
+	    /* recent */
+	    SELECT ordno, custid, logdate, status
 	    FROM orders
 	    WHERE status = 'A'
 	    ORDER BY ordno

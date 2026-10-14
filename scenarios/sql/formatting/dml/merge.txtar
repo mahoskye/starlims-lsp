@@ -22,8 +22,9 @@ INSERT indented 4 under WHEN, the USING inline view laid out flat.
 	    ) src
 	    ON (tgt.ordno = src.ordno AND tgt.testcode = src.testcode)
 	    WHEN MATCHED THEN
-	        UPDATE SET tgt.result_count = src.cnt,
-	                   tgt.updated_date = SYSDATE
+	        UPDATE SET
+	            tgt.result_count = src.cnt,
+	            tgt.updated_date = SYSDATE
 	    WHEN NOT MATCHED THEN
 	        INSERT (
 	            ordno, testcode, result_count, created_date
