@@ -34,11 +34,13 @@ SELECT s.SampleId, s.Status
 
 :PROCEDURE PendingQuery;
 	Me:sLastSql := GetRegion("PendingSamples");
+
 	:RETURN Me:sLastSql;
 :ENDPROC;
 
 :PROCEDURE Script;
 	:PARAMETERS nA, nB;
+
 	:RETURN ExecUdf(GetInlineCode("Snippet"), {nA, nB});
 :ENDPROC;
 
@@ -50,6 +52,7 @@ SELECT s.SampleId, s.Status
 
 :BEGININLINECODE Snippet;
 	:PARAMETERS nLeft, nRight;
+
 	:RETURN nLeft + nRight;
 :ENDINLINECODE;
 -- diagnostics --

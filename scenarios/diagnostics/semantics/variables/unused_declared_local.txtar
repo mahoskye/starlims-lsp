@@ -12,7 +12,9 @@ The write-only local nStage counts as used: dead stores are out of scope.
 :PROCEDURE StageBatch;
 	:PARAMETERS sBatchId, nPriority;
 	:DECLARE nStage, sLeftover;
+
 	nStage := 1;
+
 	:RETURN sBatchId;
 :ENDPROC;
 -- diagnostics --

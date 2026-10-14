@@ -16,6 +16,7 @@ aMatrix := {
 {"A8", "Theta", 8, .F., {"x", "y"}}};
 -- format --
 :DECLARE aMatrix;
+
 aMatrix := {
 	{"A1", "Alpha", 1, .T., {"x", "y"}},
 	{"A2", "Beta", 2, .F., {"x", "y"}},

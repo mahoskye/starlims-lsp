@@ -14,7 +14,9 @@ bVerbose := .T.;
 :ENDIF;
 -- format --
 :DECLARE bVerbose;
+
 bVerbose := .T.;
+
 :IF bVerbose;
 	:PROCEDURE LogLine;
 		:PARAMETERS sText;

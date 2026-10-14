@@ -10,11 +10,13 @@ advisories usually fire together.
 -- format --
 :PROCEDURE Outer;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, r.result_value
 	    FROM orders o, ordresult r
 	    WHERE o.ordno = r.ordno(+)
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

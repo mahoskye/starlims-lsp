@@ -18,6 +18,7 @@ native value restores the error.
 -- format --
 :PROCEDURE Bytes;
 	:DECLARE oList, oNum, aBytes, vOut;
+
 	oList := LimsNETConnect("mscorlib", "System.Collections.ArrayList");
 	vOut := oList:Items[0];
 	oNum := LimsNETConnect("System.Numerics", "System.Numerics.BigInteger");
@@ -25,6 +26,7 @@ native value restores the error.
 	vOut := aBytes[0];
 	aBytes := {1, 2};
 	vOut := aBytes[0];
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

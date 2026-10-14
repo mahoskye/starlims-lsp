@@ -7,6 +7,7 @@ nCount := 0;
 -- format --
 :DECLARE nCount;
 :INCLUDE Common.StringHelpers;
+
 nCount := 0;
 -- diagnostics --
 -- diagnostics [--strict --info] --

@@ -18,6 +18,7 @@ diag.prefer_exitcase last Flags fence).
 -- format --
 :PROCEDURE FirstMatch;
 	:PARAMETERS nKind, bStrict;
+
 	:BEGINCASE;
 	:CASE nKind == 1;
 		:IF bStrict;
@@ -26,6 +27,7 @@ diag.prefer_exitcase last Flags fence).
 	:OTHERWISE;
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN "loose";
 :ENDPROC;
 -- diagnostics --

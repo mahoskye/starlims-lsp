@@ -16,6 +16,7 @@ flag", diag.deprecated_keyword).
 -- format --
 :PROCEDURE LoadPrices;
 	:DECLARE aPrices, nStatus;
+
 	nStatus := 0;
 	aPrices := SQLExecute("SELECT PRICE FROM PRICELIST");
 	:RETURN aPrices;

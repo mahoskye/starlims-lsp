@@ -10,6 +10,7 @@ column, and aggregate calls packed in the SELECT list.
 -- format --
 :PROCEDURE Stats;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT testcode, COUNT(*) AS task_count, AVG(result_value) AS avg_result,
 	           MIN(result_value) AS min_result, MAX(result_value) AS max_result
@@ -19,6 +20,7 @@ column, and aggregate calls packed in the SELECT list.
 	      HAVING COUNT(*) > 5
 	    ORDER BY task_count DESC
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

@@ -21,12 +21,14 @@ nTotal := nTotal -
 :PROCEDURE Compute;
 	:PARAMETERS nBase, nRate;
 	:DECLARE nTotal, bReady;
+
 	nTotal :=
 		nBase * nRate;
 	bReady := nTotal > 0 .AND.
 		nRate < 1;
 	nTotal := nTotal -
 		1;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

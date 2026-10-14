@@ -22,16 +22,20 @@ operands, and a mismatch nested inside a call argument.
 :PROCEDURE Assemble;
 	:PARAMETERS sFirst, sLast, dDue, nDays, aCols, MAX_ROWS, oFmt;
 	:DECLARE sFull, dNext, DCUlabel, X, sCols;
+
 	sFull := sFirst + " " + sLast;
 	dNext := dDue + nDays;
 	DCUlabel := "cat";
 	sFull := DCUlabel + "." + "leaf";
 	sCols := "";
+
 	:FOR X := 1 :TO MAX_ROWS;
 		sCols := sCols + aCols[X] + " end";
 	:NEXT;
+
 	sFull := sFull + oFmt:Suffix + "Limit: " + MAX_ROWS;
 	sFull := SubStr(sFull, 1, Len(sFull) - 1);
+
 	:RETURN sFull + sCols + LimsString(dNext);
 :ENDPROC;
 -- diagnostics --

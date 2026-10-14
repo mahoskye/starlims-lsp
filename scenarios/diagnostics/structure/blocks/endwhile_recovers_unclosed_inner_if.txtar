@@ -18,11 +18,14 @@ commit be7a174).
 :PROCEDURE CountDown;
 	:PARAMETERS nStart;
 	:DECLARE nCurrent;
+
 	nCurrent := nStart;
+
 	:WHILE nCurrent > 0;
 		:IF nCurrent % 2 == 0;
 			nCurrent := nCurrent - 2;
 		:ENDWHILE;
+
 		:RETURN nCurrent;
 	:ENDPROC;
 -- diagnostics --

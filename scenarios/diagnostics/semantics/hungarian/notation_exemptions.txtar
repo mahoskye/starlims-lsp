@@ -20,14 +20,18 @@ underscores before a valid prefix.
 :PROCEDURE Survey;
 	:PARAMETERS aRows, bStrict, dFrom, fnPick, nLimit, oSink, sTag, vExtra;
 	:DECLARE i, x, MAX_PASSES, _sScratch;
+
 	MAX_PASSES := 3;
 	_sScratch := sTag;
+
 	:FOR i := 1 :TO Len(aRows);
 		x := Eval(fnPick, aRows[i]);
+
 		:IF bStrict .AND. x > nLimit;
 			oSink:Add(x);
 		:ENDIF;
 	:NEXT;
+
 	:RETURN {dFrom, vExtra, MAX_PASSES, _sScratch};
 :ENDPROC;
 -- diagnostics --

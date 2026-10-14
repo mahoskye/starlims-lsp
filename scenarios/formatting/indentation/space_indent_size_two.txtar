@@ -19,26 +19,32 @@ aRows[i];
 :PROCEDURE Tally;
   :PARAMETERS aRows;
   :DECLARE nTotal, i;
+
   nTotal := 0;
+
   :FOR i := 1 :TO Len(aRows);
     :IF aRows[i] > 0;
       nTotal := nTotal +
         aRows[i];
     :ENDIF;
   :NEXT;
+
   :RETURN nTotal;
 :ENDPROC;
 -- format --
 :PROCEDURE Tally;
 	:PARAMETERS aRows;
 	:DECLARE nTotal, i;
+
 	nTotal := 0;
+
 	:FOR i := 1 :TO Len(aRows);
 		:IF aRows[i] > 0;
 			nTotal := nTotal +
 				aRows[i];
 		:ENDIF;
 	:NEXT;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

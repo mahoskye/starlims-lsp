@@ -18,6 +18,7 @@ like any other SQL string literal.
 :PROCEDURE Lookups;
 	:PARAMETERS sOrdNo, oDb;
 	:DECLARE sName, bOk;
+
 	sName := LSearch("select custname from orders where ordno = ?",
 	                 "select nothing from nowhere where nothing = 1 order by nothing",,
 	                 {sOrdNo});
@@ -28,6 +29,7 @@ like any other SQL string literal.
 	    WHERE status = 'A'
 	    ORDER BY logdate
 	");
+
 	:RETURN {sName, bOk};
 :ENDPROC;
 -- diagnostics --

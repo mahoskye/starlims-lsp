@@ -23,6 +23,7 @@ mixed_type_operator's.
 :PROCEDURE Schedule;
 	:PARAMETERS dDue, dStart, sFirst, sSecond, MAX_ROWS, aVals, oCfg;
 	:DECLARE dRemind, nDays, sJoined, x, nLeft, aOffsets, nSigned;
+
 	dRemind := dDue - 3;
 	nDays := dDue - dStart;
 	sJoined := sFirst - sSecond;
@@ -33,6 +34,7 @@ mixed_type_operator's.
 	aOffsets := {-1, 2};
 	nSigned := -1;
 	nSigned := (-nSigned) * 2 - -1;
+
 	:RETURN {dRemind, nDays, sJoined, nLeft, aOffsets, nSigned};
 :ENDPROC;
 -- diagnostics --

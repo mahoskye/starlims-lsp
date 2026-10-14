@@ -1820,6 +1820,7 @@ func TestFormat_BlankLineBetweenSiblingBlocks_Tabs(t *testing.T) {
 	// are NOT considered siblings even if they render the same width.
 	src := "\t:IF inner;\n\t:ENDIF;\n    :IF outer;\n    :ENDIF;\n"
 	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenSections = false // this pins the sibling-block rule alone
 	out := applyPostFormatPasses(src, opts)
 	if out != src {
 		t.Errorf("expected no insertion when indent characters differ\n got: %q\nwant: %q", out, src)
@@ -1855,6 +1856,7 @@ func TestFormat_BlankLineBetweenSiblingBlocks_ClosersFollowedByOrdinaryCode(t *t
 	// NOT a block boundary — the post-pass must leave it alone.
 	src := ":IF a;\n:ENDIF;\nx := 1;\n"
 	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenSections = false // this pins the sibling-block rule alone
 	out := applyPostFormatPasses(src, opts)
 	if out != src {
 		t.Errorf("expected no blank line before plain statement\n got: %q\nwant: %q", out, src)
@@ -1869,6 +1871,7 @@ func TestFormat_BlankLineBetweenSiblingBlocks_CommentBetween(t *testing.T) {
 	// visual separator.)
 	src := ":IF a;\n:ENDIF;\n/* divider ;\n:IF b;\n:ENDIF;\n"
 	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenSections = false // this pins the sibling-block rule alone
 	out := applyPostFormatPasses(src, opts)
 	if out != src {
 		t.Errorf("expected no insertion when a comment separates the blocks\n got: %q\nwant: %q", out, src)
@@ -1891,6 +1894,7 @@ func TestFormat_BlankLineBetweenSiblingBlocks_SurvivesMaxConsecutiveCap(t *testi
 func TestFormat_BlankLineBetweenSiblingBlocks_Disabled(t *testing.T) {
 	src := ":IF a;\n:ENDIF;\n:IF b;\n:ENDIF;\n"
 	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenSections = false // this pins the sibling-block rule alone
 	opts.BlankLineBetweenBlocks = false
 	out := applyPostFormatPasses(src, opts)
 	if out != src {
@@ -2156,6 +2160,7 @@ func TestFormat_MaxConsecutiveBlankLines_CapTwo(t *testing.T) {
 func TestFormat_SemicolonEnforcement_AtEOFWithoutNewline(t *testing.T) {
 	input := ":DECLARE nValue;\nnValue := 1"
 	opts := DefaultFormattingOptions()
+	opts.BlankLinesBetweenSections = false // this pins semicolon enforcement alone
 	out := FormatDocument(input, opts)[0].NewText
 	want := ":DECLARE nValue;\nnValue := 1;\n"
 	if out != want {
@@ -2633,6 +2638,7 @@ func TestFormatDocument_CodeBlockLiteralNormalized(t *testing.T) {
 // separator is inserted where none exists.
 func TestFormat_BlankLinesBetweenProcs_ZeroDisablesNormalization(t *testing.T) {
 	opts := DefaultFormattingOptions()
+	opts.MaxConsecutiveBlankLines = 0 // the cap would shorten the run under test
 	opts.BlankLinesBetweenProcs = 0
 
 	withBlanks := ":PROCEDURE First;\n:ENDPROC;\n\n\n\n:PROCEDURE Second;\n:ENDPROC;\n"

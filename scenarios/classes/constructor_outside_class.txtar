@@ -17,12 +17,15 @@ with another name in the same script is the near miss.
 :PROCEDURE Constructor;
 	:PARAMETERS sName;
 	:DECLARE sLabel;
+
 	sLabel := "Built " + sName;
+
 	:RETURN sLabel;
 :ENDPROC;
 
 :PROCEDURE Build;
 	:PARAMETERS sName;
+
 	:RETURN DoProc("Constructor", {sName});
 :ENDPROC;
 -- diagnostics --

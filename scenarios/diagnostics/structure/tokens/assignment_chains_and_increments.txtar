@@ -24,6 +24,7 @@ bare `:RETURN;` is complete (issue #240). Clean.
 -- format --
 :PROCEDURE CounterDemo;
 	:DECLARE nA, nB, nC, aCounts, oStats;
+
 	nA := nB := nC := 0;
 	aCounts := {nA += 1, 0};
 	oStats := CreateUdObject();
@@ -33,11 +34,13 @@ bare `:RETURN;` is complete (issue #240). Clean.
 	aCounts[1]++;
 	++oStats:hits;
 	DoProc("NoteCounts", {nC := 5});
+
 	:RETURN;
 :ENDPROC;
 
 :PROCEDURE NoteCounts;
 	:PARAMETERS nValue;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

@@ -15,10 +15,12 @@ variable holding the path, and a dotted fragment in a later argument
 :PROCEDURE Dispatch;
 	:PARAMETERS oCfg;
 	:DECLARE nOut, sPath;
+
 	sPath := "Billing.ComputeFees";
 	nOut := ExecFunction("Billing.ComputeFees", {1});
 	nOut := ExecFunction(sPath, {nOut});
 	nOut := ExecFunction(sPath, {oCfg.Rate});
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

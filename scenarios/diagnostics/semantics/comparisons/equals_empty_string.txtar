@@ -16,10 +16,13 @@ also diag.equals_vs_strict_equals (info tier).
 :PROCEDURE Blank;
 	:PARAMETERS sStatus, aRow;
 	:DECLARE bBlank;
+
 	:IF sStatus = "";
 		sStatus := "Logged";
 	:ENDIF;
+
 	bBlank := aRow[2] = '' .OR. aRow[3] = [];
+
 	:RETURN bBlank;
 :ENDPROC;
 -- diagnostics --

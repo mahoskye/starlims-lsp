@@ -24,6 +24,7 @@ aRows
 -- format --
 :PROCEDURE BuildRows;
 	:DECLARE aRows, aHeaders;
+
 	:IF .T.;
 		aHeaders := {
 			"SampleId",
@@ -38,6 +39,7 @@ aRows
 		                  aRows
 		});
 	:ENDIF;
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

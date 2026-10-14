@@ -20,8 +20,10 @@ finding, never this one).
 :PROCEDURE ColorLabel;
 	:PARAMETERS nCode, bFlag;
 	:DECLARE sLabel;
+
 	/* black & white | grey;
 	sLabel := "black & white | grey";
+
 	:IF nCode == 1 .AND. bFlag;
 		sLabel := sLabel + " (1)";
 	:ENDIF;
@@ -29,6 +31,7 @@ finding, never this one).
 	:IF nCode != 2 .OR. nCode >= 3;
 		sLabel := sLabel + " (2)";
 	:ENDIF;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

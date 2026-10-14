@@ -20,12 +20,14 @@ sOut := oTemplate:ToString()
 :PROCEDURE FillTemplate;
 	:PARAMETERS oTemplate, sTitle, sUser;
 	:DECLARE sOut;
+
 	:IF .NOT. Empty(sTitle);
 		sOut := oTemplate:ToString()
 			:Replace("##TITLE##", sTitle)
 			:Replace("##USER##", sUser)
 			:Trim();
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

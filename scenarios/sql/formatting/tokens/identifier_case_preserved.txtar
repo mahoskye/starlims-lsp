@@ -12,6 +12,7 @@ names, mixed-case columns and lowercase aliases all survive.
 :PROCEDURE Casing;
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT O.ORDNO, o.CustId, t.TestCode
 	    FROM ORDERS o
@@ -20,6 +21,7 @@ names, mixed-case columns and lowercase aliases all survive.
 	    WHERE o.ORDNO = ?sOrdNo?
 	    ORDER BY t.TestCode
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

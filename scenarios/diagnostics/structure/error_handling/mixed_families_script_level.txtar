@@ -20,6 +20,7 @@ nCount := -1;
 :RESUME;
 -- format --
 :DECLARE nCount;
+
 :TRY;
 	nCount := 1;
 :CATCH;

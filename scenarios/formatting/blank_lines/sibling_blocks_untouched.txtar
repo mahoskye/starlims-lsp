@@ -25,6 +25,7 @@ sOut := "none";
 :PROCEDURE Untouched;
 	:PARAMETERS nValue;
 	:DECLARE sOut;
+
 	:IF nValue > 0;
 		:IF nValue > 5;
 			sOut := "big";
@@ -34,10 +35,13 @@ sOut := "none";
 	:WHILE nValue > 0;
 		nValue -= 1;
 	:ENDWHILE;
+
 	sOut := "done";
+
 	:IF Empty(sOut);
 		sOut := "none";
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

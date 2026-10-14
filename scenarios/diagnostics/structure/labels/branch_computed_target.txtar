@@ -20,13 +20,16 @@ diagnosed).
 :PROCEDURE JumpByName;
 	:PARAMETERS sStage;
 	:DECLARE sTarget, nVisits;
+
 	nVisits := 0;
 	sTarget := Upper(sStage);
 	:LABEL FINISH;
 	nVisits := nVisits + 1;
+
 	:IF nVisits < 2;
 		Branch(sTarget);
 	:ENDIF;
+
 	:RETURN nVisits;
 :ENDPROC;
 -- diagnostics --

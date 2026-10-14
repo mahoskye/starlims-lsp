@@ -27,6 +27,7 @@ first block belongs to the inner block, not the outer one.
 :PROCEDURE Route;
 	:PARAMETERS bReady, bUrgent, bLocal;
 	:DECLARE sQueue;
+
 	:IF .NOT. bReady;
 		sQueue := "hold";
 	:ELSE;
@@ -44,6 +45,7 @@ first block belongs to the inner block, not the outer one.
 	:ELSE;
 		sQueue := sQueue + "-local";
 	:ENDIF;
+
 	:RETURN sQueue;
 :ENDPROC;
 -- diagnostics --

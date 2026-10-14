@@ -29,7 +29,9 @@ select   a , b
 
 :PROCEDURE ReadRegion;
 	:DECLARE sText;
+
 	sText := GetRegion("TopLevelText");
+
 	:RETURN sText;
 :ENDPROC;
 -- diagnostics --

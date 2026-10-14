@@ -27,6 +27,7 @@ count.
 :PROCEDURE Add;
 	:PARAMETERS nDelta;
 	:DECLARE nOld;
+
 	nOld := Me:nTotal;
 	Me:nTotal := nOld + nDelta;
 :ENDPROC;

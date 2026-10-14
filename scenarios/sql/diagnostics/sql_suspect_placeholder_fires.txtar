@@ -10,6 +10,7 @@ combined resolution is unverified.
 -- format --
 :PROCEDURE Stamp;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    INSERT INTO auditlog (
 	        who, what
@@ -18,6 +19,7 @@ combined resolution is unverified.
 	        ?'<<username>>'?, 'login'
 	    )
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

@@ -14,9 +14,11 @@ rejects. try_requires_handler fires on the :TRY when :ENDTRY is seen
 :PROCEDURE TouchRecord;
 	:PARAMETERS nRecordId;
 	:DECLARE bOk;
+
 	:TRY;
 		bOk := RunSQL("UPDATE RECORDS SET TOUCHED = 1 WHERE RECORDID = ?",, {nRecordId});
 	:ENDTRY;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

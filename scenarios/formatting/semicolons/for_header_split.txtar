@@ -24,8 +24,10 @@ nSum -= i;
 :PROCEDURE SplitFor;
 	:PARAMETERS nLimit;
 	:DECLARE i, nSum, nDown;
+
 	nSum := 0;
 	nDown := -1;
+
 	:FOR i := 1 :TO
 		nLimit;
 		nSum += i;
@@ -35,6 +37,7 @@ nSum -= i;
 		nDown;
 		nSum -= i;
 	:NEXT;
+
 	:RETURN nSum;
 :ENDPROC;
 -- diagnostics --

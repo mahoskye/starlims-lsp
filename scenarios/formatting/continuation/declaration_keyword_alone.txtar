@@ -23,8 +23,10 @@ nCount := nMean;
 	:DEFAULT sChartId, "";
 	:DECLARE
 		nIndex, nCount;
+
 	nIndex := Len(aRules);
 	nCount := nMean;
+
 	:RETURN nCount + nIndex;
 :ENDPROC;
 -- diagnostics --

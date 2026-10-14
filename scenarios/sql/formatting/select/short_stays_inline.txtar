@@ -14,9 +14,11 @@ casing and spacing included (fmt.sql_in_strings, vs-code-ssl-formatter
 :PROCEDURE Small;
 	:PARAMETERS nId;
 	:DECLARE aRows, nCount;
+
 	aRows := SQLExecute("select ordno,status  from orders where ordno = ?nId?");
 	nCount := LSearch("Select Count(*) From ordtask Where ordno = ?", 0,, {nId});
 	aRows := SQLExecute("select o.ordno from orders o join ordtask t on t.ordno=o.ordno");
+
 	:RETURN {aRows, nCount};
 :ENDPROC;
 -- diagnostics --

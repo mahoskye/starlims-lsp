@@ -16,7 +16,9 @@ nMaxRows := nMaxRows + 0;
 /* region Setup;
 /* region Constants;
 :DECLARE nMaxRows;
+
 nMaxRows := 500;
+
 /* endregion;
 /* endregion Setup is done here;
 /* region Tail;

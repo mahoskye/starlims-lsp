@@ -82,7 +82,9 @@ bA := bX .and. bY .or. .not. bZ;
 ```ssl
 :PROCEDURE Demo;
 	:DECLARE bA;
+
 	bA := bX .AND. bY .OR. .NOT. bZ;
+
 	:RETURN bA;
 :ENDPROC;
 ```
@@ -108,6 +110,7 @@ nT := base:Compute(1);
 :PROCEDURE M;
 	Me:Helper();
 	nT := Base:Compute(1);
+
 	:RETURN nT;
 :ENDPROC;
 ```

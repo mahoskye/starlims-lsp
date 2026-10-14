@@ -11,8 +11,10 @@ defer to the lexer-level rule (diag.unknown_token).
 -- format --
 :PROCEDURE ColumnLabel;
 	:DECLARE sLabel, nCount;
+
 	nCount := 4;
 	sLabel := `nCount`;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

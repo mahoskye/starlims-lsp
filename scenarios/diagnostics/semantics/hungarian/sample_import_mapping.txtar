@@ -28,14 +28,17 @@ sCode) for --hungarian-types. A loop counter and a constant are exempt.
 :PROCEDURE MapImport;
 	:PARAMETERS aSource, sDelimiter;
 	:DECLARE rowData, nRow, sCode, Total, i, MAX_COLS;
+
 	MAX_COLS := 12;
 	Total := 0;
+
 	:FOR i := 1 :TO Len(aSource);
 		rowData := BuildArray(aSource[i], sDelimiter);
 		nRow := LimsString(i);
 		sCode := Len(rowData);
 		Total := Total + Min(Len(rowData), MAX_COLS);
 	:NEXT;
+
 	:RETURN {nRow, sCode, Total};
 :ENDPROC;
 -- diagnostics --

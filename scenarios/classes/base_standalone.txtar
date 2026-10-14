@@ -24,10 +24,12 @@ Base:Init() (well formed, :INHERIT present) and oUri:Base / oUri:Base:Host
 :PROCEDURE Init;
 	:PARAMETERS oUri;
 	:DECLARE sRoot, sHost;
+
 	Base:Init();
 	Me:oParent := Base;
 	sRoot := oUri:Base;
 	sHost := oUri:Base:Host;
+
 	:RETURN sRoot + sHost;
 :ENDPROC;
 -- diagnostics --

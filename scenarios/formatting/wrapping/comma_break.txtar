@@ -16,11 +16,13 @@ vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenu
 :PROCEDURE Totals;
 	:PARAMETERS aQuarters;
 	:DECLARE vResult, i;
+
 	:FOR i := 1 :TO Len(aQuarters);
 		vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
 		                                      nThirdQuarterRevenue, nFourthQuarterRevenue,
 		                                      aQuarters[i]});
 	:NEXT;
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

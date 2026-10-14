@@ -18,8 +18,10 @@ fnDouble := {|nX| nX +
 -- format --
 :PROCEDURE Demo;
 	:DECLARE sText, fnDouble;
+
 	sText := "alpha
 beta";
+
 	/* first line
 second line;
 	:REGION Payload;

@@ -9,7 +9,9 @@ sKey := sLane + LimsString(nDepth);
 -- format --
 :PARAMETERS sLane, nDepth := 3;
 :DECLARE sKey;
+
 sKey := sLane + LimsString(nDepth);
+
 :RETURN sKey;
 -- diagnostics --
 1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'

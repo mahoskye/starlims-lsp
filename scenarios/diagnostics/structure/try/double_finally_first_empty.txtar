@@ -18,12 +18,14 @@ diag.finally_empty fourth Flags fence).
 :PROCEDURE ReleaseLock;
 	:PARAMETERS sLockName;
 	:DECLARE bReleased;
+
 	:TRY;
 		bReleased := .T.;
 	:FINALLY;
 	:FINALLY;
 		bReleased := .F.;
 	:ENDTRY;
+
 	:RETURN bReleased;
 :ENDPROC;
 -- diagnostics --

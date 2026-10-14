@@ -24,7 +24,9 @@ the :CATCH handler, both inside the :WHILE. The FINALLY region ends at
 -- format --
 :PROCEDURE DrainInbox;
 	:DECLARE nLeft, oErr;
+
 	nLeft := 20;
+
 	:WHILE nLeft > 0;
 		:TRY;
 			nLeft := nLeft - 1;
@@ -39,6 +41,7 @@ the :CATCH handler, both inside the :WHILE. The FINALLY region ends at
 			:EXITWHILE;
 		:ENDIF;
 	:ENDWHILE;
+
 	:RETURN nLeft;
 :ENDPROC;
 -- diagnostics --

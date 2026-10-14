@@ -15,8 +15,10 @@ appears inside a string.
 -- format --
 :PROCEDURE FindSample;
 	:DECLARE sSQL, aRows;
+
 	sSQL := "SELECT sampleid FROM samples WHERE sampleid = ?nSampleId?";
 	aRows := SQLExecute("SELECT sampleid FROM samples WHERE site = ?oFilter:sName?");
+
 	:RETURN {sSQL, aRows};
 :ENDPROC;
 -- diagnostics --

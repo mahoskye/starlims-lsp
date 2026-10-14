@@ -22,10 +22,13 @@ FINALLY region. Clean (diag.exitfor_in_finally "must NOT flag").
 :PROCEDURE FirstParsable;
 	:PARAMETERS aTexts;
 	:DECLARE nIdx, nValue;
+
 	nValue := 0;
+
 	:FOR nIdx := 1 :TO Len(aTexts);
 		:TRY;
 			nValue := Val(aTexts[nIdx]);
+
 			:IF nValue > 0;
 				:EXITFOR;
 			:ENDIF;
@@ -33,6 +36,7 @@ FINALLY region. Clean (diag.exitfor_in_finally "must NOT flag").
 			:EXITFOR;
 		:ENDTRY;
 	:NEXT;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

@@ -17,11 +17,14 @@ assignment (nShipped) is not undeclared.
 :PROCEDURE TallyCrates;
 	:PARAMETERS nPerCrate;
 	:DECLARE nTotal;
+
 	nTotal := nCrateCount * nPerCrate;
 	nShipped := nTotal;
+
 	:IF nCrateCount > 10;
 		nTotal := nTotal + 1;
 	:ENDIF;
+
 	:RETURN nTotal + nShipped;
 :ENDPROC;
 -- diagnostics --

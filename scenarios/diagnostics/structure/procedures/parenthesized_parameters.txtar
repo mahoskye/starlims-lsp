@@ -11,7 +11,9 @@ and pairs with :ENDPROC (diag.procedure_declaration_syntax).
 -- format --
 :PROCEDURE CalcShipping(nWeight, sZone);
 	:DECLARE nCost;
+
 	nCost := nWeight * 1.5;
+
 	:RETURN nCost;
 :ENDPROC;
 -- diagnostics --

@@ -139,16 +139,19 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 
 :TRY;
 	sCurrentStatus := DoProc("LoadStatus", {sSampleId});
+
 	:IF Empty(sCurrentStatus);
 		:RETURN {.F., "Sample " + sSampleId + " was not found"};
 	:ENDIF;
 
 	bAllowed := DoProc("IsTransitionAllowed", {sCurrentStatus, sNewStatus});
+
 	:IF .NOT. bAllowed;
 		:RETURN {.F., "Cannot move from " + sCurrentStatus + " to " + sNewStatus};
 	:ENDIF;
 
 	bUpdated := DoProc("WriteStatus", {sSampleId, sNewStatus, sUserId});
+
 	:IF bUpdated;
 		sMessage := "Sample " + sSampleId + " is now " + sNewStatus;
 	:ELSE;
@@ -171,10 +174,13 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 :PROCEDURE LoadStatus;
 	:PARAMETERS sSampleId;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("SELECT Status FROM LabSamples WHERE SampleId = ?sSampleId?");
+
 	:IF Len(aRows) == 0;
 		:RETURN "";
 	:ENDIF;
+
 	:RETURN aRows[1][1];
 :ENDPROC;
 
@@ -188,6 +194,7 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 :PROCEDURE IsTransitionAllowed;
 	:PARAMETERS sFrom, sTo;
 	:DECLARE aAllowed;
+
 	:BEGINCASE;
 	:CASE sFrom == "LOGGED";
 		aAllowed := {"RECEIVED", "CANCELLED"};
@@ -205,6 +212,7 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 		aAllowed := {};
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN AScanExact(aAllowed, sTo) > 0;
 :ENDPROC;
 
@@ -219,6 +227,7 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 :PROCEDURE WriteStatus;
 	:PARAMETERS sSampleId, sStatus, sUserId;
 	:DECLARE sSQL, bOk;
+
 	sSQL := "
 	    UPDATE LabSamples SET
 	        Status = ?,
@@ -227,6 +236,7 @@ sNewStatus := Upper(AllTrim(sNewStatus));
 	    WHERE SampleId = ?
 	";
 	bOk := RunSQL(sSQL,, {sStatus, sUserId, Now(), sSampleId});
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

@@ -28,18 +28,23 @@ Me: access elsewhere. Should be free of field findings.
 
 :PROCEDURE Compute;
 	:DECLARE nTotal;
+
 	nTotal := 5;
+
 	:RETURN nTotal;
 :ENDPROC;
 
 :PROCEDURE Rename;
 	:PARAMETERS sLabel;
+
 	Me:sLabel := sLabel;
 :ENDPROC;
 
 :PROCEDURE Share;
 	:PUBLIC aRows;
+
 	aRows := {};
+
 	:RETURN Len(Me:aRows);
 :ENDPROC;
 -- diagnostics --

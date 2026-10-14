@@ -18,6 +18,7 @@ Base: and Me: here report at the warning tier, not error
 :PROCEDURE RefreshAll;
 	Base:Refresh();
 	Me:nRefreshCount += 1;
+
 	:RETURN Me:nRefreshCount;
 :ENDPROC;
 

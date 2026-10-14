@@ -12,6 +12,7 @@ oConfigurationManagerInstance:connectionPool:GetItem(1):lastUsedConnectionDescri
 -- format --
 :PROCEDURE Touch;
 	:PARAMETERS oConfigurationManagerInstance;
+
 	DoSomething(oConfigurationManagerInstance:databaseConnectionSettings:primaryConnectionString);
 	oConfigurationManagerInstance:connectionPool:GetItem(1):lastUsedConnectionDescriptor:Reset();
 :ENDPROC;

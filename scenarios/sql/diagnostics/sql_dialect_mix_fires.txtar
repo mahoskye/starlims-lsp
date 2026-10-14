@@ -10,12 +10,14 @@ ISNULL. The message names the markers on each side.
 -- format --
 :PROCEDURE Recent;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT ordno, NVL(status, 'X'), ISNULL(kind, 'Y')
 	    FROM orders
 	    WHERE logdate > GETDATE() - 1
 	      OR duedate < SYSDATE
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

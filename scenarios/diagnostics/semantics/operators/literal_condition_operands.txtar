@@ -23,7 +23,9 @@ Known issue: #322 (literal non-logical conditions and .AND./.OR. left operands n
 :PROCEDURE Gate;
 	:PARAMETERS bOpen;
 	:DECLARE bOut;
+
 	bOut := .F.;
+
 	:IF "x";
 		bOut := .T.;
 	:ENDIF;
@@ -31,8 +33,10 @@ Known issue: #322 (literal non-logical conditions and .AND./.OR. left operands n
 	:WHILE 1;
 		:EXITWHILE;
 	:ENDWHILE;
+
 	bOut := "x" .AND. bOpen;
 	bOut := 0 .OR. bOut;
+
 	:RETURN bOut;
 :ENDPROC;
 -- diagnostics --

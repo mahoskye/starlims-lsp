@@ -14,11 +14,13 @@ follows its closing quote.
 :PROCEDURE Build;
 	:PARAMETERS sWhere;
 	:DECLARE sSQL, sLong;
+
 	sSQL := "select ordno, status from orders " + sWhere;
 	sLong := "
 	    SELECT ordno, custid, logdate, duedate, status, site, priority
 	    FROM orders o
 	" + sWhere;
+
 	:RETURN {sSQL, sLong};
 :ENDPROC;
 -- diagnostics --

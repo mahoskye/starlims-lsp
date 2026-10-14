@@ -17,10 +17,12 @@ invariant failure, reported separately).
 :PROCEDURE CheckPair;
 	:PARAMETERS bA, bB;
 	:DECLARE bOk;
+
 	bOk := bA && bB;
 	bOk := bA || bB;
 	bOk := bA & bB;
 	bOk := bA | bB;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

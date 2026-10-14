@@ -13,10 +13,12 @@ oCfg:TableName := "stockList";
 -- format --
 /* reads :DSN and :TABLENAME settings from the config table;
 :DECLARE sDsn, sNote, oCfg;
+
 sDsn := "DATABASE";
 sNote := ":NULLASBLANK := true;";
 oCfg := CreateUdObject();
 oCfg:TableName := "stockList";
+
 :RETURN sDsn + sNote + oCfg:TableName;
 -- diagnostics --
 -- diagnostics [--strict --info] --

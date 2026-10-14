@@ -13,8 +13,10 @@ nCount:=0;aRows:={"a","b","c"}
 :PARAMETERS sMode;
 :DEFAULT sMode, "FULL";
 :DECLARE aRows, i, nCount;
+
 nCount := 0;
 aRows := {"a", "b", "c"};
+
 :IF sMode == "FULL";
 	nCount := Len(aRows);
 :ELSE;
@@ -24,6 +26,7 @@ aRows := {"a", "b", "c"};
 :FOR i := 1 :TO nCount;
 	DoProc("Touch", {aRows[i]});
 :NEXT;
+
 :RETURN nCount;
 -- diagnostics --
 1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'

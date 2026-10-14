@@ -9,8 +9,10 @@ n数量 := 3;
 :RETURN sNaïve + LimsString(n数量);
 -- format --
 :DECLARE sNaïve, n数量;
+
 sNaïve := "ok";
 n数量 := 3;
+
 :RETURN sNaïve + LimsString(n数量);
 -- diagnostics --
 1:13-1:14 error unknown_token: Unknown token: 'ï'

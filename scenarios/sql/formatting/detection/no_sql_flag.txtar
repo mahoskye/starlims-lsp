@@ -13,19 +13,23 @@ aRows := SQLExecute("select sample_id, sample_name, sample_status from samples w
 :PROCEDURE Off;
 	:PARAMETERS sStatus;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("select sample_id, sample_name, sample_status from samples where sample_status = ?sStatus? order by sample_id");
+
 	:RETURN aRows;
 :ENDPROC;
 -- format --
 :PROCEDURE Off;
 	:PARAMETERS sStatus;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT sample_id, sample_name, sample_status
 	    FROM samples
 	    WHERE sample_status = ?sStatus?
 	    ORDER BY sample_id
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

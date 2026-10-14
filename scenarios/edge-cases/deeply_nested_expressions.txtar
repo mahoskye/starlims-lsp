@@ -10,9 +10,11 @@ vLeaf := aDeep[1][1][1][1][1][1][1][1][1][1][1][1];
 :RETURN vLeaf;
 -- format --
 :DECLARE nDeep, aDeep, vLeaf;
+
 nDeep := ((((((((((((((((((((1 + 2))))))))))))))))))));
 aDeep := {{{{{{{{{{{{"leaf"}}}}}}}}}}}};
 vLeaf := aDeep[1][1][1][1][1][1][1][1][1][1][1][1];
+
 :RETURN vLeaf;
 -- diagnostics --
 -- diagnostics [--strict --info] --

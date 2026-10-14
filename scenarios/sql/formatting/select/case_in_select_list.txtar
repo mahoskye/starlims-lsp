@@ -11,6 +11,7 @@ sql_case_end_align).
 -- format --
 :PROCEDURE Labels;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, o.testcode,
 	           CASE
@@ -22,6 +23,7 @@ sql_case_end_align).
 	    FROM ordtask o
 	    WHERE o.status <> 'X'
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

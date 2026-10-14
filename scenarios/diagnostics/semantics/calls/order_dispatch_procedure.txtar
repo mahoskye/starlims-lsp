@@ -27,23 +27,28 @@ commas. The correct DoProc and colon forms in the same body stay quiet.
 -- format --
 :PROCEDURE PriceLine;
 	:PARAMETERS nQty, nUnit;
+
 	:RETURN nQty * nUnit;
 :ENDPROC;
 
 :PROCEDURE DispatchOrder;
 	:PARAMETERS oOrder;
 	:DECLARE nTotal, sCarrier, aLines, i;
+
 	aLines := oOrder:lines;
 	nTotal := 0;
+
 	:FOR i := 1 :TO Len(aLines);
 		nTotal += PriceLine(aLines[i][2], aLines[i][3]);
 		nTotal += DoProc("PriceLine", {aLines[i][2], aLines[i][3]});
 	:NEXT;
+
 	sCarrier := ExecFunction(Shipping.PickCarrier, {nTotal});
 	oOrder.carrier := sCarrier;
 	oOrder:carrier := Upper(sCarrier, 1);
 	DoProc("NotifyWarehouse", {});
 	DoProc("LogEvent", {"dispatch",, oOrder:orderNo});
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

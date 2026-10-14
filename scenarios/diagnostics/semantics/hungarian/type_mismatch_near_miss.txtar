@@ -30,6 +30,7 @@ under every profile, which is correct for that rule.
 :PROCEDURE Refresh;
 	:PARAMETERS sText, aList, vAny;
 	:DECLARE nCode, dStart, aNames, oRec, Total, i;
+
 	nCode := Len(sText);
 	sText := AllTrim(sText);
 	dStart := Today();
@@ -44,6 +45,7 @@ under every profile, which is correct for that rule.
 	nCode += 1;
 	oRec:sLabel := 5;
 	nCode := aList + sText;
+
 	:RETURN {nCode, dStart, aNames, oRec, Total, i};
 :ENDPROC;
 -- diagnostics --

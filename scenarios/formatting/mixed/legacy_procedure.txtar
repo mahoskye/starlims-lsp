@@ -31,9 +31,11 @@ bOk:=.f.;
 	:PARAMETERS sSampleId, sNewStatus, bForce;
 	:DEFAULT bForce, .F.;
 	:DECLARE sOldStatus, nRows, bOk, oErr;
+
 	bOk := .F.;
 	sOldStatus := LSearch("SELECT status FROM samples WHERE sampleid = ?", "",,
 	                      {sSampleId});  /*current status;
+
 	:IF Empty(sOldStatus) .AND. .NOT. bForce;
 		:RETURN .F.;
 	:ENDIF;
@@ -41,6 +43,7 @@ bOk:=.f.;
 	:IF sOldStatus == sNewStatus;
 		:RETURN .T.;
 	:ENDIF;
+
 	/* do the update;
 	:TRY;
 		bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {sNewStatus,
@@ -50,6 +53,7 @@ bOk:=.f.;
 		ErrorMes("UpdateSampleStatus", "update failed: " + oErr:Description);
 		bOk := .F.;
 	:ENDTRY;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

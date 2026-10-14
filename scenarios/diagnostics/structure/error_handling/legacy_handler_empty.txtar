@@ -19,6 +19,7 @@ deprecated_keyword on each legacy keyword (diag.error_handler_structure).
 -- format --
 :PROCEDURE ReadQuota;
 	:DECLARE nQuota;
+
 	nQuota := LSearch("SELECT QUOTA FROM LIMITS", 0);
 	:RETURN nQuota;
 	:ERROR;
@@ -27,6 +28,7 @@ deprecated_keyword on each legacy keyword (diag.error_handler_structure).
 
 :PROCEDURE ReadLimit;
 	:DECLARE nLimit;
+
 	nLimit := LSearch("SELECT MAXVAL FROM LIMITS", 0);
 	:ERROR;
 :ENDPROC;

@@ -24,14 +24,17 @@ branch_target_label stay silent.
 :PROCEDURE ImportWithRetry;
 	:PARAMETERS sFile;
 	:DECLARE nTries, bOk;
+
 	nTries := 0;
 	bOk := .F.;
 	:LABEL ATTEMPT;
 	nTries := nTries + 1;
 	bOk := .NOT. Empty(sFile);
+
 	:IF .NOT. bOk .AND. nTries < 3;
 		Branch("LABEL ATTEMPT");
 	:ENDIF;
+
 	:RETURN bOk;
 	:ERROR;
 		bOk := .F.;

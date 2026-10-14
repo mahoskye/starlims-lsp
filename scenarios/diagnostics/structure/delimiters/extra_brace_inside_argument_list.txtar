@@ -17,12 +17,15 @@ mismatched_delimiter (diag.unmatched_delimiter second Flags fence).
 :PROCEDURE QueueLabel;
 	:PARAMETERS sSampleId, nCopies;
 	:DECLARE vResult;
+
 	vResult := DoProc("PrintLabelCopies", {sSampleId, nCopies}});
+
 	:RETURN vResult;
 :ENDPROC;
 
 :PROCEDURE PrintLabelCopies;
 	:PARAMETERS sSampleId, nCopies;
+
 	:RETURN nCopies;
 :ENDPROC;
 -- diagnostics --

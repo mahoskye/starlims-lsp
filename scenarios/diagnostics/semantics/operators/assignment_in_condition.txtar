@@ -26,6 +26,7 @@ two findings.
 :PROCEDURE Drain;
 	:PARAMETERS nLevel, nMode;
 	:DECLARE nOut;
+
 	:IF nLevel := 0;
 		:RETURN 0;
 	:ENDIF;
@@ -42,6 +43,7 @@ two findings.
 		nOut := 0;
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

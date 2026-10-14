@@ -89,6 +89,7 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 :DECLARE oSummary, oData, oDataset, aRows, nRow, oReading, bValid, oErr;
 
 oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
+
 :IF Empty(sRunId);
 	oSummary:message := "A run identifier is required";
 	:RETURN oSummary;
@@ -104,17 +105,21 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 	aRows := oDataset:ToArray();
 
 	nRow := 1;
+
 	:WHILE nRow <= Len(aRows);
 		oReading := DoProc("ToReading", {aRows[nRow]});
 		bValid := ExecFunction("Lab.ReadingRules.Validate", {oReading});
+
 		:IF bValid;
 			DoProc("SaveReading", {oReading});
 			oSummary:imported += 1;
 		:ELSE;
 			oSummary:rejected += 1;
 		:ENDIF;
+
 		nRow += 1;
 	:ENDWHILE;
+
 	oSummary:message := "Import finished";
 :CATCH;
 	oErr := GetLastSSLError();
@@ -134,9 +139,11 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 :PROCEDURE ToReading;
 	:PARAMETERS aRow;
 	:DECLARE oReading;
+
 	oReading := CreateUdObject({{"readingId", aRow[1]}, {"sampleId", aRow[2]}});
 	oReading:analyte := AllTrim(aRow[3]);
 	oReading:value := Val(LimsString(aRow[4]));
+
 	:RETURN oReading;
 :ENDPROC;
 
@@ -149,6 +156,7 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 :PROCEDURE SaveReading;
 	:PARAMETERS oReading;
 	:DECLARE sSQL;
+
 	sSQL := "
 	    INSERT INTO LabResults (
 	        SampleId, Analyte, ResultValue, SourceReading
@@ -157,6 +165,7 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 	        ?, ?, ?, ?
 	    )
 	";
+
 	:RETURN RunSQL(sSQL,, {oReading:sampleId, oReading:analyte, oReading:value,
 	                       oReading:readingId});
 :ENDPROC;

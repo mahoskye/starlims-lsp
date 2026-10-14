@@ -12,9 +12,11 @@ first Flags fence).
 -- format --
 :PROCEDURE ResetFlags;
 	:DECLARE bDirty, bLocked;
+
 	/* clear both flags;
 	bDirty := .F.;
 	bLocked := .F.;
+
 	:RETURN bLocked;
 :ENDPROC;
 -- diagnostics --

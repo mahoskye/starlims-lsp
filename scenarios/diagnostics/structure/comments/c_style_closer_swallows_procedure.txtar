@@ -16,6 +16,7 @@ the puzzling symptom the catalog rationale describes
 */
 :PROCEDURE CleanCode;
 :PARAMETERS sCode;
+
 :RETURN Upper(AllTrim(sCode));
 :ENDPROC;
 -- diagnostics --

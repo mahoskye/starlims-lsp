@@ -20,6 +20,7 @@ aRows[j] := aRows[i];
 :PROCEDURE Loops;
 	:PARAMETERS aRows;
 	:DECLARE i, j;
+
 	:FOR i := 1 :TO Len(aRows) :STEP 2;
 		:FOR j := i :TO 1 :STEP -1;
 			:IF (j > 1);
@@ -27,6 +28,7 @@ aRows[j] := aRows[i];
 			:ENDIF;
 		:NEXT;
 	:NEXT;
+
 	:RETURN -1;
 :ENDPROC;
 -- diagnostics --

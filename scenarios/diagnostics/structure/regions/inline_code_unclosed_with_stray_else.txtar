@@ -14,10 +14,13 @@ sLine := "verbose";
 sLine := "quiet";
 -- format --
 :DECLARE bVerbose;
+
 bVerbose := .T.;
+
 :IF bVerbose;
 	:BEGININLINECODE Banner;
 		:DECLARE sLine;
+
 		sLine := "verbose";
 	:ELSE;
 		sLine := "quiet";

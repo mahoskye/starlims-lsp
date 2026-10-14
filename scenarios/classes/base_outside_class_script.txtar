@@ -14,9 +14,11 @@ Base:Init();
 -- format --
 :PARAMETERS oUri;
 :DECLARE sRoot, nCount;
+
 nCount := 1;
 sRoot := oUri:Base;
 Base:Init();
+
 :RETURN sRoot;
 -- diagnostics --
 5:1-5:5 error base_outside_class: 'Base:MemberName' can only be used inside a ':CLASS' definition

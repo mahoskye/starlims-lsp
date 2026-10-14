@@ -16,10 +16,12 @@ NIL.
 :PROCEDURE SameRule;
 	:PARAMETERS fnLeft, fnRight;
 	:DECLARE bSame;
+
 	bSame := fnLeft == fnRight;
 	bSame := fnLeft != fnRight;
 	bSame := fnLeft == NIL;
 	bSame := {|x| x + 1} = fnRight;
+
 	:RETURN bSame;
 :ENDPROC;
 -- diagnostics --

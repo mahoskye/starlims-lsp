@@ -38,6 +38,7 @@ Recalculate the totals before the report runs.
 ;
 :PROCEDURE Demo;
 	:PARAMETERS sInput, nValue;
+
 	:RETURN sInput + LimsString(nValue);
 :ENDPROC;
 -- diagnostics --

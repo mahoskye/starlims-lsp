@@ -13,6 +13,7 @@ OR group under WHERE.
 :PROCEDURE Window;
 	:PARAMETERS dFrom, dTo;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT ordno, logdate, description
 	    FROM orders
@@ -21,6 +22,7 @@ OR group under WHERE.
 	      AND result_value IS NOT NULL
 	      AND (status = 'Logged' OR status = 'Pending')
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

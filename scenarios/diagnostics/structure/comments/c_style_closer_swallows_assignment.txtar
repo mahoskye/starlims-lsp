@@ -15,11 +15,13 @@ shape).
 -- format --
 :PROCEDURE InitTotals;
 	:DECLARE nGross, nNet;
+
 	/* ---------------------------------
 	   Initialize the running totals
 	   --------------------------------- */
 	nGross := 0;
 	nNet := nGross;
+
 	:RETURN nNet;
 :ENDPROC;
 -- diagnostics --

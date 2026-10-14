@@ -16,14 +16,17 @@ correct form and does not fire.
 -- format --
 :PROCEDURE AddTax;
 	:PARAMETERS nAmount;
+
 	:RETURN nAmount * 1.2;
 :ENDPROC;
 
 :PROCEDURE Checkout;
 	:PARAMETERS nNet;
 	:DECLARE nGross;
+
 	nGross := AddTax(nNet);
 	nGross := DoProc("AddTax", {nNet});
+
 	:RETURN nGross;
 :ENDPROC;
 -- diagnostics --

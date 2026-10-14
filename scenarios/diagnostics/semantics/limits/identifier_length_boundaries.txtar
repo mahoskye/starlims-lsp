@@ -13,8 +13,10 @@ whole: 24 characters, so it fires.
 -- format --
 :PROCEDURE ArchiveCompletedWorkOrderBatch;
 	:DECLARE sAbcdefghijklmnopqrst, notesForTheShiftHandover;
+
 	sAbcdefghijklmnopqrst := "x";
 	notesForTheShiftHandover := sAbcdefghijklmnopqrst;
+
 	:RETURN notesForTheShiftHandover;
 :ENDPROC;
 -- diagnostics --

@@ -12,8 +12,10 @@ nValue := len("x");  /* call upper(x)   then  :endif;
 -- format --
 :PROCEDURE Demo;
 	:DECLARE nValue;
+
 	/* :if nil .and. x:=len(y) .t.;
 	nValue := Len("x");  /* call upper(x)   then  :endif;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

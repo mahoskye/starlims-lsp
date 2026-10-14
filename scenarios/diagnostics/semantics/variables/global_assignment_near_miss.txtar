@@ -17,11 +17,13 @@ in the checked set (only MYUSERNAME is built in).
 :PROCEDURE ResetTally;
 	:PARAMETERS sDept;
 	:DECLARE oTally, approved;
+
 	oTally := CreateUdObject();
 	oTally:pending := 0;
 	oTally:approved := 0;
 	approved := 0;
 	STARLIMSDEPT := sDept;
+
 	:RETURN oTally;
 :ENDPROC;
 -- diagnostics --

@@ -16,10 +16,12 @@ per cause).
 -- format --
 :PROCEDURE Skips;
 	:DECLARE vOut;
+
 	vOut := DoProc("Helper", {1,, 3});
 	vOut := LSearch("SELECT name FROM lots WHERE id = ?", "",, {7});
 	vOut := DoProc("Helper", {1},,);
 	vOut := SubStr("abcdef", 2,,);
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

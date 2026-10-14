@@ -12,6 +12,7 @@ value arrays stay on the closing line.
 :PROCEDURE SampleSet;
 	:PARAMETERS sStatus, sSite;
 	:DECLARE oDs;
+
 	oDs := GetSSLDataset("
 	    SELECT sampleid, status, site
 	    FROM samples
@@ -19,6 +20,7 @@ value arrays stay on the closing line.
 	      AND site = @sSite
 	    ORDER BY sampleid
 	",, {"@sStatus", "@sSite"}, {sStatus, sSite});
+
 	:RETURN oDs;
 :ENDPROC;
 -- diagnostics --

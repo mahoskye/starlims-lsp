@@ -23,6 +23,7 @@ the current procedure). Each is branch_target_label on its literal
 -- format --
 :PROCEDURE StepThrough;
 	:DECLARE nStep;
+
 	nStep := 0;
 	Branch("labeldone");
 	Branch("LABEL DNOE");
@@ -30,11 +31,13 @@ the current procedure). Each is branch_target_label on its literal
 	:LABELDONE;
 	:LABEL DONE;
 	nStep := nStep + 1;
+
 	:RETURN nStep;
 :ENDPROC;
 
 :PROCEDURE Cleanup;
 	:LABEL CLEANUP;
+
 	:RETURN .T.;
 :ENDPROC;
 -- diagnostics --

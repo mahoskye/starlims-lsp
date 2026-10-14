@@ -19,12 +19,14 @@ the message.
 :PROCEDURE Greet;
 	:PARAMETERS sFirst, sLast, nCount;
 	:DECLARE sFmt, sMsg;
+
 	sFmt := "Hello {0} {1}";
 	sMsg := sFmt:Format("{0}", sFirst);
 	sMsg := sFmt:Format("{0} {1}", sFirst, sLast);
 	sMsg := sFmt:Format("{0}", sFirst + sLast);
 	sMsg := sFmt:Format("{0}", nCount > 3);
 	sMsg := AllTrim(sFmt):Format("{0}", Len(sLast));
+
 	:RETURN sMsg;
 :ENDPROC;
 -- diagnostics --

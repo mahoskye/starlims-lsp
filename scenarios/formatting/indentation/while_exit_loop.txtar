@@ -28,10 +28,13 @@ nFound += 1;
 :PROCEDURE ScanValues;
 	:PARAMETERS aValues;
 	:DECLARE nIndex, nFound, i;
+
 	nIndex := 0;
 	nFound := 0;
+
 	:WHILE .T.;
 		nIndex += 1;
+
 		:IF nIndex > Len(aValues);
 			:EXITWHILE;
 		:ENDIF;
@@ -39,6 +42,7 @@ nFound += 1;
 		:IF Empty(aValues[nIndex]);
 			:LOOP;
 		:ENDIF;
+
 		nFound += 1;
 	:ENDWHILE;
 
@@ -47,6 +51,7 @@ nFound += 1;
 			:EXITFOR;
 		:ENDIF;
 	:NEXT;
+
 	:RETURN nFound;
 :ENDPROC;
 -- diagnostics --

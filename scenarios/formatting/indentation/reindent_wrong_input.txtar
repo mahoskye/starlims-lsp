@@ -24,6 +24,7 @@ re-indented from block depth alone.
 :PROCEDURE Classify;
 	:PARAMETERS nScore;
 	:DECLARE sGrade;
+
 	:BEGINCASE;
 	:CASE nScore >= 90;
 		sGrade := "A";
@@ -35,6 +36,7 @@ re-indented from block depth alone.
 		sGrade := "C";
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN sGrade;
 :ENDPROC;
 -- diagnostics --

@@ -14,11 +14,13 @@ both subscript forms.
 -- format --
 :PROCEDURE FirstCell;
 	:DECLARE aRows, vOut;
+
 	aRows := {{1, 2}, {3, 4}};
 	vOut := aRows[0];
 	vOut := aRows[1][0];
 	vOut := aRows[1, 0];
 	vOut := aRows[0, 1];
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

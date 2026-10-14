@@ -17,11 +17,13 @@ not fire, since an :OTHERWISE is present.
 :PROCEDURE PickShelf;
 	:PARAMETERS sZone;
 	:DECLARE sShelf;
+
 	:BEGINCASE;
 	:OTHERWISE;
 		sShelf := "A-" + sZone;
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN sShelf;
 :ENDPROC;
 -- diagnostics --

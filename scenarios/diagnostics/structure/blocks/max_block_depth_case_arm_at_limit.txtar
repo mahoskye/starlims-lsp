@@ -32,6 +32,7 @@ either (diag.max_block_depth "Does not flag").
 :PROCEDURE ClassifyReading;
 	:PARAMETERS nValue, bCalibrated;
 	:DECLARE sClass, oErr;
+
 	:TRY;
 		:IF bCalibrated;
 			:BEGINCASE;
@@ -52,6 +53,7 @@ either (diag.max_block_depth "Does not flag").
 		oErr := GetLastSSLError();
 		sClass := oErr:Description;
 	:ENDTRY;
+
 	:RETURN sClass;
 :ENDPROC;
 -- diagnostics --

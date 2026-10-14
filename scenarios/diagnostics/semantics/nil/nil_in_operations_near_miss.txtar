@@ -20,8 +20,10 @@ NIL (nil_method_call's finding instead), and a compound assignment.
 :PROCEDURE Reset;
 	:PARAMETERS nValue, dWhen;
 	:DECLARE nOut, vHeld;
+
 	vHeld := NIL;
 	nOut := vHeld + 1;
+
 	:IF nValue == NIL .OR. dWhen != NIL;
 		nOut := 0;
 	:ENDIF;
@@ -29,7 +31,9 @@ NIL (nil_method_call's finding instead), and a compound assignment.
 	:IF nValue = NIL;
 		nOut := 1;
 	:ENDIF;
+
 	nOut += NIL;
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

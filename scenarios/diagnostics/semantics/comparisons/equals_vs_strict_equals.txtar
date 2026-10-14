@@ -16,6 +16,7 @@ string equality gotcha).
 -- format --
 :PROCEDURE StatusIs;
 	:PARAMETERS sStatus;
+
 	:IF sStatus = "Log";
 		:RETURN 1;
 	:ENDIF;
@@ -23,6 +24,7 @@ string equality gotcha).
 	:IF "Done" = sStatus;
 		:RETURN 2;
 	:ENDIF;
+
 	:RETURN 0;
 :ENDPROC;
 -- diagnostics --

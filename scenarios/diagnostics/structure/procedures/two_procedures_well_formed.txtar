@@ -20,12 +20,15 @@ Clean.
 	:PARAMETERS nGross, nRate;
 	:DEFAULT nRate, 0.2;
 	:DECLARE nTax;
+
 	nTax := DoProc("TaxFor", {nGross, nRate});
+
 	:RETURN nGross - nTax;
 :ENDPROC;
 
 :PROCEDURE TaxFor;
 	:PARAMETERS nGross, nRate;
+
 	:RETURN Round(nGross * nRate, 2);
 :ENDPROC;
 -- diagnostics --

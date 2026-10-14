@@ -16,9 +16,11 @@ nLen := AllTrim( sValue ) + Upper (  sValue  );
 :PROCEDURE Parens;
 	:PARAMETERS sValue;
 	:DECLARE nLen, vResult;
+
 	nLen := Len(sValue);
 	vResult := DoProc("Helper", {sValue});
 	nLen := AllTrim(sValue) + Upper(sValue);
+
 	:RETURN nLen;
 :ENDPROC;
 -- diagnostics --

@@ -183,6 +183,7 @@ sName := "y";
 ```ssl
 :PROCEDURE Demo;
 	:DECLARE sName;
+
 	:IF bReady;
 		sName := "x";
 	:ELSE;
@@ -238,6 +239,7 @@ sOut := txt:ToString()
 
 ```ssl
 :DECLARE txt, sTitle, sUser, sOut;
+
 sOut := txt:ToString()
 	:Replace("##TITLE##", sTitle)
 	:Replace("##USER##", sUser);
@@ -308,10 +310,12 @@ nCount := 3;
 ```ssl
 :PROCEDURE Demo;
 	:DECLARE nCount;
+
 	:ERROR;
 		:IF nCount > 1;
 			nCount := 2;
 		:ENDIF;
+
 		nCount := 3;
 :ENDPROC;
 ```
@@ -335,6 +339,7 @@ i := i;
 ```ssl
 :PROCEDURE Demo;
 	:DECLARE i;
+
 	:FOR i := 1 :TO 3;
 		i := i;
 	:ENDFOR;

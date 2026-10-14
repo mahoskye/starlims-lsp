@@ -11,12 +11,14 @@ aRows := SQLExecute("SELECT aisle_id FROM aisle WHERE aisle_code = ?sAisle? OR a
 /* uses the DEFAULT aisle when none is given;
 :PARAMETERS sAisle := "DEFAULT";
 :DECLARE aRows;
+
 aRows := SQLExecute("
     SELECT aisle_id
     FROM aisle
     WHERE aisle_code = ?sAisle?
       OR aisle_code = 'DEFAULT'
 ");
+
 :RETURN aRows;
 -- diagnostics --
 -- diagnostics [--strict --info] --

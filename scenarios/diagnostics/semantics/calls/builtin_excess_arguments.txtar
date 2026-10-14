@@ -16,10 +16,12 @@ call whose first surplus slot is skipped ranges on the name.
 :PROCEDURE Clip;
 	:PARAMETERS sText, nExtra, nA, nB;
 	:DECLARE sOut, dNow;
+
 	sOut := Left(sText, 10, nExtra);
 	dNow := Today(1);
 	sOut := Left(sText, nA, nB,,);
 	sOut := Upper(sText,, nA);
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

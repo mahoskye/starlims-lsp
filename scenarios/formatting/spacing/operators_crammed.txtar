@@ -20,6 +20,7 @@ bR:="x"$sText;
 :PROCEDURE Crammed;
 	:PARAMETERS nA, nB, sText;
 	:DECLARE nR, bR;
+
 	nR := nA + nB * 2 - nA / 4 % 3;
 	nR += nA ^ 2;
 	nR -= 1;
@@ -29,6 +30,7 @@ bR:="x"$sText;
 	bR := nA == nB .OR. nA != nB .AND. nA <> nB;
 	bR := nA # nB .OR. nA <= nB .OR. nA >= nB;
 	bR := "x" $ sText;
+
 	:RETURN nR;
 :ENDPROC;
 -- diagnostics --

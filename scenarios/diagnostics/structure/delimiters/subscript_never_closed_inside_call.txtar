@@ -13,6 +13,7 @@ diag.mismatched_delimiter "Does not flag").
 :PROCEDURE FirstRowWidth;
 	:PARAMETERS aRows;
 	:DECLARE nWidth;
+
 	nWidth := Len(aRows[1);
 	              :RETURN nWidth;
 	              :ENDPROC;

@@ -11,7 +11,9 @@ variable does not fire again.
 -- format --
 :PROCEDURE ReconcileCustomerAccountBalances;
 	:DECLARE nOutstandingInvoiceBalance;
+
 	nOutstandingInvoiceBalance := 0;
+
 	:RETURN nOutstandingInvoiceBalance;
 :ENDPROC;
 -- diagnostics --

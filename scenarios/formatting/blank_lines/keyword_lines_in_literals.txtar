@@ -24,12 +24,14 @@ sTxt := "";
 :ENDIF;
 -- format --
 :DECLARE sTxt;
+
 sTxt := "header
 :ENDIF;
 :IF x
 
 
 footer";
+
 /*
 :ENDWHILE
 :WHILE y

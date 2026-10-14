@@ -25,6 +25,7 @@ nValue := 0
 :PROCEDURE Middles;
 	:PARAMETERS nValue;
 	:DECLARE sOut;
+
 	:IF nValue > 0;
 		sOut := "pos";
 	:ELSE;
@@ -38,6 +39,7 @@ nValue := 0
 	:FINALLY;
 		nValue := 0;
 	:ENDTRY;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

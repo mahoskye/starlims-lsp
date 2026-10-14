@@ -22,12 +22,15 @@ bOk := .T.;
 :PROCEDURE CheckLimits;
 	:PARAMETERS nLow, nHigh, sMode;
 	:DECLARE bOk;
+
 	bOk := .F.;
+
 	:IF nLow > 1 .AND.
 		nHigh < 50 .AND.
 		sMode == "STRICT";
 		bOk := .T.;
 	:ENDIF;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

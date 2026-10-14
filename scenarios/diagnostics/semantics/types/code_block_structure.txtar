@@ -14,10 +14,12 @@ fire.
 -- format --
 :PROCEDURE Blocks;
 	:DECLARE fnConst, fnSpaced, fnDouble, aList;
+
 	fnConst := {|| 42};
 	fnSpaced := {|| 42};
 	fnDouble := {|x| x * 2};
 	aList := {1, 2, 3};
+
 	:RETURN {fnConst, fnSpaced, fnDouble, aList, {}};
 :ENDPROC;
 -- diagnostics --

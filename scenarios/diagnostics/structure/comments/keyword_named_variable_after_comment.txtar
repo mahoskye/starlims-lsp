@@ -13,9 +13,11 @@ not a stranded header line. Clean of comment findings.
 -- format --
 :PROCEDURE ReadLabel;
 	:DECLARE label;
+
 	/* collect the request values
 	before they are parsed;
 	label := Upper("draft");
+
 	:RETURN label;
 :ENDPROC;
 -- diagnostics --

@@ -19,7 +19,9 @@ noise should appear (diag.unclosed_block, diag.stray_block_keyword).
 -- format --
 :PROCEDURE DrainQueue;
 	:DECLARE nRemaining, oErr;
+
 	nRemaining := 5;
+
 	:TRY;
 		:WHILE nRemaining > 0;
 			nRemaining := nRemaining - 1;
@@ -27,6 +29,7 @@ noise should appear (diag.unclosed_block, diag.stray_block_keyword).
 			oErr := GetLastSSLError();
 			ErrorMes("DrainQueue", oErr:Description);
 		:ENDTRY;
+
 		:RETURN nRemaining;
 	:ENDPROC;
 -- diagnostics --

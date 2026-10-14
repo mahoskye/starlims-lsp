@@ -13,6 +13,7 @@ one through LSelect1. One finding per string, ranged on the string.
 :PROCEDURE OrderTasks;
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows, aMore;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, t.testcode
 	    FROM orders o, ordtask t
@@ -25,6 +26,7 @@ one through LSelect1. One finding per string, ranged on the string.
 	    WHERE o.ordno = t.ordno
 	      AND r.ordno = t.ordno
 	",, {});
+
 	:RETURN {aRows, aMore};
 :ENDPROC;
 -- diagnostics --

@@ -24,8 +24,8 @@ nSecond := 2;
 -- format --
 :PROCEDURE Spaced;
 	:DECLARE nFirst, nSecond;
-	nFirst := 1;
 
+	nFirst := 1;
 
 
 	nSecond := 2;

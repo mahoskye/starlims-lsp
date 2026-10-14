@@ -15,10 +15,12 @@ assigning a code-block literal.
 :PROCEDURE SameResult;
 	:PARAMETERS fnLeft, fnRight, vA, oRule;
 	:DECLARE bSame, fnLocal;
+
 	fnLocal := {|x| x * 3};
 	bSame := Eval(fnLeft, 1) == Eval(fnRight, 1);
 	bSame := bSame .AND. vA == oRule:fnCheck;
 	bSame := bSame .AND. Eval(fnLocal, 2) == 6;
+
 	:RETURN bSame;
 :ENDPROC;
 -- diagnostics --

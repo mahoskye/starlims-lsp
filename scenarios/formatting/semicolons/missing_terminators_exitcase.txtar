@@ -25,11 +25,13 @@ sLabel := ""
 :PROCEDURE Terminate;
 	:PARAMETERS nValue;
 	:DECLARE sLabel, aList, fnDouble, nCount;
+
 	nCount := 0;
 	sLabel := "start";
 	aList := {1, 2};
 	fnDouble := {|n| n * 2};
 	nCount++;
+
 	:BEGINCASE;
 	:CASE nValue == 1;
 		sLabel := Upper(sLabel);
@@ -38,6 +40,7 @@ sLabel := ""
 		sLabel := "";
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

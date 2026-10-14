@@ -20,6 +20,7 @@ literal): == "NUMBER" is never true, <> "NUMBER" always true, = "String"
 -- format --
 :PROCEDURE Classify;
 	:PARAMETERS vValue;
+
 	:IF LimsTypeEx(vValue) == "NUMBER";
 		:RETURN 1;
 	:ENDIF;
@@ -31,6 +32,7 @@ literal): == "NUMBER" is never true, <> "NUMBER" always true, = "String"
 	:IF "INTEGER" = LimsTypeEx(vValue);
 		:RETURN 3;
 	:ENDIF;
+
 	:RETURN LimsTypeEx(vValue) <> "NUMBER";
 :ENDPROC;
 -- diagnostics --

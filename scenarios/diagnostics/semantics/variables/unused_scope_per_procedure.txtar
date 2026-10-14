@@ -21,7 +21,9 @@ declaration quiet; the :PUBLIC itself fires diag.limit_public_vars.
 
 :PROCEDURE Second;
 	:DECLARE nCursor;
+
 	nCursor := gTrayCount + 1;
+
 	:RETURN nCursor;
 :ENDPROC;
 -- diagnostics --

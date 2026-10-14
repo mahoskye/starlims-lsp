@@ -10,6 +10,7 @@ diag.default_after_parameters).
 :PROCEDURE PickColor;
 	:DECLARE sColor;
 	:DEFAULT sColor, "red";
+
 	:RETURN sColor;
 :ENDPROC;
 -- diagnostics --

@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Blank lines between sections** (`ssl.format.blankLinesBetweenSections`,
+  default on). The formatter inserts one blank line at each boundary
+  between logical sections of a body, following the style guide's
+  `blank_line_between_sections`:
+  - after the declarations;
+  - before a control block that follows code, and after its closer;
+  - before a section comment;
+  - before a procedure's final `:RETURN`.
+
+  It never removes an author's blank lines and adds none at the start or
+  end of a body.
+
 ### Changed
+- **`ssl.format.maxConsecutiveBlankLines` defaults to 2** (was 0,
+  disabled). Runs of one or two blank lines are kept; three or more
+  collapse to two. The VS Code extension sends its own value (0), so it
+  needs a matching default change to pick this up.
 - **Brackets align their contents.** Inside an unclosed `(`, `{` or `[`
   whose first item shares the bracket's line, a continuation line aligns
   with that first item:

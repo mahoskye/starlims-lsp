@@ -25,6 +25,7 @@ The :IF adds a level (depth 5) and is reported under --info; the
 :PROCEDURE RouteSample;
 	:PARAMETERS sType, nPriority;
 	:DECLARE sQueue;
+
 	:IF .NOT. Empty(sType);
 		:IF nPriority > 0;
 			:BEGINCASE;
@@ -39,6 +40,7 @@ The :IF adds a level (depth 5) and is reported under --info; the
 			:ENDCASE;
 		:ENDIF;
 	:ENDIF;
+
 	:RETURN sQueue;
 :ENDPROC;
 -- diagnostics --

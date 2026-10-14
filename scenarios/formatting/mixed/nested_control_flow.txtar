@@ -41,10 +41,13 @@ ErrorMes("ReviewBatch", oErr:Description);
 :PROCEDURE ReviewBatch;
 	:PARAMETERS aBatch;
 	:DECLARE nIndex, nPassed, oErr, i;
+
 	nIndex := 0;
 	nPassed := 0;
+
 	:WHILE nIndex < Len(aBatch);
 		nIndex += 1;
+
 		:TRY;
 			:BEGINCASE;
 			:CASE aBatch[nIndex] == "SKIP";
@@ -70,6 +73,7 @@ ErrorMes("ReviewBatch", oErr:Description);
 			ErrorMes("ReviewBatch", oErr:Description);
 		:ENDTRY;
 	:ENDWHILE;
+
 	:RETURN nPassed;
 :ENDPROC;
 -- diagnostics --

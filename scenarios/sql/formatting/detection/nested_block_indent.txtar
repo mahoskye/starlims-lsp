@@ -21,6 +21,7 @@ under --indent-style space.
 :PROCEDURE Deep;
     :PARAMETERS aIds;
     :DECLARE i, aRows;
+
     :IF Len(aIds) > 0;
         :FOR i := 1 :TO Len(aIds);
             :TRY;
@@ -35,12 +36,14 @@ under --indent-style space.
             :ENDTRY;
         :NEXT;
     :ENDIF;
+
     :RETURN aRows;
 :ENDPROC;
 -- format --
 :PROCEDURE Deep;
 	:PARAMETERS aIds;
 	:DECLARE i, aRows;
+
 	:IF Len(aIds) > 0;
 		:FOR i := 1 :TO Len(aIds);
 			:TRY;
@@ -55,6 +58,7 @@ under --indent-style space.
 			:ENDTRY;
 		:NEXT;
 	:ENDIF;
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

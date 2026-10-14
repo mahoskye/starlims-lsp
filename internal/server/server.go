@@ -71,18 +71,19 @@ type InlayHintsSettings struct {
 
 // FormatSettings represents formatting settings from the client.
 type FormatSettings struct {
-	IndentStyle              *string            `json:"indentStyle"`
-	IndentSize               *int               `json:"indentSize"`
-	MaxLineLength            *int               `json:"maxLineLength"`
-	OperatorSpacing          *bool              `json:"operatorSpacing"`
-	CommaSpacing             *bool              `json:"commaSpacing"`
-	SemicolonEnforcement     *bool              `json:"semicolonEnforcement"`
-	BlankLinesBetweenProcs   *int               `json:"blankLinesBetweenProcs"`
-	BlankLineBetweenBlocks   *bool              `json:"blankLineBetweenBlocks"`
-	TrimTrailingWhitespace   *bool              `json:"trimTrailingWhitespace"`
-	MaxConsecutiveBlankLines *int               `json:"maxConsecutiveBlankLines"`
-	BuiltinFunctionCase      *string            `json:"builtinFunctionCase"`
-	SQL                      *SQLFormatSettings `json:"sql"`
+	IndentStyle               *string            `json:"indentStyle"`
+	IndentSize                *int               `json:"indentSize"`
+	MaxLineLength             *int               `json:"maxLineLength"`
+	OperatorSpacing           *bool              `json:"operatorSpacing"`
+	CommaSpacing              *bool              `json:"commaSpacing"`
+	SemicolonEnforcement      *bool              `json:"semicolonEnforcement"`
+	BlankLinesBetweenProcs    *int               `json:"blankLinesBetweenProcs"`
+	BlankLineBetweenBlocks    *bool              `json:"blankLineBetweenBlocks"`
+	BlankLinesBetweenSections *bool              `json:"blankLinesBetweenSections"`
+	TrimTrailingWhitespace    *bool              `json:"trimTrailingWhitespace"`
+	MaxConsecutiveBlankLines  *int               `json:"maxConsecutiveBlankLines"`
+	BuiltinFunctionCase       *string            `json:"builtinFunctionCase"`
+	SQL                       *SQLFormatSettings `json:"sql"`
 }
 
 // SQLFormatSettings represents SQL formatting settings from the client.
@@ -468,6 +469,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Formatting.SemicolonEnforcement, fmt.SemicolonEnforcement)
 		applyOptional(&s.settings.Formatting.BlankLinesBetweenProcs, fmt.BlankLinesBetweenProcs)
 		applyOptional(&s.settings.Formatting.BlankLineBetweenBlocks, fmt.BlankLineBetweenBlocks)
+		applyOptional(&s.settings.Formatting.BlankLinesBetweenSections, fmt.BlankLinesBetweenSections)
 		applyOptional(&s.settings.Formatting.TrimTrailingWhitespace, fmt.TrimTrailingWhitespace)
 		applyOptional(&s.settings.Formatting.MaxConsecutiveBlankLines, fmt.MaxConsecutiveBlankLines)
 		applyOptional(&s.settings.Formatting.BuiltinFunctionCase, fmt.BuiltinFunctionCase)

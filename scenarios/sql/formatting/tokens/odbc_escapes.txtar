@@ -13,6 +13,7 @@ keep their casing, a space separates '}' from a following alias, and a
 :PROCEDURE Escapes;
 	:PARAMETERS sUser;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT {fn CONCAT(o.OrdNo, t.TestCode)} orderkey,
 	           {fn CONVERT(t.dispstatus, SQL_VARCHAR)} AS status
@@ -23,6 +24,7 @@ keep their casing, a space separates '}' from a following alias, and a
 	      AND t.modified < {ts '2024-06-30 23:59:59'}
 	      AND o.owner = ?sUser?
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

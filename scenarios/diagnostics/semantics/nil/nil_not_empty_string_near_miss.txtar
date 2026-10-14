@@ -16,11 +16,13 @@ test), != with NIL, and NIL assignment.
 :PROCEDURE Probe;
 	:PARAMETERS vValue, sName;
 	:DECLARE bA;
+
 	bA := vValue = NIL;
 	bA := bA .OR. NIL == 5;
 	bA := bA .OR. sName == "";
 	bA := bA .OR. NIL != "";
 	vValue := NIL;
+
 	:RETURN bA;
 :ENDPROC;
 -- diagnostics --

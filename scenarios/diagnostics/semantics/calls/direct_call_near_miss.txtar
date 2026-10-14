@@ -23,6 +23,7 @@ that bare procedure name is an undeclared variable, which it is).
 :PROCEDURE Run;
 	:PARAMETERS sText, oSvc, fnStep;
 	:DECLARE nLen, vOut, vRef;
+
 	nLen := Len(AllTrim(sText));
 	vOut := DoProc("Helper", {nLen});
 	vOut := ExecFunction("Tools.Report.Render", {vOut});
@@ -30,11 +31,13 @@ that bare procedure name is an undeclared variable, which it is).
 	vOut := Eval(fnStep, vOut);
 	oSvc:Notify(vOut);
 	vRef := Helper;
+
 	:RETURN vRef;
 :ENDPROC;
 
 :PROCEDURE Helper;
 	:PARAMETERS nIn;
+
 	:RETURN nIn + 1;
 :ENDPROC;
 -- diagnostics --

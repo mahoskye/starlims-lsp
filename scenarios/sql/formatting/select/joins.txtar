@@ -12,6 +12,7 @@ indents 2 under its JOIN, and an extra join condition sits under ON
 :PROCEDURE Joined;
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, t.testcode, r.result_value, s.spec_value, l.label
 	    FROM orders o
@@ -26,6 +27,7 @@ indents 2 under its JOIN, and an extra join condition sits under ON
 	    WHERE o.ordno = ?sOrdNo?
 	      AND t.testcode = 'pH'
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

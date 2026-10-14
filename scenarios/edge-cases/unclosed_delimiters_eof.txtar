@@ -7,6 +7,7 @@ nFirst := 1;
 aItems := {4, 5,
 -- format --
 :DECLARE aItems, nFirst;
+
 nFirst := 1;
 aItems := {4, 5,
 -- diagnostics --

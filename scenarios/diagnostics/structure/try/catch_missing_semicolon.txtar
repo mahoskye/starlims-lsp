@@ -17,12 +17,14 @@ whether unexpected_token also reports the same statement.
 :PROCEDURE ReadSetting;
 	:PARAMETERS sKey;
 	:DECLARE sValue;
+
 	:TRY;
 		sValue := LSearch("SELECT SETTINGVALUE FROM SETTINGS WHERE SETTINGKEY = ?", "",,
 		                  {sKey});
 	:CATCH;
 		sValue := "";
 	:ENDTRY;
+
 	:RETURN sValue;
 :ENDPROC;
 -- diagnostics --

@@ -16,6 +16,7 @@ quote, and an N'…' run in a non-SQL message string.
 :PROCEDURE Notes;
 	:PARAMETERS nId;
 	:DECLARE aRows, sMsg;
+
 	aRows := SQLExecute("
 	    UPDATE samples SET
 	        flag = 'N'
@@ -28,6 +29,7 @@ quote, and an N'…' run in a non-SQL message string.
 	      AND sampleid = ?nId?
 	");
 	sMsg := "PLAN'N'GO";
+
 	:RETURN {aRows, sMsg};
 :ENDPROC;
 -- diagnostics --

@@ -17,10 +17,12 @@ named like a keyword. Clean.
 :PROCEDURE WalkCursor;
 	:PARAMETERS oCursor;
 	:DECLARE next, case, step;
+
 	step := 1;
 	case := "open";
 	next := oCursor:Next();
 	oCursor:Reset();
+
 	:RETURN next;
 :ENDPROC;
 -- diagnostics --

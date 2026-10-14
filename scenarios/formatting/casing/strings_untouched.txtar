@@ -9,6 +9,7 @@ sSql:=[it's "quoted" .or. a=1 nil];
 sAlt:='len( a ) , :endif';
 -- format --
 :DECLARE sNote, sSql, sAlt;
+
 sNote := ":if nil .t. .and. x:=1";
 sSql := [it's "quoted" .or. a=1 nil];
 sAlt := 'len( a ) , :endif';

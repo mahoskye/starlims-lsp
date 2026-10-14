@@ -17,12 +17,14 @@ not concatenated, and a spliced non-SQL message string.
 :PROCEDURE Lookup;
 	:PARAMETERS sName;
 	:DECLARE aRows, sMsg;
+
 	aRows := SQLExecute("SELECT custid FROM customers WHERE kind = 'A'");
 	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
 	aRows :=
 		SQLExecute("SELECT custid FROM customers WHERE kind = 'A' -- it's the default");
 	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = 'O''Brien");
 	sMsg := "Customer '" + sName + "' was not found";
+
 	:RETURN {aRows, sMsg};
 :ENDPROC;
 -- diagnostics --

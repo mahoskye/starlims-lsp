@@ -17,6 +17,7 @@ with inline comments, which must not change the count.
 	            vCol11, vCol12, vCol13, vCol14, vCol15,  /* measurement block;
 	            vCol16, vCol17, vCol18, vCol19, vCol20,
 	            vCol21;
+
 	:RETURN {vCol01, vCol02, vCol03, vCol04, vCol05, vCol06, vCol07, vCol08, vCol09,
 	         vCol10, vCol11, vCol12, vCol13, vCol14, vCol15, vCol16, vCol17, vCol18,
 	         vCol19, vCol20, vCol21};

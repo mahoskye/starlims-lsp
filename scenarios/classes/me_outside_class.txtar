@@ -11,9 +11,11 @@ vSelf := Me;
 -- format --
 :PARAMETERS oConfig;
 :DECLARE sMessage, vOwner, vSelf;
+
 sMessage := "call me back";
 vOwner := oConfig:Me;
 vSelf := Me;
+
 :RETURN Me:sName;
 -- diagnostics --
 5:10-5:12 error me_outside_class: 'Me' can only be used inside a ':CLASS' definition

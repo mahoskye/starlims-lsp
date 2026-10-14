@@ -115,6 +115,7 @@ A subscript in the body stays glued to its array (issue #326):
 
 ```ssl
 :DECLARE fnPick;
+
 fnPick := {|aRow| aRow[2]};
 ```
 

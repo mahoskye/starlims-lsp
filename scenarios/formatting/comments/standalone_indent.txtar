@@ -21,15 +21,19 @@ nValue := 0;
 :PROCEDURE Demo;
 	/* explains the setup;
 	:DECLARE nValue;
+
 	/* far right comment;
 	nValue := 1;
+
 	:IF nValue > 0;
 		/* positive branch;
 		nValue += 1;
+
 		/* about to switch to the other branch;
 	:ELSE;
 		nValue := 0;
 	:ENDIF;
+
 	/* end of procedure;
 :ENDPROC;
 -- diagnostics --

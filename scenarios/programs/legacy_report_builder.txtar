@@ -70,21 +70,26 @@ all := SQLExecute("select * from LabSamples where LabGroup = ?grp?");
 -- format --
 :PROCEDURE header;
 	:PARAMETERS title;
+
 	:RETURN "== " + title + " ==";
 :ENDPROC;
 
 :PROCEDURE line;
 	:PARAMETERS cols;
 	:DECLARE out, c;
+
 	out := "";
+
 	:FOR c := 1 :TO Len(cols);
 		out := out + LimsString(cols[c]) + ";";
 	:NEXT;
+
 	:RETURN out;
 :ENDPROC;
 
 :PARAMETERS grp, fromdate;
 :DECLARE rows, txt, i;
+
 txt := header("Group " + grp);
 rows := LSelect("
     SELECT SampleId, Status, LoggedOn
@@ -93,7 +98,9 @@ rows := LSelect("
       AND LoggedOn >= ?
 ",, {grp, fromdate});
 :DECLARE cnt;
+
 cnt := 0;
+
 :TRY;
 	:FOR i := 1 :TO Len(rows);
 		txt := txt + Chr(10) + line(rows[i]);
@@ -103,12 +110,14 @@ cnt := 0;
 :FINALLY;
 	:RETURN txt;
 :ENDTRY;
+
 txt := txt + Chr(10) + "rows: " + LimsString(cnt);
 :RETURN txt;
 
 :PROCEDURE summary;
 	:PARAMETERS grp;
 	:DECLARE total, open, ratio, label;
+
 	:TRY;
 		total := LSearch("select count(*) from LabSamples where LabGroup = '" + grp + "'",
 		                 0);
@@ -125,6 +134,7 @@ txt := txt + Chr(10) + "rows: " + LimsString(cnt);
 	:IF grp = "";
 		:RETURN "no group";
 	:ENDIF;
+
 	ratio := IIf(total > 0, open / total, 0);
 	label := IIf(ratio > 0.5, "busy", IIf(ratio > 0.1, "normal", "quiet"));
 	:RETURN grp + ": " + label;
@@ -135,7 +145,9 @@ txt := txt + Chr(10) + "rows: " + LimsString(cnt);
 :PROCEDURE dump;
 	:PARAMETERS grp;
 	:DECLARE all;
+
 	all := SQLExecute("select * from LabSamples where LabGroup = ?grp?");
+
 	:RETURN Len(all);
 :ENDPROC;
 -- diagnostics --

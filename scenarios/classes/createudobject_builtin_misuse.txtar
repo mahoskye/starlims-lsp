@@ -25,6 +25,7 @@ seeded anonymous object, and a member method named CreateUdObject (D10).
 :PROCEDURE Build;
 	:PARAMETERS sKind;
 	:DECLARE oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory;
+
 	oMail := CreateUdObject("Email");
 	oData := CreateUdObject(" SSLDataset ");
 	oHelper := CreateUdObject("Lab.OrderHelper");
@@ -32,6 +33,7 @@ seeded anonymous object, and a member method named CreateUdObject (D10).
 	oAnon := CreateUdObject();
 	oSeeded := CreateUdObject({{"kind", sKind}});
 	oViaFactory := Me:oFactory:CreateUdObject("Email");
+
 	:RETURN {oMail, oData, oHelper, oDyn, oAnon, oSeeded, oViaFactory};
 :ENDPROC;
 -- diagnostics --

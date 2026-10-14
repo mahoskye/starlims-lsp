@@ -14,6 +14,7 @@ comment rule out: the string holds no SSL ';'.
 :PROCEDURE Commented;
 	:PARAMETERS sSite;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT r.ruleid, r.name
 	    FROM rules r
@@ -25,6 +26,7 @@ comment rule out: the string holds no SSL ';'.
 	    ) /* unmapped */
 	      AND r.site = ?sSite?
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

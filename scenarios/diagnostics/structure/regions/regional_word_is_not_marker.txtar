@@ -10,7 +10,9 @@ sLocale := "en-US";
 -- format --
 /* Regional settings follow;
 :DECLARE sLocale;
+
 sLocale := "en-US";
+
 /* endregion;
 -- diagnostics --
 4:1-4:14 hint region_end_mismatch: 'endregion' has no open '/* region' to close

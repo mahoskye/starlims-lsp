@@ -8,6 +8,7 @@ sMsg := "Select the samples from the rack
 and update the status column";
 -- format --
 :DECLARE sMsg;
+
 sMsg := "Select the samples from the rack
 and update the status column";
 -- diagnostics --

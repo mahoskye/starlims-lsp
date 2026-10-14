@@ -16,9 +16,11 @@ fnText := {|s|s+" .and. nil len(x)"};
 
 :PROCEDURE Build;
 	:DECLARE fnReady, fnLen, fnText;
+
 	fnReady := {|o| Me:IsReady(o) .AND. o != NIL .OR. .F.};
 	fnLen := {|s| Len(AllTrim(s)) > 0};
 	fnText := {|s| s + " .and. nil len(x)"};
+
 	:RETURN fnReady;
 :ENDPROC;
 -- diagnostics --

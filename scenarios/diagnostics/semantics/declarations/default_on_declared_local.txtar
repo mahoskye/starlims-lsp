@@ -17,7 +17,9 @@ statement (the two report different defects).
 	:DEFAULT sAisle, "A";
 	:DECLARE nBins;
 	:DEFAULT nBins, 0;
+
 	nBins := Len(sAisle);
+
 	:RETURN nBins;
 :ENDPROC;
 -- diagnostics --

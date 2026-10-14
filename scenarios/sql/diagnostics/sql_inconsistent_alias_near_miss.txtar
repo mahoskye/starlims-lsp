@@ -15,6 +15,7 @@ alias (issue #255 false positive), and DISTINCT with a * item.
 -- format --
 :PROCEDURE Aliases;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno AS fno FROM orders o");
 	aRows := SQLExecute("SELECT o.ordno orderno, o.folderno fno FROM orders o");
 	aRows := SQLExecute("SELECT o.ordno, o.folderno FROM orders o");
@@ -24,6 +25,7 @@ alias (issue #255 false positive), and DISTINCT with a * item.
 	    FROM orders o
 	    GROUP BY o.status
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

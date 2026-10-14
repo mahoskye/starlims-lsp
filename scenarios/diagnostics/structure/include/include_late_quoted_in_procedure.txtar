@@ -9,6 +9,7 @@ warning) are wrong, and each should be reported once on its own range.
 -- format --
 :PROCEDURE LoadHelpers;
 	:INCLUDE 'Common.StringHelpers';
+
 	:RETURN .T.;
 :ENDPROC;
 -- diagnostics --

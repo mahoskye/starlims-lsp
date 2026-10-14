@@ -7,8 +7,5 @@ formatter trims trailing whitespace; no diagnostics.
   	 
 -- format --
 
-
-
-
 -- diagnostics --
 -- diagnostics [--strict --info] --

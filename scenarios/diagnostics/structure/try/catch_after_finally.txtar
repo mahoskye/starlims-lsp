@@ -19,7 +19,9 @@ fires on the misplaced :CATCH; it is not also counted by single_catch
 :PROCEDURE CloseLedger;
 	:PARAMETERS nLedgerId;
 	:DECLARE bClosed;
+
 	bClosed := .F.;
+
 	:TRY;
 		bClosed := RunSQL("UPDATE LEDGERS SET CLOSED = 'Y' WHERE LEDGERID = ?",,
 		                  {nLedgerId});
@@ -28,6 +30,7 @@ fires on the misplaced :CATCH; it is not also counted by single_catch
 	:CATCH;
 		bClosed := .F.;
 	:ENDTRY;
+
 	:RETURN bClosed;
 :ENDPROC;
 -- diagnostics --

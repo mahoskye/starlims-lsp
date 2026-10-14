@@ -32,6 +32,7 @@ aeval(me:items,fnAdd);
 
 :PROCEDURE Init;
 	:PARAMETERS aItems;
+
 	Me:items := aItems;
 	Me:count := ALen(aItems);
 	Base:Init();
@@ -39,14 +40,17 @@ aeval(me:items,fnAdd);
 
 :PROCEDURE Total;
 	:DECLARE nSum, fnAdd;
+
 	nSum := 0;
 	fnAdd := {|n| nSum += Val(n)};
 	AEval(Me:items, fnAdd);
+
 	:RETURN nSum;
 :ENDPROC;
 
 :PROCEDURE Find;
 	:PARAMETERS sValue;
+
 	:RETURN AScan(Me:items, sValue,,);
 :ENDPROC;
 -- diagnostics --

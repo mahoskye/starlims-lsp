@@ -12,17 +12,21 @@ vResult := DoProc("LookupResult", {sSampleId, sTestCode, "FINAL", 3});
 :PROCEDURE Narrow;
 	:PARAMETERS sSampleId, sTestCode;
 	:DECLARE vResult;
+
 	vResult := DoProc("LookupResult",
 	                  {sSampleId,
 	                   sTestCode,
 	                   "FINAL", 3});
+
 	:RETURN vResult;
 :ENDPROC;
 -- format --
 :PROCEDURE Narrow;
 	:PARAMETERS sSampleId, sTestCode;
 	:DECLARE vResult;
+
 	vResult := DoProc("LookupResult", {sSampleId, sTestCode, "FINAL", 3});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

@@ -13,8 +13,10 @@ vResult := DoProc("Join",{aValues,", "});
 :PROCEDURE Commas;
 	:PARAMETERS sA, sB, sC;
 	:DECLARE aValues, vResult;
+
 	aValues := {sA, sB, sC, "a,b,c"};
 	vResult := DoProc("Join", {aValues, ", "});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

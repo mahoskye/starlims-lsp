@@ -24,17 +24,22 @@ procedure is judged on its own and nothing cascades into it
 :PROCEDURE ApplyDiscount;
 	:PARAMETERS nAmount;
 	:DECLARE nResult;
+
 	nResult := nAmount;
+
 	:IF nAmount > 100;
 		nResult := nAmount * 0.9;
+
 		:RETURN nResult;
 	:ENDPROC;
 
 	:PROCEDURE RoundAmount;
 		:PARAMETERS nAmount;
+
 		:IF nAmount < 0;
 			:RETURN 0;
 		:ENDIF;
+
 		:RETURN Round(nAmount, 2);
 	:ENDPROC;
 -- diagnostics --

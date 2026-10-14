@@ -20,6 +20,7 @@ no argument (trailing_skip_commas, info tier, covers it).
 :PROCEDURE Clip;
 	:PARAMETERS sText, oDoc, aDocs;
 	:DECLARE sOut, fnAdd, nSum;
+
 	sOut := Left(sText, 10);
 	sOut := AllTrim(Upper(Left(sText, 10)));
 	fnAdd := {|a, b, c, d, e| a + b + c + d + e};
@@ -27,6 +28,7 @@ no argument (trailing_skip_commas, info tier, covers it).
 	sOut := oDoc:Left("a", "b", "c");
 	sOut := aDocs[1]:Left("a", "b", "c");
 	sOut := Left(sText, 10,);
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

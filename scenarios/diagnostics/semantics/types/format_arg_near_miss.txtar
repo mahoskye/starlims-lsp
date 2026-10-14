@@ -28,6 +28,7 @@ in this file declares it (the catalog fence has the same shape).
 :PROCEDURE Greet;
 	:PARAMETERS sName, vThing, aTemplates, oDoc, fnBuild;
 	:DECLARE sFmt, sMsg, aArgs, x;
+
 	sFmt := "Hello {0}";
 	aArgs := {sName};
 	sMsg := sFmt:Format("Hello {0}", {sName});
@@ -42,6 +43,7 @@ in this file declares it (the catalog fence has the same shape).
 	sMsg := oDoc:Format("plain", "utf-8");
 	sMsg := aTemplates[1]:Format("{0}", vThing);
 	sMsg := String:Format("{0} of {1}", 1, 2);
+
 	:RETURN sMsg;
 :ENDPROC;
 -- diagnostics --

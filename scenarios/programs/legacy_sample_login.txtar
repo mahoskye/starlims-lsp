@@ -164,6 +164,7 @@ if Empty(sampleid);
 :ENDIF;
 
 rows := SQLExecute("select Status from LabSamples where SampleId = ?sampleid?");
+
 :IF Len(rows) > 0;
 	:RETURN .F.;
 :ENDIF;
@@ -186,12 +187,14 @@ ok := RunSQL("
         ?sampleid?, ?matrix?, ?status?
     )
 ");
+
 :IF .NOT. ok;
 	ErrorMes("login", "insert failed");
 	:RETURN .F.;
 :ENDIF;
 
 cnt := 0;
+
 :FOR i := 1 :TO Len(matrix);
 	cnt := cnt + 1;
 :NEXT;
@@ -206,11 +209,14 @@ DoProc("Notify", {sampleid, priority});
 :PROCEDURE Notify;
 	:PARAMETERS id, prio;
 	:DECLARE msg;
+
 	msg := "sample " + id + " logged with priority " + prio;
 	UsrMes(msg);
+
 	:IF prio = "H";
 		UsrMes("high priority!");
 	:ENDIF;
+
 	:ERROR;
 		ErrorMes("Notify", "notify failed");
 :ENDPROC;
@@ -219,10 +225,13 @@ DoProc("Notify", {sampleid, priority});
 	:PARAMETERS code;
 	:PUBLIC lastmatrix;
 	:DECLARE desc;
+
 	:IF code = "";
 		:RETURN "";
 	:ENDIF;
+
 	desc := LSearch("select Description from LabMatrices where Code = ?", "",, {code});
+
 	:IF Empty(desc);
 		:IF Len(code) > 1;
 			desc := LookupMatrix(Left(code, 1));
@@ -230,7 +239,9 @@ DoProc("Notify", {sampleid, priority});
 			desc := "unknown";
 		:ENDIF;
 	:ENDIF;
+
 	lastmatrix := code;
+
 	:RETURN desc;
 :ENDPROC;
 -- diagnostics --

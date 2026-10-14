@@ -12,6 +12,7 @@ nFactor := 3;
 :BEGININLINECODE Scale;
 	:DECLARE nFactor;
 	:PARAMETERS nAmount;
+
 	nFactor := 3;
 	:RETURN nAmount * nFactor;
 :ENDINLINECODE;

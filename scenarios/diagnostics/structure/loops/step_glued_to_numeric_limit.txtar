@@ -13,10 +13,13 @@ with the corrected form (diag.step_spacing).
 -- format --
 :PROCEDURE EvenTotal;
 	:DECLARE nIdx, nTotal;
+
 	nTotal := 0;
+
 	:FOR nIdx := 2 :TO 10 :STEP 2;
 		nTotal := nTotal + nIdx;
 	:NEXT;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

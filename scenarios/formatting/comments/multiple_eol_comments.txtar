@@ -10,7 +10,9 @@ nValue := 1;  /* first note;  /* second note; /* third note;
 -- format --
 :PROCEDURE Demo;
 	:DECLARE nValue;
+
 	nValue := 1;  /* first note;  /* second note;  /* third note;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

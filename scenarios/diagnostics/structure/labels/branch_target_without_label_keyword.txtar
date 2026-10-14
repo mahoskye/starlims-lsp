@@ -18,13 +18,16 @@ missing-keyword case, diag.deprecated_keyword).
 -- format --
 :PROCEDURE ConnectWithRetry;
 	:DECLARE nTries, bConnected;
+
 	nTries := 0;
 	bConnected := .F.;
 	:LABEL RETRY;
 	nTries := nTries + 1;
+
 	:IF .NOT. bConnected .AND. nTries < 3;
 		Branch("RETRY");
 	:ENDIF;
+
 	:RETURN bConnected;
 :ENDPROC;
 -- diagnostics --

@@ -21,8 +21,10 @@ which neither rule flags (diag.no_default_statements_in_datasource, issue #328).
 :PROCEDURE Pad;
 	:PARAMETERS sText, nWidth;
 	:DEFAULT nWidth, 4;
+
 	:RETURN Right(Replicate("0", nWidth) + sText, nWidth);
 :ENDPROC;
+
 :RETURN DoProc("Pad", {sAisle});
 -- diagnostics --
 4:1-4:9 error no_default_statements_in_datasource: Data source files use inline ':=' defaults in ':PARAMETERS', not separate ':DEFAULT' statements

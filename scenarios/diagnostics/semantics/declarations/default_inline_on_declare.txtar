@@ -12,7 +12,9 @@ Known issue: #323 (regression: this input should not validate clean).
 -- format --
 :PROCEDURE StartCount;
 	:DECLARE nCount :DEFAULT 0;
+
 	nCount := nCount + 1;
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

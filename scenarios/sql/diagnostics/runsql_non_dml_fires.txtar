@@ -14,6 +14,7 @@ SELECT that leads a concatenation. Its result set is silently discarded.
 :PROCEDURE Probe;
 	:PARAMETERS sOrdNo;
 	:DECLARE bOk;
+
 	bOk := RunSQL("SELECT status FROM orders WHERE ordno = ?",, {sOrdNo});
 	bOk := RunSQL("
 	    /* recent orders */
@@ -25,6 +26,7 @@ SELECT that leads a concatenation. Its result set is silently discarded.
 	    FROM recent
 	");
 	bOk := RunSQL("SELECT ordno FROM orders " + "WHERE status = 'A'");
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

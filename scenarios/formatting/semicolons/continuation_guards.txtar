@@ -23,6 +23,7 @@ nIndex})}
 :PROCEDURE Guards;
 	:PARAMETERS aRows, nIndex;
 	:DECLARE bResult, nTotal, aList;
+
 	bResult := nIndex > 0 .AND.
 		nIndex <= Len(aRows);
 	nTotal := aRows[nIndex] +
@@ -33,6 +34,7 @@ nIndex})}
 	          2,
 	          DoProc("Third", {
 	              nIndex})};
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

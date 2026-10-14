@@ -21,15 +21,18 @@ vResult := "";
 :PARAMETERS sSampleId, nMode;
 :DEFAULT nMode, 1;
 :DECLARE vResult;
+
 :IF nMode == 1;
 	vResult := DoProc("LoadOne", {sSampleId});
 :ELSE;
 	vResult := "";
 :ENDIF;
+
 :RETURN vResult;
 
 :PROCEDURE LoadOne;
 	:PARAMETERS sId;
+
 	:RETURN sId;
 :ENDPROC;
 -- diagnostics --

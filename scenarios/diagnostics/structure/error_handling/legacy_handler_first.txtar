@@ -15,8 +15,10 @@ third Flags fence).
 :PROCEDURE ComputeYield;
 	:PARAMETERS nInput, nOutput;
 	:DECLARE nYield;
+
 	:ERROR;
 		nYield := nOutput / nInput;
+
 		:RETURN nYield;
 :ENDPROC;
 -- diagnostics --

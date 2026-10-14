@@ -28,6 +28,7 @@ visibility_annotation_usage must not double-report them.
 /*@protected;
 :PROCEDURE Append;
 	:PARAMETERS sText;
+
 	Me:sBuffer += sText;
 :ENDPROC;
 -- diagnostics --

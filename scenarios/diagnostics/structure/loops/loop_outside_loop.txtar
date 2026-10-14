@@ -15,11 +15,15 @@ loop_outside_loop (error) (diag.loop_outside_loop).
 :PROCEDURE ConfirmPayment;
 	:PARAMETERS sReference;
 	:DECLARE bConfirmed;
+
 	bConfirmed := .F.;
+
 	:IF Empty(sReference);
 		:LOOP;
 	:ENDIF;
+
 	bConfirmed := .T.;
+
 	:RETURN bConfirmed;
 :ENDPROC;
 -- diagnostics --

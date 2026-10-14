@@ -17,6 +17,7 @@ bI := .t. .and. .f.;
 :RETURN {nA, nB, nC, nD, sE, sF, sG, vH, bI};
 -- format --
 :DECLARE nA, nB, nC, nD, sE, sF, sG, vH, bI;
+
 nA := 7.0e2;
 nB := 7e2;
 nC := .5;
@@ -26,6 +27,7 @@ sF := '';
 sG := [];
 vH := NIL;
 bI := .T. .AND. .F.;
+
 :RETURN {nA, nB, nC, nD, sE, sF, sG, vH, bI};
 -- diagnostics --
 3:7-3:8 error scientific_notation: SSL scientific notation requires a decimal point: use '7.0e2' instead of '7e2'

@@ -12,6 +12,7 @@ join and the array after the closing quote.
 :PROCEDURE OrderXml;
 	:PARAMETERS sOrdNo;
 	:DECLARE sXml;
+
 	sXml := GetDataSet("
 	    SELECT o.ordno, t.testcode, r.result_value
 	    FROM orders o
@@ -19,6 +20,7 @@ join and the array after the closing quote.
 	      ON r.ordno = o.ordno
 	    WHERE o.ordno = ?
 	", {sOrdNo});
+
 	:RETURN sXml;
 :ENDPROC;
 -- diagnostics --

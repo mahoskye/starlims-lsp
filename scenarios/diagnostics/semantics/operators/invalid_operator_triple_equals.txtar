@@ -11,8 +11,10 @@ bDiffer := 1 !== 2;
 -- format --
 :PROCEDURE Demo;
 	:DECLARE bSame, bDiffer;
+
 	bSame := 1 === 1;
 	bDiffer := 1 !== 2;
+
 	:RETURN bSame .AND. bDiffer;
 :ENDPROC;
 -- diagnostics --

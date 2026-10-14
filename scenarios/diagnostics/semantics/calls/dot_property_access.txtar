@@ -13,10 +13,12 @@ on the .name fragment): after a variable, a call result and a subscript
 -- format --
 :PROCEDURE ReadSubject;
 	:DECLARE oMail, aRows, vOut;
+
 	oMail := Email{};
 	vOut := oMail.Subject;
 	vOut := aRows[1].Name;
 	vOut := Today().Year;
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

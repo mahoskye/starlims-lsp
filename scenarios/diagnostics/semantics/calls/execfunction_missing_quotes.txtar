@@ -13,9 +13,11 @@ dotted fragment). dot_property_access stays silent on that fragment
 -- format --
 :PROCEDURE Dispatch;
 	:DECLARE nOut;
+
 	nOut := ExecFunction(Billing.ComputeFees, {1});
 	nOut := DoProc(Reports.BuildSummary, {nOut});
 	nOut := ExecFunction(Billing.Tax.Rate);
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

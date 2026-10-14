@@ -20,6 +20,7 @@ from samples
 :PROCEDURE Again;
 	:PARAMETERS sStatus;
 	:DECLARE aRows, aSame;
+
 	aRows := SQLExecute("
 	    SELECT sample_id
 	    FROM samples
@@ -31,6 +32,7 @@ from samples
 	    FROM samples
 	    WHERE sample_status = ?sStatus?
 	");
+
 	:RETURN {aRows, aSame};
 :ENDPROC;
 -- diagnostics --

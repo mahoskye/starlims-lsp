@@ -25,11 +25,13 @@ diag.exitwhile_in_finally).
 :PROCEDURE FlushBuffers;
 	:PARAMETERS aBuffers;
 	:DECLARE nIdx;
+
 	:TRY;
 		nIdx := 0;
 	:FINALLY;
 		:WHILE nIdx < Len(aBuffers);
 			nIdx := nIdx + 1;
+
 			:IF Empty(aBuffers[nIdx]);
 				:LOOP;
 			:ENDIF;

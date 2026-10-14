@@ -14,9 +14,11 @@ operators").
 -- format --
 :PROCEDURE Compare;
 	:PARAMETERS oSettings;
+
 	:IF oSettings:primaryConfiguration:maximumAllowedRetryCount >= oSettings:fallbackConfiguration:limit;
 		:RETURN .T.;
 	:ENDIF;
+
 	:RETURN .F.;
 :ENDPROC;
 -- diagnostics --

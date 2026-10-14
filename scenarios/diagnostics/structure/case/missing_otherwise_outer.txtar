@@ -21,7 +21,9 @@ token; legal and often intentional, so nothing stronger may appear
 :PROCEDURE StatusLabel;
 	:PARAMETERS sCode;
 	:DECLARE sLabel;
+
 	sLabel := "Unknown";
+
 	:BEGINCASE;
 	:CASE sCode == "A";
 		sLabel := "Active";
@@ -30,6 +32,7 @@ token; legal and often intentional, so nothing stronger may appear
 		sLabel := "Inactive";
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

@@ -11,8 +11,10 @@ nCount := 0;
 :ENDWHILE;
 -- format --
 :DECLARE bReady, nCount;
+
 bReady := .T.;
 nCount := 0;
+
 :IF bReady;
 	nCount := 1;
 :ENDWHILE;

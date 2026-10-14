@@ -12,6 +12,7 @@ line, indent the body one level, and close ')' at the clause column.
 -- format --
 :PROCEDURE Nested;
 	:DECLARE aRows, aMore;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, (
 	        SELECT COUNT(*)
@@ -42,6 +43,7 @@ line, indent the body one level, and close ')' at the clause column.
 	    WHERE v.task_count > 10
 	    ORDER BY v.task_count DESC
 	");
+
 	:RETURN {aRows, aMore};
 :ENDPROC;
 -- diagnostics --

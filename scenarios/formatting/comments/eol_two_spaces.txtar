@@ -13,9 +13,11 @@ nC := 3;                     /* far away   with   inner   spacing;
 -- format --
 :PROCEDURE Demo;
 	:DECLARE nA, nB, nC;
+
 	nA := 1;  /*glued;
 	nB := 2;  /* one space;
 	nC := 3;  /* far away   with   inner   spacing;
+
 	:RETURN nA + nB + nC;  /* tab separated;
 :ENDPROC;
 -- diagnostics --

@@ -27,6 +27,7 @@ Constructor placed first among the methods, after :INHERIT and the field
 :PROCEDURE Constructor;
 	:PARAMETERS nSize;
 	:DEFAULT nSize, 10;
+
 	Me:nCapacity := nSize;
 	Me:aSlots := {};
 :ENDPROC;

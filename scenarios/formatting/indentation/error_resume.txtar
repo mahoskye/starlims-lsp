@@ -16,6 +16,7 @@ ErrorMes("LegacyUpdate", "update failed");
 :PROCEDURE LegacyUpdate;
 	:PARAMETERS sSampleId;
 	:DECLARE bOk;
+
 	bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {"X", sSampleId});
 	:RETURN bOk;
 	:ERROR;

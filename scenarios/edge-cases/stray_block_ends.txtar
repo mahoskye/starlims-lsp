@@ -15,6 +15,7 @@ nCount += 1;
 -- format --
 :DECLARE nCount;
 :ENDIF;
+
 nCount := 1;
 :NEXT;
 
@@ -22,6 +23,7 @@ nCount := 1;
 	nCount += 1;
 :ENDWHILE;
 :ENDPROC;
+
 :RETURN nCount;
 -- diagnostics --
 2:1-2:7 error unmatched_block_end: Unexpected ':ENDIF' without matching block start

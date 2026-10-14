@@ -17,11 +17,13 @@ fire.
 :PROCEDURE ImpersonateRunner;
 	:PARAMETERS sRunner;
 	:DECLARE sPrevious, bIsPending, sStatus;
+
 	sPrevious := MYUSERNAME;
 	MYUSERNAME := sRunner;
 	Pending := "Waiting";
 	bIsPending := sStatus == Pending;
 	MYUSERNAME := sPrevious;
+
 	:RETURN bIsPending;
 :ENDPROC;
 -- diagnostics --

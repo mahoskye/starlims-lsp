@@ -13,12 +13,14 @@ Eval(fnOuter, aRows);
 :RETURN aOut;
 -- format --
 :DECLARE aRows, fnPick, fnOuter, aOut;
+
 aRows := {{1, "a"}, {2, "b"}, {3, "c"}};
 fnPick := {|aRow| aRow[2]};
 fnOuter := {|aList| AEval(aList, {|aRow, nIdx| aRow[1] := aRow[1] * nIdx})};
 aOut := {};
 AEval(aRows, {|aRow| AAdd(aOut, Eval(fnPick, aRow))});
 Eval(fnOuter, aRows);
+
 :RETURN aOut;
 -- diagnostics --
 -- diagnostics [--strict --info] --

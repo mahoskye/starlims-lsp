@@ -13,8 +13,10 @@ vResult:=Eval(fnOuter,1);
 -- format --
 :PROCEDURE Nested;
 	:DECLARE fnOuter, vResult;
+
 	fnOuter := {|x|Eval({|y|y+1}, x)};
 	vResult := Eval(fnOuter, 1);
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

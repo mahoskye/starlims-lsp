@@ -33,6 +33,7 @@ nCount := 1;
 -- format --
 /*@private;
 :DECLARE nCount;
+
 /*@private;
 nCount := 1;
 

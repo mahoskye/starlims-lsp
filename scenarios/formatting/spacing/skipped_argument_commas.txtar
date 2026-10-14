@@ -18,12 +18,14 @@ vResult := DoProc("Trailing", {sStatus,,});
 :PROCEDURE Skips;
 	:PARAMETERS sStatus, sSampleId;
 	:DECLARE vResult, bOk;
+
 	vResult := DoProc("MyProc", {sStatus,, sSampleId});
 	vResult := DoProc("MyProc", {sStatus,, sSampleId});
 	vResult := DoProc("MyProc", {sStatus,,, sSampleId});
 	bOk := RunSQL("UPDATE sample SET status = ? WHERE id = ?",, {sStatus, sSampleId});
 	vResult := LSearch("SELECT name FROM sample WHERE id = ?",,, {sSampleId});
 	vResult := DoProc("Trailing", {sStatus,,});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

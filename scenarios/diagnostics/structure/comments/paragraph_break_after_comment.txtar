@@ -16,6 +16,7 @@ that spans two lines;
 
 these words follow a paragraph break;
 :DECLARE nCount;
+
 nCount := 0;
 -- diagnostics --
 4:7-4:12 error unexpected_token: Unexpected identifier 'words' - expected an operator or ';'

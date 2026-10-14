@@ -11,6 +11,7 @@ SELECT line, and function calls kept whole.
 -- format --
 :PROCEDURE Wide;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT DISTINCT o.ordno, o.custid, o.logdate, o.duedate, o.status, o.site,
 	           o.priority, UPPER(o.description) AS description_upper,
@@ -18,6 +19,7 @@ SELECT line, and function calls kept whole.
 	    FROM orders o
 	    WHERE o.status = 'A'
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

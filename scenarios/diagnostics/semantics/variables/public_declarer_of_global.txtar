@@ -11,6 +11,7 @@ gShiftNo := 1;
 -- format --
 :PUBLIC MYUSERNAME;
 :PUBLIC gSiteCode, gShiftNo;
+
 MYUSERNAME := "system";
 gSiteCode := "S01";
 gShiftNo := 1;

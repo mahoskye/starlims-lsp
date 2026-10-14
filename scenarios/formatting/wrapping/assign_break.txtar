@@ -11,8 +11,10 @@ sConnectionDescriptor := oConfigurationManagerInstance:databaseConnectionSetting
 -- format --
 :PROCEDURE ReadSetting;
 	:DECLARE sConnectionDescriptor;
+
 	sConnectionDescriptor :=
 		oConfigurationManagerInstance:databaseConnectionSettings:primaryName;
+
 	:RETURN sConnectionDescriptor;
 :ENDPROC;
 -- diagnostics --

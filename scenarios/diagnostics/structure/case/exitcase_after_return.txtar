@@ -20,12 +20,14 @@ not fire (diag.exitcase_after_return, diag.exitcase_last_in_branch).
 -- format --
 :PROCEDURE PriorityName;
 	:PARAMETERS nLevel;
+
 	:BEGINCASE;
 	:CASE nLevel > 8;
 		:RETURN "critical";
 		:EXITCASE;
 	:CASE nLevel > 4;
 		:RETURN "elevated";
+
 		/* reached only by the return above;
 		:EXITCASE;
 	:OTHERWISE;

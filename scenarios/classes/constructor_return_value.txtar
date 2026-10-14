@@ -24,11 +24,14 @@ Constructor and :RETURN with a value from an ordinary method.
 
 :PROCEDURE Constructor;
 	:PARAMETERS nStart;
+
 	:IF Empty(nStart);
 		Me:nLevel := 0;
 		:RETURN;
 	:ENDIF;
+
 	Me:nLevel := nStart;
+
 	:RETURN .T.;
 :ENDPROC;
 

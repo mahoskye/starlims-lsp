@@ -21,7 +21,9 @@ parenthesized assign-and-test idiom, := inside a call argument, the
 :PROCEDURE NextBatch;
 	:PARAMETERS nLimit;
 	:DECLARE nBatch, i, nTotal;
+
 	nTotal := 0;
+
 	:IF (nBatch := DoProc("FetchBatch")) > 0;
 		nTotal := nBatch;
 	:ENDIF;
@@ -33,6 +35,7 @@ parenthesized assign-and-test idiom, := inside a call argument, the
 	:WHILE nTotal == nLimit .OR. nTotal = 0;
 		nTotal := nTotal + 1;
 	:ENDWHILE;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

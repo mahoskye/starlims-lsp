@@ -13,7 +13,9 @@ aRows := RunDS("Stock.ByBin", {"A1"});
 :DSN := DATABASE;
 :NULLASBLANK := true;
 :DECLARE aRows;
+
 aRows := RunDS("Stock.ByBin", {"A1"});
+
 :RETURN aRows;
 -- diagnostics --
 1:1-1:5 error builder_directive_outside_datasource: ':DSN' is a data source builder directive and is valid only in a data source file

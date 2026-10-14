@@ -35,7 +35,9 @@ correct.
 :PROCEDURE NormalizeValue;
 	:PARAMETERS vValue, fnDefault, nCode;
 	:DECLARE sFmt, sOut;
+
 	sFmt := "value={0}";
+
 	:BEGINCASE;
 	:CASE LimsTypeEx(vValue) == "NUMERIC";
 		sOut := sFmt:Format("n={0}", {LimsString(vValue)});
@@ -58,6 +60,7 @@ correct.
 	:IF sOut = "value";
 		sOut := sOut + "=";
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

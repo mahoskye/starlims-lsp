@@ -9,11 +9,13 @@ tier): the statement before the call is reached before any /* comment.
 -- format --
 :PROCEDURE Names;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT custname
 	    FROM customers
 	    ORDER BY custname COLLATE Latin1_General_CI_AS
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

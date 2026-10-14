@@ -14,12 +14,14 @@ only under --info. A procedure with exactly 8 does not fire.
 :PROCEDURE RegisterSample;
 	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
 	            sRemarks;
+
 	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
 	         sRemarks};
 :ENDPROC;
 
 :PROCEDURE RegisterBlank;
 	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer;
+
 	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer};
 :ENDPROC;
 -- diagnostics --

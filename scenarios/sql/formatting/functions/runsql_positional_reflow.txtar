@@ -13,6 +13,7 @@ assignment per line and AND indented 2 under WHERE.
 :PROCEDURE Complete;
 	:PARAMETERS sNewStatus, sUser, sOrdNo, sTestCode;
 	:DECLARE bOk;
+
 	bOk := RunSQL("
 	    UPDATE ordtask SET
 	        status = ?,
@@ -21,6 +22,7 @@ assignment per line and AND indented 2 under WHERE.
 	    WHERE ordno = ?
 	      AND testcode = ?
 	",, {sNewStatus, sUser, sOrdNo, sTestCode});
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

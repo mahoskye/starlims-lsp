@@ -18,12 +18,14 @@ assignment, not a test), and "" inside SQL text.
 :PROCEDURE Blank;
 	:PARAMETERS sStatus, nCount;
 	:DECLARE bBlank, sSql;
+
 	bBlank := Empty(sStatus);
 	bBlank := sStatus == "" .OR. sStatus != "";
 	bBlank := "" = sStatus;
 	bBlank := nCount = "";
 	sSql := "UPDATE lots SET note = '' WHERE id = ?";
 	sStatus = "";
+
 	:RETURN bBlank;
 :ENDPROC;
 -- diagnostics --

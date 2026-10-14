@@ -12,7 +12,9 @@ the keyword).
 :PROCEDURE Weigh;
 	:DECLARE nTare;
 	:PARAMETERS nGross;
+
 	nTare := 5;
+
 	:RETURN nGross - nTare;
 :ENDPROC;
 -- diagnostics --

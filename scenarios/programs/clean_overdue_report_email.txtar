@@ -124,9 +124,11 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 :FOR i := 1 :TO Len(aGroups);
 	sGroup := aGroups[i][1];
 	aOverdue := DoProc("FindOverdue", {sGroup, nGraceDays});
+
 	:IF Len(aOverdue) > 0;
 		sBody := DoProc("BuildBody", {sGroup, aOverdue});
 		bSent := DoProc("SendReport", {sGroup, sBody});
+
 		:IF bSent;
 			nSent += 1;
 		:ENDIF;
@@ -145,6 +147,7 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 :PROCEDURE FindOverdue;
 	:PARAMETERS sGroup, nGraceDays;
 	:DECLARE dCutoff, sSQL;
+
 	dCutoff := DateAdd(Today(), -nGraceDays, "dd");
 	sSQL := "
 	    SELECT TestId, SampleId, DueDate
@@ -153,6 +156,7 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 	      AND Status = ?
 	      AND DueDate < ?
 	";
+
 	:RETURN LSelect1(sSQL,, {sGroup, "PENDING", dCutoff});
 :ENDPROC;
 
@@ -166,13 +170,16 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 :PROCEDURE BuildBody;
 	:PARAMETERS sGroup, aOverdue;
 	:DECLARE sFmt, sBody, j, aRow;
+
 	sFmt := "Test {0} on sample {1} was due {2}";
 	sBody := "Overdue tests for " + sGroup + Chr(13) + Chr(10);
+
 	:FOR j := 1 :TO Len(aOverdue);
 		aRow := aOverdue[j];
 		sBody += sFmt:Format({aRow[1], aRow[2], DateToString(aRow[3], "yyyy-MM-dd")});
 		sBody += Chr(13) + Chr(10);
 	:NEXT;
+
 	:RETURN sBody;
 :ENDPROC;
 
@@ -186,6 +193,7 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 :PROCEDURE SendReport;
 	:PARAMETERS sGroup, sBody;
 	:DECLARE oEmail, sRecipient, bOk;
+
 	:BEGINCASE;
 	:CASE sGroup == "CHEM";
 		sRecipient := "chem-leads@example.com";
@@ -212,6 +220,7 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
 		ErrorMes("OverdueReportEmail", GetLastSSLError():Description);
 		bOk := .F.;
 	:ENDTRY;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

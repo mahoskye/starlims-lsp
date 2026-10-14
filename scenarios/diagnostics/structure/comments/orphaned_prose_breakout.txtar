@@ -12,8 +12,10 @@ orphaned-prose path of comment_text_after_terminator fires at warning
 -- format --
 :PROCEDURE MergeAddresses;
 	:PARAMETERS oAddress;
+
 	/* Treat the address as one composite value;
 	if any component changes the whole record is resent;
+
 	:RETURN oAddress;
 :ENDPROC;
 -- diagnostics --

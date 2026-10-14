@@ -13,9 +13,11 @@ replacement in the message (diag.undeclared_variable, issue #270).
 -- format --
 :PROCEDURE BuildBanner;
 	:DECLARE sBanner;
+
 	sBanner := "User: " + MYUSERNAME + CRLF + "Lang: " + UserLang;
 	sBanner := sBanner + CR + LF;
 	sBanner += Session:SessionID;
+
 	:RETURN sBanner;
 :ENDPROC;
 -- diagnostics --

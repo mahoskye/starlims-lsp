@@ -32,6 +32,7 @@ negated :IF whose only :ELSE belongs to a nested :IF.
 :PROCEDURE Settle;
 	:PARAMETERS bDone, bFailed, bReady;
 	:DECLARE nState;
+
 	:IF .NOT. bReady;
 		:RETURN 0;
 	:ENDIF;
@@ -55,6 +56,7 @@ negated :IF whose only :ELSE belongs to a nested :IF.
 			nState := 6;
 		:ENDIF;
 	:ENDIF;
+
 	:RETURN nState;
 :ENDPROC;
 -- diagnostics --

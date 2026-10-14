@@ -19,10 +19,12 @@ of the same missing :ENDCASE.
 :PROCEDURE PickBin;
 	:PARAMETERS nSize;
 	:DECLARE sBin;
+
 	:BEGINCASE;
 	:OTHERWISE;
 		sBin := "default";
 		:EXITCASE;
+
 		:RETURN sBin;
 	:ENDPROC;
 -- diagnostics --

@@ -13,12 +13,15 @@ issue #101); the statement takes the block indent like any other.
 -- format --
 :PROCEDURE Demo;
 	:DECLARE nValue;
+
 	/* initialize;
 	nValue := 1;
+
 	:IF nValue > 0;
 		/* bump it;
 		nValue += 1;
 	:ENDIF;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

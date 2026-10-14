@@ -19,7 +19,9 @@ legal (diag.return_in_finally).
 :PROCEDURE FetchCount;
 	:PARAMETERS sRegion;
 	:DECLARE nCount;
+
 	nCount := 0;
+
 	:TRY;
 		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
 	:CATCH;
@@ -27,6 +29,7 @@ legal (diag.return_in_finally).
 	:FINALLY;
 		:RETURN nCount;
 	:ENDTRY;
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

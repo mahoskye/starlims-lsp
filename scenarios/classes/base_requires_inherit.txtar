@@ -27,7 +27,9 @@ also fire on the same token.
 
 :PROCEDURE Render;
 	:DECLARE sOut;
+
 	sOut := Base:Render();
+
 	:RETURN Me:sTitle + sOut;
 :ENDPROC;
 -- diagnostics --

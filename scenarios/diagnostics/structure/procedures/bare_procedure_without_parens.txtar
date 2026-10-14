@@ -7,6 +7,7 @@ PROCEDURE CalcDiscount;
 :RETURN .T.;
 -- format --
 PROCEDURE CalcDiscount;
+
 :RETURN .T.;
 -- diagnostics --
 1:11-1:23 error unexpected_token: Unexpected identifier 'CalcDiscount' - expected an operator or ';'

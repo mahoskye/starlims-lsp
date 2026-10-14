@@ -11,9 +11,12 @@ a comment, and assignments on the lines after the :DECLARE.
 -- format --
 :PROCEDURE DescribeRule;
 	:DECLARE sRule, nLimit;
+
 	sRule := "nLimit := 5";
+
 	/* the rule text above reads nLimit := 5;
 	nLimit := 5;
+
 	:RETURN sRule + LimsString(nLimit);
 :ENDPROC;
 -- diagnostics --

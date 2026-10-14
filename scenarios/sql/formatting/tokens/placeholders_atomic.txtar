@@ -14,6 +14,7 @@ legitimized), plus bare positional ? markers in a RunSQL call.
 :PROCEDURE Placeholders;
 	:PARAMETERS sStatus, oUser, aIds, sOrdNo;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("
 	    SELECT ordno
 	    FROM orders
@@ -32,6 +33,7 @@ legitimized), plus bare positional ? markers in a RunSQL call.
 	    WHERE ordno = ?
 	      AND status <> ?
 	",, {"C", oUser:ID, sOrdNo, "X"});
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

@@ -20,6 +20,7 @@ be ranged on the placeholder's own line (issue #255).
 :PROCEDURE ByFilter;
 	:PARAMETERS oFilter;
 	:DECLARE sSQL, aRows;
+
 	sSQL := "SELECT sampleid FROM samples WHERE sampleid IN (?oFilter:aIds?)";
 	aRows := SQLExecute(sSQL);
 	aRows := SQLExecute("
@@ -27,6 +28,7 @@ be ranged on the placeholder's own line (issue #255).
 	    FROM samples
 	    WHERE status NOT IN (?oFilter:aCodes?)
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

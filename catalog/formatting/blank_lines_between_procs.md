@@ -176,6 +176,7 @@ nCount := 1;
 
 ```ssl
 :DECLARE nCount;
+
 nCount := 1;
 
 :PROCEDURE Demo;

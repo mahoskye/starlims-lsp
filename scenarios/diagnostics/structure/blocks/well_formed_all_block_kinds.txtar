@@ -41,8 +41,10 @@ diag.unmatched_block_end, diag.max_block_depth).
 :PROCEDURE SummarizeBatch;
 	:PARAMETERS aRows;
 	:DECLARE nTotal, nIdx, nRetry, sLabel, oErr;
+
 	nTotal := 0;
 	nRetry := 3;
+
 	:TRY;
 		:FOR nIdx := 1 :TO Len(aRows) :STEP 1;
 			nTotal := nTotal + aRows[nIdx];
@@ -70,6 +72,7 @@ diag.unmatched_block_end, diag.max_block_depth).
 			:EXITCASE;
 		:ENDCASE;
 	:ENDIF;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

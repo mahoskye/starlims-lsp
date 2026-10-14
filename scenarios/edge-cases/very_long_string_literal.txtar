@@ -7,11 +7,15 @@ sNote := "This string literal is deliberately very long so that it exceeds every
 :RETURN sNote;
 -- format [--max-line-length 40] --
 :DECLARE sNote;
+
 sNote := "This string literal is deliberately very long so that it exceeds every sensible maximum line length setting by a wide margin";
+
 :RETURN sNote;
 -- format --
 :DECLARE sNote;
+
 sNote := "This string literal is deliberately very long so that it exceeds every sensible maximum line length setting by a wide margin";
+
 :RETURN sNote;
 -- diagnostics --
 -- diagnostics [--strict --info] --

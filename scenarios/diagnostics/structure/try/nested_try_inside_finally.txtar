@@ -22,7 +22,9 @@ statement (diag.catch_order_before_finally, diag.finally_empty).
 :PROCEDURE ArchiveFile;
 	:PARAMETERS sPath;
 	:DECLARE bMoved, oErr;
+
 	bMoved := .F.;
+
 	:TRY;
 		bMoved := .NOT. Empty(sPath);
 	:FINALLY;
@@ -32,6 +34,7 @@ statement (diag.catch_order_before_finally, diag.finally_empty).
 			oErr := GetLastSSLError();
 		:ENDTRY;
 	:ENDTRY;
+
 	:RETURN bMoved;
 :ENDPROC;
 -- diagnostics --

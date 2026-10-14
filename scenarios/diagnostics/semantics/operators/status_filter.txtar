@@ -31,9 +31,12 @@ operators, == and != beside them are correct.
 :PROCEDURE FilterStatus;
 	:PARAMETERS aRows, sWanted, bStrict;
 	:DECLARE aOut, i, sStatus, sTag, nLeft;
+
 	aOut := {};
+
 	:FOR i := 1 :TO Len(aRows);
 		sStatus := aRows[i][2];
+
 		:IF sStatus = "" AND bStrict;
 			:LOOP;
 		:ENDIF;
@@ -48,10 +51,13 @@ operators, == and != beside them are correct.
 			AAdd(aOut, aRows[i]);
 		:ENDIF;
 	:NEXT;
+
 	nLeft := Len(aOut);
+
 	:WHILE nLeft := 0;
 		nLeft := 1;
 	:ENDWHILE;
+
 	:RETURN aOut;
 :ENDPROC;
 -- diagnostics --

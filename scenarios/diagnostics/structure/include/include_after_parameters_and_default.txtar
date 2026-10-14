@@ -17,6 +17,7 @@ nCount := Len(sTarget);
 :INCLUDE Common.StringHelpers;
 :INCLUDE Common.DateHelpers;
 :DECLARE nCount;
+
 nCount := Len(sTarget);
 -- diagnostics --
 -- diagnostics [--strict --info] --

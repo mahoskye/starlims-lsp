@@ -10,6 +10,7 @@ fnMulti := {|x|x+
 vResult:=Eval(fnMulti,1);
 -- format --
 :DECLARE fnMulti, vResult;
+
 fnMulti := {|x|x+
 1};
 vResult := Eval(fnMulti, 1);

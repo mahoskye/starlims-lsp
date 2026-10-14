@@ -12,7 +12,9 @@ unmatched_delimiter on the stray closer. unexpected_token defers to it
 :PROCEDURE NetPrice;
 	:PARAMETERS nGross, nTax;
 	:DECLARE nNet;
+
 	nNet := (nGross - nTax) * 1.0);
+
 	:RETURN nNet;
 :ENDPROC;
 -- diagnostics --

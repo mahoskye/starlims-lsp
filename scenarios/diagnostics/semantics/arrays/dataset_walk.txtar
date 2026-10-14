@@ -27,18 +27,22 @@ forms.
 :PROCEDURE CollectNames;
 	:PARAMETERS sXml;
 	:DECLARE oData, oTable, aNames, oList, i, sFirst, nCount;
+
 	oData := LimsNETConnect("System.Data", "System.Data.DataSet");
 	oData:ReadXml(sXml);
 	oTable := oData:Tables[0];
 	aNames := {};
+
 	:FOR i := 1 :TO oTable:Rows:Count;
 		AAdd(aNames, oTable:Rows[i - 1]:ItemArray[0]);
 	:NEXT;
+
 	sFirst := aNames[0];
 	oList := LimsNETConnect("mscorlib", "System.Collections.ArrayList");
 	sFirst := oList:Items[0];
 	nCount := aNames:Count;
 	nCount := Len(aNames);
+
 	:RETURN sFirst;
 :ENDPROC;
 -- diagnostics --

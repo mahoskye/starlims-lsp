@@ -20,6 +20,7 @@ placeholder, and bare positional markers.
 :PROCEDURE FindSamples;
 	:PARAMETERS sSite;
 	:DECLARE sStatus, oUser, aRows, aMore, bOk;
+
 	sStatus := "A";
 	oUser := CreateUdObject();
 	oUser:ID := "u1";
@@ -39,6 +40,7 @@ placeholder, and bare positional markers.
 	      AND logdate < ?Today()?
 	");
 	bOk := RunSQL("UPDATE samples SET status = ? WHERE sampleid = ?",, {sStatus, sSite});
+
 	:RETURN {aRows, aMore, bOk};
 :ENDPROC;
 -- diagnostics --

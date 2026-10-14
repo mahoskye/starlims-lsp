@@ -12,6 +12,7 @@ SQL (the second is an identifier followed by a literal).
 :PROCEDURE Notes;
 	:PARAMETERS nId;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    UPDATE samples SET
 	        note = N'checked by QC',
@@ -19,6 +20,7 @@ SQL (the second is an identifier followed by a literal).
 	        status = 'R'
 	    WHERE sampleid = ?nId?
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

@@ -17,11 +17,13 @@ case-insensitive (lsearch). At most one finding per string.
 :PROCEDURE UpdateStatus;
 	:PARAMETERS sStatus, sOrdNo;
 	:DECLARE bOk, sName, aRows, aAll, sXml;
+
 	bOk := RunSQL("UPDATE orders SET status = ?sStatus? WHERE ordno = ?sOrdNo?");
 	sName := LSearch("SELECT custname FROM orders WHERE ordno = ?sOrdNo?", "");
 	aRows := LSelect1("SELECT ordno FROM orders WHERE status = ?sStatus?");
 	aAll := LSelect("SELECT ordno FROM orders WHERE status = ?sStatus?");
 	sXml := GetDataSet("SELECT ordno FROM orders WHERE status = ?sStatus?");
+
 	:RETURN {bOk, sName, aRows, aAll, sXml};
 :ENDPROC;
 -- diagnostics --

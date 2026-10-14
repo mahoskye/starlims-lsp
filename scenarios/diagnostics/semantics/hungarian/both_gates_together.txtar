@@ -18,8 +18,10 @@ hungarianTypes). Neither fires by default.
 -- format --
 :PROCEDURE Mark;
 	:DECLARE Count, sLabel;
+
 	Count := 1;
 	sLabel := 0;
+
 	:RETURN sLabel + LimsString(Count);
 :ENDPROC;
 -- diagnostics --

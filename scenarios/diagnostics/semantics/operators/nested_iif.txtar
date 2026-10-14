@@ -12,7 +12,9 @@ levels give two findings. Matching is case-insensitive (iif).
 :PROCEDURE Grade;
 	:PARAMETERS nScore;
 	:DECLARE sGrade;
+
 	sGrade := IIf(nScore >= 90, "A", IIf(nScore >= 75, "B", IIf(nScore >= 50, "C", "F")));
+
 	:RETURN sGrade;
 :ENDPROC;
 -- diagnostics --

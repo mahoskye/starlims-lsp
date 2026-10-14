@@ -16,12 +16,15 @@ stored text starts with the lowercase keyword.
 -- format --
 :PROCEDURE Rewind;
 	:DECLARE nTimes;
+
 	nTimes := 0;
 	:LABEL START;
 	nTimes := nTimes + 1;
+
 	:IF nTimes < 2;
 		Branch("LABEL START");
 	:ENDIF;
+
 	:RETURN nTimes;
 :ENDPROC;
 -- diagnostics --
