@@ -75,7 +75,14 @@ type DiagnosticOptions struct {
 	HungarianPrefixes   []string
 	GlobalVariables     []string
 	MaxBlockDepth       int
-	IsDataSourceFile    bool
+	// MaxProcedureCodeLines, MaxScriptCodeLines, and MaxScriptProcedures
+	// are the size review triggers (diag.procedure_length_review,
+	// diag.script_size_review, issue #344). Code lines exclude blank and
+	// comment-only lines; 0 disables each threshold.
+	MaxProcedureCodeLines int
+	MaxScriptCodeLines    int
+	MaxScriptProcedures   int
+	IsDataSourceFile      bool
 	// IsEndpointFile marks the file as an SSL endpoint script. When true,
 	// `Request` and `Response` are treated as pre-injected runtime
 	// ambients (not declared, not flagged as undeclared, not assignable).
@@ -132,6 +139,9 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 		CheckHungarianTypes:    false,
 		HungarianPrefixes:      []string{"a", "b", "d", "fn", "n", "o", "s", "v"},
 		MaxBlockDepth:          4,
+		MaxProcedureCodeLines:  defaultMaxProcedureCodeLines,
+		MaxScriptCodeLines:     defaultMaxScriptCodeLines,
+		MaxScriptProcedures:    defaultMaxScriptProcedures,
 	}
 }
 
@@ -291,6 +301,11 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	// Check block depth
 	if opts.MaxBlockDepth > 0 {
 		diagnostics = append(diagnostics, checkBlockDepth(ast, opts.MaxBlockDepth)...)
+	}
+
+	// Size review triggers (issue #344). Data sources are out of scope.
+	if !opts.IsDataSourceFile {
+		diagnostics = append(diagnostics, checkSizeReview(tokens, opts.MaxProcedureCodeLines, opts.MaxScriptCodeLines, opts.MaxScriptProcedures)...)
 	}
 
 	variables := p.ExtractVariables()

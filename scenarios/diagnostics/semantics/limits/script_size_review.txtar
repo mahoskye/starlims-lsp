@@ -1,0 +1,113 @@
+A server script with more than 12 local procedures
+(ssl.diagnostics.maxScriptProcedures, default 12) reports
+diag.script_size_review once, info tier, on line 1, even though its 39
+code lines are far under the 400-line trigger (issue #344).
+-- input.ssl --
+/* Thirteen small steps;
+:PROCEDURE Step01;
+	:RETURN 1;
+:ENDPROC;
+
+:PROCEDURE Step02;
+	:RETURN 2;
+:ENDPROC;
+
+:PROCEDURE Step03;
+	:RETURN 3;
+:ENDPROC;
+
+:PROCEDURE Step04;
+	:RETURN 4;
+:ENDPROC;
+
+:PROCEDURE Step05;
+	:RETURN 5;
+:ENDPROC;
+
+:PROCEDURE Step06;
+	:RETURN 6;
+:ENDPROC;
+
+:PROCEDURE Step07;
+	:RETURN 7;
+:ENDPROC;
+
+:PROCEDURE Step08;
+	:RETURN 8;
+:ENDPROC;
+
+:PROCEDURE Step09;
+	:RETURN 9;
+:ENDPROC;
+
+:PROCEDURE Step10;
+	:RETURN 10;
+:ENDPROC;
+
+:PROCEDURE Step11;
+	:RETURN 11;
+:ENDPROC;
+
+:PROCEDURE Step12;
+	:RETURN 12;
+:ENDPROC;
+
+:PROCEDURE Step13;
+	:RETURN 13;
+:ENDPROC;
+-- format --
+/* Thirteen small steps;
+:PROCEDURE Step01;
+	:RETURN 1;
+:ENDPROC;
+
+:PROCEDURE Step02;
+	:RETURN 2;
+:ENDPROC;
+
+:PROCEDURE Step03;
+	:RETURN 3;
+:ENDPROC;
+
+:PROCEDURE Step04;
+	:RETURN 4;
+:ENDPROC;
+
+:PROCEDURE Step05;
+	:RETURN 5;
+:ENDPROC;
+
+:PROCEDURE Step06;
+	:RETURN 6;
+:ENDPROC;
+
+:PROCEDURE Step07;
+	:RETURN 7;
+:ENDPROC;
+
+:PROCEDURE Step08;
+	:RETURN 8;
+:ENDPROC;
+
+:PROCEDURE Step09;
+	:RETURN 9;
+:ENDPROC;
+
+:PROCEDURE Step10;
+	:RETURN 10;
+:ENDPROC;
+
+:PROCEDURE Step11;
+	:RETURN 11;
+:ENDPROC;
+
+:PROCEDURE Step12;
+	:RETURN 12;
+:ENDPROC;
+
+:PROCEDURE Step13;
+	:RETURN 13;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+1:1-1:25 info script_size_review: This script has 39 code lines and 13 procedures (review triggers: 400 lines, 12 procedures). Check its responsibilities: use regions first, and a separate script only for a reusable responsibility

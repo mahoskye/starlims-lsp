@@ -50,11 +50,15 @@ type DiagnosticsSettings struct {
 	// InfoDiagnostics enables the info severity tier (advisory detail for
 	// assistant/LLM consumers and completionist teams). Default off —
 	// info diagnostics are dropped unless enabled or per-rule configured.
-	InfoDiagnostics   *bool              `json:"infoDiagnostics"`
-	HungarianPrefixes *[]string          `json:"hungarianPrefixes"`
-	Globals           *[]string          `json:"globals"`
-	MaxBlockDepth     *int               `json:"maxBlockDepth"`
-	Rules             *map[string]string `json:"rules"`
+	InfoDiagnostics   *bool     `json:"infoDiagnostics"`
+	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
+	Globals           *[]string `json:"globals"`
+	MaxBlockDepth     *int      `json:"maxBlockDepth"`
+	// Size review triggers (issue #344); 0 disables each.
+	MaxProcedureCodeLines *int               `json:"maxProcedureCodeLines"`
+	MaxScriptCodeLines    *int               `json:"maxScriptCodeLines"`
+	MaxScriptProcedures   *int               `json:"maxScriptProcedures"`
+	Rules                 *map[string]string `json:"rules"`
 	// EndpointPatterns is a list of substrings/suffixes; any URI whose
 	// lowercased path contains one of these is treated as an endpoint
 	// script (Request/Response are then pre-injected ambients). In
@@ -497,6 +501,9 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.HungarianPrefixes, diagnostics.HungarianPrefixes)
 		applyOptional(&s.settings.Diagnostics.GlobalVariables, diagnostics.Globals)
 		applyOptional(&s.settings.Diagnostics.MaxBlockDepth, diagnostics.MaxBlockDepth)
+		applyOptional(&s.settings.Diagnostics.MaxProcedureCodeLines, diagnostics.MaxProcedureCodeLines)
+		applyOptional(&s.settings.Diagnostics.MaxScriptCodeLines, diagnostics.MaxScriptCodeLines)
+		applyOptional(&s.settings.Diagnostics.MaxScriptProcedures, diagnostics.MaxScriptProcedures)
 		applyOptional(&s.settings.Diagnostics.RuleOverrides, diagnostics.Rules)
 		applyOptional(&s.settings.EndpointPatterns, diagnostics.EndpointPatterns)
 	}

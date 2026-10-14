@@ -115,6 +115,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `parenthesize_negated_comparison` | .NOT. before a comparison without parentheses | warning | authoritative | active | [diag.parenthesize_negated_comparison](../../catalog/diagnostics/parenthesize_negated_comparison.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
+| `procedure_length_review` | Long procedure review trigger | info | advisory | active | [diag.procedure_length_review](../../catalog/diagnostics/procedure_length_review.md) |
 | `raiseerror_in_catch` | RaiseError called inside :CATCH | warning | style_only | active | [diag.raiseerror_in_catch](../../catalog/diagnostics/raiseerror_in_catch.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
 | `region_end_mismatch` | Region end marker with no open region | hint | tool | active | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
@@ -123,6 +124,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
 | `runsql_non_dml` | RunSQL called with a result-returning statement | warning | advisory | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
 | `scientific_notation` | Scientific notation missing its decimal point | error | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
+| `script_size_review` | Large server script review trigger | info | advisory | active | [diag.script_size_review](../../catalog/diagnostics/script_size_review.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | authoritative | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |

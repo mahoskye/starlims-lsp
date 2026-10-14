@@ -111,6 +111,9 @@ interface DiagnosticOptions {
   hungarianPrefixes: string[];
   globals: string[];
   maxBlockDepth: number;
+  maxProcedureCodeLines: number;
+  maxScriptCodeLines: number;
+  maxScriptProcedures: number;
   rules: { [slug: string]: "off" | "hint" | "info" | "warn" | "warning" | "error" };
   endpointPatterns: string[];
 }
@@ -716,7 +719,8 @@ Info-tier rules: `equals_vs_strict_equals`, `not_preferred_operator`,
 `limit_public_vars`, `max_params_warning`, `negative_logic`,
 `c_style_comment_closer`, `unicode_literal_prefix`,
 `unjustified_collate`, `spaced_skip_commas`,
-`visibility_annotation_usage`.
+`visibility_annotation_usage`, `procedure_length_review`,
+`script_size_review`.
 
 ```json
 { "ssl.diagnostics.infoDiagnostics": true }
@@ -773,6 +777,66 @@ SSL comment: do not add a closing `*/`, which would be code after the
 comment. An optional reason follows the rule list after `--`, `—` or `:`
 and is ignored by matching; writing one is recommended, so a later reader
 knows whether the suppression still applies.
+
+### 5.11 ssl.diagnostics.maxProcedureCodeLines
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `80` |
+| **Range** | `0` (disabled) or greater |
+| **File** | `internal/server/server.go`, `internal/providers/size_review.go` |
+
+Review trigger for procedure length. A procedure or class method with
+more than this many code lines reports `procedure_length_review`, an
+info-tier diagnostic (visible with `ssl.diagnostics.infoDiagnostics`,
+`--validate --info`, or an explicit `ssl.diagnostics.rules` entry). Code
+lines exclude blank lines and comment-only lines (a comment runs from
+`/*` to its first `;`), and the count runs from the `:PROCEDURE` line
+through the `:ENDPROC` line. The default is ssl-style-guide's
+`procedure_length_review` threshold, measured on STARLIMS 12's base layer.
+Set to `0` to disable.
+
+```json
+{ "ssl.diagnostics.maxProcedureCodeLines": 80 }
+```
+
+### 5.12 ssl.diagnostics.maxScriptCodeLines
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `400` |
+| **Range** | `0` (disabled) or greater |
+| **File** | `internal/server/server.go`, `internal/providers/size_review.go` |
+
+Review trigger for server-script size, counted like
+`maxProcedureCodeLines` over the whole file. A server script over this
+many code lines, or over `maxScriptProcedures` local procedures, reports
+`script_size_review` (info tier) once, on line 1. Class files and data
+sources are not measured. The default is ssl-style-guide's
+`script_size_review` threshold. Set to `0` to disable the line trigger.
+
+```json
+{ "ssl.diagnostics.maxScriptCodeLines": 400 }
+```
+
+### 5.13 ssl.diagnostics.maxScriptProcedures
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `12` |
+| **Range** | `0` (disabled) or greater |
+| **File** | `internal/server/server.go`, `internal/providers/size_review.go` |
+
+Review trigger for the number of local procedures in a server script; the
+other half of `script_size_review` (see `maxScriptCodeLines`). Set to `0`
+to disable the procedure-count trigger.
+
+```json
+{ "ssl.diagnostics.maxScriptProcedures": 12 }
+```
 
 ---
 
@@ -1153,6 +1217,9 @@ and `starlims-lsp --format --help`.
 | `ssl.diagnostics.hungarianPrefixes` | `["a","b","d","fn","n","o","s","v"]` |
 | `ssl.diagnostics.globals` | `[]` |
 | `ssl.diagnostics.maxBlockDepth` | `4` |
+| `ssl.diagnostics.maxProcedureCodeLines` | `80` |
+| `ssl.diagnostics.maxScriptCodeLines` | `400` |
+| `ssl.diagnostics.maxScriptProcedures` | `12` |
 | `ssl.diagnostics.rules` | `{}` |
 | `ssl.diagnostics.endpointPatterns` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |

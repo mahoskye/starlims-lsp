@@ -186,6 +186,8 @@ const (
 	CodeNonLogicalCondition           = "non_logical_condition"
 	CodeParenthesizeNegatedComparison = "parenthesize_negated_comparison"
 	CodeArrayIndexWholeNumber         = "array_index_whole_number"
+	CodeProcedureLengthReview         = "procedure_length_review"
+	CodeScriptSizeReview              = "script_size_review"
 )
 
 // Pipeline-level codes: emitted by the diagnostics pipeline itself rather
