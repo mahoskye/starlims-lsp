@@ -3895,6 +3895,20 @@ func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 		if t.Type != lexer.TokenKeyword || !strings.EqualFold(strings.TrimPrefix(t.Text, ":"), "DEFAULT") {
 			continue
 		}
+		if declareIdx := unterminatedDeclareBefore(tokens, i); declareIdx >= 0 {
+			// `:DECLARE nCount :DEFAULT 0;` — no `;` ends the :DECLARE
+			// list, so the :DEFAULT sits inside it and does not compile
+			// (issue #323). The usual target check cannot see this shape:
+			// the "target" is the value.
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    tokenToRange(t),
+				Message:  "':DEFAULT' cannot initialize a ':DECLARE' list - ':DECLARE' takes only names, so this does not compile; give the variable its value with an assignment on the next line",
+				Source:   "ssl-lsp",
+				Code:     CodeDefaultOnDeclareLine,
+			})
+			continue
+		}
 		targetIdx := nextSignificantTokenIndex(tokens, i+1)
 		if targetIdx < 0 || tokens[targetIdx].Type != lexer.TokenIdentifier {
 			continue
@@ -3912,6 +3926,25 @@ func checkDefaultOnDeclareLine(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// unterminatedDeclareBefore returns the index of the :DECLARE keyword whose
+// list the token at idx sits inside — no `;` between them, only names,
+// commas, and other list content — or -1.
+func unterminatedDeclareBefore(tokens []lexer.Token, idx int) int {
+	for j := idx - 1; j >= 0; j-- {
+		t := tokens[j]
+		if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+			return -1
+		}
+		if t.Type == lexer.TokenKeyword {
+			if strings.EqualFold(strings.TrimPrefix(t.Text, ":"), "DECLARE") {
+				return j
+			}
+			return -1
+		}
+	}
+	return -1
 }
 
 // checkDeclareInitializer flags inline initializers in :DECLARE statements

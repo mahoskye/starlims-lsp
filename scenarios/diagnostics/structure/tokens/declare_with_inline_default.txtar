@@ -1,7 +1,8 @@
 `:DECLARE nCount :DEFAULT 0;` packs two statements into one: :DEFAULT
 only follows :PARAMETERS, and a declaration takes no initializer. The
-second keyword in the :DECLARE list should be reported as a parse
-failure. Known issue: #323 (validates clean, a regression).
+:DEFAULT keyword inside the :DECLARE list is reported once, by
+diag.default_on_declare_line; diag.unexpected_token defers to it
+(issue #323).
 -- input.ssl --
 :PROCEDURE StartCounter;
 	:DECLARE nCount :DEFAULT 0;
@@ -17,4 +18,6 @@ failure. Known issue: #323 (validates clean, a regression).
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --
+2:18-2:26 error default_on_declare_line: ':DEFAULT' cannot initialize a ':DECLARE' list - ':DECLARE' takes only names, so this does not compile; give the variable its value with an assignment on the next line
 -- diagnostics [--strict --info] --
+2:18-2:26 error default_on_declare_line: ':DEFAULT' cannot initialize a ':DECLARE' list - ':DECLARE' takes only names, so this does not compile; give the variable its value with an assignment on the next line

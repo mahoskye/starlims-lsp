@@ -48,6 +48,7 @@ sLabel := ""
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --
+3:1-3:9 error unexpected_token: Unexpected keyword ':DECLARE' - expected ',' or ';' (is the ':PARAMETERS' list missing its ';'?)
 3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
 3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
 3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
@@ -56,6 +57,7 @@ sLabel := ""
 12:1-12:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)
 15:1-15:10 error unexpected_token: Unexpected keyword ':EXITCASE' - expected an operator or ';' (is the previous statement missing its ';'?)
 -- diagnostics [--strict --info] --
+3:1-3:9 error unexpected_token: Unexpected keyword ':DECLARE' - expected ',' or ';' (is the ':PARAMETERS' list missing its ';'?)
 3:10-3:16 hint redeclare_is_noop: Variable 'sLabel' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
 3:18-3:23 hint redeclare_is_noop: Variable 'aList' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
 3:25-3:33 hint redeclare_is_noop: Variable 'fnDouble' is already declared (first declared at line 3). Re-declaration is silently ignored at runtime.
