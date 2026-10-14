@@ -117,6 +117,12 @@ history:
       (bare_logical_operator), an exponent glued to a number such as the
       e2 of 7e2 (scientific_notation), and the segments of an unquoted
       ExecFunction/DoProc path (execfunction_missing_quotes).
+  - date: 2026-10-14
+    ref: "issue #343"
+    note: >-
+      Silent inside a statement that fails to parse on its first line, and
+      inside comment text stranded by a `;`: one undeclared_variable per
+      prose word was noise on top of the parse error.
 issues: []
 ---
 
@@ -171,6 +177,11 @@ D10, issue #304). A file without an `:INCLUDE` is checked single-file.
 A name immediately followed by `{` on its line is a class instantiation
 (`FormDto{}`), not a variable read, whether or not the published
 inventory lists the class (issue #304).
+
+A statement that fails to parse on its first line (`check the totals;`,
+prose stranded as code) is not checked: its words are not variables, and
+`unexpected_token` already reports the line once. Comment text stranded by
+a `;` is likewise `comment_text_after_terminator`'s alone (issue #343).
 
 ## Examples
 

@@ -23,6 +23,7 @@ class_instantiation_curly
 class_or_script
 code_block_structure
 comment_termination
+comment_text_after_terminator
 constructor_return_value
 createudobject_builtin_misuse
 datasource_default_required

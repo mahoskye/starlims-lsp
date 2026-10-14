@@ -67,7 +67,6 @@ bOk:=.f.;
 10:1-10:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
 11:1-11:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 12:5-12:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
-13:1-13:18 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
 13:19-13:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
 15:1-15:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
 19:1-19:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'
@@ -85,7 +84,6 @@ bOk:=.f.;
 10:1-10:4 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':IF'
 11:1-11:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 12:5-12:11 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
-13:1-13:18 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
 13:19-13:23 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TRY'
 15:1-15:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':CATCH'
 19:1-19:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDTRY'

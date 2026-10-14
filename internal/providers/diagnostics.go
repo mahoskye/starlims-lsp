@@ -283,8 +283,15 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	}()
 
 	// Check for lexer-level issues
+	// Expression-AST consumers (issue #184): the statement trees and the
+	// call-site index derived from them are built once here and shared by
+	// every tree-driven rule.
+	stmtExprs := parser.ExtractStatementExpressions(tokens)
+	calls := parser.CollectCallsIn(stmtExprs)
+
 	diagnostics = append(diagnostics, checkTokenErrors(tokens)...)
-	diagnostics = append(diagnostics, checkCommentTermination(tokens)...)
+	commentDiags, stranded := checkCommentTermination(tokens, stmtExprs)
+	diagnostics = append(diagnostics, commentDiags...)
 	diagnostics = append(diagnostics, checkCStyleCommentClosers(tokens)...)
 	diagnostics = append(diagnostics, checkUnterminatedStrings(tokens)...)
 
@@ -310,12 +317,6 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 
 	variables := p.ExtractVariables()
 	typeInfo := buildSimpleTypeInfo(tokens, variables)
-
-	// Expression-AST consumers (issue #184): the statement trees and the
-	// call-site index derived from them are built once here and shared by
-	// every tree-driven rule.
-	stmtExprs := parser.ExtractStatementExpressions(tokens)
-	calls := parser.CollectCallsIn(stmtExprs)
 
 	// Check for Hungarian notation (opt-in)
 	if opts.CheckHungarianNotation {
@@ -440,12 +441,57 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkCodeBlockStructure(tokens)...)
 	diagnostics = append(diagnostics, checkSQLConcatenationInjection(tokens, calls)...)
 
+	diagnostics = dropStrandedTextFindings(tokens, stranded, unparsedLineSpans(tokens, stmtExprs), diagnostics)
+
 	diagnostics = applySuppressionComments(tokens, diagnostics)
 	diagnostics = applyRuleOverrides(diagnostics, opts.RuleOverrides)
 	diagnostics = applyInfoGate(diagnostics, opts)
 
 	result = diagnostics
 	return
+}
+
+// strandedTextDeferrals are the rules that would report comment text
+// stranded as code word by word; comment_text_after_terminator reports the
+// cause once, at the comment's `;` (issue #343).
+var strandedTextDeferrals = map[string]bool{
+	CodeUnexpectedToken:    true,
+	CodeUnknownToken:       true,
+	CodeUndeclaredVariable: true,
+}
+
+// unparsedLineSpans returns the statements that fail to parse on their
+// first line — prose such as `check the totals;` — whose words are not
+// variables worth reporting as undeclared (issue #343).
+func unparsedLineSpans(tokens []lexer.Token, stmts []parser.StatementExprs) []strandedSpan {
+	var out []strandedSpan
+	for _, se := range stmts {
+		if se.Unexpected >= 0 && se.Unexpected < len(tokens) && se.Start < len(tokens) &&
+			tokens[se.Unexpected].Line == tokens[se.Start].Line {
+			out = append(out, strandedSpan{start: se.Start, end: se.End})
+		}
+	}
+	return out
+}
+
+// dropStrandedTextFindings removes the deferred rules' findings inside a
+// stranded statement, and undeclared_variable inside a statement that does
+// not parse on its first line.
+func dropStrandedTextFindings(tokens []lexer.Token, stranded, unparsed []strandedSpan, diagnostics []Diagnostic) []Diagnostic {
+	if len(stranded) == 0 && len(unparsed) == 0 {
+		return diagnostics
+	}
+	out := diagnostics[:0]
+	for _, d := range diagnostics {
+		if strandedTextDeferrals[d.Code] && inStrandedSpan(tokens, stranded, d.Range) {
+			continue
+		}
+		if d.Code == CodeUndeclaredVariable && inStrandedSpan(tokens, unparsed, d.Range) {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
 }
 
 // internalErrorDiagnostic logs a recovered panic with its stack to stderr
@@ -812,12 +858,35 @@ func checkTokenErrors(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// checkCommentTermination detects block comments where a semicolon inside the
-// text terminates the comment prematurely, causing the remaining text to become
-// executable code. This is one of the most destructive errors in SSL — a single
-// stray semicolon in a header comment can corrupt the entire file's parse.
-func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
+// checkCommentTermination reports comments that do not end in `;`
+// (diag.comment_termination) and terminated comments whose `;` strands the
+// rest of the comment as code (diag.comment_text_after_terminator, issue
+// #343). It returns the stranded statements' token spans as well, so the
+// parse-level rules that would report the same cause can defer to it.
+//
+// SSL has no construct in which two bare words follow each other, so text
+// stranded after a comment's `;` almost never parses. The rule reports, at
+// the comment's `;`:
+//
+//   - a statement right after the comment that does not parse, where the
+//     failure is on the statement's first line or the statement starts on
+//     the comment's own last line;
+//   - a statement that does parse but reads as a stranded doc line: a
+//     keyword or doc-field name followed by `:` and a space
+//     (`Parameters: none`), which is member access only by accident;
+//   - after a multi-line comment, a line that starts with a keyword-named
+//     identifier that is not assigned (a doc header cut in half).
+//
+// Code after a comment's `;` that parses is valid SSL and not reported.
+func checkCommentTermination(tokens []lexer.Token, stmts []parser.StatementExprs) ([]Diagnostic, []strandedSpan) {
 	var diagnostics []Diagnostic
+	var stranded []strandedSpan
+
+	// Statements by their first token, for the stranded-text checks.
+	stmtAt := make(map[int]*parser.StatementExprs, len(stmts))
+	for i := range stmts {
+		stmtAt[stmts[i].Start] = &stmts[i]
+	}
 
 	for i, token := range tokens {
 		if token.Type != lexer.TokenComment {
@@ -835,10 +904,12 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 			continue
 		}
 
+		if !strings.HasPrefix(token.Text, "/*") {
+			continue
+		}
 		// Skip region marker comments — the semicolon after the region name
 		// is intentional and does not indicate premature termination.
 		trimmed := strings.TrimSpace(strings.TrimPrefix(token.Text, "/*"))
-		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "//"))
 		lower := strings.ToLower(trimmed)
 		if strings.HasPrefix(lower, "region") || strings.HasPrefix(lower, "endregion") {
 			continue
@@ -848,75 +919,128 @@ func checkCommentTermination(tokens []lexer.Token) []Diagnostic {
 		if nextIdx < 0 {
 			continue
 		}
-
-		nextToken := tokens[nextIdx]
-
-		// Same-line continuation: the semicolon terminated the comment
-		// before the line ended. The remaining text becomes executable code,
-		// which may be intentional or may be hiding code accidentally.
-		if nextToken.Line == token.Line {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(token),
-				Message:  "Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden",
-				Source:   "ssl-lsp",
-				Code:     CodeCommentTextAfterTerminator,
-			})
-			continue
-		}
-
-		if !strings.HasPrefix(token.Text, "/*") {
-			continue
-		}
-		// Issue #6: suppress when there's a paragraph break (blank line or
-		// another standalone comment) between the comment-end and the alleged
-		// "broken-out" token. That gap indicates the user deliberately ended
-		// the comment — the heuristic is firing on a benign comment-after-
-		// comment chain rather than an actual mid-comment terminator.
+		// Issue #6: a paragraph break (blank line or another standalone
+		// comment) between the comment and the next code means the comment
+		// ended deliberately.
 		if commentChainBreaksBeforeNext(tokens, i, nextIdx) {
 			continue
 		}
+		nextToken := tokens[nextIdx]
+		if nextToken.Type == lexer.TokenKeyword {
+			// A colon keyword starts real code, never stranded prose.
+			continue
+		}
+		semi := commentSemicolonRange(token)
+		lastLine := semi.Start.Line + 1
 
-		// Multi-line detection: if a /* comment spans multiple lines (contains
-		// newlines in its token text) and the next token is an identifier whose
-		// name matches a keyword (e.g. "Parameters", "Default", "For"), the
-		// semicolon almost certainly terminated the comment prematurely.
-		if strings.Contains(token.Text, "\n") &&
-			nextToken.Type == lexer.TokenIdentifier && constants.IsKeyword(strings.ToUpper(nextToken.Text)) &&
-			!startsAssignment(tokens, nextIdx) {
+		se := stmtAt[nextIdx]
+		if se != nil && strandedProse(tokens, se) &&
+			(tokens[se.Unexpected].Line == nextToken.Line || nextToken.Line == lastLine) {
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityError,
-				Range:    tokenToRange(token),
-				Message:  "Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons",
+				Range:    semi,
+				Message:  "The comment ends at this ';', and the text after it is not SSL. The first ';' ends a comment, so the rest is parsed as code; remove the ';' from the comment text",
 				Source:   "ssl-lsp",
 				Code:     CodeCommentTextAfterTerminator,
 			})
+			stranded = append(stranded, strandedSpan{start: se.Start, end: se.End})
 			continue
 		}
 
-		// Issue #25: orphaned-prose signal. When the stranded lines are plain
-		// prose with no keyword-named word up front, the bare-keyword check
-		// above sees nothing. But prose betrays itself: the next significant
-		// line starts with two or more consecutive bare identifiers with
-		// nothing between them, which never forms a valid SSL statement
-		// (assignments, calls, and keyword statements all place an operator,
-		// parenthesis, or keyword between/before names). Applies to both
-		// multi-line comments and a comment whose ';' lands on its first
-		// line (the issue's original shape) — the stranded prose is on the
-		// following lines either way. Weaker signal than the bare-keyword
-		// break-out, so this path warns rather than errors.
-		if startsOrphanedProse(tokens, nextIdx) {
+		if nextToken.Type != lexer.TokenIdentifier {
+			continue
+		}
+		docLine := strandedDocLine(tokens, nextIdx)
+		keywordLine := strings.Contains(token.Text, "\n") &&
+			constants.IsKeyword(strings.ToUpper(nextToken.Text)) && !startsAssignment(tokens, nextIdx)
+		if docLine || keywordLine {
 			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(token),
-				Message:  "Comment likely terminated early by semicolon. The following lines read as prose but are being parsed as code. Rewrite the comment to avoid internal semicolons",
+				Severity: SeverityError,
+				Range:    semi,
+				Message:  fmt.Sprintf("The comment ends at this ';', so the next line, starting '%s', is parsed as code. It reads as a stranded comment line; remove the ';' from the comment text", nextToken.Text),
 				Source:   "ssl-lsp",
 				Code:     CodeCommentTextAfterTerminator,
 			})
+			if se != nil {
+				stranded = append(stranded, strandedSpan{start: se.Start, end: se.End})
+			}
 		}
 	}
 
-	return diagnostics
+	return diagnostics, stranded
+}
+
+// strandedProse reports whether a statement fails the grammar at its first
+// or second token — the shape of words that are not code (`then reset it`,
+// a `*****` banner line). Real code that is merely malformed (an unclosed
+// call, a stray token mid-expression) fails further along and is
+// unexpected_token's to report, not the comment's.
+func strandedProse(tokens []lexer.Token, se *parser.StatementExprs) bool {
+	if se.Unexpected < 0 || se.Unexpected >= len(tokens) {
+		return false
+	}
+	if se.Unexpected == se.Start {
+		return true
+	}
+	return se.Unexpected == nextSignificantTokenIndex(tokens, se.Start+1)
+}
+
+// strandedSpan is the inclusive token span of a statement made of comment
+// text that a `;` stranded as code (diag.comment_text_after_terminator).
+type strandedSpan struct{ start, end int }
+
+// commentSemicolonRange is the range of the `;` that ends a comment token.
+func commentSemicolonRange(comment lexer.Token) Range {
+	end := tokenToRange(comment).End
+	return Range{Start: Position{Line: end.Line, Character: end.Character - 1}, End: end}
+}
+
+// docFieldNames are the field labels of a documentation header. A line that
+// starts with one followed by `:` and a space is a doc line, not member
+// access, which is written with no space after the colon.
+var docFieldNames = map[string]bool{
+	"PURPOSE": true, "DESCRIPTION": true, "PARAMETER": true, "PARAMETERS": true,
+	"PARAMS": true, "RETURNS": true, "RETURN": true, "AUTHOR": true, "DATE": true,
+	"CREATED": true, "MODIFIED": true, "VERSION": true, "NOTE": true, "NOTES": true,
+	"USAGE": true, "EXAMPLE": true, "EXAMPLES": true, "INPUT": true, "INPUTS": true,
+	"OUTPUT": true, "OUTPUTS": true, "SCRIPT": true, "PROCEDURE": true, "SUMMARY": true,
+	"HISTORY": true, "CHANGES": true, "TODO": true,
+}
+
+// strandedDocLine reports whether the identifier at idx starts a doc-header
+// line: a keyword or doc-field name, then `:` on the same line, then a
+// space (`Parameters: none`).
+func strandedDocLine(tokens []lexer.Token, idx int) bool {
+	name := strings.ToUpper(tokens[idx].Text)
+	if !docFieldNames[name] && !constants.IsKeyword(name) {
+		return false
+	}
+	colon := nextSignificantTokenIndex(tokens, idx+1)
+	if colon < 0 || tokens[colon].Line != tokens[idx].Line ||
+		tokens[colon].Type != lexer.TokenPunctuation || tokens[colon].Text != ":" {
+		return false
+	}
+	return colon+1 < len(tokens) && tokens[colon+1].Type == lexer.TokenWhitespace
+}
+
+// inStrandedSpan reports whether a diagnostic starts inside one of the
+// stranded statements' spans.
+func inStrandedSpan(tokens []lexer.Token, spans []strandedSpan, r Range) bool {
+	for _, sp := range spans {
+		if sp.start < 0 || sp.end >= len(tokens) {
+			continue
+		}
+		from, to := tokenToRange(tokens[sp.start]).Start, tokenToRange(tokens[sp.end]).End
+		if !positionBefore(r.Start, from) && positionBefore(r.Start, to) {
+			return true
+		}
+	}
+	return false
+}
+
+// positionBefore reports whether a sorts strictly before b.
+func positionBefore(a, b Position) bool {
+	return a.Line < b.Line || (a.Line == b.Line && a.Character < b.Character)
 }
 
 // startsAssignment reports whether the identifier at idx is the target of
@@ -934,26 +1058,6 @@ func startsAssignment(tokens []lexer.Token, idx int) bool {
 		return true
 	}
 	return false
-}
-
-// startsOrphanedProse reports whether the significant token at idx begins a
-// run of two consecutive bare identifiers on the same line with nothing
-// between them — the signature of comment prose stranded as code (issue #25).
-// A single identifier is not enough: it could be the start of a legitimate
-// statement continued on the next line, so the second identifier must share
-// the first one's line. Any operator, parenthesis, bracket, or keyword after
-// the first identifier means legitimate code and does not match.
-func startsOrphanedProse(tokens []lexer.Token, idx int) bool {
-	first := tokens[idx]
-	if first.Type != lexer.TokenIdentifier {
-		return false
-	}
-	secondIdx := nextSignificantTokenIndex(tokens, idx+1)
-	if secondIdx < 0 {
-		return false
-	}
-	second := tokens[secondIdx]
-	return second.Type == lexer.TokenIdentifier && second.Line == first.Line
 }
 
 // commentChainBreaksBeforeNext reports whether the run of tokens between

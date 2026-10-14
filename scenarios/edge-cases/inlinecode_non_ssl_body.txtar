@@ -20,18 +20,7 @@ Hello world, this is prose;
 3:7-3:12 error unexpected_token: Unexpected identifier 'world' - expected an operator or ';'
 4:1-4:2 error unexpected_token: Unexpected operator '<' - expected a statement
 -- diagnostics [--strict --info] --
-2:1-2:7 warning undeclared_variable: Variable 'SELECT' is not declared
-2:10-2:14 warning undeclared_variable: Variable 'FROM' is not declared
-2:15-2:25 warning undeclared_variable: Variable 'LabSamples' is not declared
 2:15-2:25 error unexpected_token: Unexpected identifier 'LabSamples' - expected an operator or ';'
-2:26-2:31 warning undeclared_variable: Variable 'WHERE' is not declared
-2:32-2:38 warning undeclared_variable: Variable 'Status' is not declared
 2:39-2:40 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
-3:1-3:6 warning undeclared_variable: Variable 'Hello' is not declared
-3:7-3:12 warning undeclared_variable: Variable 'world' is not declared
 3:7-3:12 error unexpected_token: Unexpected identifier 'world' - expected an operator or ';'
-3:14-3:18 warning undeclared_variable: Variable 'this' is not declared
-3:22-3:27 warning undeclared_variable: Variable 'prose' is not declared
 4:1-4:2 error unexpected_token: Unexpected operator '<' - expected a statement
-4:2-4:3 warning undeclared_variable: Variable 'b' is not declared
-4:4-4:8 warning undeclared_variable: Variable 'bold' is not declared

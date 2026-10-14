@@ -22,12 +22,6 @@ second part looks like code;
 
 :RETURN sA + sB + sC;
 -- diagnostics --
-5:1-5:15 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
-5:23-5:27 error unexpected_token: Unexpected identifier 'part' - expected an operator or ';'
+5:14-5:15 error comment_text_after_terminator: The comment ends at this ';', and the text after it is not SSL. The first ';' ends a comment, so the rest is parsed as code; remove the ';' from the comment text
 -- diagnostics [--strict --info] --
-5:1-5:15 warning comment_text_after_terminator: Comment terminated early by semicolon. Text after the ';' becomes executable code and may be unintentionally hidden
-5:23-5:27 warning undeclared_variable: Variable 'part' is not declared
-5:23-5:27 error unexpected_token: Unexpected identifier 'part' - expected an operator or ';'
-5:28-5:33 warning undeclared_variable: Variable 'looks' is not declared
-5:34-5:38 warning undeclared_variable: Variable 'like' is not declared
-5:39-5:43 warning undeclared_variable: Variable 'code' is not declared
+5:14-5:15 error comment_text_after_terminator: The comment ends at this ';', and the text after it is not SSL. The first ';' ends a comment, so the rest is parsed as code; remove the ';' from the comment text

@@ -34,7 +34,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `code_block_structure` | Code block literal without a bound variable | error | authoritative | active | [diag.code_block_structure](../../catalog/diagnostics/code_block_structure.md) |
 | `comment_swallows_code` | Comment runs past its '*/' and swallows the next statement | warning | authoritative | active | [diag.comment_swallows_code](../../catalog/diagnostics/comment_swallows_code.md) |
 | `comment_termination` | Comment missing its semicolon terminator | error | authoritative | active | [diag.comment_termination](../../catalog/diagnostics/comment_termination.md) |
-| `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | warning | tool | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
+| `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | error | authoritative | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
 | `complex_sql_placeholder` | Complex expression inside a SQLExecute named placeholder | info | advisory | active | [diag.complex_sql_placeholder](../../catalog/diagnostics/complex_sql_placeholder.md) |
 | `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | authoritative | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |

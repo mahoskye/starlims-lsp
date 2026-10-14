@@ -2480,7 +2480,7 @@ x := 1;`
 	diagnostics := GetDiagnostics(text, DefaultDiagnosticOptions())
 
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "Comment terminated early by semicolon") {
+		if d.Code == CodeCommentTextAfterTerminator && d.Severity == SeverityError {
 			return
 		}
 	}
@@ -7587,7 +7587,7 @@ func TestGetDiagnostics_CommentEarlyTermination_SemicolonInText(t *testing.T) {
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.Contains(d.Message, "terminate") || strings.Contains(d.Message, "executable code") {
+		if d.Code == CodeCommentTextAfterTerminator {
 			found = true
 		}
 	}
