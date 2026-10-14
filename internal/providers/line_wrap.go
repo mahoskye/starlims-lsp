@@ -2,6 +2,7 @@
 package providers
 
 import (
+	"sort"
 	"strings"
 
 	"starlims-lsp/internal/lexer"
@@ -140,12 +141,34 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isContinuationLine bool, opts FormattingOptions) []string {
 	runes := []rune(line)
 
-	// Candidate rune positions (break BEFORE the token starting at pos).
-	var cands []int
+	// Candidate rune positions (break BEFORE the token starting at pos),
+	// each owned by the innermost bracket opened on this line and still
+	// open there (-1: none). A continuation inside such a bracket aligns
+	// with the bracket's first item, or — when its items cannot fit at
+	// that column — the bracket breaks after itself and its items hang one
+	// level in (fmt.indent_style bracket alignment).
+	type bracket struct {
+		align   int  // rune column of its first item on this line, -1 if none
+		hanging bool // items do not fit at align: break after the bracket
+		capped  bool // its first item sits past alignCap: items hang one level in
+	}
+	var brackets []bracket
+	var open []int // indexes into brackets
+	var cands, owner []int
 	subDepth := inheritedSubscripts
 	var prev lexer.Token
 	havePrev := false
+	pendingOpen := -1
 	for _, t := range toks {
+		if pendingOpen >= 0 && t.Type != lexer.TokenComment {
+			ind := len([]rune(leadingIndentString(line)))
+			if !isCloseParen(t) && visualWidth(string(runes[ind:t.Column-1]), opts) <= alignCap(opts) {
+				brackets[pendingOpen].align = t.Column - 1
+			} else if !isCloseParen(t) {
+				brackets[pendingOpen].capped = true
+			}
+			pendingOpen = -1
+		}
 		if t.Type == lexer.TokenPunctuation {
 			switch t.Text {
 			case "[":
@@ -163,13 +186,24 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 			// end-of-line comment detaches it onto a line of its own, and
 			// the next pass re-classifies it (issue #258).
 			case prev.Text == "," && t.Text != "," && t.Text != ";" && !isCloseParen(t) &&
-				t.Type != lexer.TokenComment:
+				t.Type != lexer.TokenComment,
+				prev.Text == ":=" && t.Type != lexer.TokenComment,
+				isContinuationOperator(t) && !isUnaryContext(prev, false):
 				cands = append(cands, pos)
-			case prev.Text == ":=" && t.Type != lexer.TokenComment:
-				cands = append(cands, pos)
-			case isContinuationOperator(t) && !isUnaryContext(prev, false):
-				cands = append(cands, pos)
+				o := -1
+				if n := len(open); n > 0 {
+					o = open[n-1]
+				}
+				owner = append(owner, o)
 			}
+		}
+		switch {
+		case isOpenParen(t):
+			brackets = append(brackets, bracket{align: -1})
+			open = append(open, len(brackets)-1)
+			pendingOpen = len(brackets) - 1
+		case isCloseParen(t) && len(open) > 0:
+			open = open[:len(open)-1]
 		}
 		prev = t
 		havePrev = true
@@ -189,52 +223,128 @@ func wrapOneLine(line string, toks []lexer.Token, inheritedSubscripts int, isCon
 		// formatter writes the same column on the next pass.
 		contIndent = indent + strings.Repeat(" ", toks[1].Column-toks[0].Column)
 	}
-	contWidth := visualWidth(contIndent, opts)
-
-	// Spans between candidates; span 0 includes the line's indent. Each
-	// span remembers the whitespace that separated it from the previous
-	// span in the source line: when two spans stay on one line they rejoin
-	// with exactly those bytes, so a line the wrapper does not break at a
-	// candidate keeps the spacing the formatter (or, with commaSpacing /
-	// operatorSpacing off, the author) gave it (issue #255).
-	bounds := append(append([]int{0}, cands...), len(runes))
-	type span struct {
-		text  string
-		width int
-		sep   string // whitespace before this span in the source line
+	alignPrefix := func(col int) string {
+		return indent + strings.Repeat(" ", visualWidth(string(runes[len([]rune(indent)):col]), opts))
 	}
-	var spans []span
-	prevSep := ""
-	for k := 0; k+1 < len(bounds); k++ {
-		raw := string(runes[bounds[k]:bounds[k+1]])
-		txt := strings.TrimRight(raw, " \t")
-		spans = append(spans, span{txt, visualWidth(txt, opts), prevSep})
-		prevSep = raw[len(txt):]
+	hangPrefix := hangFrom(indent, opts)
+
+	// Hanging is decided by packing (below): a bracket hangs only when one
+	// of its items still overflows at the aligned column once the line is
+	// packed. A hanging bracket breaks after itself — its first item
+	// becomes one more candidate, forced — and its items hang one level in.
+	baseCands, baseOwner := cands, owner
+	withHanging := func() ([]int, []int, map[int]bool) {
+		cs := append([]int{}, baseCands...)
+		os := append([]int{}, baseOwner...)
+		forced := map[int]bool{}
+		for bi, b := range brackets {
+			if b.hanging {
+				forced[b.align] = true
+				cs = append(cs, b.align)
+				os = append(os, bi)
+			}
+		}
+		order := make([]int, len(cs))
+		for i := range order {
+			order[i] = i
+		}
+		sort.SliceStable(order, func(x, y int) bool { return cs[order[x]] < cs[order[y]] })
+		var sc, so []int
+		for _, i := range order {
+			if len(sc) > 0 && sc[len(sc)-1] == cs[i] {
+				if forced[cs[i]] {
+					so[len(so)-1] = os[i]
+				}
+				continue
+			}
+			sc, so = append(sc, cs[i]), append(so, os[i])
+		}
+		return sc, so, forced
 	}
 
-	// Greedy packing with no-gain guard: break only when the next span fits
-	// on its continuation line; an over-wide span stays glued to the current
-	// line (atomic tokens are never moved just to overflow elsewhere).
-	var outLines []string
-	cur := spans[0].text
-	curWidth := spans[0].width
-	for _, sp := range spans[1:] {
-		sepWidth := visualWidth(sp.sep, opts)
-		fitsHere := curWidth+sepWidth+sp.width <= opts.MaxLineLength
-		fitsCont := contWidth+sp.width <= opts.MaxLineLength
-		if fitsHere || !fitsCont {
-			// Keep packing — either it fits, or moving it gains nothing
-			// (the span overflows a continuation line too).
-			cur = cur + sp.sep + sp.text
-			curWidth += sepWidth + sp.width
-			continue
+	// pack lays the line out for the current hanging set and reports
+	// whether a bracket's item overflowed at its aligned column though it
+	// would fit hanging — that bracket then hangs and the line is packed
+	// again.
+	pack := func() ([]string, bool) {
+		cands, owner, forcedAt := withHanging()
+		contFor := func(k int) string {
+			if o := owner[k]; o >= 0 && brackets[o].capped {
+				return hangPrefix
+			}
+			if o := owner[k]; o >= 0 && brackets[o].align >= 0 {
+				if brackets[o].hanging {
+					return hangPrefix
+				}
+				return alignPrefix(brackets[o].align)
+			}
+			return contIndent
+		}
+		// Spans between candidates; span 0 includes the line's indent.
+		// Each span remembers the whitespace that separated it from the
+		// previous span in the source line: when two spans stay on one
+		// line they rejoin with exactly those bytes, so a line the wrapper
+		// does not break at a candidate keeps the spacing the formatter
+		// (or, with commaSpacing / operatorSpacing off, the author) gave it
+		// (issue #255).
+		bounds := append(append([]int{0}, cands...), len(runes))
+		type span struct {
+			text  string
+			width int
+			sep   string // whitespace before this span in the source line
+		}
+		var spans []span
+		prevSep := ""
+		for k := 0; k+1 < len(bounds); k++ {
+			raw := string(runes[bounds[k]:bounds[k+1]])
+			txt := strings.TrimRight(raw, " \t")
+			spans = append(spans, span{txt, visualWidth(txt, opts), prevSep})
+			prevSep = raw[len(txt):]
+		}
+
+		// Greedy packing with no-gain guard: break only when the next span
+		// fits on its continuation line; an over-wide span stays glued to
+		// the current line (atomic tokens are never moved just to overflow
+		// elsewhere).
+		var outLines []string
+		cur := spans[0].text
+		curWidth := spans[0].width
+		again := false
+		for k, sp := range spans[1:] {
+			sepWidth := visualWidth(sp.sep, opts)
+			pre := contFor(k)
+			preWidth := visualWidth(pre, opts)
+			fitsHere := curWidth+sepWidth+sp.width <= opts.MaxLineLength
+			fitsCont := preWidth+sp.width <= opts.MaxLineLength
+			if !forcedAt[cands[k]] && !fitsHere && !fitsCont {
+				if o := owner[k]; o >= 0 && brackets[o].align >= 0 && !brackets[o].hanging &&
+					visualWidth(hangPrefix, opts)+sp.width <= opts.MaxLineLength {
+					brackets[o].hanging = true
+					again = true
+				}
+			}
+			if !forcedAt[cands[k]] && (fitsHere || !fitsCont) {
+				// Keep packing — either it fits, or moving it gains nothing
+				// (the span overflows a continuation line too).
+				cur = cur + sp.sep + sp.text
+				curWidth += sepWidth + sp.width
+				continue
+			}
+			outLines = append(outLines, cur)
+			cur = pre + sp.text
+			curWidth = preWidth + sp.width
 		}
 		outLines = append(outLines, cur)
-		cur = contIndent + sp.text
-		curWidth = contWidth + sp.width
+		return outLines, again
 	}
-	outLines = append(outLines, cur)
-	return outLines
+	for range len(brackets) + 1 {
+		out, again := pack()
+		if !again {
+			return out
+		}
+	}
+	out, _ := pack()
+	return out
 }
 
 // oneIndentLevel returns one indentation level in the configured style.

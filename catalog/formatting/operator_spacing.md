@@ -37,6 +37,12 @@ history:
       removed, as the behavior already required; a known colon keyword
       glued to its neighbors (`1:TO 5`, `:IF(`, `:RETURN-1`) is spaced, so
       step_spacing no longer fires on formatted output.
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      In a :FOR header, `:STEP`/`:TO` glued to a closing delimiter or a
+      name (`Len(aRows):STEP 2`) is spaced and upper-cased as the keyword;
+      it lexed as a member access and was left glued.
 issues: ["#83", "#88", "#326"]
 ---
 
@@ -56,9 +62,12 @@ each side. Exceptions:
   would re-lex as another token (`! =`, `- -5`) (issue #326).
 - A known colon keyword glued to the code around it is set apart by one
   space: `1:TO 5:STEP-1` → `1 :TO 5 :STEP -1`, `:IF(j > 1)` →
-  `:IF (j > 1)` (schema `spaces.before_step_keyword`, issue #326). A
-  colon after `)` or `]` lexes as member access, so `Len(a):STEP` is left
-  to `step_spacing`.
+  `:IF (j > 1)` (schema `spaces.before_step_keyword`, issue #326). In a
+  `:FOR` header the same holds after a closing delimiter or a name, where
+  the colon lexes as member access: `:TO Len(aRows):STEP 2` becomes
+  `:TO Len(aRows) :STEP 2`, because a `STEP` (or `TO`) followed by an
+  operand there can only be the keyword. A property that ends the header
+  (`:TO oRange:Step;`) is left alone.
 - The member-access `:` is not an operator: it never gains spaces, and
   spaces around it are removed (`oUser : firstName` → `oUser:firstName`).
 - No space is inserted before `;` or a closing delimiter, or after an

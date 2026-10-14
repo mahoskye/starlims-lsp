@@ -36,7 +36,7 @@ func TestFormatDocument_WrappedDeclarationListAligns(t *testing.T) {
 		// The alignment ends with the statement.
 		{"next statement unaffected", "tab",
 			":DECLARE sA,\nsB;\nnX := DoProc(\"Foo\", {nA,\nnB});\n",
-			":DECLARE sA,\n         sB;\nnX := DoProc(\"Foo\", {nA,\n\tnB});\n"},
+			":DECLARE sA,\n         sB;\nnX := DoProc(\"Foo\", {nA,\n                     nB});\n"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

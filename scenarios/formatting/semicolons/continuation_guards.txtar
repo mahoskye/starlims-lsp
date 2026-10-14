@@ -27,12 +27,12 @@ nIndex})}
 		nIndex <= Len(aRows);
 	nTotal := aRows[nIndex] +
 		aRows[
-		nIndex] *
+			nIndex] *
 		2;
 	aList := {1,
-		2,
-		DoProc("Third", {
-		nIndex})};
+	          2,
+	          DoProc("Third", {
+	              nIndex})};
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

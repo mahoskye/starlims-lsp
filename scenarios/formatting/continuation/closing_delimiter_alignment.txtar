@@ -35,7 +35,7 @@ aRows
 			{"S-002", "Released"}
 		};
 		DoProc("Render", {aHeaders,
-			aRows
+		                  aRows
 		});
 	:ENDIF;
 	:RETURN aRows;

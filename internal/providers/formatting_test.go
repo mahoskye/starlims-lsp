@@ -957,13 +957,13 @@ func TestFormatDocument_MultiLineStructurePreserved(t *testing.T) {
 
 	// Verify indentation levels (fixed 1-level continuation per schema):
 	// Line 1: result := OuterFunction( - 0 tabs
-	// Line 2: InnerFunction( - 1 tab (continuation inside parens)
-	// Line 3: arg1, - 1 tab (continuation, fixed 1 level)
-	// Line 4: arg2 - 1 tab (continuation, fixed 1 level)
-	// Line 5: ), - 0 tabs (closing paren aligns with opening level)
-	// Line 6: arg3 - 1 tab (continuation inside parens)
+	// Line 2: InnerFunction( - 1 tab (hangs one level past the outer paren's line)
+	// Line 3: arg1, - 2 tabs (hangs one level past InnerFunction('s line)
+	// Line 4: arg2 - 2 tabs
+	// Line 5: ), - 1 tab (closes at the line InnerFunction( opened on)
+	// Line 6: arg3 - 1 tab (back inside the outer paren)
 	// Line 7: ); - 0 tabs (closing outer paren)
-	expectedIndents := []int{0, 1, 1, 1, 0, 1, 0}
+	expectedIndents := []int{0, 1, 2, 2, 1, 1, 0}
 	for i, line := range lines {
 		if i >= len(expectedIndents) {
 			break

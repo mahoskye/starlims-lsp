@@ -111,7 +111,7 @@ txt := txt + Chr(10) + "rows: " + LimsString(cnt);
 	:DECLARE total, open, ratio, label;
 	:TRY;
 		total := LSearch("select count(*) from LabSamples where LabGroup = '" + grp + "'",
-			0);
+		                 0);
 		open := LSearch("
 		    SELECT COUNT(*)
 		    FROM LabSamples

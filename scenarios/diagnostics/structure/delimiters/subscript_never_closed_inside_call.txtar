@@ -14,8 +14,8 @@ diag.mismatched_delimiter "Does not flag").
 	:PARAMETERS aRows;
 	:DECLARE nWidth;
 	nWidth := Len(aRows[1);
-		:RETURN nWidth;
-		:ENDPROC;
+	              :RETURN nWidth;
+	              :ENDPROC;
 -- diagnostics --
 4:21-4:22 error unclosed_delimiter: Unclosed '['
 -- diagnostics [--strict --info] --

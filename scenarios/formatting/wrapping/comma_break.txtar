@@ -18,7 +18,8 @@ vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenu
 	:DECLARE vResult, i;
 	:FOR i := 1 :TO Len(aQuarters);
 		vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
-			nThirdQuarterRevenue, nFourthQuarterRevenue, aQuarters[i]});
+		                                      nThirdQuarterRevenue, nFourthQuarterRevenue,
+		                                      aQuarters[i]});
 	:NEXT;
 	:RETURN vResult;
 :ENDPROC;

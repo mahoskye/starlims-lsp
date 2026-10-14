@@ -165,7 +165,7 @@ aList := {1,
 
 ```ssl
 aList := {1,
-	2};
+          2};
 ```
 
 A final statement with no trailing newline is terminated:

@@ -83,6 +83,15 @@ history:
       one continuation level throughout, and a comma-led line is a
       continuation; the list's first line used to sit at the keyword's
       depth and the rest one deeper.
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      Brackets align: a continuation inside an unclosed ( { [ whose first
+      item shares the bracket's line aligns with that item; a bracket that
+      ends its line hangs one level past the line it opened on, and a
+      leading closer returns to that line's indentation. Continuations
+      inside brackets used to sit one fixed level past the statement line,
+      whatever the nesting.
 issues: ["#36", "#86", "#101", "#326"]
 ---
 
@@ -113,9 +122,28 @@ past the line that opened the statement (issues #86/#89; the member-access
 form is the issue #240 follow-up; the keyword-operand form is issue #255).
 The anchor is lexical, not block depth: an `:IF` condition's continuation
 indents one level past the `:IF` line — the same column as the body; the
-leading operator is what distinguishes it. The extra level is fixed, never proportional
-to nesting depth, and a closing delimiter that leads a line aligns with
-the statement line itself.
+leading operator is what distinguishes it.
+
+Brackets show their structure by alignment. Inside an unclosed `(`, `{`
+or `[` whose first item shares the bracket's line, a continuation line
+aligns with that first item — the opening line's indentation, then spaces
+up to the item's column:
+
+```text
+:RETURN {sSampleNo, sMatrix, sSite,
+         sRemarks};
+```
+
+A bracket that ends its line hangs: its items sit one level past the line
+the bracket opened on, so nested hanging brackets step in one level each.
+So does a bracket whose first item sits more than half the line limit
+past its line's indentation (the alignment cap), or nested expressions
+would march off to the right. After alignment spaces the extra level is
+spaces, so a tab never follows a space. The innermost open bracket
+decides. A closing delimiter that leads a line
+returns to the indentation of the line its bracket opened on. The line
+wrapper hangs a bracket — breaking right after it — only when one of its
+items would not fit at the aligned column (fmt.max_line_length).
 
 A declaration list is the exception (style guide wrapped_list_alignment,
 ssl-style-guide#120): every hanging line of a `:DECLARE`, `:PARAMETERS` or

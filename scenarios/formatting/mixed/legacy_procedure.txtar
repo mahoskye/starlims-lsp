@@ -33,7 +33,7 @@ bOk:=.f.;
 	:DECLARE sOldStatus, nRows, bOk, oErr;
 	bOk := .F.;
 	sOldStatus := LSearch("SELECT status FROM samples WHERE sampleid = ?", "",,
-		{sSampleId});  /*current status;
+	                      {sSampleId});  /*current status;
 	:IF Empty(sOldStatus) .AND. .NOT. bForce;
 		:RETURN .F.;
 	:ENDIF;

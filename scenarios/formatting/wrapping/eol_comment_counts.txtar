@@ -15,10 +15,10 @@ aFields := {"SampleId", "TestCode", "AnalystName", "RunDate",/*the columns the e
 :PROCEDURE Log;
 	:PARAMETERS sSampleId, sTestCode, sAnalystName;
 	DoProc("WriteAuditEntry", {sSampleId, sTestCode,
-		sAnalystName});  /* audit trail entry for the release step;
+	                           sAnalystName});  /* audit trail entry for the release step;
 	aFields := {"SampleId", "TestCode", "AnalystName",
-		"RunDate",  /*the columns the export expects in order;
-		"Status"};
+	            "RunDate",  /*the columns the export expects in order;
+	            "Status"};
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --

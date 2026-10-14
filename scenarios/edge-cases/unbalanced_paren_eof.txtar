@@ -8,7 +8,7 @@ sOut := Upper(AllTrim("abc");
 -- format --
 :DECLARE sOut;
 sOut := Upper(AllTrim("abc");
-	:RETURN Left(sOut, 2;
+              :RETURN Left(sOut, 2;
 -- diagnostics --
 2:14-2:15 error unclosed_delimiter: Unclosed '('
 3:13-3:14 error unclosed_delimiter: Unclosed '('
