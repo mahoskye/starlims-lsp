@@ -26,7 +26,14 @@ history:
       built-in call casing; with commaSpacing off its comma spacing is
       left as written; an empty body gains no stray space; and the
       nested-block bail-out asks the lexer instead of searching for "{|".
-issues: ["#91"]
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      A subscript in a body stays glued to its array (`{|aRow| aRow[2]}`),
+      and a built-in instantiation's `{` to its class name (`Email{}`), as
+      in a statement; the body normalizer used to insert a space before
+      `[`.
+issues: ["#91", "#326"]
 ---
 
 ## Behavior
@@ -100,6 +107,15 @@ multi-line body:
 fnOuter := {|x|Eval({|y|y+1}, x)};
 fnMulti := {|x|x+
 1};
+```
+
+A subscript in the body stays glued to its array (issue #326):
+
+### Idempotent
+
+```ssl
+:DECLARE fnPick;
+fnPick := {|aRow| aRow[2]};
 ```
 
 ## Rationale
