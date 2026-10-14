@@ -24,7 +24,13 @@ history:
     note: >-
       Operators glued to a preceding operator no longer double the space:
       the previous operator's trailing space is reused.
-issues: ["#83", "#88"]
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      The invalid `===` / `!==` (which lex as `==`/`!=` then `=`) stay
+      glued. Spacing them apart (`== =`) split invalid_operator_sequence's
+      one operator into two and added an unexpected_token error.
+issues: ["#83", "#88", "#326"]
 ---
 
 ## Behavior
@@ -125,6 +131,24 @@ nOffset := -5;
 ```ssl
 sName := oUser:firstName;
 nOffset := -5;
+```
+
+The invalid JavaScript-style `===` and `!==` are left glued, so
+`invalid_operator_sequence` reports one operator rather than formatting
+creating a second error (issue #326):
+
+### Before
+
+```ssl
+:DECLARE bSame;
+bSame := 1===1;
+```
+
+### After
+
+```ssl
+:DECLARE bSame;
+bSame := 1 === 1;
 ```
 
 ## Rationale

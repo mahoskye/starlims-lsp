@@ -1130,9 +1130,14 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			next := tokens[index+1]
 			// No space before a comma either when the whitespace handler
 			// would drop it (issue #256, found by FuzzFormat).
+			// The invalid `===` / `!==` lex as `==`/`!=` then `=`; spacing
+			// them apart turns invalid_operator_sequence's one operator
+			// into two and adds an unexpected_token error, so a glued pair
+			// stays glued (issue #326).
+			gluedStrictEquals := (token.Text == "==" || token.Text == "!=") && next.Text == "="
 			if next.Type != lexer.TokenWhitespace && !isCloseParen(next) && next.Text != ";" &&
 				!(s.opts.CommaSpacing && next.Text == ",") && !trailingComment(tokens, index+1) &&
-				next.Type != lexer.TokenEOF {
+				next.Type != lexer.TokenEOF && !gluedStrictEquals {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
