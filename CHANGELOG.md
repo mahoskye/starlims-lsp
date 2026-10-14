@@ -74,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Queries ending at the limit:** these are reflowed, because the
     fits-inline test now counts the `");` that must stay on the line. The
     statement used to wrap after `:=` instead.
+  - **MERGE `UPDATE SET`:** it lays out like a plain `UPDATE`, with `SET`
+    ending its line and each assignment on its own line.
   - **Layout:** these now follow the SQL reference:
     - the SELECT item after a multi-line CASE starts a fresh line;
     - a parenthesized predicate group that fits (`AND (a = 1 OR b = 2)`,

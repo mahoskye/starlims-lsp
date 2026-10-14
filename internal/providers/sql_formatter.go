@@ -512,10 +512,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// SET clause formatting. Plain UPDATE breaks every assignment to
 			// its own line (S38); MERGE keeps the first assignment on the
 			// UPDATE SET line and aligns the rest under it (S43, issue #95).
-			if prev != nil && prevUpper == "SET" && parenDepth == 0 && rootCommand != "MERGE" {
+			if prev != nil && prevUpper == "SET" && parenDepth == 0 {
 				needsBreak = true
 				if style == "canonicalCompact" || style == "expanded" {
 					extraIndent = f.indentString
+					// MERGE's UPDATE SET sits one level in, under its WHEN,
+					// so its assignments start one level past that — the
+					// same SET-ends-the-line layout as a plain UPDATE.
+					if rootCommand == "MERGE" {
+						extraIndent = strings.Repeat(f.indentString, 2)
+					}
 				}
 			}
 			if prev != nil && prev.Text == "," && currentClause == "SET" && parenDepth == 0 {
