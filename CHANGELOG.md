@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whose long default no longer fits at the aligned column stay on one
   line.
 
+### Fixed
+- **Range formatting no longer corrupts multi-line statements or literal
+  text** (#325). Formatting a selection used to treat one line of a
+  multi-line statement as a whole statement. It added a `;` mid-statement,
+  re-indented continuation lines, and upper-cased a leading `:Replace(...)`
+  member call into a keyword. It also indented the interior lines of a
+  multi-line string, comment, region body or code block, which changed a
+  string's value. The range is now widened to whole statements, literal
+  interiors keep their text, and reflowed SQL packs as it does in a full
+  format. A range whose formatting never settles is declined, as a
+  document is. Range-formatting each line of formatted output used to
+  change 5,032 lines in a 577-file production sample; across all 4,620
+  scripts it now changes none.
+
 ## [0.25.0] - 2026-10-13
 
 The drift audit (epic #253). A deliberate re-read of the whole project

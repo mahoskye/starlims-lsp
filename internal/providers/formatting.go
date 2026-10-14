@@ -112,6 +112,25 @@ const maxFormatPasses = 3
 // — malformed input the formatter keeps rewriting, such as a code block
 // whose string never closes (issue #311) — it reports false and the
 // caller leaves the text unchanged, as for an unterminated string.
+// formatTokensToFixedPoint is formatToFixedPoint for range formatting,
+// which runs the token formatter without the whole-document post passes
+// (feature.formatting).
+func formatTokensToFixedPoint(tokens []lexer.Token, opts FormattingOptions) (string, bool) {
+	formatted := formatTokens(tokens, opts)
+	for pass := 1; pass < maxFormatPasses; pass++ {
+		again := lexer.NewLexer(formatted).Tokenize()
+		if hasUnterminatedString(again) {
+			return "", false
+		}
+		next := formatTokens(again, opts)
+		if next == formatted {
+			return formatted, true
+		}
+		formatted = next
+	}
+	return "", false
+}
+
 func formatToFixedPoint(tokens []lexer.Token, opts FormattingOptions) (string, bool) {
 	formatted := applyPostFormatPasses(formatTokens(tokens, opts), opts)
 	for pass := 1; pass < maxFormatPasses; pass++ {
@@ -154,7 +173,7 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	if hasUnterminatedString(docTokens) {
 		return nil // issue #87 — see FormatDocument
 	}
-	startLine, endLine = widenRangeToTokens(docTokens, startLine, endLine)
+	startLine, endLine = widenRangeToStatements(docTokens, startLine, endLine)
 
 	// Expand range to include complete lines for proper formatting
 	// This ensures we format complete statements
@@ -170,29 +189,80 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	}
 	rangeText := strings.Join(rangeLines, "\n")
 
-	// Detect the base indentation of the first non-empty line in the range
-	baseIndent := detectBaseIndent(rangeLines)
+	// Lines inside a multi-line token (string, comment, code block, region
+	// body) are literal text: they neither set nor take the base indent,
+	// or re-indenting would change a string's value (issue #325, A13).
+	docMask := literalInteriorMask(docTokens, len(lines), nil)
+	var codeLines []string
+	for i, line := range rangeLines {
+		if !docMask[startLine+i] {
+			codeLines = append(codeLines, line)
+		}
+	}
+	baseIndent := detectBaseIndent(codeLines)
+	// The one line widening cannot anchor: the document's first code line
+	// led by a binary operator. The formatter gives it a continuation
+	// level of its own, which the base indent already holds (issue #325,
+	// found by FuzzFormatRangeStable).
+	if first := firstSignificant(docTokens); first != nil && first.Line-1 == startLine &&
+		isContinuationOperator(*first) {
+		baseIndent = strings.TrimSuffix(baseIndent, oneIndentLevel(opts))
+	}
 
 	// Remove the base indentation for formatting
 	dedentedLines := make([]string, len(rangeLines))
 	for i, line := range rangeLines {
-		dedentedLines[i] = removeIndent(line, baseIndent)
+		if docMask[startLine+i] {
+			dedentedLines[i] = line
+		} else {
+			dedentedLines[i] = removeIndent(line, baseIndent)
+		}
 	}
 	dedentedText := strings.Join(dedentedLines, "\n")
 
-	// Format the dedented text
-	lex := lexer.NewLexer(dedentedText)
+	// Format the dedented text. The range is whole lines, so it is lexed
+	// with its line break, as the full document is: a token that runs to
+	// end of input (an unclosed code block or comment) then carries the
+	// same newline it does there (issue #325).
+	toLex := dedentedText
+	if !strings.HasSuffix(toLex, "\n") {
+		toLex += "\n"
+	}
+	lex := lexer.NewLexer(toLex)
 	tokens := lex.Tokenize()
 	if hasUnterminatedString(tokens) {
 		return nil // issue #87 — see FormatDocument
 	}
-	formatted := formatTokens(tokens, opts)
+	// Like a full format, a range converges or is declined: an input whose
+	// formatting never settles (each pass appends another ';' after a code
+	// block left open at end of input) is left unchanged (issue #325).
+	// The range is formatted dedented, so every width decision the token
+	// formatter makes would measure from column 0 and pack lines wider than
+	// a full format does. Narrow each budget by the base indent the lines
+	// get back, in that budget's own unit: the SSL fit test counts a tab as
+	// indentSize columns, the SQL engine counts its indent string in bytes
+	// (a tab as one — the SQL width defect in issue #327; change this
+	// offset with it) (issue #325).
+	rangeOpts := opts
+	if rangeOpts.MaxLineLength > 0 {
+		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-visualWidth(baseIndent, opts))
+	}
+	if rangeOpts.SQL.MaxLineLength > 0 {
+		rangeOpts.SQL.MaxLineLength = max(1, rangeOpts.SQL.MaxLineLength-len(baseIndent))
+	}
+	formatted, ok := formatTokensToFixedPoint(tokens, rangeOpts)
+	if !ok {
+		return nil
+	}
 
 	// Re-apply the base indentation to each line
 	formattedLines := strings.Split(formatted, "\n")
+	outMask := verbatimInteriorMask(toLex, formatted)
 	reindentedLines := make([]string, 0, len(formattedLines))
-	for _, line := range formattedLines {
-		if strings.TrimSpace(line) == "" {
+	for i, line := range formattedLines {
+		if outMask[i] {
+			reindentedLines = append(reindentedLines, line)
+		} else if strings.TrimSpace(line) == "" {
 			reindentedLines = append(reindentedLines, "")
 		} else {
 			reindentedLines = append(reindentedLines, baseIndent+line)
@@ -207,7 +277,10 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	}
 
 	reindentedText := strings.Join(reindentedLines, "\n")
-	reindentedText = wrapLongLines(reindentedText, opts)
+	// The wrap pass sees the range's line break too, so a token running to
+	// end of input is multi-line here as in the document, and freezes its
+	// line the same way (issue #325, found by FuzzFormatRangeStable).
+	reindentedText = strings.TrimSuffix(wrapLongLines(reindentedText+"\n", opts), "\n")
 
 	return []TextEdit{
 		{
@@ -218,6 +291,177 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 			NewText: reindentedText,
 		},
 	}
+}
+
+// firstSignificant returns the first token that is neither whitespace nor
+// a comment, or nil.
+func firstSignificant(tokens []lexer.Token) *lexer.Token {
+	for i, t := range tokens {
+		if t.Type == lexer.TokenEOF {
+			return nil
+		}
+		if t.Type != lexer.TokenWhitespace && t.Type != lexer.TokenComment {
+			return &tokens[i]
+		}
+	}
+	return nil
+}
+
+// verbatimInteriorMask marks the lines of output that are interior lines of
+// a multi-line literal token (string, comment, code block, region body)
+// the formatter passed through unchanged from input. Those lines are
+// literal text and must not take the range's base indent; the interior of
+// a token the formatter rewrote — reflowed SQL, laid out at the range's
+// local depth — still does.
+func verbatimInteriorMask(input, output string) []bool {
+	kept := map[string]bool{}
+	for _, t := range lexer.NewLexer(input).Tokenize() {
+		if isLiteralToken(t) {
+			kept[t.Text] = true
+		}
+	}
+	return literalInteriorMask(lexer.NewLexer(output).Tokenize(), strings.Count(output, "\n")+1, kept)
+}
+
+// literalInteriorMask marks the 0-based lines that begin inside a
+// multi-line literal token — every line after the token's first that holds
+// some of its text (a region body's closing newline leaves the
+// :ENDREGION line outside it). With only non-nil, only tokens whose text
+// is in only count.
+func literalInteriorMask(tokens []lexer.Token, nLines int, only map[string]bool) []bool {
+	mask := make([]bool, nLines)
+	for _, t := range tokens {
+		if !isLiteralToken(t) || (only != nil && !only[t.Text]) {
+			continue
+		}
+		first := t.Line - 1
+		last := first + strings.Count(strings.TrimSuffix(t.Text, "\n"), "\n")
+		for l := first + 1; l <= last && l < nLines; l++ {
+			mask[l] = true
+		}
+	}
+	return mask
+}
+
+func isLiteralToken(t lexer.Token) bool {
+	for _, typ := range literalTokenTypes {
+		if t.Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
+// widenRangeToStatements grows the 0-based line range [startLine, endLine]
+// to whole statements, alternating with widenRangeToTokens until neither
+// moves a boundary. Formatted on its own, a line from the middle of a
+// statement reads as a statement: the line before a continuation gets a
+// ';', an operator-led line loses its continuation anchor, and a leading
+// `:Member` lexes as a keyword (issue #325, feature.formatting A2).
+func widenRangeToStatements(tokens []lexer.Token, startLine, endLine int) (int, int) {
+	cont, prev := statementContinuations(tokens)
+	for changed := true; changed; {
+		changed = false
+		startLine, endLine = widenRangeToTokens(tokens, startLine, endLine)
+		for {
+			p, ok := prev[startLine]
+			if !ok || !cont[startLine] {
+				break
+			}
+			startLine, changed = p, true
+		}
+		// The first code line after the range continues it: take it in.
+		next := -1
+		for l := range cont {
+			if l > endLine && (next < 0 || l < next) {
+				next = l
+			}
+		}
+		if next >= 0 && cont[next] {
+			endLine, changed = next, true
+		}
+	}
+	return startLine, endLine
+}
+
+// statementContinuations reports, for each 0-based line whose first token
+// starts a line, whether that line continues the statement of the code
+// before it (cont), and the line on which the preceding token ends (prev).
+// The decision mirrors formatTokens: a line led by a binary operator or a
+// member-access ':', inside an open delimiter, or after code ending in
+// ':=', ',' or a binary operator always continues; otherwise a line led by
+// any colon keyword but :TO/:STEP starts a statement;
+// otherwise the line continues unless the last code token before it is
+// ';' or is one the formatter terminates there (needsSemicolonAtLineEnd,
+// which looks past comments to the next code token). Standalone comments
+// sit on lines of their own and get the same decision, so widening walks
+// through them; the semicolon decision ignores them, as formatTokens'
+// lookahead does.
+func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[int]int) {
+	cont, prev = map[int]bool{}, map[int]int{}
+	var last, lastCode lexer.Token
+	haveLast, haveCode := false, false
+	lastEnd := -1   // 0-based line on which `last` ends
+	codeWsIdx := -1 // first newline whitespace token after lastCode
+	depth := 0      // open ( { [ delimiters
+	for i, t := range tokens {
+		if t.Type == lexer.TokenEOF {
+			break
+		}
+		if t.Type == lexer.TokenWhitespace {
+			if haveCode && codeWsIdx < 0 && strings.Contains(t.Text, "\n") {
+				codeWsIdx = i
+			}
+			continue
+		}
+		line := t.Line - 1
+		if haveLast && t.Type == lexer.TokenComment && isEndOfLineComment(t, last) {
+			continue // rides its code line, as in formatTokens
+		}
+		if line > lastEnd && haveLast {
+			prev[line] = lastEnd
+			// A line led by a keyword starts a statement or clause; only
+			// :TO / :STEP continue one (a mid-:FOR header).
+			kw := t.Type == lexer.TokenKeyword && strings.HasPrefix(t.Text, ":") &&
+				!isLabelKeywordMashed(t.Text)
+			if kw {
+				switch strings.ToUpper(strings.TrimPrefix(t.Text, ":")) {
+				case "TO", "STEP":
+					kw = false
+				}
+			}
+			switch {
+			case depth > 0 || isContinuationOperator(t) || isMemberAccessColon(t):
+				cont[line] = true
+			case haveCode && (lastCode.Text == ":=" || lastCode.Text == "," ||
+				isContinuationOperator(lastCode) || (awaitsOperand(lastCode) && !kw)):
+				// The code before ends mid-expression: writeIndentIfNeeded
+				// indents this line as a continuation, keyword or not.
+				cont[line] = true
+			case kw || !haveCode:
+				cont[line] = false
+			default:
+				ended := lastCode.Text == ";" ||
+					(codeWsIdx >= 0 && needsSemicolonAtLineEnd(lastCode, tokens, codeWsIdx))
+				cont[line] = !ended
+			}
+		} else if line > lastEnd {
+			cont[line] = false
+		}
+		switch {
+		case isOpenParen(t):
+			depth++
+		case isCloseParen(t) && depth > 0:
+			depth--
+		}
+		last, haveLast = t, true
+		lastEnd = line + strings.Count(strings.TrimSuffix(t.Text, "\n"), "\n")
+		if t.Type != lexer.TokenComment {
+			lastCode, haveCode = t, true
+			codeWsIdx = -1
+		}
+	}
+	return cont, prev
 }
 
 // widenRangeToTokens grows the 0-based line range [startLine, endLine] until
@@ -231,8 +475,10 @@ func widenRangeToTokens(tokens []lexer.Token, startLine, endLine int) (int, int)
 				!strings.Contains(t.Text, "\n") {
 				continue
 			}
+			// A token ending in a newline (one that runs to end of input
+			// takes the final line break) does not occupy the next line.
 			first := t.Line - 1
-			last := first + strings.Count(t.Text, "\n")
+			last := first + strings.Count(strings.TrimSuffix(t.Text, "\n"), "\n")
 			if last < startLine || first > endLine {
 				continue
 			}

@@ -97,7 +97,21 @@ history:
       unchanged. Fuzzing had found malformed shapes the formatter kept
       rewriting; well-formed input is unaffected (corpus output
       byte-identical).
-issues: []
+  - date: 2026-10-13
+    ref: "issue #325"
+    note: >-
+      Range formatting widens the range to whole statements, so one line
+      of a multi-line statement no longer gains a ';', loses its
+      continuation indent, or has a leading `:Member` re-lexed as a
+      keyword; the interior lines of a multi-line string, comment, region
+      body or code block keep their text when the base indent is
+      re-applied; the width budgets are narrowed by the base indent so
+      reflowed SQL packs as in a full format; and a range whose
+      formatting never converges is declined like a document (A14). On
+      the production corpus, range-formatting each line of formatted
+      output changed 5,032 lines in a 577-file sample before, and none
+      across all 4,620 scripts after.
+issues: ["#325"]
 ---
 
 ## Behavior
@@ -117,7 +131,23 @@ not restate them.
   in context. The range is first widened so that no multi-line token — a
   string, comment, code block or `:REGION` body — crosses either boundary
   (issue #258): a line from inside such a token, lexed on its own, reads as
-  code, and formatting it rewrites literal text. A range runs the token
+  code, and formatting it rewrites literal text. It is also widened to
+  whole statements (issue #325): a range never starts on a line that
+  continues the statement before it, or ends on a line the next line
+  continues. Formatted alone, such a line reads as a statement of its own
+  — it gains a ';', loses its continuation indent, and a leading
+  `:Member` lexes as a keyword. A line continues the code before it
+  exactly when the token formatter would neither find nor insert a ';'
+  there, or when it sits inside an open delimiter, or leads with a binary
+  operator or member-access ':'; a line led by any other colon keyword
+  than `:TO`/`:STEP` starts a statement. The interior lines of a
+  multi-line token the formatter passes through unchanged keep their
+  text: they neither set nor take the base indentation. Because the range
+  is formatted dedented, its width budgets (`ssl.format.maxLineLength`
+  and the SQL engine's) are narrowed by the base indentation, so it packs
+  lines as a full format does. Like a document (A6), a range is formatted
+  until its output formats to itself, and is declined — no edit — when it
+  does not converge. A range runs the token
   formatter (spacing, casing of keywords, semicolons, indentation, SQL
   hand-off, trailing-whitespace trim) and the line-wrap pass only; the
   whole-document post-passes — built-in function casing outside code-block
@@ -169,7 +199,7 @@ not restate them.
 ## Acceptance
 
 - A1: Given an unformatted SSL document, when `textDocument/formatting` is requested, then exactly one TextEdit spanning the full document is returned.
-- A2: Given a document where only lines N..M are requested, when range formatting runs, then the returned edit covers only those lines (widened only as A11 requires) and the block's base indentation is preserved so text outside the range is unaffected.
+- A2: Given a document where only lines N..M are requested, when range formatting runs, then the returned edit covers only those lines, widened only to whole statements and as A13 requires, and the block's base indentation is preserved so text outside the edit is unaffected (issue #325).
 - A3: Given a document containing comments and non-SQL string literals, when formatted, then the comment text and string contents are byte-identical to the input — and every comment survives: a line carrying several consecutive end-of-line comments keeps all of them in order (issue #215; the pending-EOL-comment slot merged by clobbering, deleting all but the last).
 - A4: Given `SQLExecute("select ... from ...")` or an overflowing standalone SQL string with detection on, when formatted, then the string is reformatted by the SQL formatter per `ssl.format.sql.*`; and given a plain-English string, it MUST NOT be treated as SQL.
 - A5: Given `ssl.format.sql.enabled: false`, when a document with SQL strings is formatted, then no string literal content changes.
@@ -180,7 +210,8 @@ not restate them.
 - A10: Given a document with CRLF line endings, when formatted, then the output uses LF exclusively and a second format is byte-identical.
 - A11: Given CLI `--format` input that is not a data source (no `.ds`/`.ds.txt` path, no `--ds`) whose content has no colon keyword and no `:=`, when formatted, then it is formatted as SSL; given SQL-mode content from a data-source path or under `--ds`, then it passes through unchanged.
 - A12: Given a document whose last line holds an emoji (one character, two UTF-16 code units), when `textDocument/formatting` is requested, then the full-document edit ends at that line's UTF-16 length (issue #307).
-- A13: Given a range whose first or last line lies inside a multi-line comment or string literal, when range formatting runs, then the edit is widened to cover the whole token and the token's text is byte-identical in the result — no `;` or spacing change is ever written inside it (issue #258).
+- A13: Given a range whose first or last line lies inside a multi-line comment or string literal, when range formatting runs, then the edit is widened to cover the whole token and the token's text is byte-identical in the result — no `;` or spacing change is ever written inside it (issue #258), and re-applying the base indentation never indents its interior lines (issue #325).
+- A14: Given the output of a full format of code that validates without errors, when any one of its lines is range-formatted under the same options, then the result is unchanged — and a range whose formatting does not converge is declined with no edit (issue #325).
 
 ## Rationale
 

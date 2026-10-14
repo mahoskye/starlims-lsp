@@ -1,4 +1,3 @@
-Known failure: range-stable — range formatting indents the interior lines of a multi-line string, comment, region body or code block inside a block, changing a string's value (feature.formatting A13; #325)
 Multi-line tokens inside a procedure: a string, a comment, a :REGION body
 and a code block keep their interior lines verbatim under full formatting
 (fmt.indent_style, fmt.code_block_literals, feature.formatting A3).

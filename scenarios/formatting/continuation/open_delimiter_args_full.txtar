@@ -1,4 +1,3 @@
-Known failure: range-stable — range-formatting one line of a multi-line statement adds ';' and re-indents a continuation line (#325)
 A call whose argument list spans lines inside an unclosed `(` and `{`:
 every continuation line sits exactly one level past the statement line,
 not proportional to paren depth, and the closing `})` that leads its line

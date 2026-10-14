@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // addCorpusSeeds seeds a fuzz target with the formatter idempotence corpus
@@ -127,4 +128,69 @@ func FuzzFormatRange(f *testing.F) {
 			_ = FormatDocumentRange(src, w[0], 0, w[1], 0, opts)
 		}
 	})
+}
+
+// FuzzFormatRangeStable checks feature.formatting A14: when a full format
+// of code that validates without errors succeeds, range-formatting any one
+// line of its output leaves it unchanged (issue #325). Malformed input is
+// FuzzFormatRange's (no panic): block keywords used as operands or
+// delimiters left open across statements have no statement structure for
+// a range to keep.
+func FuzzFormatRangeStable(f *testing.F) {
+	addCorpusSeeds(f)
+	f.Fuzz(func(t *testing.T, src string) {
+		opts := DefaultFormattingOptions()
+		full := FormatDocument(src, opts)
+		if len(full) == 0 {
+			return
+		}
+		doc := full[0].NewText
+		for _, d := range GetDiagnostics(doc, DefaultDiagnosticOptions()) {
+			if d.Severity == SeverityError {
+				return
+			}
+		}
+		lines := strings.Split(doc, "\n")
+		for i, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			edits := FormatDocumentRange(doc, i, 0, i, utf8.RuneCountInString(line), opts)
+			if len(edits) == 0 {
+				continue
+			}
+			r := edits[0].Range
+			was := strings.Join(lines[r.Start.Line:r.End.Line+1], "\n")
+			if edits[0].NewText != was {
+				if semicolonGap326(lines, r.End.Line) {
+					t.Skip("known: the full formatter leaves a statement before a middle keyword unterminated (issue #326)")
+				}
+				t.Fatalf("range-formatting line %d of formatted output changes it\ndoc: %q\nwas: %q\nnow: %q", i+1, doc, was, edits[0].NewText)
+			}
+		}
+	})
+}
+
+// semicolonGap326 reports the issue #326 class: line end of the formatted
+// output lacks its ';' and the next code line opens with :ELSE, :CATCH,
+// :FINALLY, :CASE or :OTHERWISE, which the full formatter wrongly treats
+// as continuing the statement. A range ending there terminates it, as the
+// full formatter will once #326 is fixed; remove this then.
+func semicolonGap326(lines []string, end int) bool {
+	if end >= len(lines) || strings.HasSuffix(strings.TrimSpace(lines[end]), ";") {
+		return false
+	}
+	for _, l := range lines[end+1:] {
+		l = strings.ToUpper(strings.TrimSpace(l))
+		if l == "" {
+			continue
+		}
+		for _, kw := range []string{":ELSE", ":CATCH", ":FINALLY", ":CASE", ":OTHERWISE"} {
+			if strings.HasPrefix(l, kw) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
