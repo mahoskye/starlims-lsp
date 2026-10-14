@@ -1058,6 +1058,12 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				pushedCase.breakThen = f.caseBreaksThen(nonWSTokens, i, pushedCase.endIdx, pushedCase.branchCol, pushedCase.flatCol)
 			}
 		} else if upperText == "END" && t.Type == SQLTokenKeyword && len(caseStack) > 0 {
+			// A CASE laid out over several lines is a multi-line group:
+			// the SELECT item after it starts a fresh line (C3, issue
+			// #219; reference §2.1), as after a broken paren group.
+			if !caseStack[len(caseStack)-1].inline {
+				groupJustClosedMultiline = true
+			}
 			caseStack = caseStack[:len(caseStack)-1]
 		}
 	}

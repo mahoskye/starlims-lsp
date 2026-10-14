@@ -135,6 +135,12 @@ history:
       on the line after the string (`");`, up to the first comma or
       operator break), so a query ending exactly at the limit is reflowed
       instead of the statement wrapping after ':='.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A multi-line CASE in the SELECT list counts as a multi-line group, so
+      the item after its END starts a fresh continuation line (C3,
+      reference §2.1); it used to stay on the END line.
 issues: ["#81", "#82", "#327"]
 ---
 

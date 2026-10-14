@@ -2,7 +2,6 @@ A CASE item in the SELECT list starts its own line at the SELECT-list
 column, WHEN/ELSE sit 4 past CASE and END aligns with it, and the alias
 stays with END (issue #271, sql_case_when_else_indent /
 sql_case_end_align).
-Suspected issue: #327 — the item after the CASE (UPPER(o.result) AS result_upper) stays on the END line; fmt.sql_in_strings history (issue #219) says "the SELECT item after a multi-line group starts a fresh continuation line so aliases stay with their block (C3)", as reference §2.1 shows.
 -- input.ssl --
 :PROCEDURE Labels;
 	:DECLARE aRows;
@@ -18,7 +17,8 @@ Suspected issue: #327 — the item after the CASE (UPPER(o.result) AS result_upp
 	               WHEN o.status = 'L' THEN 'Logged'
 	               WHEN o.status = 'C' THEN 'Complete'
 	               ELSE 'Unknown'
-	           END AS status_desc, UPPER(o.result) AS result_upper
+	           END AS status_desc,
+	           UPPER(o.result) AS result_upper
 	    FROM ordtask o
 	    WHERE o.status <> 'X'
 	");
