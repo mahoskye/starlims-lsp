@@ -106,7 +106,7 @@ func TestFormat_WrapHonorsSpacingOffOptions(t *testing.T) {
 	opts := DefaultFormattingOptions()
 	opts.CommaSpacing = false
 	got := formatTwice(t, "DoProc(\"CalculateTotals\",{nFirstQuarterRevenue,nSecondQuarterRevenue,nThirdQuarterRevenue,nFourth});\n", opts)
-	want := "DoProc(\"CalculateTotals\",{nFirstQuarterRevenue,nSecondQuarterRevenue,nThirdQuarterRevenue,\n\tnFourth});\n"
+	want := "DoProc(\"CalculateTotals\",{nFirstQuarterRevenue,nSecondQuarterRevenue,nThirdQuarterRevenue,\n                          nFourth});\n"
 	if got != want {
 		t.Errorf("commaSpacing off:\ngot  %q\nwant %q", got, want)
 	}
@@ -183,7 +183,7 @@ func TestFormat_WrapChainContinuationIdempotent(t *testing.T) {
 	opts.MaxLineLength = 40
 	src := ":PROCEDURE P;\n:RETURN txt:ToString()\n:Replace(\"##TITLE##\", sTitle)\n:Replace(\"##DATE##\", Now():ToString());\n:ENDPROC;\n"
 	got := formatTwice(t, src, opts)
-	if !strings.Contains(got, "\t\t:Replace(\"##DATE##\",\n\t\tNow():ToString());") {
+	if !strings.Contains(got, "\t\t:Replace(\"##DATE##\",\n\t\t         Now():ToString());") {
 		t.Errorf("unexpected layout:\n%s", got)
 	}
 }

@@ -19,7 +19,7 @@ whether unexpected_token also reports the same statement.
 	:DECLARE sValue;
 	:TRY;
 		sValue := LSearch("SELECT SETTINGVALUE FROM SETTINGS WHERE SETTINGKEY = ?", "",,
-			{sKey});
+		                  {sKey});
 	:CATCH;
 		sValue := "";
 	:ENDTRY;

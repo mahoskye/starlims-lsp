@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Brackets align their contents.** Inside an unclosed `(`, `{` or `[`
+  whose first item shares the bracket's line, a continuation line aligns
+  with that first item:
+  `:RETURN {sSampleNo, sMatrix,` then `         sRemarks};`. A bracket
+  that ends its line hangs, with its items one level past the line it
+  opened on, and a closing delimiter that leads a line returns to that
+  line's indentation. When an item would not fit at the aligned column,
+  the line wrapper breaks right after the bracket instead. Continuation
+  lines inside brackets used to sit one fixed tab past the statement line
+  whatever the nesting.
 - **Wrapped declaration lists align under their first item.** The
   hanging lines of a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list now line
   up with the list's first item (the statement's indent, then spaces), as

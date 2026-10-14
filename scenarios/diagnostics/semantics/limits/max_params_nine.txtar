@@ -15,7 +15,7 @@ only under --info. A procedure with exactly 8 does not fire.
 	:PARAMETERS sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
 	            sRemarks;
 	:RETURN {sSampleNo, sMatrix, sSite, dTaken, sTakenBy, nVolume, sUnit, sContainer,
-		sRemarks};
+	         sRemarks};
 :ENDPROC;
 
 :PROCEDURE RegisterBlank;

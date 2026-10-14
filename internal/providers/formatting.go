@@ -36,6 +36,9 @@ type FormattingOptions struct {
 	// inventory casing; "preserve" keeps the user's casing.
 	BuiltinFunctionCase string
 	SQL                 SQLFormattingOptions
+	// alignCap overrides alignCap's half-the-limit default; range
+	// formatting sets it from the configured limit before narrowing it.
+	alignCap int
 }
 
 // DefaultFormattingOptions returns default formatting options.
@@ -101,10 +104,12 @@ func FormatDocument(text string, opts FormattingOptions) []TextEdit {
 	}
 }
 
-// maxFormatPasses bounds formatToFixedPoint. Well-formed input is stable
-// after one pass; the extra passes absorb a malformed shape that settles
-// on the second.
-const maxFormatPasses = 3
+// maxFormatPasses bounds formatToFixedPoint. Most input is stable after
+// one pass. Bracket alignment can take a few more: once the line wrapper
+// breaks a line, the next pass aligns the following line to a bracket on
+// the new one, and nested brackets settle one level per pass (four passes
+// on the production corpus at most).
+const maxFormatPasses = 5
 
 // formatToFixedPoint formats until the output formats to itself, so the
 // result always satisfies feature.formatting A6 (formatting it again
@@ -242,6 +247,9 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// get back, in columns — the unit both the SSL fit test and the SQL
 	// engine count indentation in (issues #325, #327).
 	rangeOpts := opts
+	// The alignment cap follows the configured limit, not the narrowed
+	// one, so a range aligns exactly where a full format does.
+	rangeOpts.alignCap = alignCap(opts)
 	baseWidth := visualWidth(baseIndent, opts)
 	if rangeOpts.MaxLineLength > 0 {
 		rangeOpts.MaxLineLength = max(1, rangeOpts.MaxLineLength-baseWidth)
@@ -606,6 +614,23 @@ type formatState struct {
 	// the first item of the declaration list being written; its hanging
 	// lines align there (wrapped_list_alignment). 0 when not in such a list.
 	declListAlign int
+	// linePrefix is the indentation written at the start of the current
+	// output line (tabs and spaces).
+	linePrefix string
+	// delims holds a frame per open ( { [ for bracket alignment: a
+	// continuation line inside a bracket whose first item shares the
+	// bracket's line aligns with that item.
+	delims []delimFrame
+	// upperNextIdent: the next identifier is a :FOR keyword read off a
+	// glued member-access colon (forHeaderGluedKeyword).
+	upperNextIdent bool
+}
+
+// delimFrame is one open delimiter in the formatter's output.
+type delimFrame struct {
+	prefix  string // indentation of the line the delimiter opened on
+	align   int    // columns past prefix where its first item sits; -1 when none
+	pending bool   // the first item has not been written yet
 }
 
 func newFormatState(opts FormattingOptions) *formatState {
@@ -643,6 +668,47 @@ func trailingCodeWidth(tokens []lexer.Token, i int) int {
 		}
 	}
 	return w
+}
+
+// forHeaderGluedKeyword reports whether the member-access colon at
+// tokens[i] is really a :FOR header keyword glued to its operand: inside a
+// :FOR header, a colon directly followed by STEP (or TO, before :TO is
+// seen) that is in turn followed by an operand on the same line.
+func (s *formatState) forHeaderGluedKeyword(tokens []lexer.Token, i int) bool {
+	if s.prevKeyword != "FOR" && s.prevKeyword != "TO" {
+		return false
+	}
+	if i+1 >= len(tokens) || tokens[i+1].Type != lexer.TokenIdentifier {
+		return false
+	}
+	word := strings.ToUpper(tokens[i+1].Text)
+	if word != "STEP" && !(word == "TO" && s.prevKeyword == "FOR") {
+		return false
+	}
+	next := nextSignificantOnLine(tokens, i+1)
+	if next == nil {
+		return false
+	}
+	switch next.Text {
+	case ";", "(", ")", ",", ":", "[", "]":
+		return false
+	}
+	return true
+}
+
+// nextSignificantOnLine returns the first code token after tokens[i] on
+// the same line, or nil.
+func nextSignificantOnLine(tokens []lexer.Token, i int) *lexer.Token {
+	for j := i + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenEOF || (t.Type == lexer.TokenWhitespace && strings.Contains(t.Text, "\n")) {
+			return nil
+		}
+		if t.Type != lexer.TokenWhitespace && t.Type != lexer.TokenComment {
+			return &tokens[j]
+		}
+	}
+	return nil
 }
 
 // keywordInExpression reports whether the keyword being formatted follows
@@ -868,14 +934,32 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 			isContinuationOperator(s.lastNonWSToken) ||
 			(awaitsOperand(s.lastNonWSToken) && token.Type != lexer.TokenKeyword)
 		s.declPending = false
+		for k := range s.delims {
+			s.delims[k].pending = false // an item on a later line aligns nothing
+		}
+		// Inside a bracket whose first item shares its line, a
+		// continuation line aligns with that item; a closing delimiter
+		// leading the line returns to the opening line's indentation
+		// (brackets show their structure by alignment).
+		// A bracket that ends its line hangs: its items sit one level past
+		// the line it opened on (fmt.indent_style).
+		if n := len(s.delims); isContinuation && n > 0 {
+			top := s.delims[n-1]
+			switch {
+			case isCloseParen(token):
+				s.writeLinePrefix(top.prefix)
+			case top.align >= 0:
+				s.writeLinePrefix(top.prefix + strings.Repeat(" ", top.align))
+			default:
+				s.writeLinePrefix(hangFrom(top.prefix, s.opts))
+			}
+			return
+		}
 		if isContinuation && s.declListAlign > 0 {
 			// A hanging line of a wrapped declaration list aligns with the
 			// list's first item: the statement's indent, then spaces
 			// (style guide wrapped_list_alignment, ssl-style-guide#120).
-			s.currentLineLen = writeIndentLen(s.builder, s.lastLineIndent, s.opts)
-			s.builder.WriteString(strings.Repeat(" ", s.declListAlign))
-			s.currentLineLen += s.declListAlign
-			s.lineStart = false
+			s.writeLinePrefix(indentString(s.lastLineIndent, s.opts) + strings.Repeat(" ", s.declListAlign))
 			return
 		}
 		var totalIndent int
@@ -892,11 +976,67 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 			s.declListAlign = 0
 		}
 		s.currentLineLen = writeIndentLen(s.builder, totalIndent, s.opts)
+		s.linePrefix = indentString(totalIndent, s.opts)
 		if !isContinuation {
 			s.stmtIndentWidth = s.currentLineLen
 		}
 		s.lineStart = false
 	}
+}
+
+// writeLinePrefix writes an explicit indentation string at the start of a
+// line and records it.
+func (s *formatState) writeLinePrefix(prefix string) {
+	s.builder.WriteString(prefix)
+	s.currentLineLen = visualWidth(prefix, s.opts)
+	s.linePrefix = prefix
+	s.lineStart = false
+}
+
+// noteDelimStart records where an open delimiter's first item sits, called
+// for each written token before it is written.
+func (s *formatState) noteDelimStart(token lexer.Token) {
+	n := len(s.delims)
+	if n == 0 || !s.delims[n-1].pending || token.Type == lexer.TokenComment {
+		return
+	}
+	s.delims[n-1].pending = false
+	if off := s.currentLineLen - visualWidth(s.delims[n-1].prefix, s.opts); !isCloseParen(token) && off <= alignCap(s.opts) {
+		s.delims[n-1].align = off
+	}
+}
+
+// alignCap is the deepest a bracket's first item may sit past its line's
+// indentation and still be aligned to: half the line limit. Deeper, the
+// bracket hangs instead, or nested expressions march off to the right.
+func alignCap(opts FormattingOptions) int {
+	if opts.alignCap > 0 {
+		return opts.alignCap
+	}
+	if opts.MaxLineLength > 0 {
+		return opts.MaxLineLength / 2
+	}
+	return 45
+}
+
+// hangFrom is the indentation one level past prefix. After alignment
+// spaces it steps in by spaces, so a tab never follows a space.
+func hangFrom(prefix string, opts FormattingOptions) string {
+	if strings.ContainsRune(prefix, ' ') {
+		return prefix + strings.Repeat(" ", opts.IndentSize)
+	}
+	return prefix + indentString(1, opts)
+}
+
+// indentString returns the indentation for level in the configured style.
+func indentString(level int, opts FormattingOptions) string {
+	if level <= 0 {
+		return ""
+	}
+	if opts.IndentStyle == "space" {
+		return strings.Repeat(" ", opts.IndentSize*level)
+	}
+	return strings.Repeat("\t", level)
 }
 
 // noteDeclListStart records where a declaration list's first item sits,
@@ -1399,6 +1539,7 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// by FuzzFormatRangeStable).
 	if idx := strings.LastIndex(formattedSQL, "\n"); idx >= 0 {
 		s.currentLineLen = visualWidth(formattedSQL[idx+1:], s.opts)
+		s.linePrefix = leadingIndentString(formattedSQL[idx+1:])
 	} else {
 		s.currentLineLen += len(formattedSQL)
 	}
@@ -1422,6 +1563,13 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		s.pendingStatementBreak = true
 		s.prevKeyword = ""
 		s.declListAlign = 0
+	}
+
+	switch {
+	case isOpenParen(token):
+		s.delims = append(s.delims, delimFrame{prefix: s.linePrefix, align: -1, pending: true})
+	case isCloseParen(token) && len(s.delims) > 0:
+		s.delims = s.delims[:len(s.delims)-1]
 	}
 
 	// A declaration keyword that began its line opens an alignable list.
@@ -1543,6 +1691,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		}
 
 		state.noteDeclListStart(token)
+		state.noteDelimStart(token)
 		state.updateSQLFunctionState(token)
 		tokenWritten := state.writeOperatorOrComma(token, tokens, i)
 		if !tokenWritten {
@@ -1583,6 +1732,16 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 					state.builder.WriteString(" ")
 					state.currentLineLen++
 				}
+			} else if isMemberAccessColon(token) && state.forHeaderGluedKeyword(tokens, i) {
+				// `:TO Len(aRows):STEP 2` — glued to a closing paren, the
+				// colon lexes as member access, but in a :FOR header a
+				// `STEP`/`TO` followed by an operand can only be the
+				// keyword (a property would end the expression). Space it
+				// apart so it reads as the keyword (schema
+				// spaces.before_step_keyword; step_spacing).
+				state.builder.WriteString(" :")
+				state.currentLineLen += 2
+				state.upperNextIdent = true
 			} else if canonical, ok := canonicalReceiver(token, tokens, i); ok {
 				// Me/Base as member-access receivers take their canonical
 				// casing (issue #90, schema R41).
@@ -1594,6 +1753,10 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				normalized := normalizeCodeBlockLiteral(token.Text, opts)
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
+			} else if state.upperNextIdent && token.Type == lexer.TokenIdentifier {
+				state.builder.WriteString(strings.ToUpper(token.Text))
+				state.currentLineLen += len(token.Text)
+				state.upperNextIdent = false
 			} else {
 				state.builder.WriteString(token.Text)
 				state.currentLineLen += len(token.Text)

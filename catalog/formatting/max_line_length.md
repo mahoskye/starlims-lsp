@@ -68,6 +68,14 @@ history:
       deeper; the no-gain guard measures against that column, so a
       `:PARAMETERS p := "..."` default too long to fit there now stays on
       the keyword's line.
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      A break inside a bracket opened on the line aligns with the bracket's
+      first item (fmt.indent_style); when an item would overflow there, the
+      bracket breaks after itself and its items hang one level in. The
+      conformance guarantee holds: a line stays long only for an atomic
+      token.
 issues: ["#85"]
 ---
 
@@ -86,10 +94,15 @@ counts as `indentSize` columns) is re-flowed at its legal break points:
   (`.NOT.` is unary, so a break never lands before it).
 
 Packing is greedy latest-fitting: each output line keeps as much as fits,
-and continuation lines sit exactly one indent level past the original line
-(fixed, not proportional to paren depth — fmt.indent_style), except that a
-declaration list's continuation lines align with its first item
-(fmt.indent_style, ssl-style-guide#120). A break is
+and a continuation line sits one indent level past the original line,
+except inside a bracket opened on the line, where it aligns with the
+bracket's first item, and in a declaration list, where it aligns with the
+list's first item (fmt.indent_style; ssl-style-guide#120). A bracket
+whose first item sits past the alignment cap (half the line limit, past
+the line's indentation) steps in one level instead. When an item of a
+bracket would not fit at the aligned column, the line breaks right after
+that bracket and its items hang one level in; the line is then packed
+again, so a bracket hangs only when alignment cannot make its items fit. A break is
 only taken when the following segment actually fits within the limit on
 its continuation line (the issue-#85 no-gain guard), so an over-long
 atomic token — typically a long string — leaves its line over-long rather
@@ -119,7 +132,7 @@ that the comment fits, and the comment travels with the last fragment.
 ## Examples
 
 The array literal overflows at `nThirdQuarterRevenue`, so the line wraps at
-the preceding comma with a one-level continuation indent:
+the preceding comma and the next item aligns with the array's first item:
 
 ### Before
 
@@ -131,7 +144,7 @@ DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQu
 
 ```ssl
 DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
-	nThirdQuarterRevenue, nFourthQuarter});
+                           nThirdQuarterRevenue, nFourthQuarter});
 ```
 
 A single long string argument has no legal wrap point and is left over-long
@@ -157,7 +170,7 @@ vRes := CreateUdObject("MyNamespace.MyClassName", {oParentObject:ChildCollection
 
 ```ssl
 vRes := CreateUdObject("MyNamespace.MyClassName",
-	{oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
+                       {oParentObject:ChildCollection[nChildIndex], sConfigurationKey});
 ```
 
 ### Before
@@ -170,7 +183,7 @@ vRes := DoProc("Wrapper", {DoProc("InnerOne", {sArgumentOne, sArgumentTwo}), DoP
 
 ```ssl
 vRes := DoProc("Wrapper", {DoProc("InnerOne", {sArgumentOne, sArgumentTwo}),
-	DoProc("InnerTwo", {sArgumentThree})});
+                           DoProc("InnerTwo", {sArgumentThree})});
 ```
 
 ### Before
@@ -200,6 +213,27 @@ with the first item:
 ```ssl
 :DECLARE sRequestIdentifier, sRouteCode, sSettingKey, nRetryCount, nRetryLimit, bStarted,
          bCommit;
+```
+
+A bracket whose first item sits more than half the line limit past the
+line's indentation does not align; its continuation lines step in one
+level instead:
+
+### Before
+
+```ssl
+:PROCEDURE P;
+	vRes := ExecFunction("Category.ScriptName.LongerProcedureName", {sFirstParameterValue, sSecondParameterValue, sThirdParameterValue});
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE P;
+	vRes := ExecFunction("Category.ScriptName.LongerProcedureName", {sFirstParameterValue,
+		sSecondParameterValue, sThirdParameterValue});
+:ENDPROC;
 ```
 
 An end-of-line comment counts toward the width, so the code before it

@@ -18,8 +18,8 @@ sKey)),
 	:DECLARE vResult;
 	vResult := DoProc("Outer", {DoProc("Inner", {Upper(AllTrim(
 		sKey)),
-		"second"}),
-		"third"});
+	                                             "second"}),
+	                            "third"});
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

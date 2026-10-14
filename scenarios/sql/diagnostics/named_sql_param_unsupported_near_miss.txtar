@@ -26,7 +26,7 @@ argument of a positional call.
 	aRows := LSelect1("SELECT ordno FROM orders WHERE status = ?",, {sStatus});
 	bOk := oDb:RunSQL("UPDATE orders SET status = ?sStatus?");
 	sName := LSearch("SELECT custname FROM orders WHERE ordno = ?", "?sOrdNo?",,
-		{sOrdNo});
+	                 {sOrdNo});
 	:RETURN {bOk, sName, aRows};
 :ENDPROC;
 -- diagnostics --

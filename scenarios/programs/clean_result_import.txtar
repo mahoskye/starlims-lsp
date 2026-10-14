@@ -158,7 +158,7 @@ oSummary := CreateUdObject("Lab.ImportSummary", {sRunId});
 	    )
 	";
 	:RETURN RunSQL(sSQL,, {oReading:sampleId, oReading:analyte, oReading:value,
-		oReading:readingId});
+	                       oReading:readingId});
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --

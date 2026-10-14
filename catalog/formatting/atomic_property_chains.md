@@ -58,7 +58,7 @@ sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString, oCo
 
 ```ssl
 sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString,
-	oConfiguration:database:timeout);
+                                   oConfiguration:database:timeout);
 ```
 
 A chain whose only possible break points are its own `:` boundaries is left

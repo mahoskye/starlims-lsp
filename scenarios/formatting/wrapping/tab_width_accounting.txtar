@@ -21,7 +21,7 @@ vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
 	:FOR i := 1 :TO Len(aRows);
 		:IF .NOT. Empty(aRows[i]);
 			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
-				"FINAL", i});
+			                               "FINAL", i});
 		:ENDIF;
 	:NEXT;
 	:RETURN vResult;
@@ -33,7 +33,7 @@ vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
         :FOR i := 1 :TO Len(aRows);
                 :IF .NOT. Empty(aRows[i]);
                         vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
-                                "FINAL", i});
+                                                       "FINAL", i});
                 :ENDIF;
         :NEXT;
         :RETURN vResult;

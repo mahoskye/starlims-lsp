@@ -19,7 +19,8 @@ like any other SQL string literal.
 	:PARAMETERS sOrdNo, oDb;
 	:DECLARE sName, bOk;
 	sName := LSearch("select custname from orders where ordno = ?",
-		"select nothing from nowhere where nothing = 1 order by nothing",, {sOrdNo});
+	                 "select nothing from nowhere where nothing = 1 order by nothing",,
+	                 {sOrdNo});
 	bOk := RunSQL("delete from ordtask where ordno = ?", "select connection", {sOrdNo});
 	bOk := oDb:Execute("
 	    SELECT ordno, status, logdate, custid, site

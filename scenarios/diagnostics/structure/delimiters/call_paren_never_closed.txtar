@@ -18,11 +18,11 @@ disturbed (diag.unclosed_delimiter, diag.unexpected_token deferral).
 	:PARAMETERS sNote;
 	:DECLARE nLen;
 	nLen := Len(AllTrim(sNote);
-		:IF nLen > 200;
-		nLen := 200;
-		:ENDIF;
-		:RETURN nLen;
-		:ENDPROC;
+	            :IF nLen > 200;
+	            nLen := 200;
+	            :ENDIF;
+	            :RETURN nLen;
+	            :ENDPROC;
 -- diagnostics --
 4:13-4:14 error unclosed_delimiter: Unclosed '('
 -- diagnostics [--strict --info] --

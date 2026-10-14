@@ -119,7 +119,7 @@ aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",, 
 
 nSent := 0;
 aGroups := LSelect1("SELECT DISTINCT LabGroup FROM LabTests WHERE Status = ?",,
-	{"PENDING"});
+                    {"PENDING"});
 
 :FOR i := 1 :TO Len(aGroups);
 	sGroup := aGroups[i][1];

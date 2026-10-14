@@ -25,7 +25,7 @@ exitwhile_outside_loop is silent (diag.exitwhile_in_finally).
 	:WHILE sState == "RUNNING";
 		:TRY;
 			sState := LSearch("SELECT STATE FROM JOBS WHERE JOBID = ?", "DONE",,
-				{nJobId});
+			                  {nJobId});
 		:FINALLY;
 			:IF sState == "FAILED";
 				:EXITWHILE;

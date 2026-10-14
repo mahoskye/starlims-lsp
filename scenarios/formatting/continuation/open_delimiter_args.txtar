@@ -23,9 +23,9 @@ Now()});
 	:DECLARE vResult;
 	:IF nValue > 0;
 		vResult := ExecFunction("Results.Store",
-			{sSampleId,
-			nValue,
-			Now()});
+		                        {sSampleId,
+		                         nValue,
+		                         Now()});
 	:ENDIF;
 	:RETURN vResult;
 :ENDPROC;
