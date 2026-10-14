@@ -29,6 +29,12 @@ history:
       (no_mixed_error_handling_families), and a Flags fence added for the
       shape that actually intercepts: the handler as the procedure's last
       section, after the :TRY.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      Corrected: `:ERROR` in expression position is not a corpus-observed
+      form; the grammar admits only the statement marker and
+      unexpected_token reports the operand. This rule still ignores it.
 issues: []
 ---
 
@@ -51,9 +57,10 @@ It must NOT flag:
 - a procedure using only one family, whichever it is;
 - the two families in *different* procedures of the same file — each
   procedure's handler chain is independent;
-- `:ERROR` in expression position (`LimsString(:ERROR)` inside a
-  `:CATCH`, a corpus-observed pattern) — only the marker-statement form
-  `:ERROR;` starts a legacy handler;
+- `:ERROR` written as an operand (`LimsString(:ERROR)`) — only the
+  marker statement `:ERROR;` starts a legacy handler; the grammar has no
+  expression form, so `unexpected_token` reports the operand (issue
+  #328);
 - any severity duplication with `deprecated_keyword`: every `:ERROR` /
   `:RESUME` use already carries that separate warning; this rule adds the
   interception hazard only when the families actually meet.

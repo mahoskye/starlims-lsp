@@ -645,6 +645,14 @@ func trailingCodeWidth(tokens []lexer.Token, i int) int {
 	return w
 }
 
+// keywordInExpression reports whether the keyword being formatted follows
+// an opening delimiter, a comma or an operator — an operand position, not
+// the start of a statement.
+func (s *formatState) keywordInExpression() bool {
+	last := s.lastNonWSToken
+	return isOpenParen(last) || last.Text == "," || last.Text == ":=" || isOperator(last)
+}
+
 // sqlOptsFor returns the SQL engine options for an SSL format: the SQL
 // engine measures the SSL indent it sits at with the SSL tab width.
 func sqlOptsFor(opts FormattingOptions) SQLFormattingOptions {
@@ -721,7 +729,13 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	case "ENDREGION":
 		s.afterEndRegion = true
 	case "ERROR":
-		// :ERROR is scope-based (no explicit closer). Indent its body.
+		// :ERROR is scope-based (no explicit closer). Indent its body —
+		// unless it sits inside an expression (`LimsString(:ERROR)`),
+		// which is not a handler marker (unexpected_token reports it;
+		// issue #328).
+		if s.keywordInExpression() {
+			break
+		}
 		s.inErrorHandler = true
 		s.afterEndProc = false
 		s.afterEndRegion = false
@@ -1398,7 +1412,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 			s.indent++
 		}
 		// :ERROR and :RESUME are scope-based — indent body after them
-		if s.prevKeyword == "ERROR" || s.prevKeyword == "RESUME" {
+		if (s.prevKeyword == "ERROR" || s.prevKeyword == "RESUME") && !s.keywordInExpression() {
 			s.indent++
 			s.errorBodyIndent = s.indent
 		}
