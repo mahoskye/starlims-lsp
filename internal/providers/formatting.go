@@ -631,7 +631,10 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	// Only the block end that closes the block holding the :ERROR —
 	// reached at the handler body's own depth — ends the handler; a closer
 	// of a block nested in the handler body does not (issue #326).
-	if constants.IsBlockEndKeyword(normalized) {
+	// :ENDFOR is not SSL (endfor_invalid reports it), but the validator
+	// pairs it with its :FOR; indenting it as a closer keeps the rest of
+	// the file at its depth instead of one level too deep (issue #326).
+	if constants.IsBlockEndKeyword(normalized) || normalized == "ENDFOR" {
 		if s.inErrorHandler && s.indent == s.errorBodyIndent {
 			s.indent--
 			s.inErrorHandler = false

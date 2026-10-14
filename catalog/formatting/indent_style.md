@@ -70,6 +70,12 @@ history:
       end used to close the handler scope too, so a nested :ENDIF and
       everything after it dedented one level too far. Only the end of the
       block holding the :ERROR closes it.
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      The invalid :ENDFOR closes its :FOR's indentation, as the validator
+      pairs them (endfor_invalid reports it); it used to leave every
+      following line, the next :PROCEDURE included, one level deep.
 issues: ["#36", "#86", "#101", "#326"]
 ---
 
@@ -269,6 +275,31 @@ nCount := 3;
 			nCount := 2;
 		:ENDIF;
 		nCount := 3;
+:ENDPROC;
+```
+
+The invalid `:ENDFOR` (reported by `endfor_invalid`) closes its `:FOR`'s
+indentation, as the validator pairs them (issue #326):
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE i;
+:FOR i := 1 :TO 3;
+i := i;
+:ENDFOR;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE i;
+	:FOR i := 1 :TO 3;
+		i := i;
+	:ENDFOR;
 :ENDPROC;
 ```
 
