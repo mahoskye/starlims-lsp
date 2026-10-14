@@ -17,7 +17,11 @@ SQL comment, and COLLATE in a non-SQL string.
 :PROCEDURE Names;
 	:DECLARE aRows, sMsg;
 	/* the server default is case-sensitive, so this report sorts case-insensitively;
-	aRows := SQLExecute("SELECT custname FROM customers ORDER BY custname COLLATE Latin1_General_CI_AS");
+	aRows := SQLExecute("
+	    SELECT custname
+	    FROM customers
+	    ORDER BY custname COLLATE Latin1_General_CI_AS
+	");
 	aRows := SQLExecute("SELECT custname FROM customers WHERE kind = 'COLLATERAL'");
 	aRows := SQLExecute("
 	    SELECT custname

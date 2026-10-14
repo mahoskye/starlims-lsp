@@ -124,6 +124,17 @@ history:
       as ssl.format.indentSize. It counted the indent string's bytes, a
       tab as one column, so packed SQL lines inside a procedure reached
       91-94 columns.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      Detection gaps closed: a statement led by a SQL comment or hint, one
+      holding COLLATE (now a keyword, so `col COLLATE name` is no longer a
+      three-bare-word prose run), and one naming double-quoted identifiers
+      (`FROM "Orders"`) are SQL. A block comment stays separated from the
+      code after it. The fits-inline test counts the code that must stay
+      on the line after the string (`");`, up to the first comma or
+      operator break), so a query ending exactly at the limit is reflowed
+      instead of the statement wrapping after ':='.
 issues: ["#81", "#82", "#327"]
 ---
 

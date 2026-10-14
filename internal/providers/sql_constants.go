@@ -37,6 +37,9 @@ var SQLKeywords = map[string]bool{
 	// DDL modifiers
 	"PURGE": true, "REPLACE": true, "SEQUENCE": true,
 	"CASCADE": true, "NATURAL": true, "PERCENT": true,
+	// Collation clause: a keyword, or `col COLLATE name` reads as a run of
+	// three bare words and the statement as prose (issue #327)
+	"COLLATE": true,
 	// DML command keywords (also need uppercasing)
 	"GRANT": true, "REVOKE": true,
 }

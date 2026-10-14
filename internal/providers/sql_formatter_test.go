@@ -2709,7 +2709,7 @@ func TestSQLFormatter_OverClauseReviewRegressions(t *testing.T) {
 			name:  "comment between OVER and paren still breaks per §3.1",
 			input: "SELECT ordno, ROW_NUMBER() OVER /* keep */ (PARTITION BY testcode, analysisgroup ORDER BY sampledate DESC, sampleno) AS rn FROM ordresult",
 			want: "SELECT ordno,\n" +
-				"       ROW_NUMBER() OVER /* keep */(\n" +
+				"       ROW_NUMBER() OVER /* keep */ (\n" +
 				"           PARTITION BY testcode, analysisgroup\n" +
 				"           ORDER BY sampledate DESC, sampleno\n" +
 				"       ) AS rn\n" +

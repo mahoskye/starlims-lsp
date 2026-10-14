@@ -126,6 +126,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// token MUST start a new line or it is swallowed into the comment
 	// (issue #218 corpus finding: `-- note` glued to `NOT EXISTS`).
 	pendingLineCommentBreak := false
+	afterBlockComment := false // a /* */ comment was just written
 	// ODBC escape tracking (issue #217): inside `{...}` the content is
 	// ODBC grammar, not schema identifiers — the marker (`fn`, `d`, `ts`,
 	// ...) is canonical lowercase, the scalar-function name after `{fn`
@@ -935,6 +936,8 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			isFirstToken = false
 			if strings.HasPrefix(t.Text, "--") {
 				pendingLineCommentBreak = true
+			} else {
+				afterBlockComment = true
 			}
 			continue
 		}
@@ -974,10 +977,13 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			result.WriteString(extraIndent)
 			currentLineLen = baseW + len(parenIndent) + len(extraIndent)
 			lineStartCol = currentLineLen
-		} else if prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken) {
+		} else if afterBlockComment || (prev != nil && f.shouldAddSpace(prev, &t, prevPrevToken)) {
+			// A block comment is separated from the code after it — a
+			// leading `/* note */` used to glue to SELECT (issue #327).
 			result.WriteString(" ")
 			currentLineLen++
 		}
+		afterBlockComment = false
 
 		if rootCommand == "MERGE" && prev != nil && strings.ToUpper(prev.Text) == "SET" && parenDepth == 0 {
 			mergeSetCol = currentLineLen
@@ -1753,6 +1759,11 @@ func IsSQLString(content string) bool {
 // isSQLStatementTokens applies the command-keyword and structure validation
 // of IsSQLString to a pre-filtered token list.
 func isSQLStatementTokens(tokens []SQLToken) bool {
+	// A leading comment or hint (`/* recent */ SELECT ...`) does not hide
+	// the command keyword behind it (issue #327).
+	for len(tokens) > 0 && (tokens[0].Type == SQLTokenComment || tokens[0].Type == SQLTokenHint) {
+		tokens = tokens[1:]
+	}
 	if len(tokens) == 0 {
 		return false
 	}
@@ -1801,7 +1812,10 @@ func hasBareIdentifierRun(tokens []SQLToken, n int) bool {
 // classify as SQL). The English-prose guards stay identifier-only: prose
 // words never lex as functions, so widening them would gain nothing.
 func isSQLNameToken(t SQLToken) bool {
-	return t.Type == SQLTokenIdentifier || t.Type == SQLTokenFunction
+	// A double-quoted span is a quoted identifier in SQL (`FROM "Orders"`);
+	// only single quotes make a literal (issue #327).
+	return t.Type == SQLTokenIdentifier || t.Type == SQLTokenFunction ||
+		(t.Type == SQLTokenString && strings.HasPrefix(t.Text, `"`))
 }
 
 // validateTargetAfter checks that the token following keyword kw looks like
