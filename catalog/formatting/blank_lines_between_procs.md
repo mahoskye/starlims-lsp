@@ -29,14 +29,23 @@ history:
       :PROCEDURE) are now normalized too; only same-kind pairs were,
       leaving a procedure and an adjacent region unseparated against the
       schema's blank_lines.before_procedure / before_region of 1.
-issues: ["#33"]
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      A top-level :PROCEDURE or :REGION after script-level code or a
+      class header gets the separating blank lines too; only the boundary
+      after :ENDPROC;/:ENDREGION; used to be normalized, so a procedure
+      directly after top-level statements stayed butted against them.
+issues: ["#33", "#326"]
 ---
 
 ## Behavior
 
 When a `:PROCEDURE` or `:REGION` keyword follows a `:ENDPROC;` or
-`:ENDREGION;` — any of the four pairings — the formatter normalizes the
-separation at that boundary to exactly `ssl.format.blankLinesBetweenProcs`
+`:ENDREGION;` — any of the four pairings — or opens a top-level unit
+after any other code (script-level statements, a `:CLASS` header;
+schema `blank_lines.before_procedure` / `before_region`, issue #326),
+the formatter normalizes the separation at that boundary to exactly `ssl.format.blankLinesBetweenProcs`
 blank lines (default 1) — whatever blank lines the source had there are
 replaced, never stacked on. The boundary holds across intervening
 statements that do not start with a keyword (a stray top-level assignment
@@ -148,6 +157,29 @@ raw text
 :ENDREGION;
 
 :PROCEDURE Second;
+:ENDPROC;
+```
+
+A procedure after script-level code is a boundary too (issue #326):
+
+### Before
+
+```ssl
+:DECLARE nCount;
+nCount := 1;
+:PROCEDURE Demo;
+:RETURN nCount;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:DECLARE nCount;
+nCount := 1;
+
+:PROCEDURE Demo;
+	:RETURN nCount;
 :ENDPROC;
 ```
 

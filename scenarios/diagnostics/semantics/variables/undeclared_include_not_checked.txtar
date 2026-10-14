@@ -12,6 +12,7 @@ aShelfCodes would otherwise flag.
 :ENDPROC;
 -- format --
 :INCLUDE Inventory.ShelfCodes;
+
 :PROCEDURE ShelfLabel;
 	:PARAMETERS nSlot;
 	:DECLARE sLabel;

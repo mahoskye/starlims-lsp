@@ -26,6 +26,7 @@ sResult := DoProc("Normalize", {sOrderNo});
 	:PARAMETERS nValue;
 	:RETURN nValue * 2;
 :ENDINLINECODE;
+
 :PROCEDURE Normalize;
 	/* trims and uppercases the order number;
 	:PARAMETERS sRaw;

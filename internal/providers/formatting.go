@@ -663,7 +663,12 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		// :PROCEDURE or :REGION — is normalized; mixed pairs used to be
 		// left unseparated (issue #255; schema blank_lines.before_procedure
 		// and before_region are both 1).
-		if s.afterEndProc || s.afterEndRegion {
+		// A top-level :PROCEDURE after any other code — script-level
+		// statements, a class header — is a unit boundary too (schema
+		// blank_lines.before_procedure: 1, issue #326); at the start of
+		// the file normalizeProcBoundary finds nothing above and adds no
+		// line.
+		if s.afterEndProc || s.afterEndRegion || (!s.inProcedure && s.indent == 0) {
 			s.normalizeProcBoundary()
 		}
 		s.inProcedure = true
@@ -673,7 +678,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		s.inProcedure = false
 		s.afterEndProc = true
 	case "REGION":
-		if s.afterEndRegion || s.afterEndProc {
+		// Likewise a top-level :REGION (schema blank_lines.before_region).
+		if s.afterEndRegion || s.afterEndProc || (!s.inProcedure && s.indent == 0) {
 			s.normalizeProcBoundary()
 		}
 		s.afterEndRegion = false

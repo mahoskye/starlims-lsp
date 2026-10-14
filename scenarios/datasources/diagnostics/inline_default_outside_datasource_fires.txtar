@@ -11,6 +11,7 @@ signature.
 :RETURN DoProc("CountTrucks", {sFleet, nLimit});
 -- format --
 :PARAMETERS sFleet := "F1", nLimit := 5;
+
 :PROCEDURE CountTrucks;
 	:PARAMETERS sCode, nMax := 10;
 	:RETURN Len(sCode) + nMax;

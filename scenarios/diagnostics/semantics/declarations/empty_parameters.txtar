@@ -9,6 +9,7 @@ the keyword), at script level and inside a procedure.
 :RETURN DoProc("Ping");
 -- format --
 :PARAMETERS;
+
 :PROCEDURE Ping;
 	:PARAMETERS;
 	:RETURN .T.;

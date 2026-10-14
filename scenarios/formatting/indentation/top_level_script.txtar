@@ -1,12 +1,8 @@
 A script with top-level code (no :PROCEDURE): script-level :PARAMETERS
 and :DEFAULT, top-level blocks and a trailing procedure. Top-level code
 sits at column 0 and blocks indent from there (fmt.indent_style).
-Suspected issue: #326 — no blank line is put between the top-level `:RETURN` and
-the following `:PROCEDURE`; fmt.blank_lines_between_procs only acts after
-`:ENDPROC;` / `:ENDREGION;`, but the style guide schema sets
-formatting.blank_lines.before_procedure: 1 (blank_line_between_procedures).
-The same gap shows in indentation/class_file between the class header and
-the first method.
+A blank line separates the top-level code from the trailing :PROCEDURE
+(fmt.blank_lines_between_procs, schema blank_lines.before_procedure).
 -- input.ssl --
 :PARAMETERS sSampleId, nMode;
 :DEFAULT nMode, 1;
@@ -31,6 +27,7 @@ vResult := "";
 	vResult := "";
 :ENDIF;
 :RETURN vResult;
+
 :PROCEDURE LoadOne;
 	:PARAMETERS sId;
 	:RETURN sId;

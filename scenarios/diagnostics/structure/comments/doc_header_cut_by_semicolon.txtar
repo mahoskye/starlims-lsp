@@ -16,6 +16,7 @@ Suspected issue: #328 — the range of a diagnostic on a multi-line comment ends
 /*
  BuildSummary writes the nightly summary row;
 Parameters:dRunDate - the run date;
+
 :PROCEDURE BuildSummary;
 	:PARAMETERS dRunDate;
 	:RETURN DateToString(dRunDate, "yyyyMMdd");
