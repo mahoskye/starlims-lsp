@@ -1,8 +1,7 @@
 A Branch target built at run time, missing the LABEL keyword in the
-computed text. branch_target_label deliberately checks only single string
-literals, so nothing reports the dead jump.
-Known issue: #321 (computed Branch() targets never jump - not yet
-diagnosed).
+computed text. branch_target_label checks only single string literals; a
+computed target never jumps on STARLIMS 12 whatever its text, which
+diag.branch_literal_target reports on the argument (issue #321).
 -- input.ssl --
 :PROCEDURE JumpByName;
 	:PARAMETERS sStage;
@@ -34,5 +33,7 @@ diagnosed).
 :ENDPROC;
 -- diagnostics --
 6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+9:10-9:17 error branch_literal_target: Branch() only jumps for a string-literal target; this call always falls through. Choose among literal Branch() calls with ':IF' or ':BEGINCASE' instead
 -- diagnostics [--strict --info] --
 6:2-6:8 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code
+9:10-9:17 error branch_literal_target: Branch() only jumps for a string-literal target; this call always falls through. Choose among literal Branch() calls with ':IF' or ':BEGINCASE' instead

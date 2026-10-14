@@ -50,9 +50,11 @@ two findings.
 4:13-4:15 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
 7:16-7:18 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
 11:14-11:16 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:17-11:18 error non_logical_condition: Left operand of '.OR.' is a number literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
 11:29-11:31 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
 -- diagnostics [--strict --info] --
 4:13-4:15 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
 7:16-7:18 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
 11:14-11:16 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
+11:17-11:18 error non_logical_condition: Left operand of '.OR.' is a number literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
 11:29-11:31 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?

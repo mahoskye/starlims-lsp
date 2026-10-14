@@ -50,5 +50,5 @@ dropped (entry retains the history).
 
 ## Diagnostics
 
-144 rules cataloged: 141 active, 0 draft, 0 planned, 3 removed.
+148 rules cataloged: 145 active, 0 draft, 0 planned, 3 removed.
 Full table: [docs/reference/DIAGNOSTICS.md](reference/DIAGNOSTICS.md).

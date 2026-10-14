@@ -1,7 +1,9 @@
 $ (containment) takes strings on both sides (diag.dollar_string_only,
-warning, on the $ token): a numeric-prefixed operand fires, and
-.NOT. "a" $ sList fires because unary .NOT. binds tighter than $, putting
-a boolean on the left; the intended test is .NOT. ("a" $ sList).
+warning, on the $ token): a numeric-prefixed operand fires. In
+.NOT. "a" $ sList unary .NOT. binds tighter than $, putting a boolean on
+the left; diag.parenthesize_negated_comparison reports that cause (error:
+.NOT. on a string literal raises) and dollar_string_only defers to it.
+The intended test is .NOT. ("a" $ sList).
 -- input.ssl --
 :PROCEDURE HasCode;
 	:PARAMETERS nCode, sList;
@@ -29,7 +31,7 @@ a boolean on the left; the intended test is .NOT. ("a" $ sList).
 :ENDPROC;
 -- diagnostics --
 3:12-3:13 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
-6:16-6:17 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
+6:6-6:23 error parenthesize_negated_comparison: '.NOT.' binds before '$', so it applies to a string literal and raises at run time - write '.NOT. (a $ b)' to negate the comparison
 -- diagnostics [--strict --info] --
 3:12-3:13 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
-6:16-6:17 warning dollar_string_only: The '$' containment operator only works on strings. Non-string operands cause error
+6:6-6:23 error parenthesize_negated_comparison: '.NOT.' binds before '$', so it applies to a string literal and raises at run time - write '.NOT. (a $ b)' to negate the comparison

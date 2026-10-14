@@ -1,9 +1,8 @@
 SSL has no truthy/falsy coercion: a literal string, number or NIL as an
 :IF/:WHILE condition, or as the left operand of .AND./.OR., raises at run
-time on v12. Nothing reports these literal cases today; the same
-condition written with a variable is not provable and stays silent by
-design.
-Known issue: #322 (literal non-logical conditions and .AND./.OR. left operands not diagnosed).
+time on v12. diag.non_logical_condition reports each literal (issue
+#322); the same condition written with a variable is not provable and
+stays silent by design.
 -- input.ssl --
 :PROCEDURE Gate;
 	:PARAMETERS bOpen;
@@ -40,4 +39,12 @@ Known issue: #322 (literal non-logical conditions and .AND./.OR. left operands n
 	:RETURN bOut;
 :ENDPROC;
 -- diagnostics --
+5:6-5:9 error non_logical_condition: ':IF' condition is a string literal - SSL has no truthy/falsy coercion, so a non-logical condition raises at run time
+8:9-8:10 error non_logical_condition: ':WHILE' condition is a number literal - SSL has no truthy/falsy coercion, so a non-logical condition raises at run time
+11:10-11:13 error non_logical_condition: Left operand of '.AND.' is a string literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
+12:10-12:11 error non_logical_condition: Left operand of '.OR.' is a number literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
 -- diagnostics [--strict --info] --
+5:6-5:9 error non_logical_condition: ':IF' condition is a string literal - SSL has no truthy/falsy coercion, so a non-logical condition raises at run time
+8:9-8:10 error non_logical_condition: ':WHILE' condition is a number literal - SSL has no truthy/falsy coercion, so a non-logical condition raises at run time
+11:10-11:13 error non_logical_condition: Left operand of '.AND.' is a string literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
+12:10-12:11 error non_logical_condition: Left operand of '.OR.' is a number literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
