@@ -112,6 +112,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The default profile's findings on the corpus are unchanged, and no file
   formats differently.
+- **Catalog and message drift** (#329):
+  - `feature.diagnostics_pipeline` now says data sources require inline
+    `:PARAMETERS` defaults, as `datasource_default_required` enforces.
+  - `exitcase_last_in_branch` gives `exitcase_after_return`'s severity as
+    hint.
+  - `hungarian_type_mismatch` writes "an array" and "an object".
 
 ## [0.25.0] - 2026-10-13
 

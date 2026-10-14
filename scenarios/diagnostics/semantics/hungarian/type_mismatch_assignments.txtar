@@ -17,7 +17,7 @@ into n, a number literal into s, a string into a, a string into b, and a
 3:11-3:22 warning hungarian_type_mismatch: 'nWidth' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
 5:2-5:35 warning hungarian_type_mismatch: 'nCode' promises a number by its prefix, but this expression produces a string - rename the variable or fix the expression
 6:2-6:13 warning hungarian_type_mismatch: 'sTotal' promises a string by its prefix, but this expression produces a number - rename the variable or fix the expression
-7:2-7:21 warning hungarian_type_mismatch: 'aNames' promises a array by its prefix, but this expression produces a string - rename the variable or fix the expression
+7:2-7:21 warning hungarian_type_mismatch: 'aNames' promises an array by its prefix, but this expression produces a string - rename the variable or fix the expression
 8:2-8:15 warning hungarian_type_mismatch: 'bReady' promises a boolean by its prefix, but this expression produces a string - rename the variable or fix the expression
 -- format --
 :PROCEDURE ParseCode;

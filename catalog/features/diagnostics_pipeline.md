@@ -190,6 +190,13 @@ history:
       an error reported by a late check could be dropped behind 110
       warnings that came before it. Endpoint patterns also match the
       file path, now that every URI is canonicalized to its escaped form.
+  - date: 2026-10-13
+    ref: "issue #329"
+    note: >-
+      Text corrected: the data-source check set requires inline
+      :PARAMETERS defaults again (datasource_default_required, reinstated
+      in #263/#269); the entry still said `:PARAMETERS p1;` was valid and
+      the rule removed. A13 no longer calls inline defaults optional.
 issues: []
 ---
 
@@ -288,10 +295,11 @@ rules (those are `diag.*` entries).
   counts as a SQL comment — such content keeps its SSL diagnostics. A
   recognized header followed by an empty body (directives-only stub)
   keeps header-only diagnostics.
-- The data-source check set does not require inline `:PARAMETERS`
-  defaults: `:PARAMETERS p1;` is valid data-source syntax (issue #147,
-  ssl-style-guide#48; the former `datasource_default_required` rule is
-  removed).
+- The data-source check set requires inline `:PARAMETERS` defaults:
+  `datasource_default_required` reports a data-source parameter written
+  without one (`:PARAMETERS p1;`), because the builder fails at run time
+  without it (ssl-style-guide#82, reversing #48). The rule was removed in
+  issue #147 and reinstated in #263/#269.
 - Region bodies are opaque payload (issue #164): the text between a
   `:REGION <name>;` header and its `:ENDREGION` closer is
   stored for `GetRegion()` retrieval, not executed, so the lexer captures
@@ -326,7 +334,7 @@ rules (those are `diag.*` entries).
 - A10: Given a data-source document containing only a SQL statement (optionally preceded by `--` or `/* */` SQL comments), when diagnostics are collected, then the result is empty — no SSL diagnostic (dot_property_access or otherwise) fires on SQL syntax.
 - A11: Given a data-source document containing SSL code, when diagnostics are collected, then SSL and data-source diagnostics are produced exactly as before — SQL mode only activates on SQL content.
 - A12: Given a non-data-source document whose content is a SQL statement, when diagnostics are collected, then SSL diagnostics still run — SQL-mode classification is scoped to data-source files.
-- A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or a `:PARAMETERS` statement (inline `:=` defaults optional) followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
+- A13: Given a data-source document whose leading lines are builder directives (`:DSN`/`:TABLENAME`/`:NULLASBLANK`/`:INVARIANTDATECOLUMNS` `:= value;`) or a `:PARAMETERS` statement (with or without inline `:=` defaults — a missing one is `datasource_default_required`'s finding) followed by a SQL statement, when diagnostics are collected, then no diagnostic fires on the SQL body while the header lines keep their SSL and data-source checks.
 - A14: Given a `.ds` (or `.ds.txt`) file whose content is plain SQL or the hybrid header-then-SQL shape, when it is validated via the `--validate` CLI file path, then the result matches the editor path — no diagnostic fires on SQL content, header lines keep their checks — and an SSL-content `.ds` file keeps the full data-source diagnostic set.
 - A15: Given `--validate --stdin --ds`, when stdin content is validated, then it is classified as a data-source document (SQL-mode suppression and data-source rules apply); without `--ds`, stdin content is treated as an ordinary SSL document.
 - A16: Given a data-source document containing only terminated SQL comments (`/* banner */`, `--` lines) and whitespace, when diagnostics are collected, then the result is empty; a document whose comment is the unterminated SSL form (`/* text;`) is NOT comment-classified and keeps SSL diagnostics.

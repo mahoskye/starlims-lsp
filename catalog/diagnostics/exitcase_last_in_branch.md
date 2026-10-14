@@ -50,7 +50,7 @@ It must NOT flag:
 
 - an `:EXITCASE` that is the last statement of its branch, including
   after a `:RETURN` (`exitcase_after_return` reports that pair as
-  unreachable, at warning);
+  unreachable, at hint);
 - comments after the `:EXITCASE`: they are not statements;
 - a branch with no `:EXITCASE` (that is `prefer_exitcase`).
 
