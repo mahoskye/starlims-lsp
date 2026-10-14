@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Diagnostics for run-time behaviors verified on STARLIMS 12, the
-style guide's severity decisions, and its new size review triggers. On the
-production corpus, the default profile goes from 4,898 to 4,832 findings,
-and 2 of 6,228 documents that validated before now fail, both on real
-defects. Formatted output is unchanged on the corpus.
+## [0.27.0] - 2026-10-14
+
+The verified-behavior release. It adds diagnostics for run-time behaviors
+verified on STARLIMS 12, applies the style guide's severity decisions, and
+adds its new size review triggers. On the production corpus, the default
+profile goes from 4,898 to 4,832 findings, and 2 of 6,228 documents that
+validated before now fail, both on real defects. Formatted output is
+unchanged on the corpus.
 
 ### Breaking
 - **Four codes can now fail validation** (D16). Three are new error
@@ -3018,7 +3021,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.23.0...v0.24.0
