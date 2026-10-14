@@ -201,11 +201,11 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	}
 	baseIndent := detectBaseIndent(codeLines)
 	// The one line widening cannot anchor: the document's first code line
-	// led by a binary operator. The formatter gives it a continuation
+	// led by a binary operator or a comma. The formatter gives it a continuation
 	// level of its own, which the base indent already holds (issue #325,
 	// found by FuzzFormatRangeStable).
 	if first := firstSignificant(docTokens); first != nil && first.Line-1 == startLine &&
-		isContinuationOperator(*first) {
+		(isContinuationOperator(*first) || first.Text == ",") {
 		baseIndent = strings.TrimSuffix(baseIndent, oneIndentLevel(opts))
 	}
 
@@ -431,7 +431,7 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 				}
 			}
 			switch {
-			case depth > 0 || isContinuationOperator(t) || isMemberAccessColon(t):
+			case depth > 0 || isContinuationOperator(t) || isMemberAccessColon(t) || t.Text == ",":
 				cont[line] = true
 			case haveCode && (lastCode.Text == ":=" || lastCode.Text == "," ||
 				isContinuationOperator(lastCode) || (awaitsOperand(lastCode) && !kw)):
@@ -807,6 +807,7 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		// the second pass and oscillated (issue #218).
 		isContinuation := s.continuationIndent > 0 ||
 			isContinuationOperator(token) ||
+			token.Text == "," || // a comma-led line continues its list (issue #326)
 			(isMemberAccessColon(token) && s.colonHasReceiver()) ||
 			s.lastNonWSToken.Text == ":=" ||
 			s.lastNonWSToken.Text == "," ||
@@ -1782,7 +1783,18 @@ func awaitsOperand(tok lexer.Token) bool {
 	if tok.Type != lexer.TokenKeyword || !strings.HasPrefix(tok.Text, ":") {
 		return false
 	}
-	return operandKeywords[strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))]
+	k := strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))
+	return operandKeywords[k] || declarationOperandKeywords[k]
+}
+
+// declarationOperandKeywords take an operand list that may start on the
+// next line (`:PARAMETERS ⏎ sA, sB;`); that list is a continuation, one
+// level deep throughout, rather than its first line sitting at the
+// keyword's depth and the rest one deeper (issue #326). Their ';' handling
+// is needsSemicolonAtLineEnd's.
+var declarationOperandKeywords = map[string]bool{
+	"PARAMETERS": true, "DECLARE": true, "PUBLIC": true, "DEFAULT": true,
+	"INCLUDE": true, "INHERIT": true,
 }
 
 // findNextSignificant returns the next token after startIdx that is neither

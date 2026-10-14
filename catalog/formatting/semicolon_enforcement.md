@@ -187,7 +187,7 @@ following lines — no semicolon is forced after the bare keyword, which
 would truncate the statement and orphan the list (production-corpus
 shape, issue #216 review residual):
 
-### Idempotent
+### Before
 
 ```ssl
 :PARAMETERS
@@ -196,9 +196,18 @@ chartNo, strRules, Mean
 :DEFAULT chartNo, "";
 ```
 
-(Continuation-line reindentation for split declaration lists is a
-separate open layout question; this fence pins only the no-forced-';'
-guarantee.)
+### After
+
+```ssl
+:PARAMETERS
+	chartNo, strRules, Mean
+	, STD, CV;
+:DEFAULT chartNo, "";
+```
+
+(The list's lines take one continuation level throughout, a comma-led
+line included — fmt.indent_style, issue #326. The fence also pins the
+no-forced-';' guarantee.)
 
 An operand-taking keyword whose operand starts the next line keeps that
 operand — a forced `;` would make `:IF` a compile error and `:RETURN` a

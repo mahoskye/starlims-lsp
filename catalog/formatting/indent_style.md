@@ -76,6 +76,13 @@ history:
       The invalid :ENDFOR closes its :FOR's indentation, as the validator
       pairs them (endfor_invalid reports it); it used to leave every
       following line, the next :PROCEDURE included, one level deep.
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      A declaration list that starts on the line after its keyword takes
+      one continuation level throughout, and a comma-led line is a
+      continuation; the list's first line used to sit at the keyword's
+      depth and the rest one deeper.
 issues: ["#36", "#86", "#101", "#326"]
 ---
 
@@ -95,10 +102,13 @@ space-indented file. For line-length accounting a tab is counted as
 `indentSize` columns.
 
 Continuation lines — inside an unclosed `(`/`{`/`[`, beginning with a
-binary operator or with a member-access `:` continuing a call chain,
+binary operator, a comma (a comma-led list line, issue #326) or with a
+member-access `:` continuing a call chain,
 following a line that ended in `:=`, a comma or a binary operator, or
 supplying the operand of a keyword that ended the previous line
-(`:RETURN ⏎ nValue;`, fmt.semicolon_enforcement) — sit exactly one level
+(`:RETURN ⏎ nValue;`, or a declaration list after a bare `:PARAMETERS`,
+`:DECLARE`, `:PUBLIC`, `:DEFAULT`, `:INCLUDE` or `:INHERIT` — issue #326;
+fmt.semicolon_enforcement) — sit exactly one level
 past the line that opened the statement (issues #86/#89; the member-access
 form is the issue #240 follow-up; the keyword-operand form is issue #255).
 The anchor is lexical, not block depth: an `:IF` condition's continuation
@@ -113,7 +123,7 @@ ssl-style-guide#120): every hanging line of a `:DECLARE`, `:PARAMETERS` or
 that first item — the statement's indent in the configured style, then
 spaces up to the item's column (9 for `:DECLARE`, 12 for `:PARAMETERS`, 8
 for `:PUBLIC`). A list that starts on the line after its keyword has no
-first item to align with and keeps the rules above.
+first item to align with: all its lines take one continuation level.
 
 Standalone comments are indented at the enclosing block depth like
 statements. Only the first line of a multi-line comment is indented:

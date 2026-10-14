@@ -122,6 +122,7 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 		// fragments must stay at its indent too (issue #255).
 		isCont := delimsAtLine[i] > 0 ||
 			isContinuationOperator(firstTokOfLine[i]) ||
+			firstTokOfLine[i].Text == "," ||
 			isMemberAccessColon(firstTokOfLine[i]) ||
 			lastTokBeforeLine[i].Text == ":=" ||
 			lastTokBeforeLine[i].Text == "," ||

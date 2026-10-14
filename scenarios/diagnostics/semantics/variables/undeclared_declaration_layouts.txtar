@@ -20,7 +20,7 @@ from this input: range-formatting the line before it appends a `;`.)
 	:PARAMETERS sPrefix, sStem,
 	            sSuffix;
 	:DECLARE
-	sJoined,
+		sJoined,
 		sSeparator;
 	sSeparator := "-";
 	sJoined := sPrefix + sSeparator + sStem + sSeparator + sSuffix;
