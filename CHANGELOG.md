@@ -32,6 +32,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document is. Range-formatting each line of formatted output used to
   change 5,032 lines in a 577-file production sample; across all 4,620
   scripts it now changes none.
+- **SSL formatter defects** (#326):
+  - **Missing terminators:** a statement left without `;` before `:ELSE`,
+    `:CASE`, `:OTHERWISE`, `:CATCH` or `:FINALLY` is terminated. Those
+    keywords were treated as continuations, so the compile error was kept.
+  - **Glued `===` / `!==`:** they stay one operator. Formatting split them
+    into `== =`, adding an `unexpected_token` error.
+  - **`:ERROR` handler bodies:** a block nested in the body keeps its
+    depth. A nested `:ENDIF` used to close the handler too.
+  - **`:ENDFOR`:** it closes its `:FOR`'s indent, as the validator pairs
+    them. Every following line used to sit one level deep.
+  - **Code-block subscripts:** a subscript stays glued to its array in a
+    code-block body (`{|aRow| aRow[2]}`).
+  - **Unary operators:** they attach to their operand (`- 5` → `-5`,
+    `! bR` → `!bR`, `nA ++` → `nA++`).
+  - **Glued keywords:** a keyword glued to its neighbors is spaced
+    (`1:TO 5:STEP-1` → `1 :TO 5 :STEP -1`, `:IF(` → `:IF (`).
+  - **Stray semicolons:** they stay on their statement's line instead of
+    becoming lines of their own.
+  - **Declaration lists started on the next line:** such a list takes one
+    continuation level throughout, a comma-led line included.
+  - **Procedure boundaries:** a top-level `:PROCEDURE` or `:REGION` after
+    script-level code or a class header gets its blank line (schema
+    `blank_lines.before_procedure`).
+
+  On the production corpus 475 of 6,228 files format differently, most
+  of them from `! Empty(...)` becoming `!Empty(...)`. No file becomes
+  non-idempotent, and formatting adds no errors.
 
 ## [0.25.0] - 2026-10-13
 

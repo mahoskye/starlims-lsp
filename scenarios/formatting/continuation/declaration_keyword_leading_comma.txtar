@@ -17,11 +17,11 @@ nCount := 0;
 -- format --
 :PROCEDURE ChartStats;
 	:PARAMETERS
-	sChartId, aRules, nMean
-	, nDeviation, nLimit;
+		sChartId, aRules, nMean
+		, nDeviation, nLimit;
 	:DEFAULT sChartId, "";
 	:DECLARE
-	nIndex, nCount;
+		nIndex, nCount;
 	nIndex := 0;
 	nCount := 0;
 	:RETURN nCount;

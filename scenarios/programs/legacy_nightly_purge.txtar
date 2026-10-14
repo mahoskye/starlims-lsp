@@ -6,7 +6,6 @@ concatenation, and an :ERROR / :RESUME pair. Formatting plus the full
 diagnostic picture of an old maintenance script.
 Also carries a :FOR typed without its colon (For k ...) and a :WHILE
 missing its ';', as hand-edited legacy code does.
-Suspected issue: #326 — the validator pairs :ENDFOR with its :FOR (no unclosed_block; the later :NEXT is unmatched_block_end), but the formatter does not treat :ENDFOR as a closer, so every following line, the :PROCEDURE included, is indented one level too deep until a :NEXT.
 The second half adds an archive procedure that sends a SELECT through
 RunSQL (runsql_non_dml), compares strings with '= ""', declares a
 :PUBLIC counter, and crams a :FOR loop body onto its header line.
@@ -135,26 +134,26 @@ n := 1;
 :FOR n := 0 :TO Len(purged) - 1;
 	deleted := purged[n];
 	UsrMes("purged " + deleted);
-	:ENDFOR;
+:ENDFOR;
 
-	:IF Len(purged) == Len(tables);
-		:RETURN "all purged";
-	:ENDIF;
+:IF Len(purged) == Len(tables);
+	:RETURN "all purged";
+:ENDIF;
 
-	DoProc("ReportPartial", {purged});
-	:RETURN "partial";
+DoProc("ReportPartial", {purged});
+:RETURN "partial";
 
-	:PROCEDURE ReportPartial;
-		:PARAMETERS done;
-		:DECLARE msg, k;
-		msg := "";
-		For k := 1 :TO Len(done);
-		msg := msg + done[k] + " ";
-	:NEXT;
-	ErrorMes("purge", "partial: " + msg);
-	:ERROR;
-		ErrorMes("purge", "ReportPartial failed");
-	:RESUME;
+:PROCEDURE ReportPartial;
+	:PARAMETERS done;
+	:DECLARE msg, k;
+	msg := "";
+	For k := 1 :TO Len(done);
+	msg := msg + done[k] + " ";
+:NEXT;
+ErrorMes("purge", "partial: " + msg);
+:ERROR;
+	ErrorMes("purge", "ReportPartial failed");
+:RESUME;
 :ENDPROC;
 
 :PROCEDURE Archive;

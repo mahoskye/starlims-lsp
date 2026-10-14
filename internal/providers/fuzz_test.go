@@ -162,35 +162,8 @@ func FuzzFormatRangeStable(f *testing.F) {
 			r := edits[0].Range
 			was := strings.Join(lines[r.Start.Line:r.End.Line+1], "\n")
 			if edits[0].NewText != was {
-				if semicolonGap326(lines, r.End.Line) {
-					t.Skip("known: the full formatter leaves a statement before a middle keyword unterminated (issue #326)")
-				}
 				t.Fatalf("range-formatting line %d of formatted output changes it\ndoc: %q\nwas: %q\nnow: %q", i+1, doc, was, edits[0].NewText)
 			}
 		}
 	})
-}
-
-// semicolonGap326 reports the issue #326 class: line end of the formatted
-// output lacks its ';' and the next code line opens with :ELSE, :CATCH,
-// :FINALLY, :CASE or :OTHERWISE, which the full formatter wrongly treats
-// as continuing the statement. A range ending there terminates it, as the
-// full formatter will once #326 is fixed; remove this then.
-func semicolonGap326(lines []string, end int) bool {
-	if end >= len(lines) || strings.HasSuffix(strings.TrimSpace(lines[end]), ";") {
-		return false
-	}
-	for _, l := range lines[end+1:] {
-		l = strings.ToUpper(strings.TrimSpace(l))
-		if l == "" {
-			continue
-		}
-		for _, kw := range []string{":ELSE", ":CATCH", ":FINALLY", ":CASE", ":OTHERWISE"} {
-			if strings.HasPrefix(l, kw) {
-				return true
-			}
-		}
-		return false
-	}
-	return false
 }

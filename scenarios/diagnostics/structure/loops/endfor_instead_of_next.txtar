@@ -19,9 +19,9 @@ unexpected_token (diag.endfor_invalid, diag.unclosed_block issue #255).
 	nTotal := 0;
 	:FOR nIdx := 1 :TO Len(aWeights);
 		nTotal := nTotal + aWeights[nIdx];
-		:ENDFOR;
-		:RETURN nTotal;
-	:ENDPROC;
+	:ENDFOR;
+	:RETURN nTotal;
+:ENDPROC;
 -- diagnostics --
 7:2-7:9 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
 -- diagnostics [--strict --info] --

@@ -13,8 +13,7 @@ nValue += 1;;
 :PROCEDURE Tidy;
 	:DECLARE nValue;
 	nValue := 1;
-	nValue += 1;
-	;
+	nValue += 1;;
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

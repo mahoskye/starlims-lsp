@@ -1,13 +1,8 @@
 A declaration keyword alone on its line (:PARAMETERS, :DECLARE) takes its
 operand list from the following lines: no `;` is forced after the bare
-keyword (fmt.semicolon_enforcement issue #216). The list has no first
-item on the keyword's line to align with, so fmt.indent_style says it
-"keeps the rules above" (one continuation level for the operand of a
-keyword that ended the previous line).
-Suspected issue: #326 — the first operand line stays at the keyword's own indent
-(unlike `:RETURN ⏎ nValue;`) and the next list line is indented one level
-past it, a staircase; fmt.indent_style says such a list "keeps the rules
-above" (fmt.semicolon_enforcement still calls this an open layout question).
+keyword (fmt.semicolon_enforcement issue #216), and every list line takes
+one continuation level, as the operand of a keyword that ended the
+previous line does (fmt.indent_style, issue #326).
 -- input.ssl --
 :PROCEDURE ChartStats;
 :PARAMETERS
@@ -23,11 +18,11 @@ nCount := nMean;
 -- format --
 :PROCEDURE ChartStats;
 	:PARAMETERS
-	sChartId, aRules,
+		sChartId, aRules,
 		nMean;
 	:DEFAULT sChartId, "";
 	:DECLARE
-	nIndex, nCount;
+		nIndex, nCount;
 	nIndex := Len(aRules);
 	nCount := nMean;
 	:RETURN nCount + nIndex;

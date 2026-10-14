@@ -13,6 +13,7 @@ through Me: is the correct pattern and does not fire.
 :CLASS TrayQueue;
 :DECLARE sQueueName := "default";
 :DECLARE nDepth;
+
 :PROCEDURE Constructor;
 	Me:nDepth := 0;
 	Me:sQueueName := "main";

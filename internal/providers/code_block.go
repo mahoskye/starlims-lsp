@@ -95,6 +95,13 @@ func normalizeExpression(expr string, opts FormattingOptions) string {
 				space = false
 			case t.Text == "(" && prev.Type == lexer.TokenIdentifier:
 				space = false
+			case t.Text == "[" && t.Type == lexer.TokenPunctuation &&
+				(prev.Type == lexer.TokenIdentifier || isCloseParen(prev)),
+				t.Text == "{" && prev.Type == lexer.TokenIdentifier:
+				// A subscript binds to its array, and a built-in class
+				// instantiation's '{' to its class name, as in a statement
+				// (`aRow[2]`, `Email{}`; issue #326).
+				space = false
 			case t.Text == "++" || t.Text == "--":
 				space = false
 			case prev.Text == "!":

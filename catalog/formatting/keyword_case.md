@@ -104,6 +104,7 @@ nT := base:Compute(1);
 
 ```ssl
 :CLASS Demo;
+
 :PROCEDURE M;
 	Me:Helper();
 	nT := Base:Compute(1);

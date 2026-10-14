@@ -29,6 +29,7 @@ aeval(me:items,fnAdd);
 :CLASS ResultBatch;
 :INHERIT Common.BatchBase;
 :DECLARE items, count;
+
 :PROCEDURE Init;
 	:PARAMETERS aItems;
 	Me:items := aItems;

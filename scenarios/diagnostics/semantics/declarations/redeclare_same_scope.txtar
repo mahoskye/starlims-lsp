@@ -14,6 +14,7 @@ nRound := 1;
 -- format --
 :DECLARE nRound;
 :DECLARE NROUND;
+
 :PROCEDURE Merge;
 	:PARAMETERS aLeft, aRight;
 	:DECLARE aMerged, aRight;

@@ -19,6 +19,7 @@ literals, and dotted text inside a :REGION body (issue #164).
 :ENDPROC;
 -- format --
 :INCLUDE Framework.Core.Text.Helpers;
+
 :PROCEDURE ReadSubject;
 	:PARAMETERS bA, bB;
 	:DECLARE oMail, vOut, nRate;

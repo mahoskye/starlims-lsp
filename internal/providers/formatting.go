@@ -201,11 +201,11 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	}
 	baseIndent := detectBaseIndent(codeLines)
 	// The one line widening cannot anchor: the document's first code line
-	// led by a binary operator. The formatter gives it a continuation
+	// led by a binary operator or a comma. The formatter gives it a continuation
 	// level of its own, which the base indent already holds (issue #325,
 	// found by FuzzFormatRangeStable).
 	if first := firstSignificant(docTokens); first != nil && first.Line-1 == startLine &&
-		isContinuationOperator(*first) {
+		(isContinuationOperator(*first) || first.Text == ",") {
 		baseIndent = strings.TrimSuffix(baseIndent, oneIndentLevel(opts))
 	}
 
@@ -431,7 +431,7 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 				}
 			}
 			switch {
-			case depth > 0 || isContinuationOperator(t) || isMemberAccessColon(t):
+			case depth > 0 || isContinuationOperator(t) || isMemberAccessColon(t) || t.Text == ",":
 				cont[line] = true
 			case haveCode && (lastCode.Text == ":=" || lastCode.Text == "," ||
 				isContinuationOperator(lastCode) || (awaitsOperand(lastCode) && !kw)):
@@ -564,6 +564,7 @@ type formatState struct {
 	lineStart             bool
 	prevToken             lexer.Token
 	lastNonWSToken        lexer.Token
+	beforeLastNonWS       lexer.Token // the code token before lastNonWSToken
 	prevKeyword           string
 	inProcedure           bool
 	afterEndProc          bool
@@ -588,6 +589,7 @@ type formatState struct {
 	tokenIndex            int
 	pendingStatementBreak bool
 	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
+	errorBodyIndent       int  // indent level of the :ERROR / :RESUME body
 	// commentBlockStart is the builder offset where the current run of
 	// standalone comment lines began, or -1 when the output does not
 	// currently end in such a run. A blank line or any non-comment content
@@ -627,8 +629,14 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	// Handle block end keywords - dedent before.
 	// If we're in an :ERROR handler, the scope-based handler ends too,
 	// so we need an extra dedent to close it.
-	if constants.IsBlockEndKeyword(normalized) {
-		if s.inErrorHandler {
+	// Only the block end that closes the block holding the :ERROR —
+	// reached at the handler body's own depth — ends the handler; a closer
+	// of a block nested in the handler body does not (issue #326).
+	// :ENDFOR is not SSL (endfor_invalid reports it), but the validator
+	// pairs it with its :FOR; indenting it as a closer keeps the rest of
+	// the file at its depth instead of one level too deep (issue #326).
+	if constants.IsBlockEndKeyword(normalized) || normalized == "ENDFOR" {
+		if s.inErrorHandler && s.indent == s.errorBodyIndent {
 			s.indent--
 			s.inErrorHandler = false
 		}
@@ -655,7 +663,12 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		// :PROCEDURE or :REGION — is normalized; mixed pairs used to be
 		// left unseparated (issue #255; schema blank_lines.before_procedure
 		// and before_region are both 1).
-		if s.afterEndProc || s.afterEndRegion {
+		// A top-level :PROCEDURE after any other code — script-level
+		// statements, a class header — is a unit boundary too (schema
+		// blank_lines.before_procedure: 1, issue #326); at the start of
+		// the file normalizeProcBoundary finds nothing above and adds no
+		// line.
+		if s.afterEndProc || s.afterEndRegion || (!s.inProcedure && s.indent == 0) {
 			s.normalizeProcBoundary()
 		}
 		s.inProcedure = true
@@ -665,7 +678,8 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 		s.inProcedure = false
 		s.afterEndProc = true
 	case "REGION":
-		if s.afterEndRegion || s.afterEndProc {
+		// Likewise a top-level :REGION (schema blank_lines.before_region).
+		if s.afterEndRegion || s.afterEndProc || (!s.inProcedure && s.indent == 0) {
 			s.normalizeProcBoundary()
 		}
 		s.afterEndRegion = false
@@ -799,6 +813,7 @@ func (s *formatState) writeIndentIfNeeded(token lexer.Token) {
 		// the second pass and oscillated (issue #218).
 		isContinuation := s.continuationIndent > 0 ||
 			isContinuationOperator(token) ||
+			token.Text == "," || // a comma-led line continues its list (issue #326)
 			(isMemberAccessColon(token) && s.colonHasReceiver()) ||
 			s.lastNonWSToken.Text == ":=" ||
 			s.lastNonWSToken.Text == "," ||
@@ -866,6 +881,12 @@ func isDeclListKeyword(tok lexer.Token) bool {
 
 func (s *formatState) flushPendingStatementBreak(token lexer.Token) {
 	if !s.pendingStatementBreak || token.Type == lexer.TokenWhitespace || token.Type == lexer.TokenComment {
+		return
+	}
+	// An empty statement — a stray ';' after a ';' — stays on its
+	// statement's line (`:IF .T.;;`); breaking before each one turned a
+	// typo into lines holding a lone ';' (issue #326).
+	if token.Text == ";" && s.lastNonWSToken.Text == ";" {
 		return
 	}
 
@@ -947,6 +968,13 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 			s.continuationIndent = 0
 		}
 	} else if !s.lineStart {
+		// Unary operators attach to their operand (fmt.operator_spacing):
+		// a source space after `!`, a unary sign or a prefix `++`/`--`,
+		// or before a postfix `++`/`--`, is dropped (issue #326).
+		if next := findNextNonWS(tokens, index); next != nil && s.attachesUnary(*next) {
+			s.prevToken = token
+			return true
+		}
 		// Suppress space before ( in function calls: "MyFunc (" -> "MyFunc("
 		if s.lastNonWSToken.Type == lexer.TokenIdentifier {
 			if next := findNextNonWS(tokens, index); next != nil && next.Text == "(" {
@@ -1016,6 +1044,54 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 
 	s.prevToken = token
 	return true
+}
+
+// gluedBefore reports whether a colon keyword follows code on its line
+// with no space between them.
+func (s *formatState) gluedBefore(kw lexer.Token) bool {
+	p := s.prevToken
+	return !s.lineStart && !s.lineHasOnlyIndent() && p.Type != 0 &&
+		p.Type != lexer.TokenWhitespace && !isOpenParen(p) && p.Line == kw.Line
+}
+
+// gluedAfter reports whether the colon keyword at tokens[i] is directly
+// followed by an operand on its line — anything but whitespace, ';', a
+// closing delimiter or a comma.
+func gluedAfter(tokens []lexer.Token, i int) bool {
+	if i+1 >= len(tokens) {
+		return false
+	}
+	n := tokens[i+1]
+	return n.Type != lexer.TokenWhitespace && n.Type != lexer.TokenEOF &&
+		n.Type != lexer.TokenComment && n.Text != ";" && n.Text != "," && !isCloseParen(n)
+}
+
+// attachesUnary reports whether the source space between the last code
+// token and next separates a unary operator from its operand, so it is
+// dropped. The space stays wherever gluing would re-lex as a different
+// token (`! =` -> `!=`, `- -5` -> `--5`).
+func (s *formatState) attachesUnary(next lexer.Token) bool {
+	if !s.opts.OperatorSpacing || next.Type == lexer.TokenComment || next.Type == lexer.TokenEOF {
+		return false
+	}
+	last, before := s.lastNonWSToken, s.beforeLastNonWS
+	operandEnd := func(t lexer.Token) bool {
+		return t.Type == lexer.TokenIdentifier || t.Text == ")" || t.Text == "]"
+	}
+	switch {
+	case (next.Text == "++" || next.Text == "--") && operandEnd(last):
+		return true // postfix: `nA ++` -> `nA++`
+	case last.Type == lexer.TokenOperator && last.Text == "!":
+		return !strings.HasPrefix(next.Text, "=")
+	case (last.Text == "-" || last.Text == "+") && before.Type != 0 &&
+		before.Line == last.Line && isUnaryContext(before, false) &&
+		// A value keyword (NIL, .T.) is an operand: the sign after it is binary.
+		!(before.Type == lexer.TokenKeyword && !strings.HasPrefix(before.Text, ":")):
+		return !strings.ContainsAny(next.Text[:1], "+-=")
+	case (last.Text == "++" || last.Text == "--") && !operandEnd(before):
+		return !strings.ContainsAny(next.Text[:1], "+-=") // prefix: `++ nA`
+	}
+	return false
 }
 
 // shouldJoinSQLStringBreak reports whether a newline whitespace token sits at
@@ -1130,9 +1206,14 @@ func (s *formatState) writeOperatorOrComma(token lexer.Token, tokens []lexer.Tok
 			next := tokens[index+1]
 			// No space before a comma either when the whitespace handler
 			// would drop it (issue #256, found by FuzzFormat).
+			// The invalid `===` / `!==` lex as `==`/`!=` then `=`; spacing
+			// them apart turns invalid_operator_sequence's one operator
+			// into two and adds an unexpected_token error, so a glued pair
+			// stays glued (issue #326).
+			gluedStrictEquals := (token.Text == "==" || token.Text == "!=") && next.Text == "="
 			if next.Type != lexer.TokenWhitespace && !isCloseParen(next) && next.Text != ";" &&
 				!(s.opts.CommaSpacing && next.Text == ",") && !trailingComment(tokens, index+1) &&
-				next.Type != lexer.TokenEOF {
+				next.Type != lexer.TokenEOF && !gluedStrictEquals {
 				s.builder.WriteString(" ")
 				s.currentLineLen++
 			}
@@ -1259,8 +1340,13 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// quote at baseIndent). Otherwise the next token's wrap logic sees a
 	// huge length and forces a newline between the closing '"' and a
 	// trailing ',' / remaining call args.
+	// It is measured in columns, a tab as indentSize, like the indent
+	// writeIndentLen counts; counting bytes made a range format, which
+	// narrows its budget by its base indent in columns, disagree with a
+	// full format on the next string's fit (issue #325 follow-up, found
+	// by FuzzFormatRangeStable).
 	if idx := strings.LastIndex(formattedSQL, "\n"); idx >= 0 {
-		s.currentLineLen = len(formattedSQL) - idx - 1
+		s.currentLineLen = visualWidth(formattedSQL[idx+1:], s.opts)
 	} else {
 		s.currentLineLen += len(formattedSQL)
 	}
@@ -1276,6 +1362,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		// :ERROR and :RESUME are scope-based — indent body after them
 		if s.prevKeyword == "ERROR" || s.prevKeyword == "RESUME" {
 			s.indent++
+			s.errorBodyIndent = s.indent
 		}
 	}
 
@@ -1305,6 +1392,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 
 	s.orphanColon = isMemberAccessColon(token) && !s.colonHasReceiver()
 	s.prevToken = token
+	s.beforeLastNonWS = s.lastNonWSToken
 	s.lastNonWSToken = token
 }
 
@@ -1427,10 +1515,22 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
 			} else if token.Type == lexer.TokenKeyword {
-				// Colon-prefixed keyword: :if -> :IF, :endIf -> :ENDIF
+				// Colon-prefixed keyword: :if -> :IF, :endIf -> :ENDIF.
+				// A keyword glued to the code around it is spaced apart
+				// (`1:TO 5`, `:STEP-1`, `:IF(j > 1)`; schema
+				// spaces.before_step_keyword, issue #326).
+				known := constants.IsKeyword(strings.ToUpper(strings.TrimPrefix(token.Text, ":")))
+				if known && state.gluedBefore(token) {
+					state.builder.WriteString(" ")
+					state.currentLineLen++
+				}
 				normalized := ":" + strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
+				if known && gluedAfter(tokens, i) {
+					state.builder.WriteString(" ")
+					state.currentLineLen++
+				}
 			} else if canonical, ok := canonicalReceiver(token, tokens, i); ok {
 				// Me/Base as member-access receivers take their canonical
 				// casing (issue #90, schema R41).
@@ -1648,18 +1748,13 @@ func needsSemicolonAtLineEnd(lastToken lexer.Token, tokens []lexer.Token, wsInde
 		if nextTok.Type == lexer.TokenKeyword {
 			keyword := strings.ToUpper(strings.TrimPrefix(nextTok.Text, ":"))
 
-			// Keywords that are continuations (don't need semicolon before)
-			continuationKeywords := map[string]bool{
-				"ELSE":      true,
-				"CATCH":     true,
-				"FINALLY":   true,
-				"CASE":      true,
-				"OTHERWISE": true,
-				"TO":        true,
-				"STEP":      true,
-			}
-
-			if continuationKeywords[keyword] {
+			// Only :TO / :STEP continue a statement (a :FOR header split
+			// across lines). The middle keywords :ELSE, :CATCH, :FINALLY,
+			// :CASE and :OTHERWISE begin a clause of their own, so the
+			// statement before them ends here; treating them as
+			// continuations left it unterminated, a compile error the
+			// formatter kept (issue #326).
+			if keyword == "TO" || keyword == "STEP" {
 				return false
 			}
 
@@ -1694,7 +1789,18 @@ func awaitsOperand(tok lexer.Token) bool {
 	if tok.Type != lexer.TokenKeyword || !strings.HasPrefix(tok.Text, ":") {
 		return false
 	}
-	return operandKeywords[strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))]
+	k := strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))
+	return operandKeywords[k] || declarationOperandKeywords[k]
+}
+
+// declarationOperandKeywords take an operand list that may start on the
+// next line (`:PARAMETERS ⏎ sA, sB;`); that list is a continuation, one
+// level deep throughout, rather than its first line sitting at the
+// keyword's depth and the rest one deeper (issue #326). Their ';' handling
+// is needsSemicolonAtLineEnd's.
+var declarationOperandKeywords = map[string]bool{
+	"PARAMETERS": true, "DECLARE": true, "PUBLIC": true, "DEFAULT": true,
+	"INCLUDE": true, "INHERIT": true,
 }
 
 // findNextSignificant returns the next token after startIdx that is neither

@@ -14,7 +14,7 @@ with the corrected form (diag.step_spacing).
 :PROCEDURE EvenTotal;
 	:DECLARE nIdx, nTotal;
 	nTotal := 0;
-	:FOR nIdx := 2 :TO 10:STEP 2;
+	:FOR nIdx := 2 :TO 10 :STEP 2;
 		nTotal := nTotal + nIdx;
 	:NEXT;
 	:RETURN nTotal;

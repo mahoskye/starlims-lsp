@@ -1,5 +1,3 @@
-Known failure: range-stable — a statement left without ";" before :ELSE / :OTHERWISE is terminated by range formatting but not by the full formatter (#326 item 1)
-Known failure: no-gained-errors — an unterminated :EXITCASE before :OTHERWISE stays unterminated, adding exitcase_last_in_branch (#326)
 Lines that finish a statement without `;` get one when the next line
 starts a new statement: after an identifier, number, string, closing
 delimiter, postfix `++` (issue #99), a code-block literal and a bare
@@ -35,7 +33,7 @@ sLabel := ""
 	:BEGINCASE;
 	:CASE nValue == 1;
 		sLabel := Upper(sLabel);
-		:EXITCASE
+		:EXITCASE;
 	:OTHERWISE;
 		sLabel := "";
 		:EXITCASE;

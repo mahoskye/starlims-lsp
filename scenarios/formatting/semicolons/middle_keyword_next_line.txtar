@@ -1,4 +1,3 @@
-Known failure: range-stable — a statement left without ";" before :ELSE / :OTHERWISE is terminated by range formatting but not by the full formatter (#326 item 1)
 A statement line without `;` followed by a continuation keyword
 (:ELSE, :CASE, :OTHERWISE, :CATCH, :FINALLY): records whether the
 missing terminator is supplied before the middle keyword
@@ -27,15 +26,15 @@ nValue := 0
 	:PARAMETERS nValue;
 	:DECLARE sOut;
 	:IF nValue > 0;
-		sOut := "pos"
+		sOut := "pos";
 	:ELSE;
 		sOut := "neg";
 	:ENDIF;
 
 	:TRY;
-		sOut := LimsString(nValue)
+		sOut := LimsString(nValue);
 	:CATCH;
-		sOut := ""
+		sOut := "";
 	:FINALLY;
 		nValue := 0;
 	:ENDTRY;

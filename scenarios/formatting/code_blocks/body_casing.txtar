@@ -13,6 +13,7 @@ fnText := {|s|s+" .and. nil len(x)"};
 :ENDPROC;
 -- format --
 :CLASS Filter;
+
 :PROCEDURE Build;
 	:DECLARE fnReady, fnLen, fnText;
 	fnReady := {|o| Me:IsReady(o) .AND. o != NIL .OR. .F.};

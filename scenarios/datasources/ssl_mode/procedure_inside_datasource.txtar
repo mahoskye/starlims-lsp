@@ -12,6 +12,7 @@ parameter has its inline default. The procedure is called with DoProc.
 :RETURN DoProc("BuildCode", {sPrefix, 1});
 -- format --
 :PARAMETERS sPrefix := "LOT";
+
 :PROCEDURE BuildCode;
 	:PARAMETERS sHead, nSeq;
 	:RETURN sHead + "-" + LimsString(nSeq);

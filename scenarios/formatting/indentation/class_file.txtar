@@ -24,6 +24,7 @@ me:isValid := .t.;
 :CLASS OrderHandler;
 :INHERIT Common.BaseHandler;
 :DECLARE orderNo, isValid;
+
 :PROCEDURE Init;
 	:PARAMETERS sOrderNo;
 	Me:orderNo := sOrderNo;

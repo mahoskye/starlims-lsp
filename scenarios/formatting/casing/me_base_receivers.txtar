@@ -21,6 +21,7 @@ me := 1;
 :CLASS SampleHandler;
 :INHERIT Common.BaseHandler;
 :DECLARE status;
+
 :PROCEDURE Refresh;
 	:DECLARE nTotal;
 	Me:status := "R";
