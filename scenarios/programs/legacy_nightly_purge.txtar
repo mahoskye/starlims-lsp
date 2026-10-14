@@ -241,7 +241,6 @@ ErrorMes("purge", "partial: " + msg);
 17:1-17:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
 17:13-17:16 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
 20:1-20:8 error endfor_invalid: ':ENDFOR' is not valid — FOR loops must be terminated with ':NEXT'
-33:1-33:4 warning undeclared_variable: Variable 'For' is not declared
 33:5-33:6 error unexpected_token: Unexpected identifier 'k' - expected an operator or ';'
 33:55-33:60 error unmatched_block_end: Unexpected ':NEXT' without matching block start
 35:1-35:7 warning deprecated_keyword: ':ERROR' is legacy error handling. Prefer ':TRY' / ':CATCH' / ':FINALLY'

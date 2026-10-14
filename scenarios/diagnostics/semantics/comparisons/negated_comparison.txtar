@@ -1,0 +1,41 @@
+.NOT. binds before every comparison operator, so `.NOT. sCode = "AB"`
+is `(.NOT. sCode) = "AB"` (diag.parenthesize_negated_comparison, warning,
+on the whole comparison). A string or number literal under the .NOT.
+always raises, so that form is an error. Parenthesized comparisons and an
+explicitly grouped negation stay silent (issue #339).
+-- input.ssl --
+:PROCEDURE CheckCode;
+	:PARAMETERS sCode, nLimit, bReady;
+	:DECLARE bOut;
+	bOut := .NOT. sCode = "AB";
+	bOut := .NOT. nLimit < 3;
+	bOut := .NOT. 5 == nLimit;
+	bOut := .NOT. (sCode = "AB");
+	bOut := (.NOT. bReady) == .F.;
+	bOut := .NOT. bReady .AND. bOut;
+	:RETURN bOut;
+:ENDPROC;
+-- format --
+:PROCEDURE CheckCode;
+	:PARAMETERS sCode, nLimit, bReady;
+	:DECLARE bOut;
+
+	bOut := .NOT. sCode = "AB";
+	bOut := .NOT. nLimit < 3;
+	bOut := .NOT. 5 == nLimit;
+	bOut := .NOT. (sCode = "AB");
+	bOut := (.NOT. bReady) == .F.;
+	bOut := .NOT. bReady .AND. bOut;
+
+	:RETURN bOut;
+:ENDPROC;
+-- diagnostics --
+4:10-4:28 warning parenthesize_negated_comparison: '.NOT.' binds before '=', so this negates the left operand alone - write '.NOT. (a = b)' to negate the comparison
+5:10-5:26 warning parenthesize_negated_comparison: '.NOT.' binds before '<', so this negates the left operand alone - write '.NOT. (a < b)' to negate the comparison
+6:10-6:27 error parenthesize_negated_comparison: '.NOT.' binds before '==', so it applies to a number literal and raises at run time - write '.NOT. (a == b)' to negate the comparison
+-- diagnostics [--strict --info] --
+4:10-4:28 warning parenthesize_negated_comparison: '.NOT.' binds before '=', so this negates the left operand alone - write '.NOT. (a = b)' to negate the comparison
+4:22-4:23 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons
+5:10-5:26 warning parenthesize_negated_comparison: '.NOT.' binds before '<', so this negates the left operand alone - write '.NOT. (a < b)' to negate the comparison
+6:10-6:27 error parenthesize_negated_comparison: '.NOT.' binds before '==', so it applies to a number literal and raises at run time - write '.NOT. (a == b)' to negate the comparison
+7:23-7:24 info equals_vs_strict_equals: For strings, '=' does prefix matching. Use '==' for exact string comparisons

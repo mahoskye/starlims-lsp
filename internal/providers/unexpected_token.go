@@ -65,7 +65,57 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 			Code:     CodeUnexpectedToken,
 		})
 	}
+	diagnostics = append(diagnostics, declarationListKeywords(tokens, reported)...)
 	return append(diagnostics, orphanColons(tokens, reported)...)
+}
+
+// declarationKeywords take a bare name list: `:DECLARE a, b;`. The
+// statement extractor carries no expressions for them, so the parser
+// never judges their content.
+var declarationKeywords = map[string]bool{"DECLARE": true, "PARAMETERS": true, "PUBLIC": true}
+
+// declarationListKeywords reports the first keyword inside a declaration
+// list — `:PARAMETERS sIn :DEFAULT sIn, "";` — which can only mean the
+// list is missing its `;` (issue #323). A :DEFAULT inside a :DECLARE list
+// is default_on_declare_line's finding, named there with its fix.
+func declarationListKeywords(tokens []lexer.Token, reported map[int]bool) []Diagnostic {
+	var out []Diagnostic
+	for i := 0; i < len(tokens); i++ {
+		t := tokens[i]
+		if t.Type != lexer.TokenKeyword {
+			continue
+		}
+		head := strings.ToUpper(strings.TrimPrefix(t.Text, ":"))
+		if !declarationKeywords[head] {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			tok := tokens[j]
+			if tok.Type == lexer.TokenEOF || (tok.Type == lexer.TokenPunctuation && tok.Text == ";") {
+				break
+			}
+			if tok.Type != lexer.TokenKeyword {
+				continue
+			}
+			kw := strings.ToUpper(strings.TrimPrefix(tok.Text, ":"))
+			if !reported[j] && !(head == "DECLARE" && kw == "DEFAULT") {
+				reported[j] = true
+				msg := fmt.Sprintf("Unexpected %s - expected ',' or ';' (is the ':%s' list missing its ';'?)", describeToken(tok), head)
+				out = append(out, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(tok),
+					Message:  msg,
+					Source:   "ssl-lsp",
+					Code:     CodeUnexpectedToken,
+				})
+			}
+			// The keyword starts whatever follows; resume the outer scan
+			// there so a :DECLARE after it is judged on its own.
+			i = j - 1
+			break
+		}
+	}
+	return out
 }
 
 // orphanColons reports a ':' that starts a statement with nothing to be the

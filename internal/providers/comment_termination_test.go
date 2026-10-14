@@ -5,7 +5,15 @@ import (
 	"testing"
 
 	"starlims-lsp/internal/lexer"
+	"starlims-lsp/internal/parser"
 )
+
+// commentTerminationDiags runs the comment checks alone over text.
+func commentTerminationDiags(text string) []Diagnostic {
+	tokens := lexer.NewLexer(text).Tokenize()
+	diags, _ := checkCommentTermination(tokens, parser.ExtractStatementExpressions(tokens))
+	return diags
+}
 
 // Issue #6: a comment-only line following another comment must not be flagged
 // as "comment_text_after_terminator". The multi-line heuristic was over-eager
@@ -28,16 +36,13 @@ Parameters sName;
 
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	// The paragraph-break guard protects the SECOND comment (line 8,
 	// 0-based 7): its broken-out "Parameters" keyword sits across a blank
 	// line and must not be reported. The FIRST comment (0-based line 3)
-	// legitimately warns since issue #25's orphaned-prose signal landed —
-	// its "With more body" lines are genuinely stranded as code with no
-	// paragraph break in between.
+	// is reported: its "With more body" lines are stranded as code with no
+	// paragraph break in between, and they do not parse.
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator && d.Range.Start.Line == 7 {
 			t.Errorf("expected no comment_text_after_terminator across paragraph break, got: line=%d msg=%s",
@@ -56,13 +61,12 @@ Parameters sName;
    something */
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	found := false
 	for _, d := range diags {
-		if d.Code == CodeCommentTextAfterTerminator && strings.Contains(d.Message, "terminated early") {
+		if d.Code == CodeCommentTextAfterTerminator && strings.Contains(d.Message, "ends at this ';'") &&
+			d.Severity == SeverityError {
 			found = true
 		}
 	}
@@ -74,9 +78,8 @@ Parameters sName;
 // Issue #25: a multi-line comment whose interior line ends in ; strands the
 // remaining prose lines as code. When the prose contains no bare keyword the
 // bare-keyword signal is blind, but the next significant line starting with
-// two consecutive bare identifiers is the signature of orphaned prose and
-// must fire — as a warning, since keyword-less prose is a weaker signal than
-// a keyword match.
+// two consecutive bare identifiers never parses, so it must fire — as an
+// error since issue #343.
 func TestCheckCommentTermination_Issue25_OrphanedProseFires(t *testing.T) {
 	text := `:PROCEDURE Demo;
 /* This header explains the module
@@ -85,16 +88,14 @@ so these words are now parsed as code
 ;
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	found := false
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("orphaned-prose path must be a warning, got severity %v", d.Severity)
+			if d.Severity != SeverityError {
+				t.Errorf("stranded prose must be an error (issue #343), got severity %v", d.Severity)
 			}
 		}
 	}
@@ -103,10 +104,9 @@ so these words are now parsed as code
 	}
 }
 
-// Issue #25 boundary: a single bare identifier followed by valid code must
-// not fire the orphaned-prose signal — one identifier can legitimately start
-// a statement continued on the next line, so the second identifier must
-// share the first one's line.
+// Issue #25 boundary: a single bare identifier followed by code on the next
+// line is not blamed on the comment. The statement fails only on its second
+// line, which reads as a missing ';' (unexpected_token's finding).
 func TestCheckCommentTermination_Issue25_SingleIdentifierDoesNotFire(t *testing.T) {
 	text := `:PROCEDURE Demo;
 /* a multi-line note
@@ -115,9 +115,7 @@ orphan
 nCount := 1;
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator {
@@ -139,9 +137,7 @@ these words follow a paragraph break
 ;
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator {
@@ -162,9 +158,7 @@ nCount := 1;
 DoProc("X");
 :ENDPROC;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator {
@@ -181,20 +175,66 @@ func TestCheckCommentTermination_Issue25_SingleLineCommentStrandsProse(t *testin
 	text := `/* Client address: treat as a single composite object;
    if any component changes, the whole address is flagged;`
 
-	lex := lexer.NewLexer(text)
-	tokens := lex.Tokenize()
-	diags := checkCommentTermination(tokens)
+	diags := commentTerminationDiags(text)
 
 	found := false
 	for _, d := range diags {
 		if d.Code == CodeCommentTextAfterTerminator {
 			found = true
-			if d.Severity != SeverityWarning {
-				t.Errorf("expected warning severity for orphaned prose, got %v", d.Severity)
+			if d.Severity != SeverityError {
+				t.Errorf("expected error severity for stranded prose (issue #343), got %v", d.Severity)
 			}
 		}
 	}
 	if !found {
 		t.Errorf("expected orphaned-prose warning for single-line comment shape, got: %+v", diags)
+	}
+}
+
+// [spec diag.comment_text_after_terminator] Issue #343: one error at the
+// comment's ';'; valid code after the ';' on the same line is not
+// reported; a stranded doc line that parses is; and the parse-level rules
+// defer inside the stranded statement.
+func TestCommentTextAfterTerminator_Issue343(t *testing.T) {
+	// Valid same-line code is not a finding any more.
+	if got := commentTerminationDiags(":DECLARE nX;\n/* note; nX := 1;\n"); len(got) != 0 {
+		t.Errorf("valid code after ';': want none, got %+v", got)
+	}
+
+	// Stranded prose: one error, ranged on the ';', and no duplicates.
+	text := ":DECLARE nCount;\n/* check the totals; then the rows\n;\nnCount := 0;\n"
+	opts := DefaultDiagnosticOptions()
+	opts.CheckUndeclaredVars = true
+	diags := GetDiagnostics(text, opts)
+	got := diagsWithCode(diags, CodeCommentTextAfterTerminator)
+	if len(got) != 1 {
+		t.Fatalf("want 1 finding, got %+v", diags)
+	}
+	if r := got[0].Range; r.Start.Line != 1 || r.Start.Character != 19 || r.End.Character != 20 || got[0].Severity != SeverityError {
+		t.Errorf("got %+v, want an error on the ';' at 1:19", got[0])
+	}
+	for _, code := range []string{CodeUnexpectedToken, CodeUndeclaredVariable} {
+		if n := len(diagsWithCode(diags, code)); n != 0 {
+			t.Errorf("%s should defer inside stranded text, got %d", code, n)
+		}
+	}
+
+	// A single-line comment followed by a doc line that parses.
+	got = diagsWithCode(GetDiagnostics("/* Purpose: totals;\n   Parameters: none;\n", opts), CodeCommentTextAfterTerminator)
+	if len(got) != 1 || got[0].Range.Start.Line != 0 || got[0].Range.Start.Character != 18 {
+		t.Errorf("stranded doc line: want 1 on the ';', got %+v", got)
+	}
+	// Member access written the usual way is code.
+	if got := commentTerminationDiags(":DECLARE oRec;\n/* read the name;\noRec:Name;\n"); len(got) != 0 {
+		t.Errorf("member access: want none, got %+v", got)
+	}
+
+	// Prose as code, with no comment involved: unexpected_token only.
+	diags = GetDiagnostics("check the totals;\n", opts)
+	if n := len(diagsWithCode(diags, CodeUndeclaredVariable)); n != 0 {
+		t.Errorf("undeclared_variable on a line that does not parse: got %d", n)
+	}
+	if n := len(diagsWithCode(diags, CodeUnexpectedToken)); n != 1 {
+		t.Errorf("want 1 unexpected_token, got %d", n)
 	}
 }

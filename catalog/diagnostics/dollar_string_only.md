@@ -35,6 +35,13 @@ history:
       flags. authority corrected to authoritative: the style-guide
       record dollar_string_only (level authoritative) names this rule in
       enforced_by, so the guide is not silent.
+  - date: 2026-10-14
+    ref: "issue #339"
+    note: >-
+      Defers `.NOT. "a" $ sList` to the new
+      parenthesize_negated_comparison, which reports the same cause (the
+      negation binding first) at error severity with the fix. One finding
+      per cause.
 issues: []
 ---
 
@@ -48,8 +55,11 @@ prefixes on bare identifiers in their documented shape (`sName`,
 `nCount`). The range covers the `$` token.
 
 Precedence is the grammar's: unary operators bind tighter than `$`, so
-`.NOT. "a" $ sList` is `(.NOT. "a") $ sList` — a boolean on the left —
-and flags. The intended test is `.NOT. ("a" $ sList)`.
+`.NOT. "a" $ sList` is `(.NOT. "a") $ sList` — a boolean on the left.
+That cause is `parenthesize_negated_comparison`'s, which names the fix
+`.NOT. ("a" $ sList)`, so this rule defers when its left operand is an
+unparenthesized `.NOT.` / `!` and the right operand is a string or
+unknown (issue #339).
 
 It must NOT flag:
 
@@ -74,9 +84,10 @@ sText := "abcdef";
 :ENDIF;
 ```
 
-### Flags
+### Does not flag
 
-`.NOT.` binds tighter than `$`, so the left operand is a boolean.
+`.NOT.` binds tighter than `$`, so the left operand is a boolean; that
+cause is `parenthesize_negated_comparison`'s.
 
 ```ssl
 :PROCEDURE Demo;

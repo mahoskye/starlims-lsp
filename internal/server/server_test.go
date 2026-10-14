@@ -126,6 +126,10 @@ func TestApplySettings_FullSettings(t *testing.T) {
 				"hungarianNotation": true,
 				"hungarianPrefixes": []string{"a", "b"},
 				"maxBlockDepth":     6,
+				// Size review triggers (issue #344).
+				"maxProcedureCodeLines": 60,
+				"maxScriptCodeLines":    0,
+				"maxScriptProcedures":   20,
 			},
 		},
 	}
@@ -180,6 +184,9 @@ func TestApplySettings_FullSettings(t *testing.T) {
 	}
 	if s.settings.Diagnostics.MaxBlockDepth != 6 {
 		t.Errorf("expected max block depth 6, got %d", s.settings.Diagnostics.MaxBlockDepth)
+	}
+	if d := s.settings.Diagnostics; d.MaxProcedureCodeLines != 60 || d.MaxScriptCodeLines != 0 || d.MaxScriptProcedures != 20 {
+		t.Errorf("size review triggers = %d/%d/%d, want 60/0/20", d.MaxProcedureCodeLines, d.MaxScriptCodeLines, d.MaxScriptProcedures)
 	}
 }
 

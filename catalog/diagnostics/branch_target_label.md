@@ -144,8 +144,8 @@ check from the prefix convention to the label set itself: a literal
 target is static and labels resolve within the procedure, so a target no
 label in scope carries is provably dead, typo or not. Restricting the
 check to single string literals keeps it free of false positives on
-computed targets, at the cost of missing them; that trade is intentional
-for legacy flow control the style guide already discourages
-(`diag.deprecated_keyword` separately warns on every `:LABEL`). Introduced
+computed targets. Those never jump at all (verified on STARLIMS 12), which
+`diag.branch_literal_target` reports (issue #321); `diag.deprecated_keyword`
+separately warns on every `:LABEL`. Introduced
 in the style-guide alignment pass (commit cdbfee6); the code slug was
 stabilized in PR #3 (v0.4.0).

@@ -1,8 +1,7 @@
 A multi-line documentation header with a `;` at the end of its first text
-line. The comment ends there and the next line starts with `Parameters`,
-an SSL keyword name: the bare-keyword break-out path escalates
-comment_text_after_terminator to error. The stranded header line also
-fails to parse (diag.comment_text_after_terminator second Flags fence).
+line. The comment ends there and the stranded header line does not parse,
+so comment_text_after_terminator reports one error at the comment's `;`;
+unexpected_token and undeclared_variable defer to it (issue #343).
 -- input.ssl --
 /*
  BuildSummary writes the nightly summary row;
@@ -22,12 +21,6 @@ Parameters:dRunDate - the run date;
 	:RETURN DateToString(dRunDate, "yyyyMMdd");
 :ENDPROC;
 -- diagnostics --
-1:1-2:46 error comment_text_after_terminator: Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons
-3:29-3:32 error unexpected_token: Unexpected identifier 'run' - expected an operator or ';'
+2:45-2:46 error comment_text_after_terminator: The comment ends at this ';', so the next line, starting 'Parameters', is parsed as code. It reads as a stranded comment line; remove the ';' from the comment text
 -- diagnostics [--strict --info] --
-1:1-2:46 error comment_text_after_terminator: Comment likely terminated early by semicolon. The text on the following lines may be intended as comment content but is being parsed as code. Rewrite the comment to avoid internal semicolons
-3:2-3:12 warning undeclared_variable: Variable 'Parameters' is not declared
-3:25-3:28 warning undeclared_variable: Variable 'the' is not declared
-3:29-3:32 warning undeclared_variable: Variable 'run' is not declared
-3:29-3:32 error unexpected_token: Unexpected identifier 'run' - expected an operator or ';'
-3:33-3:37 warning undeclared_variable: Variable 'date' is not declared
+2:45-2:46 error comment_text_after_terminator: The comment ends at this ';', so the next line, starting 'Parameters', is parsed as code. It reads as a stranded comment line; remove the ';' from the comment text

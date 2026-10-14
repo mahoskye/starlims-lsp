@@ -165,6 +165,13 @@ history:
       first assignment used to stay on the UPDATE SET line with the rest
       aligned under it (reference §2.12/§7.4, to be updated to match
       §2.10).
+  - date: 2026-10-14
+    ref: "issue #342"
+    note: >-
+      A MERGE's `DELETE WHERE` stays on one line, indented under its WHEN
+      like UPDATE SET and INSERT; the WHERE used to break to column 0, where
+      it read as a top-level clause of the MERGE. Its AND/OR conditions sit
+      one level past the DELETE.
 issues: ["#81", "#82", "#327"]
 ---
 
@@ -716,6 +723,33 @@ bOk := RunSQL("
         UPDATE SET
             tgt.result_count = src.cnt,
             tgt.updated_date = SYSDATE
+");
+```
+
+A `DELETE WHERE` under `WHEN MATCHED` keeps its `WHERE` with the `DELETE`
+(issue #342):
+
+### Before
+
+```ssl
+:DECLARE bOk;
+bOk := RunSQL("merge into ordtask_summary tgt using source src on (tgt.ordno = src.ordno) when matched then update set tgt.status = src.status delete where tgt.status = 'X' and tgt.cnt = 0");
+```
+
+### After
+
+```ssl
+:DECLARE bOk;
+
+bOk := RunSQL("
+    MERGE INTO ordtask_summary tgt
+    USING source src
+    ON (tgt.ordno = src.ordno)
+    WHEN MATCHED THEN
+        UPDATE SET
+            tgt.status = src.status
+        DELETE WHERE tgt.status = 'X'
+            AND tgt.cnt = 0
 ");
 ```
 

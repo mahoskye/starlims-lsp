@@ -143,6 +143,12 @@ func dollarMismatch(tokens []lexer.Token, e *parser.Expr) (Diagnostic, bool) {
 	if (left == typeUnknown || left == typeString) && (right == typeUnknown || right == typeString) {
 		return Diagnostic{}, false
 	}
+	if isBareNegation(e.Children[0]) && (right == typeUnknown || right == typeString) {
+		// `.NOT. "a" $ sList`: the boolean on the left comes from `.NOT.`
+		// binding first, which parenthesize_negated_comparison reports
+		// with the fix (issue #339).
+		return Diagnostic{}, false
+	}
 	opIdx := operatorTokenIndex(tokens, e)
 	if opIdx < 0 {
 		return Diagnostic{}, false

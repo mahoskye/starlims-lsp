@@ -36,6 +36,12 @@ history:
       `aRows[1].Value`), which dot_property_access now names, and a
       leading UTF-8 byte-order mark is no longer read as an unknown
       character.
+  - date: 2026-10-14
+    ref: "issue #343"
+    note: >-
+      Defers inside a statement of comment text stranded by a `;` (a
+      banner's `..` leaders, say): comment_text_after_terminator reports
+      the cause once, at error severity.
 issues: ["#291"]
 ---
 
@@ -59,7 +65,9 @@ It must NOT flag:
   which the lexer keeps as zero-width whitespace;
 - dotted boolean literals (`.T.`, `.F.`) and dotted logical operators
   (`.AND.`, `.OR.`, `.NOT.`) — the lexer classifies those as literals and
-  operators, so they never reach this rule.
+  operators, so they never reach this rule;
+- a token inside comment text stranded as code by a `;`, which
+  `comment_text_after_terminator` reports once at that `;` (issue #343).
 
 ## Examples
 

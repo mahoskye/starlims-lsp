@@ -12,6 +12,4 @@ PROCEDURE CalcDiscount;
 -- diagnostics --
 1:11-1:23 error unexpected_token: Unexpected identifier 'CalcDiscount' - expected an operator or ';'
 -- diagnostics [--strict --info] --
-1:1-1:10 warning undeclared_variable: Variable 'PROCEDURE' is not declared
-1:11-1:23 warning undeclared_variable: Variable 'CalcDiscount' is not declared
 1:11-1:23 error unexpected_token: Unexpected identifier 'CalcDiscount' - expected an operator or ';'

@@ -119,6 +119,22 @@ history:
       A lone ':' starting a statement is reported (`:;`, `: IF x;`, a
       trailing `:`); no rule named it. Production corpus: no
       occurrence.
+  - date: 2026-10-14
+    ref: "issue #323"
+    note: >-
+      Declaration lists are judged. `:DECLARE`, `:PARAMETERS`, and
+      `:PUBLIC` take bare names and carry no expressions, so a keyword
+      inside one — `:PARAMETERS sIn :DEFAULT sIn, "";`, a list missing
+      its `;` — went unreported. The first keyword before the list's `;`
+      is now reported (the compiler expects `;` there). A `:DEFAULT`
+      inside a `:DECLARE` list defers to default_on_declare_line.
+  - date: 2026-10-14
+    ref: "issue #343"
+    note: >-
+      Defers a statement of comment text stranded by a `;` to
+      comment_text_after_terminator, now an error that reports the cause
+      once at the comment's `;`. A `*****` banner line after a comment is
+      that rule's; the same line with no comment before it stays here.
 issues: ["#240", "#244", "#246", "#291"]
 ---
 
@@ -159,6 +175,14 @@ The statements in scope are the ones the parser models:
   independent of header validity: a malformed header still opens its
   `:FOR` block, so `unclosed_block` and `mismatched_block_end` are
   unaffected.
+
+- the declaration lists `:DECLARE`, `:PARAMETERS`, and `:PUBLIC`, which
+  take bare names. A keyword before the list's `;` can only mean the list
+  is missing its terminator (`:PARAMETERS sIn :DEFAULT sIn, "";`), so the
+  first such keyword is flagged and the message asks whether the list is
+  missing its `;` (issue #323). A `:DEFAULT` inside a `:DECLARE` list is
+  `default_on_declare_line`'s finding, which names the fix, and is
+  deferred to it.
 
 A required operand that is missing is unexpected at whatever token stands
 in its place, including the `;` itself (`nCount := ;`, `:IF;`). Where the
@@ -218,7 +242,10 @@ It must NOT flag:
   `mismatched_delimiter`), or any token inside a statement whose opener is
   never closed (`unclosed_delimiter`, which swallows the rest of the file
   into that statement), or an unterminated string literal
-  (`unterminated_string`, which names its opener). One finding per cause,
+  (`unterminated_string`, which names its opener), or any token of a
+  statement that is comment text stranded by a `;`
+  (`comment_text_after_terminator`, which reports it once at that `;`,
+  issue #343). One finding per cause,
   and every rule deferred to is an error, so a parse failure is never
   reported at warning severity alone. An unknown colon form is *not*
   deferred: `unknown_keyword` is a warning (a gap in its list must not
@@ -398,11 +425,23 @@ nX := 2;
 nX **= 3;
 ```
 
-### Flags
+### Does not flag
+
+Text stranded after a comment's `;` is `comment_text_after_terminator`'s.
 
 ```ssl
 :DECLARE nX;
 /* Totals for the day;
+**********************
+nX := 1;
+```
+
+### Flags
+
+The same banner line with no comment before it.
+
+```ssl
+:DECLARE nX;
 **********************
 nX := 1;
 ```
@@ -441,6 +480,26 @@ sText := 1 "never closed;
 ```ssl
 :DECLARE nCount;
 nCount := 1 :FOOBAR 2;
+```
+
+### Flags
+
+A declaration list missing its `;` (issue #323).
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS sIn :DEFAULT sIn, "";
+	:RETURN sIn;
+:ENDPROC;
+```
+
+### Does not flag
+
+A `:DEFAULT` inside a `:DECLARE` list is `default_on_declare_line`'s.
+
+```ssl
+:DECLARE nCount :DEFAULT 0;
+:RETURN nCount;
 ```
 
 ## Rationale

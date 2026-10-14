@@ -1,7 +1,8 @@
 A comment whose `;` lands mid-sentence; the next line begins with two
 adjacent bare identifiers, which no SSL statement can start with. The
-orphaned-prose path of comment_text_after_terminator fires at warning
-(issue #25; diag.comment_text_after_terminator fourth Flags fence shape).
+stranded text does not parse, so comment_text_after_terminator reports one
+error at the comment's `;` and the parse-level rules defer (issues #25,
+#343).
 -- input.ssl --
 :PROCEDURE MergeAddresses;
 	:PARAMETERS oAddress;
@@ -19,16 +20,6 @@ orphaned-prose path of comment_text_after_terminator fires at warning
 	:RETURN oAddress;
 :ENDPROC;
 -- diagnostics --
-3:2-3:46 warning comment_text_after_terminator: Comment likely terminated early by semicolon. The following lines read as prose but are being parsed as code. Rewrite the comment to avoid internal semicolons
-4:8-4:11 error unexpected_token: Unexpected identifier 'any' - expected an operator or ';'
+3:45-3:46 error comment_text_after_terminator: The comment ends at this ';', and the text after it is not SSL. The first ';' ends a comment, so the rest is parsed as code; remove the ';' from the comment text
 -- diagnostics [--strict --info] --
-3:2-3:46 warning comment_text_after_terminator: Comment likely terminated early by semicolon. The following lines read as prose but are being parsed as code. Rewrite the comment to avoid internal semicolons
-4:5-4:7 warning undeclared_variable: Variable 'if' is not declared
-4:8-4:11 warning undeclared_variable: Variable 'any' is not declared
-4:8-4:11 error unexpected_token: Unexpected identifier 'any' - expected an operator or ';'
-4:12-4:21 warning undeclared_variable: Variable 'component' is not declared
-4:22-4:29 warning undeclared_variable: Variable 'changes' is not declared
-4:30-4:33 warning undeclared_variable: Variable 'the' is not declared
-4:34-4:39 warning undeclared_variable: Variable 'whole' is not declared
-4:40-4:46 warning undeclared_variable: Variable 'record' is not declared
-4:50-4:56 warning undeclared_variable: Variable 'resent' is not declared
+3:45-3:46 error comment_text_after_terminator: The comment ends at this ';', and the text after it is not SSL. The first ';' ends a comment, so the rest is parsed as code; remove the ';' from the comment text

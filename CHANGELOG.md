@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Diagnostics for run-time behaviors verified on STARLIMS 12, the
+style guide's severity decisions, and its new size review triggers. On the
+production corpus, the default profile goes from 4,898 to 4,832 findings,
+and 2 of 6,228 documents that validated before now fail, both on real
+defects. Formatted output is unchanged on the corpus.
+
+### Breaking
+- **Four codes can now fail validation** (D16). Three are new error
+  codes, and one existing code is now an error:
+  - `branch_literal_target` (#321): a `Branch()` target that is not a
+    single string literal never jumps. On STARLIMS 12 a computed target
+    falls through without an error, even when its text matches the label.
+  - `non_logical_condition` (#322): a literal string, number, `NIL`,
+    array or code-block literal as an `:IF`/`:WHILE`/`:CASE` condition, or
+    as the left operand of `.AND.`/`.OR.`. SSL has no truthy/falsy
+    coercion, so these raise at run time.
+  - `array_index_whole_number` (#339): an array index that is a
+    fractional literal or is computed with `/`. A non-integer index
+    raises, and `/` gives a whole number only when it divides evenly.
+    Wrap the index in `Integer()`.
+  - `comment_text_after_terminator` is an error (#343). It reports a
+    comment whose `;` strands the rest of its text as code, once, at
+    that `;`.
+
+  The new warning `parenthesize_negated_comparison` (below) also reports
+  at error when the negated operand is a string or number literal.
+
+  On the corpus, the three new error codes report nothing, and the
+  comment rule's errors fall on two stranded banner lines that
+  `unexpected_token` already failed. The two documents that now fail do so
+  on `.NOT. 'X' $ s`, which raises on STARLIMS 12, and on a `:PARAMETERS`
+  list missing its `;` (#323, under Fixed). **Downstream:** consumers that
+  list diagnostic codes (the VS Code extension's slug enum, the MCP
+  server) need the six new codes.
+
+### Added
+- **`parenthesize_negated_comparison`** (warning, #339). `.NOT. a = b`
+  is `(.NOT. a) = b`, because `.NOT.` binds before every comparison. It is
+  an error when the negated operand is a string or number literal, which
+  always raises. Write `.NOT. (a = b)`. Corpus: 5 findings, which replace 5
+  `dollar_string_only` warnings on the same expressions.
+- **Size review triggers** (info tier, #344). `procedure_length_review`
+  flags a procedure or class method with more than
+  `ssl.diagnostics.maxProcedureCodeLines` code lines (default 80).
+  `script_size_review` flags a server script with more than
+  `ssl.diagnostics.maxScriptCodeLines` code lines (default 400) or more
+  than `ssl.diagnostics.maxScriptProcedures` local procedures (default
+  12). Blank and comment-only lines do not count. The defaults are the
+  style guide's, measured on STARLIMS 12's base layer. Both are prompts to
+  review, not limits, so they are hidden by default like
+  `max_block_depth`. Corpus (`--info`): 402 and 154 findings.
+
+### Changed
+- **`comment_text_after_terminator` reports the unexpected next token**
+  (#343). The tool cannot see a `;` inside a comment, only that the next
+  token is unexpected:
+  - Stranded text that does not parse gets one error at the comment's
+    `;`. Before, it got a warning, an `unexpected_token` error and an
+    `undeclared_variable` warning per word.
+  - A stranded doc line that parses (`Parameters: none`) is caught after
+    a single-line comment too.
+  - Code after a comment's `;` that parses is valid SSL and is no longer
+    reported. Corpus: 67 warnings drop.
+- **`undeclared_variable` is silent on a line that does not parse**
+  (#343). Prose such as `check the totals;` reports one `unexpected_token`,
+  without one warning per word.
+- **`dollar_string_only` defers `.NOT. "a" $ s`** to
+  `parenthesize_negated_comparison`, which names the cause and the fix.
+
+### Fixed
+- **`:DECLARE nCount :DEFAULT 0;` fails validation again** (#323). It
+  validated clean after the #255 re-scope of `default_on_declare_line`;
+  that rule now flags a `:DEFAULT` inside an unterminated `:DECLARE` list.
+  `unexpected_token` flags any other keyword inside a
+  `:DECLARE`/`:PARAMETERS`/`:PUBLIC` list, which means the list is missing
+  its `;`. Corpus: 1 new finding, a real missing `;`.
+- **SQL formatter: a MERGE's `DELETE WHERE` stays together** (#342).
+  The `WHERE` used to break to column 0, where it read as a top-level
+  clause. It now stays on the `DELETE` line, indented under its `WHEN`, and
+  its `AND`/`OR` conditions sit one level past the `DELETE`.
+
 ## [0.26.0] - 2026-10-13
 
 The formatter release. A new scenario suite pins what the formatter and

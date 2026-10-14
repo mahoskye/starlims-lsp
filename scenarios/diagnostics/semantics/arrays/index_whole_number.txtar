@@ -1,0 +1,41 @@
+A fractional array index raises at run time on STARLIMS 12, and `/`
+always divides exactly, so an index computed with `/` is a fraction
+whenever the division is uneven (diag.array_index_whole_number, error, on
+the subscript). A literal quotient that is whole, an Integer()-wrapped
+quotient and other arithmetic stay silent (issue #339).
+-- input.ssl --
+:PROCEDURE Middle;
+	:PARAMETERS aRows;
+	:DECLARE nCount, vItem;
+	nCount := Len(aRows);
+	vItem := aRows[nCount / 2];
+	vItem := aRows[(nCount + 1) / 2];
+	vItem := aRows[2.5];
+	vItem := aRows[Integer(nCount / 2)];
+	vItem := aRows[4 / 2];
+	vItem := aRows[nCount - 1];
+	:RETURN vItem;
+:ENDPROC;
+-- format --
+:PROCEDURE Middle;
+	:PARAMETERS aRows;
+	:DECLARE nCount, vItem;
+
+	nCount := Len(aRows);
+	vItem := aRows[nCount / 2];
+	vItem := aRows[(nCount + 1) / 2];
+	vItem := aRows[2.5];
+	vItem := aRows[Integer(nCount / 2)];
+	vItem := aRows[4 / 2];
+	vItem := aRows[nCount - 1];
+
+	:RETURN vItem;
+:ENDPROC;
+-- diagnostics --
+5:17-5:27 error array_index_whole_number: Index is computed with '/', which yields a fraction unless it divides evenly - a non-integer array index raises at run time; wrap a computed index in Integer()
+6:17-6:33 error array_index_whole_number: Index is computed with '/', which yields a fraction unless it divides evenly - a non-integer array index raises at run time; wrap a computed index in Integer()
+7:17-7:20 error array_index_whole_number: Index 2.5 is not a whole number - a non-integer array index raises at run time; wrap a computed index in Integer()
+-- diagnostics [--strict --info] --
+5:17-5:27 error array_index_whole_number: Index is computed with '/', which yields a fraction unless it divides evenly - a non-integer array index raises at run time; wrap a computed index in Integer()
+6:17-6:33 error array_index_whole_number: Index is computed with '/', which yields a fraction unless it divides evenly - a non-integer array index raises at run time; wrap a computed index in Integer()
+7:17-7:20 error array_index_whole_number: Index 2.5 is not a whole number - a non-integer array index raises at run time; wrap a computed index in Integer()

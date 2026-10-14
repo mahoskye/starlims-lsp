@@ -33,6 +33,15 @@ history:
       authoritative: the style-guide record no_default_on_declare_line
       (level authoritative) names this rule in enforced_by, so the guide
       is not silent.
+  - date: 2026-10-14
+    ref: "issue #323"
+    note: >-
+      Regression from the #255 re-scope fixed. `:DECLARE nCount :DEFAULT
+      0;` (no `;` between the two) validated clean: the "target" is the
+      value `0`, not a name, so the target check skipped it. A :DEFAULT
+      inside an unterminated :DECLARE list is now flagged on the
+      :DEFAULT keyword; it does not compile (verified on STARLIMS 12:
+      the compiler expects `;` before `:DEFAULT`).
 issues: []
 ---
 
@@ -55,6 +64,14 @@ that happened to share a line with a `:DECLARE`, and missed the defect on
 any other line (issue #255). Placement — `:DEFAULT` not directly after
 `:PARAMETERS` — remains `default_after_parameters`' finding; the two
 report different defects and can both fire on one statement.
+
+It also flags a `:DEFAULT` inside a `:DECLARE` list that no `;` has
+ended (`:DECLARE nCount :DEFAULT 0;`), ranged on the `:DEFAULT` keyword.
+That is the classic attempt to initialize a declaration; it does not
+compile, and its "target" is the value rather than a name, so the
+target check alone cannot see it (issue #323). `unexpected_token` defers
+this one keyword to this rule; any other keyword inside a declaration
+list is `unexpected_token`'s finding.
 
 It must NOT flag:
 
@@ -84,6 +101,15 @@ A `:DECLARE`d local on its own line, after the parameter defaults.
 	:DECLARE nCount;
 	:DEFAULT nCount, 0;
 :ENDPROC;
+```
+
+### Flags
+
+`:DEFAULT` inside an unterminated `:DECLARE` list (issue #323).
+
+```ssl
+:DECLARE nCount :DEFAULT 0;
+:RETURN nCount;
 ```
 
 ### Does not flag

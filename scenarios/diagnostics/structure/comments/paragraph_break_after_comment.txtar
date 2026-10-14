@@ -1,8 +1,8 @@
 Near miss for comment_text_after_terminator: a multi-line comment ends,
 then a blank line, then a prose-shaped line. The paragraph break means
-the comment ended deliberately, so the orphaned-prose signal is
-suppressed (issue #6). The stranded words are still not SSL and remain
-unexpected_token's to report.
+the comment ended deliberately, so the comment is not blamed (issue #6).
+The words are still not SSL and remain unexpected_token's to report;
+undeclared_variable is silent on a line that does not parse (issue #343).
 -- input.ssl --
 /* a multi-line note
 that spans two lines;
@@ -21,10 +21,4 @@ nCount := 0;
 -- diagnostics --
 4:7-4:12 error unexpected_token: Unexpected identifier 'words' - expected an operator or ';'
 -- diagnostics [--strict --info] --
-4:1-4:6 warning undeclared_variable: Variable 'these' is not declared
-4:7-4:12 warning undeclared_variable: Variable 'words' is not declared
 4:7-4:12 error unexpected_token: Unexpected identifier 'words' - expected an operator or ';'
-4:13-4:19 warning undeclared_variable: Variable 'follow' is not declared
-4:20-4:21 warning undeclared_variable: Variable 'a' is not declared
-4:22-4:31 warning undeclared_variable: Variable 'paragraph' is not declared
-4:32-4:37 warning undeclared_variable: Variable 'break' is not declared

@@ -3,9 +3,9 @@ id: diag.comment_text_after_terminator
 title: Comment terminated earlier than its layout suggests
 kind: diagnostic
 status: active
-authority: tool
+authority: authoritative
 schema_ref: null
-default_severity: warning
+default_severity: error
 severity_overridable: true
 suppressible: true
 tests:
@@ -43,8 +43,7 @@ history:
     ref: "issue #269"
     note: >-
       Severity re-checked against the style guide, which maps
-      no_semicolon_in_comment_text and banner_has_no_semicolon (both
-      error) to this rule. Kept at warning: when the stranded text does
+      no_semicolon_in_comment_text (error) to this rule. Kept at warning: when the stranded text does
       not parse, unexpected_token already reports the compile error at
       error severity, and this rule explains its cause. When the text
       happens to parse, it is a detection heuristic, so error would
@@ -64,61 +63,120 @@ history:
       On a comment spanning lines the range now ends at the comment's last
       character, on its last line; it used to end on the first line at the
       start column plus the whole comment's length, past that line's end.
-issues: ["#25"]
+  - date: 2026-10-14
+    ref: "issue #343"
+    note: >-
+      Reworked as an unexpected-next-token rule at error severity, the
+      style guide's decision (no_semicolon_in_comment_text is error and
+      the LSP follows). The LSP cannot see a semicolon "inside" a comment;
+      it sees that the next token is unexpected. Stranded text that does
+      not parse is now one error at the comment's `;`, and
+      unexpected_token, unknown_token, and undeclared_variable defer inside
+      that statement (it used to draw a warning here, an unexpected_token
+      error, and one undeclared_variable per word). The same-line path is
+      dropped: code after a comment's `;` that parses is valid SSL. A
+      stranded doc line that parses (`Parameters: none` reads as member
+      access) is caught after a single-line comment too. The orphaned-prose
+      path is subsumed: two bare words never parse. authority corrected to
+      authoritative: the style-guide record names this rule in
+      enforced_by. The retired banner_has_no_semicolon is folded into
+      no_semicolon_in_comment_text.
+issues: []
 ---
 
 ## Behavior
 
-Flags a terminated comment whose layout suggests the `;` landed earlier than
-the author intended, in exactly three situations:
+An SSL comment runs from `/*` to its first `;`. When a `;` written as
+punctuation ends a comment early, the rest of the comment text is read as
+code. The tool cannot see a semicolon "inside" a comment, since the comment
+simply ends there; what it sees is that the next token is unexpected. SSL
+has no construct in which two bare words follow each other, so stranded
+text almost never parses. This rule reports, as an error ranged on the
+comment's `;`, a terminated `/*` comment followed with no paragraph break
+by:
 
-- **Same-line continuation** (warning): code follows the comment's `;` on
-  the same line. That text is executable and easy to misread as comment.
-- **Bare-keyword break-out** (error): a `/*` comment spanning multiple lines
-  terminates, and the next significant token is an identifier that matches
-  an SSL keyword name (e.g. `Parameters`, `Default`) — the signature of a
-  doc-header comment cut in half. An identifier followed on its line by
-  `:=` or a compound assignment operator is an assignment, not a stranded
-  header line, and does not count (issue #304).
-- **Orphaned-prose break-out** (warning): a terminated `/*` comment —
-  whether it spans multiple lines or its `;` lands on the first line — is
-  followed, with no paragraph break in between, by a significant line that
-  begins with two or more consecutive bare identifiers with nothing between
-  them. No valid SSL statement starts with two adjacent bare identifiers
-  (assignments, calls, and keyword statements all place an operator,
-  parenthesis, or keyword between/before names), so the line is comment
-  prose stranded as code (issue #25).
+- **Stranded text that does not parse.** The statement that starts right
+  after the comment fails the statement grammar at its first or second
+  token — words that are not code (`then reset it`, a `*****` banner
+  line) — and the failure is on the statement's first line, or the
+  statement starts on the comment's own last line (`/* Set the count; then
+  reset it;`). The message says the comment
+  ended there and the rest is not SSL. Inside that statement
+  `unexpected_token`, `unknown_token`, and `undeclared_variable` defer to
+  this rule: one finding per cause.
+- **A stranded doc line that parses.** The next line starts with an SSL
+  keyword name or a doc-field name (`Parameters`, `Returns`, `Purpose`,
+  `Description`, `Author`, `Notes`, …) followed by `:` and a space.
+  `Parameters: none;` parses as member access, but member access is
+  written with no space after the colon, so the line reads as a doc header
+  cut in half. This applies whether the comment spans lines or not.
+- **A bare-keyword break-out.** After a comment spanning several lines, the
+  next token is an identifier named like an SSL keyword (`Parameters`,
+  `Default`) that is not the target of an assignment (`label := ...` is a
+  statement, issue #304).
 
-This rule deliberately emits two severities: `default_severity: warning`
-records the same-line path; the bare-keyword break-out path escalates to
-error because it almost always means real code is being swallowed. The
-orphaned-prose break-out stays at warning: it is the same comment-cut-in-half
-failure, but keyword-less prose is a weaker signal than a keyword match, so
-it takes the default severity rather than the error escalation. A severity
-override via `ssl.diagnostics.rules` remaps all paths.
+Real code that is merely malformed is not blamed on the comment: a
+statement that fails further along (an unclosed call after an ordinary
+comment) or only on a later line (`nCount := 1` with its `;` missing before
+the next statement) is `unexpected_token`'s to report. Separately
+from comments, `undeclared_variable` is also silent inside any statement
+that fails to parse on its first line (`check the totals;`), whose words
+are not variables.
 
 It must NOT flag when:
 
+- code after the comment's `;` parses, on the same line or the next
+  (`/* note; nX := 1;`) — that is valid SSL;
 - a paragraph break (blank line or another standalone comment) separates the
   comment from the following code — the comment ended deliberately
-  (issue #6); this suppression applies to the orphaned-prose signal exactly
-  as it does to the bare-keyword signal;
+  (issue #6);
 - the comment is a `/* region` / `/* endregion` marker, whose `;` is
   intentional;
-- an ordinary terminated comment is simply followed by code on later lines;
+- the next statement starts with a colon keyword;
 - the next line assigns a variable whose name happens to be a keyword
   name (`label := ...`) — that is a statement (issue #304);
-- the next line is a single bare identifier followed by valid code — one
-  identifier can legitimately start a statement continued on the next line,
-  so the prose signal requires the second identifier to share the first
-  one's line.
+- the next line is ordinary member access (`oRec:Name;`).
 
 ## Examples
 
 ### Flags
 
 ```ssl
-/* note; nCount := 1;
+:DECLARE nCount;
+/* Set the count; then reset it;
+nCount := 0;
+```
+
+### Flags
+
+A banner's doc block, cut by a `;` in its text.
+
+```ssl
+/* ********************************************************************************
+Description.. : Records a status change; for one sample.
+Returns...... : {.T., NIL} on success
+********************************************************************************;
+:RETURN {.T., NIL};
+```
+
+### Flags
+
+The stranded doc line parses as member access.
+
+```ssl
+:DECLARE nCount;
+/*
+Resets the count;
+Parameters: none
+;
+nCount := 0;
+```
+
+### Flags
+
+```ssl
+/* Purpose: totals;
+   Parameters: none;
 ```
 
 ### Flags
@@ -144,6 +202,26 @@ so these words are now parsed as code
 ```ssl
 /* Client address: treat as a single composite object;
    if any component changes, the whole address is flagged;
+```
+
+### Flags
+
+A `*****` banner line stranded after a comment.
+
+```ssl
+:DECLARE nX;
+/* Totals for the day;
+**********************
+nX := 1;
+```
+
+### Does not flag
+
+Valid code after the `;` on the same line.
+
+```ssl
+:DECLARE nX;
+/* note; nX := 1;
 ```
 
 ### Does not flag
@@ -186,6 +264,24 @@ nCount := 1;
 ### Does not flag
 
 ```ssl
+:DECLARE oRec;
+/* read the name;
+oRec:Name;
+```
+
+### Does not flag
+
+Malformed code after an ordinary comment is `unexpected_token`'s.
+
+```ssl
+:DECLARE sRow, aVals;
+/* Convert the row count to a string;
+sRow := AllTrim(Str(Len(aVals) + 1);
+```
+
+### Does not flag
+
+```ssl
 /* a multi-line note
 that spans two lines;
 
@@ -214,14 +310,14 @@ these words follow a paragraph break
 
 ## Rationale
 
-Premature termination detection is inherently heuristic — the `;` is valid
-syntax either way — which is why this rule churned three times in one day
-(history) before settling on high-precision signals only. Every suppression
-above encodes a real false positive that must never regress. Issue #25
-showed the bare-keyword-only tuning had a real false negative on keyword-less
-prose; the orphaned-prose signal (2026-07-02, history) extends the multi-line
-detection to two-adjacent-bare-identifiers, a pattern no valid SSL statement
-can produce, while sitting behind the same paragraph-break suppression so the
-#6 false-positive class stays closed. The two-identifier minimum (on one
-line) keeps single stranded words from flagging: precision over recall, per
-this rule's history.
+The style guide decides this rule's severity, and it set
+`no_semicolon_in_comment_text` to error (issue #343). The framing that makes
+error right is the parse: stranded comment text that does not parse cannot
+compile, so reporting it once, at its cause, is better than three findings
+for one mistake. Stranded text that does parse runs silently, and only two
+shapes are reported there — a keyword or doc-field name followed by `: `,
+and a keyword-named word after a multi-line comment — because both read as
+a doc header and as nothing a developer writes as code. Valid code after a
+comment's `;` on the same line used to warn; it is valid SSL, so it is no
+longer this rule's concern. Every suppression above encodes a real false
+positive that must never regress (issues #6, #304).

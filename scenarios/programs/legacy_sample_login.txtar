@@ -311,7 +311,6 @@ DoProc("Notify", {sampleid, priority});
 5:1-5:9 error default_after_parameters: ':DEFAULT' must appear immediately after ':PARAMETERS'
 5:1-5:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
 5:10-5:16 error default_on_declare_line: ':DEFAULT' target 'status' is not a ':PARAMETERS' name here - ':DEFAULT' only supplies a fallback for a parameter; give a ':DECLARE'd variable its value with an assignment
-8:1-8:3 warning undeclared_variable: Variable 'if' is not declared
 8:4-8:9 error unexpected_token: Unexpected identifier 'empty' - expected an operator or ';'
 8:21-8:28 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 8:34-8:40 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'

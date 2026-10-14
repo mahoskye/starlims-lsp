@@ -1,0 +1,36 @@
+A MERGE's `DELETE WHERE` under `WHEN MATCHED` keeps its WHERE on the
+DELETE line, indented under the WHEN like UPDATE SET and INSERT, and its
+AND/OR conditions sit one level past the DELETE. The next WHEN branch
+returns to column 0 (fmt.sql_in_strings, issue #342).
+-- input.ssl --
+:PROCEDURE SyncStatus;
+	:DECLARE bOk;
+	bOk := RunSQL("merge into t1 tgt using t2 src on (tgt.id = src.id) when matched then update set tgt.status = src.status delete where tgt.status = 'X' and tgt.qty = 0 when not matched then insert (id, status) values (src.id, src.status)");
+	:RETURN bOk;
+:ENDPROC;
+-- format --
+:PROCEDURE SyncStatus;
+	:DECLARE bOk;
+
+	bOk := RunSQL("
+	    MERGE INTO t1 tgt
+	    USING t2 src
+	    ON (tgt.id = src.id)
+	    WHEN MATCHED THEN
+	        UPDATE SET
+	            tgt.status = src.status
+	        DELETE WHERE tgt.status = 'X'
+	            AND tgt.qty = 0
+	    WHEN NOT MATCHED THEN
+	        INSERT (
+	            id, status
+	        )
+	        VALUES (
+	            src.id, src.status
+	        )
+	");
+
+	:RETURN bOk;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

@@ -206,10 +206,18 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// Column where a MERGE UPDATE SET's first assignment starts, for
 	// aligning subsequent assignments (S43 — issue #95).
 	mergeSetCol := -1
+	// Inside a MERGE's `DELETE WHERE` condition, whose AND/OR sit one level
+	// past the DELETE (issue #342). The next WHEN branch ends it.
+	inMergeDeleteWhere := false
 
 	for i := 0; i < len(nonWSTokens); i++ {
 		t := nonWSTokens[i]
 		upperText := strings.ToUpper(t.Text)
+		if upperText == "WHEN" && parenDepth == 0 && i+1 < len(nonWSTokens) {
+			if next := strings.ToUpper(nonWSTokens[i+1].Text); next == "MATCHED" || next == "NOT" {
+				inMergeDeleteWhere = false
+			}
+		}
 
 		prevCommand := ""
 		if p := getPrevNonWS(nonWSTokens, i); p != nil {
@@ -412,6 +420,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else if upperText == "FROM" && prevUpper == "DELETE" {
 					// DELETE FROM stays on one line
 					needsBreak = false
+				} else if upperText == "WHERE" && prevUpper == "DELETE" && rootCommand == "MERGE" {
+					// A MERGE's DELETE WHERE is the matched action, not a
+					// top-level clause: it stays on the DELETE line (issue #342).
+					needsBreak = false
+					inMergeDeleteWhere = parenDepth == 0
 				} else if upperText == "UPDATE" && prevUpper == "FOR" {
 					// FOR UPDATE is a compound clause — stays on one line
 					needsBreak = false
@@ -485,6 +498,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				} else {
 					needsBreak = true
 					extraIndent = f.keywordIndent(style, upperText, currentClause, rootCommand, parenDepth)
+					if inMergeDeleteWhere && parenDepth == 0 && (upperText == "AND" || upperText == "OR") {
+						extraIndent = strings.Repeat(f.indentString, 2)
+					}
 					// Inside a non-subquery paren group (a MERGE ON
 					// condition list, a parenthesized predicate group),
 					// AND/OR align under the first condition after the

@@ -71,8 +71,12 @@ b := .NOT. "a" $ sList;
 b := nCount $ sList;
 b := .NOT. ("a" $ sList);
 :ENDPROC;`
+	// Line 6 (`.NOT. "a" $ sList`) is parenthesize_negated_comparison's
+	// finding; this rule defers to it (issue #339).
 	assertLines(t, CodeDollarStringOnly,
-		codeLines(t, text, CodeDollarStringOnly, DefaultDiagnosticOptions()), []int{6, 7})
+		codeLines(t, text, CodeDollarStringOnly, DefaultDiagnosticOptions()), []int{7})
+	assertLines(t, CodeParenthesizeNegatedComparison,
+		codeLines(t, text, CodeParenthesizeNegatedComparison, DefaultDiagnosticOptions()), []int{6})
 }
 
 func TestCodeBlockComparison_AllEqualityOperators(t *testing.T) {

@@ -11,12 +11,14 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | Code | Title | Default severity | Authority | Status | Entry |
 |------|-------|------------------|-----------|--------|-------|
 | `arithmetic_type_mismatch` | Mismatched operand types in arithmetic | warning | authoritative | active | [diag.arithmetic_type_mismatch](../../catalog/diagnostics/arithmetic_type_mismatch.md) |
+| `array_index_whole_number` | Array index that may not be a whole number | error | authoritative | active | [diag.array_index_whole_number](../../catalog/diagnostics/array_index_whole_number.md) |
 | `assignment_in_condition` | Assignment operator used in a condition | warning | tool | active | [diag.assignment_in_condition](../../catalog/diagnostics/assignment_in_condition.md) |
 | `bare_logical_operator` | Bare AND/OR/NOT instead of .AND./.OR./.NOT. | error | authoritative | active | [diag.bare_logical_operator](../../catalog/diagnostics/bare_logical_operator.md) |
 | `base_outside_class` | Base member access outside a class definition | error | authoritative | active | [diag.base_outside_class](../../catalog/diagnostics/base_outside_class.md) |
 | `base_requires_inherit` | Base member access in a class without :INHERIT | error | authoritative | active | [diag.base_requires_inherit](../../catalog/diagnostics/base_requires_inherit.md) |
 | `base_standalone` | Base used without a member access | error | authoritative | active | [diag.base_standalone](../../catalog/diagnostics/base_standalone.md) |
 | `begincase_requires_case` | BEGINCASE block with no CASE clause | error | authoritative | active | [diag.begincase_requires_case](../../catalog/diagnostics/begincase_requires_case.md) |
+| `branch_literal_target` | Branch() target that is not a string literal | error | authoritative | active | [diag.branch_literal_target](../../catalog/diagnostics/branch_literal_target.md) |
 | `branch_target_label` | Branch() target string without the LABEL token | error | authoritative | active | [diag.branch_target_label](../../catalog/diagnostics/branch_target_label.md) |
 | `builder_directive_case` | Data source builder directive not uppercase | error | authoritative | active | [diag.builder_directive_case](../../catalog/diagnostics/builder_directive_case.md) |
 | `builder_directive_outside_datasource` | Data source builder directive outside a data source | error | authoritative | active | [diag.builder_directive_outside_datasource](../../catalog/diagnostics/builder_directive_outside_datasource.md) |
@@ -32,7 +34,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `code_block_structure` | Code block literal without a bound variable | error | authoritative | active | [diag.code_block_structure](../../catalog/diagnostics/code_block_structure.md) |
 | `comment_swallows_code` | Comment runs past its '*/' and swallows the next statement | warning | authoritative | active | [diag.comment_swallows_code](../../catalog/diagnostics/comment_swallows_code.md) |
 | `comment_termination` | Comment missing its semicolon terminator | error | authoritative | active | [diag.comment_termination](../../catalog/diagnostics/comment_termination.md) |
-| `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | warning | tool | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
+| `comment_text_after_terminator` | Comment terminated earlier than its layout suggests | error | authoritative | active | [diag.comment_text_after_terminator](../../catalog/diagnostics/comment_text_after_terminator.md) |
 | `complex_sql_placeholder` | Complex expression inside a SQLExecute named placeholder | info | advisory | active | [diag.complex_sql_placeholder](../../catalog/diagnostics/complex_sql_placeholder.md) |
 | `constructor_outside_class` | Constructor procedure outside a :CLASS definition | warning | authoritative | active | [diag.constructor_outside_class](../../catalog/diagnostics/constructor_outside_class.md) |
 | `constructor_return_value` | :RETURN with a value inside a Constructor | error | authoritative | active | [diag.constructor_return_value](../../catalog/diagnostics/constructor_return_value.md) |
@@ -105,12 +107,15 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `nil_method_call` | Method call on NIL | warning | tool | active | [diag.nil_method_call](../../catalog/diagnostics/nil_method_call.md) |
 | `nil_not_empty_string` | NIL compared against a default-value literal | info | authoritative | active | [diag.nil_not_empty_string](../../catalog/diagnostics/nil_not_empty_string.md) |
 | `no_default_statements_in_datasource` | DEFAULT statement used in a data source file | error | authoritative | active | [diag.no_default_statements_in_datasource](../../catalog/diagnostics/no_default_statements_in_datasource.md) |
+| `non_logical_condition` | Literal non-logical condition or .AND./.OR. left operand | error | authoritative | active | [diag.non_logical_condition](../../catalog/diagnostics/non_logical_condition.md) |
 | `not_preferred_operator` | Discouraged inequality operator form | info | style_only | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
 | `nullasblank_value` | :NULLASBLANK value other than true or false | warning | authoritative | active | [diag.nullasblank_value](../../catalog/diagnostics/nullasblank_value.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
+| `parenthesize_negated_comparison` | .NOT. before a comparison without parentheses | warning | authoritative | active | [diag.parenthesize_negated_comparison](../../catalog/diagnostics/parenthesize_negated_comparison.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
+| `procedure_length_review` | Long procedure review trigger | info | advisory | active | [diag.procedure_length_review](../../catalog/diagnostics/procedure_length_review.md) |
 | `raiseerror_in_catch` | RaiseError called inside :CATCH | warning | style_only | active | [diag.raiseerror_in_catch](../../catalog/diagnostics/raiseerror_in_catch.md) |
 | `redeclare_is_noop` | Variable re-declared in the same scope | hint | authoritative | active | [diag.redeclare_is_noop](../../catalog/diagnostics/redeclare_is_noop.md) |
 | `region_end_mismatch` | Region end marker with no open region | hint | tool | active | [diag.region_end_mismatch](../../catalog/diagnostics/region_end_mismatch.md) |
@@ -119,6 +124,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `return_in_finally` | RETURN inside a FINALLY block | error | authoritative | active | [diag.return_in_finally](../../catalog/diagnostics/return_in_finally.md) |
 | `runsql_non_dml` | RunSQL called with a result-returning statement | warning | advisory | active | [diag.runsql_non_dml](../../catalog/diagnostics/runsql_non_dml.md) |
 | `scientific_notation` | Scientific notation missing its decimal point | error | tool | active | [diag.scientific_notation](../../catalog/diagnostics/scientific_notation.md) |
+| `script_size_review` | Large server script review trigger | info | advisory | active | [diag.script_size_review](../../catalog/diagnostics/script_size_review.md) |
 | `single_catch` | More than one CATCH in a TRY block | error | authoritative | active | [diag.single_catch](../../catalog/diagnostics/single_catch.md) |
 | `single_finally` | More than one FINALLY in a TRY block | error | tool | active | [diag.single_finally](../../catalog/diagnostics/single_finally.md) |
 | `spaced_skip_commas` | Skip-comma pair written with whitespace between the commas | info | style_only | active | [diag.spaced_skip_commas](../../catalog/diagnostics/spaced_skip_commas.md) |

@@ -1,8 +1,7 @@
 :DECLARE nCount :DEFAULT 0; writes the default inline on the :DECLARE
-statement. v0.24.0 reported diag.default_on_declare_line here; the
-re-scoped rule only inspects statement-initial :DEFAULT targets, and the
-statement now validates clean under every profile.
-Known issue: #323 (regression: this input should not validate clean).
+statement. It does not compile: no `;` ends the :DECLARE list before
+:DEFAULT. diag.default_on_declare_line reports the :DEFAULT keyword
+(issue #323, a v0.25.0 regression that validated clean).
 -- input.ssl --
 :PROCEDURE StartCount;
 	:DECLARE nCount :DEFAULT 0;
@@ -18,4 +17,6 @@ Known issue: #323 (regression: this input should not validate clean).
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --
+2:18-2:26 error default_on_declare_line: ':DEFAULT' cannot initialize a ':DECLARE' list - ':DECLARE' takes only names, so this does not compile; give the variable its value with an assignment on the next line
 -- diagnostics [--strict --info] --
+2:18-2:26 error default_on_declare_line: ':DEFAULT' cannot initialize a ':DECLARE' list - ':DECLARE' takes only names, so this does not compile; give the variable its value with an assignment on the next line
