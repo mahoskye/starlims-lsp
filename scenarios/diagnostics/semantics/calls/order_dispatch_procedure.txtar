@@ -54,7 +54,6 @@ commas. The correct DoProc and colon forms in the same body stay quiet.
 -- diagnostics [--strict --info] --
 11:13-11:22 error direct_procedure_call: Custom procedures cannot be called directly. Use DoProc("PriceLine", {args}) for same-file script procedures, ExecFunction(...) for external script procedures, or Me:/Base: inside classes.
 14:27-14:47 error execfunction_missing_quotes: Namespace path must be quoted: ExecFunction("Module.Procedure", ...) not ExecFunction(Module.Procedure, ...)
-14:27-14:35 warning undeclared_variable: Variable 'Shipping' is not declared
 15:8-15:16 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:carrier' instead of 'object.carrier'
 16:36-16:37 warning builtin_excess_arguments: 'Upper' accepts at most 1 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
 17:28-17:30 info empty_optional_param_array: Omit the trailing empty array for 'DoProc' instead of passing '{}'

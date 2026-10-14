@@ -31,4 +31,3 @@ bI := .T. .AND. .F.;
 3:7-3:8 error scientific_notation: SSL scientific notation requires a decimal point: use '7.0e2' instead of '7e2'
 -- diagnostics [--strict --info] --
 3:7-3:8 error scientific_notation: SSL scientific notation requires a decimal point: use '7.0e2' instead of '7e2'
-3:8-3:10 warning undeclared_variable: Variable 'e2' is not declared

@@ -109,6 +109,14 @@ history:
       that resolves every include, the closure applies as before
       (feature.cross_file_resolution A21). Corpus under --strict,
       unmodified product code: 328 -> 115 findings.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      A fragment another rule already reports is no longer an undeclared
+      variable too (one typo is one finding): a bare AND/OR/NOT
+      (bare_logical_operator), an exponent glued to a number such as the
+      e2 of 7e2 (scientific_notation), and the segments of an unquoted
+      ExecFunction/DoProc path (execfunction_missing_quotes).
 issues: []
 ---
 

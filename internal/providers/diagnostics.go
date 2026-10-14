@@ -1863,6 +1863,61 @@ func checkDirectProcedureCalls(tokens []lexer.Token, ast *parser.Node, p *parser
 	return diagnostics
 }
 
+// unquotedPathEnd returns the index of the last token of an unquoted
+// namespace path whose first `.segment` token is tokens[k]: the path runs
+// on through glued identifiers and `.`-led tokens (`Billing.Tax.Rate`
+// lexes as Billing, `.Tax.`, Rate).
+func unquotedPathEnd(tokens []lexer.Token, k int) int {
+	last := k
+	for j := k + 1; j < len(tokens); j++ {
+		t := tokens[j]
+		if t.Type == lexer.TokenIdentifier || (t.Type == lexer.TokenUnknown && strings.HasPrefix(t.Text, ".")) ||
+			(t.Type == lexer.TokenPunctuation && t.Text == ".") {
+			last = j
+			continue
+		}
+		break
+	}
+	return last
+}
+
+// unquotedPathTokens marks the tokens of every unquoted ExecFunction /
+// DoProc namespace path (execfunction_missing_quotes), so other rules
+// leave its segments to that finding — `Billing` and `Rate` in
+// `ExecFunction(Billing.Tax.Rate)` are not undeclared variables
+// (issue #328).
+func unquotedPathTokens(tokens []lexer.Token) map[int]bool {
+	marked := map[int]bool{}
+	for i, token := range tokens {
+		if token.Type != lexer.TokenIdentifier {
+			continue
+		}
+		upper := strings.ToUpper(token.Text)
+		if upper != "EXECFUNCTION" && upper != "DOPROC" {
+			continue
+		}
+		j := i + 1
+		for j < len(tokens) && (tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment) {
+			j++
+		}
+		if j >= len(tokens) || tokens[j].Text != "(" {
+			continue
+		}
+		j++
+		for j < len(tokens) && (tokens[j].Type == lexer.TokenWhitespace || tokens[j].Type == lexer.TokenComment) {
+			j++
+		}
+		if j+1 >= len(tokens) || tokens[j].Type != lexer.TokenIdentifier ||
+			tokens[j+1].Type != lexer.TokenUnknown || !strings.HasPrefix(tokens[j+1].Text, ".") {
+			continue
+		}
+		for k := j; k <= unquotedPathEnd(tokens, j+1); k++ {
+			marked[k] = true
+		}
+	}
+	return marked
+}
+
 // checkMissingQuotesInExecFunction detects ExecFunction(Module.Proc, ...) patterns
 // where the namespace path is not quoted.
 // Related to Gotcha #8 (dot notation).
@@ -1906,12 +1961,15 @@ func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
 							continue
 						}
 						if tokens[k].Type == lexer.TokenUnknown && strings.HasPrefix(tokens[k].Text, ".") {
-							// Found identifier.something pattern without quotes
+							// Found identifier.something pattern without quotes.
+							// The range runs to the path's last segment
+							// (`Billing.Tax.Rate`, issue #328).
+							last := unquotedPathEnd(tokens, k)
 							diagnostics = append(diagnostics, Diagnostic{
 								Severity: SeverityError,
 								Range: Range{
 									Start: Position{Line: t.Line - 1, Character: t.Column - 1},
-									End:   Position{Line: tokens[k].Line - 1, Character: tokens[k].Column - 1 + len(tokens[k].Text)},
+									End:   Position{Line: tokens[last].Line - 1, Character: tokens[last].Column - 1 + len(tokens[last].Text)},
 								},
 								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
 								Source:  "ssl-lsp",
@@ -6465,6 +6523,7 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
 func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
+	pathTokens := unquotedPathTokens(tokens)
 	var diagnostics []Diagnostic
 
 	// Build set of declared variables from the token stream
@@ -6551,6 +6610,21 @@ func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []
 
 		// Skip built-in identifiers (functions, classes, literals, operators)
 		if builtins[upperName] {
+			continue
+		}
+
+		// One typo is one finding (issue #255): a fragment another rule
+		// already reports is not an undeclared variable too (issue #328) —
+		// a bare AND/OR/NOT (bare_logical_operator), the exponent glued to
+		// a number in `7e2` (scientific_notation), a segment of an unquoted
+		// ExecFunction path (execfunction_missing_quotes).
+		if upperName == "AND" || upperName == "OR" || upperName == "NOT" {
+			continue
+		}
+		if i > 0 && tokens[i-1].Type == lexer.TokenNumber && (token.Text[0] == 'e' || token.Text[0] == 'E') {
+			continue
+		}
+		if pathTokens[i] {
 			continue
 		}
 
