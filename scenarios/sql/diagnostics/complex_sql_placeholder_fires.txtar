@@ -3,7 +3,6 @@ SQLExecute named placeholders that hold arithmetic or concatenation
 later line of a multi-line string, where the range must sit on the
 placeholder's own line (issue #255). Info tier, so only the
 [--strict --info] profile reports it.
-Suspected issue: #328 — unused_variable reports sPrefix, sSuffix and nBase although the complex placeholders read them at run time (unused_variable: a "Deliberately generous notion of use", "trading false negatives for zero false positives").
 -- input.ssl --
 :PROCEDURE LoadByKey;
 	:PARAMETERS sPrefix, sSuffix, nBase;
@@ -34,8 +33,5 @@ Suspected issue: #328 — unused_variable reports sPrefix, sSuffix and nBase alt
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --
-2:14-2:21 hint unused_variable: Variable 'sPrefix' is declared but never used
-2:23-2:30 hint unused_variable: Variable 'sSuffix' is declared but never used
-2:32-2:37 hint unused_variable: Variable 'nBase' is declared but never used
 4:71-4:90 info complex_sql_placeholder: Complex expression '?sPrefix + sSuffix?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.
 8:21-8:32 info complex_sql_placeholder: Complex expression '?nBase * 2?' in SQLExecute placeholder is evaluated on every execution. Pre-compute into a variable for better performance.

@@ -6755,9 +6755,16 @@ func checkUnusedVariables(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 
 	// Extract procedures for scope awareness
 	procedures := p.ExtractProcedures(ast)
+	isClass := isFirstSignificantStatementKeyword(tokens, "CLASS")
 
 	// Count usages for each declared variable
 	for _, v := range variables {
+		// A class-level :DECLARE is a field — part of the class's public
+		// interface, read by callers in other files this check cannot see
+		// (issue #328).
+		if isClass && !insideProcedure(v.Line, procedures) {
+			continue
+		}
 		usageCount := countVariableUsages(tokens, v, procedures)
 
 		if usageCount == 0 {
@@ -6852,7 +6859,14 @@ func countSQLMarkerUsages(text, varNameUpper string) int {
 	}
 	n := 0
 	for _, ph := range ParseSQLPlaceholders(text[1 : len(text)-1]) {
-		if !ph.IsNamed || !isSimpleNamedPlaceholder(ph.Name) || strings.Contains(ph.Name, "(") {
+		if !ph.IsNamed {
+			continue
+		}
+		if !isSimpleNamedPlaceholder(ph.Name) || strings.Contains(ph.Name, "(") {
+			// A complex placeholder or call (`?sPrefix + sSuffix?`,
+			// `?Len(aIds)?`) is an SSL expression evaluated at run time:
+			// every variable it names is read (issue #328).
+			n += countExpressionReads(ph.Name, varNameUpper)
 			continue
 		}
 		if strings.ToUpper(extractBaseVarName(ph.Name)) == varNameUpper {
@@ -6860,6 +6874,43 @@ func countSQLMarkerUsages(text, varNameUpper string) int {
 		}
 	}
 	return n
+}
+
+// countExpressionReads counts the reads of a variable in an SSL expression:
+// identifiers that are not a member name (after ':') or a called function
+// (before '(').
+func countExpressionReads(expr, varNameUpper string) int {
+	toks := lexer.NewLexer(expr).Tokenize()
+	var sig []lexer.Token
+	for _, t := range toks {
+		if t.Type != lexer.TokenWhitespace && t.Type != lexer.TokenEOF {
+			sig = append(sig, t)
+		}
+	}
+	n := 0
+	for i, t := range sig {
+		if t.Type != lexer.TokenIdentifier || strings.ToUpper(t.Text) != varNameUpper {
+			continue
+		}
+		if i > 0 && sig[i-1].Text == ":" {
+			continue
+		}
+		if i+1 < len(sig) && sig[i+1].Text == "(" {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+// insideProcedure reports whether a 1-based line falls in a procedure.
+func insideProcedure(line int, procedures []parser.ProcedureInfo) bool {
+	for _, pr := range procedures {
+		if line >= pr.StartLine && line <= pr.EndLine {
+			return true
+		}
+	}
+	return false
 }
 
 // checkSQLParameterValidation checks that SQL parameters (?param?) match declared variables.

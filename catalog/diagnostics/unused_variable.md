@@ -44,6 +44,15 @@ history:
     note: >-
       A ?name? marker in a string literal counts as a use: a parameter
       read only through SQLExecute substitution was reported unused.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      Two false positives removed: a variable read only inside a complex
+      SQL placeholder or call (`?sPrefix + sSuffix?`, `?Len(aIds)?`)
+      counts as used, the placeholder being an expression evaluated at run
+      time; and a class-level :DECLARE in a class file is a field — part
+      of the class's interface, read by callers in other files — so it is
+      not reported.
 issues: ["#48"]
 ---
 
@@ -71,7 +80,13 @@ finding:
   (issue #270): `SQLExecute` substitutes the variable at run time. The
   marker is read the same way `invalid_sql_param` reads it, so a
   property or array marker (`?oUser:ID?`, `?aIds[1]?`) uses its base
-  variable.
+  variable, and a complex placeholder or call (`?sPrefix + sSuffix?`,
+  `?Len(aIds)?`) uses every variable its expression reads (issue #328).
+
+Class fields — names declared by a class-level `:DECLARE` in a class file,
+outside any procedure — are never reported: they are the class's
+interface, read through instances in files this check cannot see
+(issue #328).
 
 ## Examples
 
