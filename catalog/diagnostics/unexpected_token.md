@@ -113,6 +113,12 @@ history:
       scientific_notation, and the delimiter, operator, and endfor rules)
       are all errors, so no parse failure is reported at warning severity
       alone.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      A lone ':' starting a statement is reported (`:;`, `: IF x;`, a
+      trailing `:`); no rule named it. Production corpus: no
+      occurrence.
 issues: ["#240", "#244", "#246", "#291"]
 ---
 
@@ -125,6 +131,12 @@ grammatical statement; when consumption stops before the terminating `;`
 on is unexpected. The range covers that token and the message names its
 class, its text, and what was expected
 (`Unexpected identifier 'is' - expected an operator or ';'`).
+
+A `:` that starts a statement with nothing before it to be a
+member-access receiver — `:;`, `: IF x;`, a trailing `:` — is unexpected
+too, the parser forming no statement around it; when a keyword name
+follows after a space the message suggests the joined form (`':IF'`,
+issue #328).
 
 The statements in scope are the ones the parser models:
 
@@ -231,6 +243,14 @@ to report; when consumption stops on the unterminated string itself, this
 rule defers.
 
 ## Examples
+
+### Flags
+
+```ssl
+:DECLARE nCount;
+: IF nCount > 0;
+:ENDIF;
+```
 
 ### Flags
 
