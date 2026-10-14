@@ -51,6 +51,11 @@ history:
       authority corrected to style_only: the style-guide record
       prefix_matches_type (level style_only) names this rule in
       enforced_by, so the guide is not silent.
+  - date: 2026-10-13
+    ref: "issue #329"
+    note: >-
+      The message picks "a" or "an" from the type ("promises an array"); it
+      always wrote "a" ("a array", "a object").
 issues: []
 ---
 

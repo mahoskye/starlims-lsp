@@ -64,8 +64,8 @@ func checkHungarianTypeMismatch(tokens []lexer.Token, stmts []parser.StatementEx
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
 			Range:    rng,
-			Message: fmt.Sprintf("'%s' promises a %s by its prefix, but this expression produces a %s - rename the variable or fix the expression",
-				target.Name, declared, actual),
+			Message: fmt.Sprintf("'%s' promises %s by its prefix, but this expression produces %s - rename the variable or fix the expression",
+				target.Name, withArticle(fmt.Sprint(declared)), withArticle(fmt.Sprint(actual))),
 			Source: "ssl-lsp",
 			Code:   CodeHungarianTypeMismatch,
 		})
