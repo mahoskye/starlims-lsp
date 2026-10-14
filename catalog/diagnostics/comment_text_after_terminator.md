@@ -58,6 +58,12 @@ history:
       keyword and assigns it on the line after a two-line comment;
       a keyword name followed by `:=` is a statement, not a doc header
       cut in half.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      On a comment spanning lines the range now ends at the comment's last
+      character, on its last line; it used to end on the first line at the
+      start column plus the whole comment's length, past that line's end.
 issues: ["#25"]
 ---
 

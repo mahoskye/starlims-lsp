@@ -3173,17 +3173,26 @@ func isFirstSignificantStatementKeyword(tokens []lexer.Token, keyword string) bo
 }
 
 // tokenToRange converts a token to a range, its end in runes like its
-// start (issue #307).
+// start (issue #307). A token spanning lines (a multi-line comment or
+// string) ends on its last line, after its last character there; it used
+// to end on its first line at the start column plus the whole token's
+// length, past that line's end (issue #328).
 func tokenToRange(token lexer.Token) Range {
+	// A token that runs to end of input carries the final line break; the
+	// range ends at its last character, not on the empty line after it.
+	text := strings.TrimRight(token.Text, "\r\n")
+	if text == "" {
+		text = token.Text
+	}
+	endLine := token.Line - 1
+	endChar := token.Column - 1 + utf8.RuneCountInString(text)
+	if nl := strings.LastIndex(text, "\n"); nl >= 0 {
+		endLine += strings.Count(text, "\n")
+		endChar = utf8.RuneCountInString(text[nl+1:])
+	}
 	return Range{
-		Start: Position{
-			Line:      token.Line - 1,
-			Character: token.Column - 1,
-		},
-		End: Position{
-			Line:      token.Line - 1,
-			Character: token.Column - 1 + utf8.RuneCountInString(token.Text),
-		},
+		Start: Position{Line: token.Line - 1, Character: token.Column - 1},
+		End:   Position{Line: endLine, Character: endChar},
 	}
 }
 

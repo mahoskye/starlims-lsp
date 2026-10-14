@@ -22,6 +22,12 @@ history:
       owner ruled the form valid and purely stylistic (SSL never sees
       the `*/`) and suggested an info-tier note — the first rule designed
       for the opt-in info tier.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      On a comment spanning lines the range now ends at the comment's last
+      character, on its last line; it used to end on the first line at the
+      start column plus the whole comment's length, past that line's end.
 issues: []
 ---
 
