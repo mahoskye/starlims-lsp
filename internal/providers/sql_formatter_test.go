@@ -1481,10 +1481,18 @@ func TestSQLFormatter_MergeDeleteWhere(t *testing.T) {
 	input := "MERGE INTO target t USING source s ON t.id = s.id WHEN MATCHED THEN UPDATE SET t.name = s.name WHEN NOT MATCHED THEN INSERT (id) VALUES (s.id) WHEN MATCHED AND s.active = 0 THEN DELETE WHERE t.status = 0"
 	result := f.FormatSQL(input, "")
 
-	if !strings.Contains(result, "\n    DELETE") {
-		t.Errorf("expected DELETE indented under WHEN, got:\n%s", result)
+	if !strings.Contains(result, "\n    DELETE WHERE t.status = 0") {
+		t.Errorf("expected DELETE WHERE on one line, indented under WHEN, got:\n%s", result)
 	}
-	t.Logf("Formatted MERGE DELETE WHERE:\n%s", result)
+
+	// Issue #342: the WHERE stays with its DELETE, and its AND/OR sit one
+	// level past the DELETE; a later WHEN branch is unaffected.
+	input = "MERGE INTO t1 tgt USING t2 src ON (tgt.id = src.id) WHEN MATCHED THEN UPDATE SET tgt.status = src.status DELETE WHERE tgt.status = 'X' AND tgt.qty = 0 WHEN NOT MATCHED THEN INSERT (id) VALUES (src.id)"
+	result = f.FormatSQL(input, "")
+	want := "    UPDATE SET\n        tgt.status = src.status\n    DELETE WHERE tgt.status = 'X'\n        AND tgt.qty = 0\nWHEN NOT MATCHED THEN\n"
+	if !strings.Contains(result, want) {
+		t.Errorf("DELETE WHERE layout, want fragment:\n%s\ngot:\n%s", want, result)
+	}
 }
 
 // --- LISTAGG WITHIN GROUP ---
