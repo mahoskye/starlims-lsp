@@ -11,7 +11,9 @@ diag.declare_initializer on its operator, one per initializer.
 :PROCEDURE SeedCounters;
 	:DECLARE nOpened := 0;
 	:DECLARE nClosed := 0, sLabel := "none", nSkipped;
+
 	nSkipped := nOpened + nClosed;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

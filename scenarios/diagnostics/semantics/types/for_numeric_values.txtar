@@ -22,7 +22,9 @@ per offending part.
 :PROCEDURE Walk;
 	:PARAMETERS sStart;
 	:DECLARE nIdx, sName, nSum;
+
 	nSum := 0;
+
 	:FOR nIdx := 1 :TO "ten";
 		nSum := nSum + nIdx;
 	:NEXT;
@@ -34,6 +36,7 @@ per offending part.
 	:FOR sName := sStart :TO 10;
 		nSum := nSum + 1;
 	:NEXT;
+
 	:RETURN nSum;
 :ENDPROC;
 -- diagnostics --

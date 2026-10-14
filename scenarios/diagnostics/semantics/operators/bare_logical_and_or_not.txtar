@@ -20,6 +20,7 @@ unexpected_token (issue #255): one finding per typo.
 -- format --
 :PROCEDURE CanRelease;
 	:PARAMETERS bApproved, bPaid, bOnHold;
+
 	:IF bApproved AND bPaid;
 		:RETURN .T.;
 	:ENDIF;
@@ -31,6 +32,7 @@ unexpected_token (issue #255): one finding per typo.
 	:IF Not bOnHold;
 		:RETURN .T.;
 	:ENDIF;
+
 	:RETURN NOT(bOnHold);
 :ENDPROC;
 -- diagnostics --

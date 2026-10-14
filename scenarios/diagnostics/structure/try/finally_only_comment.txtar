@@ -18,6 +18,7 @@ requirement). The :CATCH before it is fine (diag.finally_empty).
 :PROCEDURE SendReport;
 	:PARAMETERS sRecipient;
 	:DECLARE oMail, oErr;
+
 	:TRY;
 		oMail := Email{.F.};
 		oMail:To := sRecipient;

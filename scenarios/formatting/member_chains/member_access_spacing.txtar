@@ -17,10 +17,12 @@ oUser : Address : city := "Springfield";
 :PROCEDURE ReadUser;
 	:PARAMETERS oUser, oText;
 	:DECLARE sName;
+
 	sName := oUser:firstName;
 	sName := oUser:lastName + oText:upper();
 	oText:len(sName);
 	oUser:Address:city := "Springfield";
+
 	:RETURN sName;
 :ENDPROC;
 -- diagnostics --

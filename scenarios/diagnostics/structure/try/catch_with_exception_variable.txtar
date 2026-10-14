@@ -17,12 +17,14 @@ on the would-be exception variable and points at GetLastSSLError(); the
 :PROCEDURE SafeDivide;
 	:PARAMETERS nNumerator, nDenominator;
 	:DECLARE nResult;
+
 	:TRY;
 		nResult := nNumerator / nDenominator;
 	:CATCH oEx;
 		nResult := 0;
 		ErrorMes("SafeDivide", oEx:Description);
 	:ENDTRY;
+
 	:RETURN nResult;
 :ENDPROC;
 -- diagnostics --

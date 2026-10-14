@@ -22,8 +22,10 @@ nCount := 0;
 	:DEFAULT sChartId, "";
 	:DECLARE
 		nIndex, nCount;
+
 	nIndex := 0;
 	nCount := 0;
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

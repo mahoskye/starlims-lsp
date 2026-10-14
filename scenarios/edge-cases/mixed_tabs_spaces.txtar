@@ -16,22 +16,26 @@ by default, spaces in the variant).
 :PROCEDURE Mixed;
     :PARAMETERS nValue;
     :DECLARE sOut;
+
     :IF nValue > 0;
         sOut := "positive";
     :ELSE;
         sOut := "other";
     :ENDIF;
+
     :RETURN sOut;
 :ENDPROC;
 -- format --
 :PROCEDURE Mixed;
 	:PARAMETERS nValue;
 	:DECLARE sOut;
+
 	:IF nValue > 0;
 		sOut := "positive";
 	:ELSE;
 		sOut := "other";
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

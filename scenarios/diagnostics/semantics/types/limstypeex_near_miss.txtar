@@ -19,6 +19,7 @@ a non-literal comparand, and LimsTypeEx used in IIF/concatenation. The
 :PROCEDURE Classify;
 	:PARAMETERS vValue, sExpected;
 	:DECLARE bHit, sDesc;
+
 	bHit := LimsTypeEx(vValue) == "NUMERIC";
 	bHit := bHit .OR. LimsTypeEx(vValue) = "NUM";
 	bHit := bHit .OR. "STRINGS" = LimsTypeEx(vValue);
@@ -26,6 +27,7 @@ a non-literal comparand, and LimsTypeEx used in IIF/concatenation. The
 	bHit := bHit .AND. LimsTypeEx(vValue) <> "CODEBLOCK";
 	sDesc := "type " + LimsTypeEx(vValue);
 	sDesc := IIf(bHit, LimsTypeEx(vValue), sDesc);
+
 	:RETURN sDesc;
 :ENDPROC;
 -- diagnostics --

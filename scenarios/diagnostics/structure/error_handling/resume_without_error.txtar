@@ -10,6 +10,7 @@ warning (diag.error_handler_structure fourth Flags fence).
 -- format --
 :PROCEDURE StoreAudit;
 	:PARAMETERS sAction;
+
 	RunSQL("INSERT INTO AUDITLOG(ACTION) VALUES(?)",, {sAction});
 	:RESUME;
 	:ENDPROC;

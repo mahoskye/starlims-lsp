@@ -18,10 +18,12 @@ sFarewell := "goodbye";
 	/* the default greeting;
 	Greeting;
 	:DECLARE sGreeting;
+
 	sGreeting := "hello";
 :ENDINLINECODE;
 :BEGININLINECODE "Farewell";
 	:DECLARE sFarewell;
+
 	sFarewell := "goodbye";
 :ENDINLINECODE;
 -- diagnostics --

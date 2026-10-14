@@ -21,14 +21,17 @@ fire.
 :PROCEDURE Walk;
 	:PARAMETERS oCursor, oFlow, oTask, oRange, oList;
 	:DECLARE vNext, vRet, vCase, nTo;
+
 	:WHILE oCursor:Next();
 		vNext := oCursor:Current;
 	:ENDWHILE;
+
 	vRet := oFlow:Return;
 	vCase := oTask:Case;
 	nTo := oRange:To;
 	oList:EndIf();
 	oFlow:Return := vNext;
+
 	:RETURN {vRet, vCase, nTo};
 :ENDPROC;
 -- diagnostics --

@@ -38,16 +38,20 @@ another procedure.
 -- format --
 :PROCEDURE Cleanup;
 	:DECLARE oStream;
+
 	oStream := NIL;
+
 	:RETURN oStream;
 :ENDPROC;
 
 :PROCEDURE Work;
 	:PARAMETERS bAbort, bFresh;
 	:DECLARE oStream, oPrev, oCache;
+
 	oStream := DoProc("OpenStream");
 	oStream:Write("x");
 	oPrev := NIL;
+
 	:IF !Empty(oPrev);
 		oPrev:Reset();
 	:ENDIF;
@@ -66,9 +70,11 @@ another procedure.
 		oStream := NIL;
 		:RETURN .F.;
 	:ENDIF;
+
 	oStream:Close();
 	oPrev := CreateUdObject();
 	oPrev:Reset();
+
 	:RETURN .T.;
 :ENDPROC;
 -- diagnostics --

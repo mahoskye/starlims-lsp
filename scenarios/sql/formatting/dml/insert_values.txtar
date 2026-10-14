@@ -14,6 +14,7 @@ placeholders mix with literals and SYSDATE.
 :PROCEDURE Log;
 	:PARAMETERS sOrdNo, sUser;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("
 	    INSERT INTO auditlog (
 	        log_id, ordno, action, username, log_date
@@ -30,6 +31,7 @@ placeholders mix with literals and SYSDATE.
 	        ?, ?, ?, 'Complete', SYSDATE, ?
 	    )
 	",, {sOrdNo, "pH", 7.2, sUser});
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

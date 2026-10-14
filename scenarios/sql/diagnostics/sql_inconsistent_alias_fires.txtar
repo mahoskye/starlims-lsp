@@ -11,8 +11,10 @@ prefix whose count must not count as an item.
 -- format --
 :PROCEDURE Aliases;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("SELECT o.ordno AS orderno, o.folderno fno FROM orders o");
 	aRows := SQLExecute("SELECT TOP 10 o.ordno ordnum, o.status AS st FROM orders o");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

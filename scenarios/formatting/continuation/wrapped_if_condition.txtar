@@ -22,7 +22,9 @@ nLow += 1;
 :PROCEDURE CheckLimits;
 	:PARAMETERS nLow, nHigh, sMode;
 	:DECLARE bOk;
+
 	bOk := .F.;
+
 	:IF nLow > 1
 		.AND. nHigh < 50
 		.AND. sMode == "STRICT";
@@ -33,6 +35,7 @@ nLow += 1;
 		.OR. bOk;
 		nLow += 1;
 	:ENDWHILE;
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

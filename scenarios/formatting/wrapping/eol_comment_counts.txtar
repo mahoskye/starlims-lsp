@@ -14,6 +14,7 @@ aFields := {"SampleId", "TestCode", "AnalystName", "RunDate",/*the columns the e
 -- format --
 :PROCEDURE Log;
 	:PARAMETERS sSampleId, sTestCode, sAnalystName;
+
 	DoProc("WriteAuditEntry", {sSampleId, sTestCode,
 	                           sAnalystName});  /* audit trail entry for the release step;
 	aFields := {"SampleId", "TestCode", "AnalystName",

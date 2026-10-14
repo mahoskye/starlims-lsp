@@ -18,13 +18,16 @@ Flags fence).
 :PROCEDURE FindIndex;
 	:PARAMETERS aKeys, sWanted;
 	:DECLARE nIdx, nFound;
+
 	nFound := 0;
+
 	:FOR nIdx := 1 :TO Len(aKeys);
 		:IF aKeys[nIdx] == sWanted;
 			nFound := nIdx;
 			:EXITWHILE;
 		:ENDIF;
 	:NEXT;
+
 	:RETURN nFound;
 :ENDPROC;
 -- diagnostics --

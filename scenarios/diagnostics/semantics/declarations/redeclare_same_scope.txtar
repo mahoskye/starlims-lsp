@@ -18,7 +18,9 @@ nRound := 1;
 :PROCEDURE Merge;
 	:PARAMETERS aLeft, aRight;
 	:DECLARE aMerged, aRight;
+
 	aMerged := aLeft;
+
 	:RETURN aMerged;
 :ENDPROC;
 nRound := 1;

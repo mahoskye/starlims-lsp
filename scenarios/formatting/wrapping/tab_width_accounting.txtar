@@ -18,35 +18,41 @@ vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
 :PROCEDURE Deep;
 	:PARAMETERS aRows;
 	:DECLARE i, vResult;
+
 	:FOR i := 1 :TO Len(aRows);
 		:IF .NOT. Empty(aRows[i]);
 			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
 			                               "FINAL", i});
 		:ENDIF;
 	:NEXT;
+
 	:RETURN vResult;
 :ENDPROC;
 -- format [--indent-style space --indent-size 8] --
 :PROCEDURE Deep;
         :PARAMETERS aRows;
         :DECLARE i, vResult;
+
         :FOR i := 1 :TO Len(aRows);
                 :IF .NOT. Empty(aRows[i]);
                         vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT",
                                                        "FINAL", i});
                 :ENDIF;
         :NEXT;
+
         :RETURN vResult;
 :ENDPROC;
 -- format --
 :PROCEDURE Deep;
 	:PARAMETERS aRows;
 	:DECLARE i, vResult;
+
 	:FOR i := 1 :TO Len(aRows);
 		:IF .NOT. Empty(aRows[i]);
 			vResult := DoProc("StoreRow", {aRows[i], "SAMPLE", "RESULT", "FINAL", i});
 		:ENDIF;
 	:NEXT;
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

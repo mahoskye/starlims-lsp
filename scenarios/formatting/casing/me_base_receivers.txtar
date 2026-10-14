@@ -24,15 +24,19 @@ me := 1;
 
 :PROCEDURE Refresh;
 	:DECLARE nTotal;
+
 	Me:status := "R";
 	nTotal := Base:Compute(1) + Me:Count();
 	Base:Refresh();
+
 	:RETURN nTotal;
 :ENDPROC;
 
 :PROCEDURE Shadow;
 	:DECLARE me;
+
 	me := 1;
+
 	:RETURN me + 1;
 :ENDPROC;
 -- diagnostics --

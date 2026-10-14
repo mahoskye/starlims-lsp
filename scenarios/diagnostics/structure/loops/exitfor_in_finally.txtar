@@ -21,7 +21,9 @@ exitfor_outside_loop must not fire (diag.exitfor_in_finally).
 :PROCEDURE ProbeHosts;
 	:PARAMETERS aHosts;
 	:DECLARE nIdx, nReached;
+
 	nReached := 0;
+
 	:FOR nIdx := 1 :TO Len(aHosts);
 		:TRY;
 			nReached := nReached + 1;
@@ -31,6 +33,7 @@ exitfor_outside_loop must not fire (diag.exitfor_in_finally).
 			:ENDIF;
 		:ENDTRY;
 	:NEXT;
+
 	:RETURN nReached;
 :ENDPROC;
 -- diagnostics --

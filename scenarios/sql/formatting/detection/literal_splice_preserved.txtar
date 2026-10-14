@@ -14,8 +14,10 @@ so the statements do not wrap at '+'.
 :PROCEDURE Splice;
 	:PARAMETERS sDate, sList;
 	:DECLARE bOk;
+
 	bOk := RunSQL("update runs set fromd = {d '" + sDate + "'} where id = 1");
 	bOk := RunSQL("delete from qd where product not in('" + sList + "')");
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

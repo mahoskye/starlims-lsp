@@ -15,8 +15,10 @@ both readings.
 :PROCEDURE ReadSetting;
 	:PARAMETERS sKey;
 	:DECLARE sValue;
+
 	sValue := ReadSetting(Upper(sKey));
 	SetSiteClock(sValue);
+
 	:RETURN sValue;
 :ENDPROC;
 -- diagnostics --

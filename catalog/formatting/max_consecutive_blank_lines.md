@@ -28,6 +28,13 @@ history:
       source blank lines, changing the string's value; lines inside a
       multi-line string, comment, code block or :REGION body are now
       left alone (D7).
+  - date: 2026-10-14
+    ref: "formatter preview review"
+    note: >-
+      Default 0 -> 2, alongside fmt.blank_lines_between_sections: authors'
+      blank lines are kept, and runs of three or more collapse to two. The
+      style guide's no_excess_blank_lines rule still says one; its update
+      is tracked upstream.
 issues: ["#37"]
 ---
 
@@ -35,11 +42,11 @@ issues: ["#37"]
 
 When `ssl.format.maxConsecutiveBlankLines` is greater than 0, a post-format
 pass collapses any run of more than that many consecutive blank
-(whitespace-only) lines to exactly the threshold. The default is 0: the cap
-is disabled and source blank-line runs pass through the formatter
-unchanged — the streaming formatter emits exactly the newlines the source
-had, so authors keep multi-blank-line groupings through a format (issue
-#37). Intermediate caps work too: a cap of 2 turns a five-blank-line run
+(whitespace-only) lines to exactly the threshold. The default is 2: a run
+of one or two blank lines — an author's grouping — survives, and a longer
+one collapses to two. At 0 the cap is disabled and source blank-line runs
+pass through unchanged — the streaming formatter emits exactly the
+newlines the source had (issue #37). Intermediate caps work too: a cap of 2 turns a five-blank-line run
 into two, leaving one- and two-blank runs alone.
 
 Blank lines inside a multi-line string literal, comment, code block or

@@ -18,6 +18,7 @@ span, and a quote inside a comment are all fine (diag.unterminated_string
 -- format --
 :PROCEDURE ListOpen;
 	:DECLARE sSQL, sA, sB, sC, aRows;
+
 	/* don't flag a quote in a comment;
 	sSQL := "
 	    SELECT ITEMID, DISPLAYTEXT
@@ -28,6 +29,7 @@ span, and a quote inside a comment are all fine (diag.unterminated_string
 	sB := 'say "hi"';
 	sC := [it's "quoted" [and nested]];
 	aRows := SQLExecute(sSQL);
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

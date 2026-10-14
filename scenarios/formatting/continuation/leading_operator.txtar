@@ -17,12 +17,14 @@ bShow := nCount > 0
 :PROCEDURE Describe;
 	:PARAMETERS sName, sStatus, nCount;
 	:DECLARE sOut, bShow;
+
 	sOut := "Sample " + sName
 		+ " is " + sStatus
 		+ " with " + LimsString(nCount) + " results";
 	bShow := nCount > 0
 		.AND. "X" $ sStatus
 		.OR. Empty(sName);
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

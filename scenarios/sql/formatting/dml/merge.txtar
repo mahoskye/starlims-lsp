@@ -12,6 +12,7 @@ INSERT indented 4 under WHEN, the USING inline view laid out flat.
 :PROCEDURE Summarize;
 	:PARAMETERS sOrdNo;
 	:DECLARE bOk;
+
 	bOk := RunSQL("
 	    MERGE INTO ordtask_summary tgt
 	    USING (
@@ -33,6 +34,7 @@ INSERT indented 4 under WHEN, the USING inline view laid out flat.
 	            src.ordno, src.testcode, src.cnt, SYSDATE
 	        )
 	",, {sOrdNo});
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

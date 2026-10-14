@@ -16,10 +16,12 @@ sKey)),
 :PROCEDURE Nested;
 	:PARAMETERS sKey;
 	:DECLARE vResult;
+
 	vResult := DoProc("Outer", {DoProc("Inner", {Upper(AllTrim(
 		sKey)),
 	                                             "second"}),
 	                            "third"});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

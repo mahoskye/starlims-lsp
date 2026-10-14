@@ -14,11 +14,14 @@ nArea := DoProc("Square", {nInput});
 -- format --
 :PROCEDURE Square;
 	:PARAMETERS nSide;
+
 	:RETURN nSide * nSide;
 :ENDPROC;
 :PARAMETERS nInput;
 :DECLARE nArea;
+
 nArea := DoProc("Square", {nInput});
+
 :RETURN nArea;
 -- diagnostics --
 -- diagnostics [--strict --info] --

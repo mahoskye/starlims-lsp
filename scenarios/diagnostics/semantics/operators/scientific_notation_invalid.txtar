@@ -13,9 +13,11 @@ shows the corrected literal): 7e2, 9E+1 (sign kept in the suggestion) and
 -- format --
 :PROCEDURE Scale;
 	:DECLARE nA, nB, nC;
+
 	nA := 7e2;
 	nB := 9E + 1;
 	nC := .5e1;
+
 	:RETURN nA + nB + nC;
 :ENDPROC;
 -- diagnostics --

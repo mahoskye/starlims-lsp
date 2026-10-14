@@ -24,6 +24,7 @@ statement's first token (diag.exitcase_last_in_branch "Not last" case).
 :PROCEDURE NormalizeFlag;
 	:PARAMETERS sFlag;
 	:DECLARE nOut;
+
 	:BEGINCASE;
 	:CASE sFlag == "Y";
 		:EXITCASE;
@@ -36,6 +37,7 @@ statement's first token (diag.exitcase_last_in_branch "Not last" case).
 		nOut := -1;
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

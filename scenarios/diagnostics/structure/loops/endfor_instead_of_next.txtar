@@ -16,10 +16,13 @@ unexpected_token (diag.endfor_invalid, diag.unclosed_block issue #255).
 :PROCEDURE SumWeights;
 	:PARAMETERS aWeights;
 	:DECLARE nIdx, nTotal;
+
 	nTotal := 0;
+
 	:FOR nIdx := 1 :TO Len(aWeights);
 		nTotal := nTotal + aWeights[nIdx];
 	:ENDFOR;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

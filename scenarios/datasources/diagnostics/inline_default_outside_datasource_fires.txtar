@@ -14,8 +14,10 @@ signature.
 
 :PROCEDURE CountTrucks;
 	:PARAMETERS sCode, nMax := 10;
+
 	:RETURN Len(sCode) + nMax;
 :ENDPROC;
+
 :RETURN DoProc("CountTrucks", {sFleet, nLimit});
 -- diagnostics --
 1:13-1:22 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'sFleet' to a ':DEFAULT' line after ':PARAMETERS'

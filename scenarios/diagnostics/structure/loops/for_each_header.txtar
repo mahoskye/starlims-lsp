@@ -16,10 +16,13 @@ still opens and pairs with :NEXT (diag.unexpected_token :FOR header).
 :PROCEDURE TotalItems;
 	:PARAMETERS aItems;
 	:DECLARE nTotal, nItem;
+
 	nTotal := 0;
+
 	:FOR EACH nItem IN aItems;
 		nTotal += nItem;
 	:NEXT;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

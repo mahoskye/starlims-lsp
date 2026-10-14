@@ -17,18 +17,23 @@ nCounter := 2;
 :ENDPROC;
 -- format --
 :DECLARE nCounter;
+
 nCounter := 1;
 nCounter := 2;
 
 :PROCEDURE First;
 	:DECLARE nCounter;
+
 	nCounter := 3;
+
 	:RETURN nCounter;
 :ENDPROC;
 
 :PROCEDURE Second;
 	:DECLARE nCounter;
+
 	nCounter := 4;
+
 	:RETURN nCounter;
 :ENDPROC;
 -- diagnostics --

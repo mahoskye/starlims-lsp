@@ -24,10 +24,12 @@ into n, a number literal into s, a string into a, a string into b, and a
 	:PARAMETERS sText, nWidth;
 	:DEFAULT nWidth, "4";
 	:DECLARE nCode, sTotal, aNames, bReady;
+
 	nCode := SubStr(sText, 1, nWidth);
 	sTotal := 0;
 	aNames := "Ann,Bob";
 	bReady := "Y";
+
 	:RETURN {nCode, sTotal, aNames, bReady};
 :ENDPROC;
 -- diagnostics --

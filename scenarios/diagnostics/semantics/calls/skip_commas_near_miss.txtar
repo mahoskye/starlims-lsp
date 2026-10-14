@@ -17,11 +17,13 @@ array's length), and a trailing skip on a :-qualified member call (D10).
 :PROCEDURE Skips;
 	:PARAMETERS sValue;
 	:DECLARE vOut, aSlots;
+
 	vOut := LSelect("SELECT id FROM lots WHERE kind = ?",,, {"A"});
 	vOut := DoProc("Helper", {1,, 3});
 	vOut := Today();
 	aSlots := {1, 2,};
 	vOut := sValue:Substring(1,);
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

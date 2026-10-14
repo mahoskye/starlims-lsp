@@ -20,8 +20,10 @@ the editor and strict profiles stay quiet.
 :PROCEDURE CountNotes;
 	:PARAMETERS notes, cName;
 	:DECLARE Total, bins;
+
 	Total := Len(notes);
 	bins := Total + Len(cName);
+
 	:RETURN bins;
 :ENDPROC;
 -- diagnostics --

@@ -5,6 +5,7 @@ or document: the formatter normalizes them to ordinary spacing.
 nCount := 1;
 -- format --
 :DECLARE nCount;
+
 nCount := 1;
 -- diagnostics --
 -- diagnostics [--strict --info] --

@@ -17,6 +17,7 @@ c_style_comment_closer, info tier only, so it appears only under --info
  *******************************************/;
 :PROCEDURE PrintLabel;
 	:PARAMETERS sShipment;
+
 	/* short note */;
 	:RETURN "LBL-" + sShipment;
 :ENDPROC;

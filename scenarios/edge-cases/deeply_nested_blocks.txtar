@@ -43,7 +43,9 @@ nLevel -= 1;
 :PROCEDURE Deep;
 	:PARAMETERS nLevel;
 	:DECLARE i, j, k, sOut;
+
 	sOut := "";
+
 	:IF nLevel > 0;
 		:WHILE nLevel > 1;
 			:FOR i := 1 :TO 2;
@@ -72,9 +74,11 @@ nLevel -= 1;
 					:NEXT;
 				:ENDIF;
 			:NEXT;
+
 			nLevel -= 1;
 		:ENDWHILE;
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

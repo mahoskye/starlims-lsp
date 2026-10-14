@@ -15,6 +15,7 @@ branch of a UNION. One finding per string.
 :PROCEDURE Everything;
 	:PARAMETERS nOrd;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("SELECT * FROM orders WHERE ordno = ?nOrd?");
 	aRows := SQLExecute("SELECT DISTINCT o.* FROM orders o");
 	aRows := SQLExecute("
@@ -26,6 +27,7 @@ branch of a UNION. One finding per string.
 	    )
 	");
 	aRows := SQLExecute("SELECT ordno FROM orders UNION SELECT * FROM orders_archive");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

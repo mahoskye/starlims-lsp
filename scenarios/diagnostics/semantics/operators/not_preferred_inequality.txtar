@@ -19,7 +19,9 @@ same characters inside strings and comments do not fire.
 :PROCEDURE CompareCodes;
 	:PARAMETERS nLeft, nRight;
 	:DECLARE sNote;
+
 	sNote := "a <> b # c";
+
 	/* note: <> and # are aliases of != here;
 	:IF nLeft <> nRight .AND. nLeft # 0;
 		sNote := "differ";
@@ -28,6 +30,7 @@ same characters inside strings and comments do not fire.
 	:IF nLeft != nRight;
 		sNote := sNote + "!";
 	:ENDIF;
+
 	:RETURN sNote;
 :ENDPROC;
 -- diagnostics --

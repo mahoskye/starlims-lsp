@@ -32,10 +32,13 @@ loop_outside_loop: a :FOR nested in a :WHILE, with :EXITWHILE inside the
 :PROCEDURE ScanPages;
 	:PARAMETERS aPages;
 	:DECLARE nPage, nLine, nFound;
+
 	nPage := 0;
 	nFound := 0;
+
 	:WHILE nPage < Len(aPages);
 		nPage := nPage + 1;
+
 		:IF Len(aPages[nPage]) == 0;
 			:LOOP;
 		:ENDIF;
@@ -52,9 +55,11 @@ loop_outside_loop: a :FOR nested in a :WHILE, with :EXITWHILE inside the
 			:IF aPages[nPage][nLine] == "NEXTPAGE";
 				:EXITFOR;
 			:ENDIF;
+
 			nFound := nFound + 1;
 		:NEXT;
 	:ENDWHILE;
+
 	:RETURN nFound;
 :ENDPROC;
 -- diagnostics --

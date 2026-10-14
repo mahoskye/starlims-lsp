@@ -19,6 +19,7 @@ placeholder's own line (issue #255). Info tier, so only the
 :PROCEDURE LoadByKey;
 	:PARAMETERS sPrefix, sSuffix, nBase;
 	:DECLARE aRows, aLater;
+
 	aRows := SQLExecute("
 	    SELECT ordno, status
 	    FROM orders
@@ -29,6 +30,7 @@ placeholder's own line (issue #255). Info tier, so only the
 	    FROM orders
 	    WHERE ordseq > ?nBase * 2?
 	");
+
 	:RETURN {aRows, aLater};
 :ENDPROC;
 -- diagnostics --

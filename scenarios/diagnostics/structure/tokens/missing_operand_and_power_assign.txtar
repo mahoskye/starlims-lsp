@@ -17,12 +17,16 @@ per statement, no cascade; the :IF block still pairs
 -- format --
 :PROCEDURE BrokenMath;
 	:DECLARE nTotal, nBase;
+
 	nBase := 2;
 	nTotal :=;
+
 	:IF;
 		nTotal := 1;
 	:ENDIF;
+
 	nBase ** = 3;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

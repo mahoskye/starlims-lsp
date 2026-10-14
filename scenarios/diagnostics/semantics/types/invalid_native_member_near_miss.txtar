@@ -26,6 +26,7 @@ ignore member case.
 :PROCEDURE Probe;
 	:PARAMETERS aRows;
 	:DECLARE aItems, sText, aNames, oRec, aPassed, vOut;
+
 	aItems := {1, 2, 3};
 	sText := "abc";
 	vOut := aItems:Length;
@@ -39,6 +40,7 @@ ignore member case.
 	aPassed := {1};
 	DoProc("Fill", {aPassed});
 	vOut := aPassed:Count;
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

@@ -34,8 +34,10 @@ compared against "" (info), and a NIL in a string concatenation. The
 :PROCEDURE SyncLabels;
 	:PARAMETERS sHost;
 	:DECLARE oConn, sLog, bOk;
+
 	bOk := .F.;
 	sLog := "";
+
 	:TRY;
 		oConn := LimsNETConnect("LabelBridge", "LabelBridge.Client");
 		oConn:Open(sHost);
@@ -56,8 +58,10 @@ compared against "" (info), and a NIL in a string concatenation. The
 	:IF NIL = "";
 		sLog := sLog + NIL;
 	:ENDIF;
+
 	oConn := NIL;
 	oConn:Dispose();
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

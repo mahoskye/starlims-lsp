@@ -24,17 +24,21 @@ diag.prefer_exitcase).
 :PROCEDURE CheckLimit;
 	:PARAMETERS nValue, bEnforce;
 	:DECLARE sResult;
+
 	sResult := "ok";
+
 	:BEGINCASE;
 	:CASE nValue > 100;
 		:IF bEnforce;
 			sResult := "rejected";
 			:EXITCASE;
 		:ENDIF;
+
 		sResult := "warned";
 	:OTHERWISE;
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN sResult;
 :ENDPROC;
 -- diagnostics --

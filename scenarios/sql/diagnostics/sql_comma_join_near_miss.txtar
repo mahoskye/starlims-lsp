@@ -18,6 +18,7 @@ commas inside an inline view in FROM, and a DELETE (no join surface).
 :PROCEDURE OrderTasks;
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, t.testcode
 	    FROM orders o
@@ -51,6 +52,7 @@ commas inside an inline view in FROM, and a DELETE (no join surface).
 	        WHERE status = 'X'
 	    )
 	");
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

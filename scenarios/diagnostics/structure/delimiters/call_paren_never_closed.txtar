@@ -17,6 +17,7 @@ disturbed (diag.unclosed_delimiter, diag.unexpected_token deferral).
 :PROCEDURE NoteLength;
 	:PARAMETERS sNote;
 	:DECLARE nLen;
+
 	nLen := Len(AllTrim(sNote);
 	            :IF nLen > 200;
 	            nLen := 200;

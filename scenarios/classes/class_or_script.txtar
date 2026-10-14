@@ -13,6 +13,7 @@ is not script code; the :DECLARE is.
 -- format --
 /* Order helper;
 :DECLARE nVersion;
+
 :CLASS OrderHelper;
 :DECLARE sOrderNo;
 

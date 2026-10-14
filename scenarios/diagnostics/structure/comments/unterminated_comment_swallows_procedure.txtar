@@ -13,6 +13,7 @@ the :PROCEDURE line is swallowed, so its :ENDPROC is unmatched
 /* Helper: trims and upper-cases a code
 :PROCEDURE CleanCode;
 :PARAMETERS sCode;
+
 :RETURN Upper(AllTrim(sCode));
 :ENDPROC;
 -- diagnostics --

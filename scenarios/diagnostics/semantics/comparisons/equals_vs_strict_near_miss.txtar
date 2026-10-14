@@ -17,11 +17,13 @@ string-typed names (no literal, so no evidence).
 :PROCEDURE StatusIs;
 	:PARAMETERS sStatus, sOther, nCode;
 	:DECLARE bHit;
+
 	bHit := sStatus != "Log";
 	bHit := bHit .AND. sStatus # "Log" .AND. sStatus <> "Log";
 	bHit := bHit .OR. sStatus == "Done";
 	bHit := bHit .OR. nCode = 3;
 	bHit := bHit .OR. sStatus = sOther;
+
 	:RETURN bHit;
 :ENDPROC;
 -- diagnostics --

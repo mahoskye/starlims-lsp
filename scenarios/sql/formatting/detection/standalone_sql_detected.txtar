@@ -14,6 +14,7 @@ overflows (fmt.sql_in_strings); a short one stays inline.
 :PROCEDURE Build;
 	:PARAMETERS sStatus;
 	:DECLARE sSQL, sCount, aRows;
+
 	sSQL := "
 	    SELECT ordno, custid, logdate, status
 	    FROM orders
@@ -22,6 +23,7 @@ overflows (fmt.sql_in_strings); a short one stays inline.
 	";
 	sCount := "select count(*) from orders";
 	aRows := SQLExecute(sSQL);
+
 	:RETURN {aRows, sCount};
 :ENDPROC;
 -- diagnostics --

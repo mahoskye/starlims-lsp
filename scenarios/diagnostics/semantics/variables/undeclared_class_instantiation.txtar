@@ -13,9 +13,11 @@ read, even when the class is not in the published inventory
 -- format --
 :PROCEDURE OpenPanel;
 	:DECLARE oPanel, nWidth, dOpened;
+
 	oPanel := PanelLayout{"pnlMain", 0, 0, 320, 240};
 	nWidth := Len("pnlMain") * 10;
 	dOpened := Today();
+
 	:RETURN oPanel;
 :ENDPROC;
 -- diagnostics --

@@ -13,6 +13,7 @@ accepts :INHERIT directly after the class declaration. The misplaced
 -- format --
 :CLASS Widget;
 :DECLARE nWidth;
+
 :INHERIT Lab.Control;
 
 :PROCEDURE Init;

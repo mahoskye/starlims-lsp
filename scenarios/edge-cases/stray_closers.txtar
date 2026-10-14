@@ -10,9 +10,11 @@ nFirst := aItems[1]];
 :RETURN nFirst;
 -- format --
 :DECLARE aItems, nFirst;
+
 nFirst := 1);
 aItems := {1, 2, 3}};
 nFirst := aItems[1]];
+
 :RETURN nFirst;
 -- diagnostics --
 2:12-2:13 error unmatched_delimiter: Unmatched ')'

@@ -12,6 +12,7 @@ SELECT * probe directly inside NOT EXISTS (...).
 -- format --
 :PROCEDURE Counts;
 	:DECLARE nCount, aRows;
+
 	nCount := LSearch("SELECT COUNT(*) FROM orders", 0);
 	aRows := SQLExecute("SELECT ordno, qty * price AS total FROM orders");
 	aRows := SQLExecute("
@@ -23,6 +24,7 @@ SELECT * probe directly inside NOT EXISTS (...).
 	        WHERE t.ordno = o.ordno
 	    )
 	");
+
 	:RETURN {nCount, aRows};
 :ENDPROC;
 -- diagnostics --

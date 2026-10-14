@@ -11,10 +11,13 @@ nRuns := 0;
 -- format --
 :PARAMETERS sMode;
 :DECLARE nRuns;
+
 nRuns := 0;
+
 :IF sMode == "full";
 	nRuns := 2;
 :ENDIF;
+
 :RETURN nRuns;
 -- diagnostics --
 -- diagnostics [--strict --info] --

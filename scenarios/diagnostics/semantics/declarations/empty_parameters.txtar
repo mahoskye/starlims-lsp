@@ -12,8 +12,10 @@ the keyword), at script level and inside a procedure.
 
 :PROCEDURE Ping;
 	:PARAMETERS;
+
 	:RETURN .T.;
 :ENDPROC;
+
 :RETURN DoProc("Ping");
 -- diagnostics --
 1:1-1:12 error empty_parameters: ':PARAMETERS' must name at least one parameter; leave the line out when there are none

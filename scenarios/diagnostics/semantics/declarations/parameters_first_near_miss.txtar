@@ -21,17 +21,21 @@ sResult := DoProc("Normalize", {sOrderNo});
 :INCLUDE Shared.Constants;
 :PARAMETERS sOrderNo;
 :DECLARE sResult;
+
 sResult := DoProc("Normalize", {sOrderNo});
 :BEGININLINECODE Doubler;
 	:PARAMETERS nValue;
+
 	:RETURN nValue * 2;
 :ENDINLINECODE;
 
 :PROCEDURE Normalize;
 	/* trims and uppercases the order number;
 	:PARAMETERS sRaw;
+
 	:RETURN Upper(AllTrim(sRaw));
 :ENDPROC;
+
 :RETURN sResult;
 -- diagnostics --
 -- diagnostics [--strict --info] --

@@ -12,8 +12,10 @@ closes the procedure cleanly (diag.unmatched_block_end).
 -- format --
 :PROCEDURE ResetCounter;
 	:DECLARE nCount;
+
 	nCount := 0;
 :ENDIF;
+
 :RETURN nCount;
 :ENDPROC;
 -- diagnostics --

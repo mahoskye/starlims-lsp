@@ -14,6 +14,7 @@ another object all count as uses (diag.unused_variable near-miss).
 :PROCEDURE LoadShipment;
 	:PARAMETERS sShipId, oCarrier;
 	:DECLARE aRows, nWeight, oManifest;
+
 	oManifest := CreateUdObject();
 	aRows := SQLExecute("
 	    SELECT id, weight
@@ -22,6 +23,7 @@ another object all count as uses (diag.unused_variable near-miss).
 	      AND carrier = ?oCarrier:code?
 	");
 	oManifest:nWeight := Len(aRows);
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

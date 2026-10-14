@@ -76,8 +76,9 @@ sResult := "two";
 :ENDPROC;
 ```
 
-Already-separated siblings, statement/block adjacency, and closer-inside-
-closer stay untouched:
+Already-separated siblings and closer-inside-closer stay untouched. (A
+block next to an ordinary statement is fmt.blank_lines_between_sections'
+boundary, which separates it too by default.)
 
 ### Idempotent
 
@@ -90,6 +91,7 @@ closer stay untouched:
 	:WHILE bLoop;
 		sResult := "two";
 	:ENDWHILE;
+
 	nCount := 1;
 :ENDPROC;
 ```

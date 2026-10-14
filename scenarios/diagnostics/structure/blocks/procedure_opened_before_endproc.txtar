@@ -15,10 +15,12 @@ diag.mismatched_block_end).
 -- format --
 :PROCEDURE LoadHeader;
 	:PARAMETERS sKey;
+
 	:RETURN "H-" + sKey;
 
 	:PROCEDURE LoadDetail;
 		:PARAMETERS sKey;
+
 		:RETURN "D-" + sKey;
 	:ENDPROC;
 -- diagnostics --

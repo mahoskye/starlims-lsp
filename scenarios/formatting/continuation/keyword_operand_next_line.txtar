@@ -23,7 +23,9 @@ nResult;
 :PROCEDURE Pick;
 	:PARAMETERS nValue;
 	:DECLARE nResult;
+
 	nResult := 0;
+
 	:WHILE
 		nResult < nValue;
 		nResult += 1;
@@ -34,6 +36,7 @@ nResult;
 		:RETURN
 			nResult;
 	:ENDIF;
+
 	:RETURN;
 :ENDPROC;
 -- diagnostics --

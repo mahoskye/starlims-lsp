@@ -21,11 +21,13 @@ first Flags fence).
 :PROCEDURE CountRows;
 	:PARAMETERS sRegion;
 	:DECLARE nCount;
+
 	:TRY;
 		nCount := LSearch("SELECT COUNT(*) FROM ORDERS WHERE REGION = ?", 0,, {sRegion});
 	:CATCH;
 		nCount := 0;
 	:ENDTRY;
+
 	:RETURN nCount;
 	:ERROR;
 		nCount := -1;

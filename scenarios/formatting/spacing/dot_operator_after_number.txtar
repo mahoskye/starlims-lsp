@@ -14,10 +14,12 @@ nCount:=-nCount;
 -- format --
 :PROCEDURE Glued;
 	:PARAMETERS nCount, bReady, bFlag;
+
 	:IF nCount >= 10 .AND. bReady .OR. nCount < 2.5 .AND. .NOT. bFlag;
 		bFlag := .NOT. bFlag;
 		nCount := -nCount;
 	:ENDIF;
+
 	:RETURN bFlag;
 :ENDPROC;
 -- diagnostics --

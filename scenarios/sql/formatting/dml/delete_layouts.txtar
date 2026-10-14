@@ -12,6 +12,7 @@ DELETE FROM with a WHERE clause and with an EXISTS subquery (reference
 :PROCEDURE Purge;
 	:PARAMETERS sOrdNo;
 	:DECLARE bOk;
+
 	bOk := RunSQL("delete from ordtask where ordno = ?",, {sOrdNo});
 	bOk := RunSQL("
 	    DELETE FROM ordresult r
@@ -23,6 +24,7 @@ DELETE FROM with a WHERE clause and with an EXISTS subquery (reference
 	          AND t.status = 'Cancelled'
 	    )
 	");
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

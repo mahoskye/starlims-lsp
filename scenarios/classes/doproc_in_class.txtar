@@ -28,15 +28,18 @@ restriction).
 :PROCEDURE Check;
 	:PARAMETERS oInput, sRule;
 	:DECLARE bOk, bShape, bCustom, vExt;
+
 	bOk := DoProc("CheckRequired", {oInput});
 	bShape := DoProc("Lab.ShapeRules.Validate", {oInput});
 	bCustom := DoProc(sRule, {oInput});
 	vExt := ExecFunction("Lab.ShapeRules", {oInput});
+
 	:RETURN bOk .AND. bShape .AND. bCustom .AND. Me:CheckRequired(oInput);
 :ENDPROC;
 
 :PROCEDURE CheckRequired;
 	:PARAMETERS oInput;
+
 	:RETURN .NOT. Empty(oInput);
 :ENDPROC;
 -- diagnostics --

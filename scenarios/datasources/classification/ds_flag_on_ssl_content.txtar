@@ -11,6 +11,7 @@ is correct.
 -- format [--ds] --
 :PARAMETERS sCode;
 :DEFAULT sCode, "NONE";
+
 :RETURN Upper(sCode);
 -- diagnostics [--ds] --
 1:13-1:18 error datasource_default_required: Data source parameter 'sCode' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)
@@ -18,6 +19,7 @@ is correct.
 -- format --
 :PARAMETERS sCode;
 :DEFAULT sCode, "NONE";
+
 :RETURN Upper(sCode);
 -- diagnostics --
 -- diagnostics [--strict --info] --

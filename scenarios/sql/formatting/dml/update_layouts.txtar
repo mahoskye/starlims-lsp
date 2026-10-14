@@ -14,6 +14,7 @@ assignment line.
 :PROCEDURE Refresh;
 	:PARAMETERS sOrdNo, sUser;
 	:DECLARE bOk;
+
 	bOk := RunSQL("
 	    UPDATE ordtask SET
 	        status = 'Complete',
@@ -31,6 +32,7 @@ assignment line.
 	    )
 	    WHERE o.status = 'Active'
 	");
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

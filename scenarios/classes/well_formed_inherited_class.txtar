@@ -61,6 +61,7 @@ profile.
 ;
 :PROCEDURE Constructor;
 	:PARAMETERS sOrderNo;
+
 	Base:Constructor(sOrderNo);
 	Me:aHistory := {};
 :ENDPROC;
@@ -74,10 +75,13 @@ profile.
 :PROCEDURE SetStatus;
 	:PARAMETERS sStatus;
 	:DECLARE bChanged;
+
 	bChanged := Base:SetStatus(sStatus);
+
 	:IF bChanged;
 		AAdd(Me:aHistory, {Now(), sStatus});
 	:ENDIF;
+
 	:RETURN bChanged;
 :ENDPROC;
 

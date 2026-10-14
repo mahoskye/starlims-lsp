@@ -5,6 +5,7 @@ not counted, however long; only :PROCEDURE lists are.
 :RETURN {vArg1, vArg2, vArg3, vArg4, vArg5, vArg6, vArg7, vArg8, vArg9, vArg10};
 -- format --
 :PARAMETERS vArg1, vArg2, vArg3, vArg4, vArg5, vArg6, vArg7, vArg8, vArg9, vArg10;
+
 :RETURN {vArg1, vArg2, vArg3, vArg4, vArg5, vArg6, vArg7, vArg8, vArg9, vArg10};
 -- diagnostics --
 -- diagnostics [--strict --info] --

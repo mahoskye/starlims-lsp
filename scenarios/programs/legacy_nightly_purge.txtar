@@ -113,21 +113,26 @@ res := res + tbls[x] + ",";
 -- format --
 :PARAMETERS days;
 :DECLARE cutoff, tables, t, n, sql, ok, deleted, purged;
+
 :IF Empty(days);
 	days := 30;
 :ENDIF;
+
 cutoff := DateAdd(Today(), -days, "dd");
 tables := {"LabAuditLog", "LabTempResults", "LabSessionLog"};
 purged := {};
 UsrMes("first table: " + tables[0]);
 n := 1;
+
 :WHILE n <= Len(tables);
 	t := tables[n];
 	sql := "delete from " + t + " where CreatedOn < ?";
 	ok := RunSQL(sql,, {cutoff});
+
 	:IF ok AND n > 0;
 		AAdd(purged, t);
 	:ENDIF;
+
 	n := n + 1;
 :ENDWHILE;
 
@@ -146,10 +151,12 @@ DoProc("ReportPartial", {purged});
 :PROCEDURE ReportPartial;
 	:PARAMETERS done;
 	:DECLARE msg, k;
+
 	msg := "";
 	For k := 1 :TO Len(done);
 	msg := msg + done[k] + " ";
 :NEXT;
+
 ErrorMes("purge", "partial: " + msg);
 :ERROR;
 	ErrorMes("purge", "ReportPartial failed");
@@ -160,9 +167,11 @@ ErrorMes("purge", "partial: " + msg);
 	:PARAMETERS tbl, before;
 	:PUBLIC archived;
 	:DECLARE cnt, rows, j, ok;
+
 	:IF tbl = "";
 		:RETURN 0;
 	:ENDIF;
+
 	cnt := RunSQL("select count(*) from LabArchiveQueue where TableName = ?",, {tbl});
 	rows := LSelect1("
 	    SELECT RowKey
@@ -170,26 +179,34 @@ ErrorMes("purge", "partial: " + msg);
 	    WHERE TableName = ?
 	      AND QueuedOn < ?
 	",, {tbl, before});
+
 	:FOR j := 1 :TO Len(rows);
 		ok := RunSQL("delete from LabArchiveQueue where RowKey = ?",, {rows[j][1]});
 	:NEXT;
+
 	archived := Len(rows);
+
 	:RETURN archived;
 :ENDPROC;
 
 :PROCEDURE Vacuum;
 	:PARAMETERS tbls;
 	:DECLARE x, res;
+
 	res := "";
+
 	:FOR x := 1 :TO Len(tbls);
 		:IF tbls[x] == "LabAuditLog";
 			:LOOP;
 		:ENDIF;
+
 		res := res + tbls[x] + ",";
+
 		:IF Len(res) > 200;
 			:EXITFOR;
 		:ENDIF;
 	:NEXT;
+
 	:RETURN Left(res, Len(res) - 1);
 :ENDPROC;
 -- diagnostics --

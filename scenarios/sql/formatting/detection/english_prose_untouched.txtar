@@ -14,10 +14,12 @@ are all byte-preserved.
 -- format --
 :PROCEDURE Messages;
 	:DECLARE sMsg, sHelp, sWarn, sNote;
+
 	sMsg := "Select the samples from the rack and update the status column before continuing with the run";
 	sHelp := "Update the set of instruments where the calibration has expired";
 	sWarn := "Delete from the list any sample that was already received by the lab";
 	sNote := "Select one";
+
 	:RETURN {sMsg, sHelp, sWarn, sNote};
 :ENDPROC;
 -- diagnostics --

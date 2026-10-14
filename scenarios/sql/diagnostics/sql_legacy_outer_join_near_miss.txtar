@@ -16,6 +16,7 @@ comment.
 :PROCEDURE Outer;
 	:PARAMETERS nOrd;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT o.ordno, r.result_value
 	    FROM orders o
@@ -28,6 +29,7 @@ comment.
 	    FROM orders
 	    WHERE note = '(+)' -- no (+) here
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

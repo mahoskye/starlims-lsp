@@ -21,6 +21,7 @@ on a number (:ToJson()), and -- on a string.
 -- format --
 :PROCEDURE Probe;
 	:DECLARE aItems, sText, dToday, nNum, vOut;
+
 	aItems := {1, 2, 3};
 	sText := "a,b";
 	dToday := Today();
@@ -31,6 +32,7 @@ on a number (:ToJson()), and -- on a string.
 	vOut := dToday:year;
 	vOut := nNum:ToJson();
 	sText--;
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

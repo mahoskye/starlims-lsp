@@ -24,11 +24,13 @@ issue #32).
 :PROCEDURE Send;
 	:PARAMETERS sTo;
 	:DECLARE oMail, oGood, oData, oPattern, vSent;
+
 	oMail := Email();
 	oPattern := SSLRegex("^[a-z]+$");
 	oGood := Email{};
 	oData := SSLDataset{};
 	vSent := Me:oSvc:Email(sTo);
+
 	:RETURN vSent;
 :ENDPROC;
 -- diagnostics --

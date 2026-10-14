@@ -35,6 +35,7 @@ dropped (entry retains the history).
 | [fmt.atomic_property_chains](../catalog/formatting/atomic_property_chains.md) | Property chains are atomic when wrapping | active |
 | [fmt.blank_line_between_blocks](../catalog/formatting/blank_line_between_blocks.md) | Blank line between sibling control-flow blocks | active |
 | [fmt.blank_lines_between_procs](../catalog/formatting/blank_lines_between_procs.md) | Blank lines between procedures | active |
+| [fmt.blank_lines_between_sections](../catalog/formatting/blank_lines_between_sections.md) | Blank line between logical sections | active |
 | [fmt.builtin_function_case](../catalog/formatting/builtin_function_case.md) | Built-in function name casing | active |
 | [fmt.code_block_literals](../catalog/formatting/code_block_literals.md) | Code-block literal canonical form | active |
 | [fmt.comma_spacing](../catalog/formatting/comma_spacing.md) | Space after commas | active |

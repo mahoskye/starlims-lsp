@@ -15,10 +15,12 @@ next line); case does not matter.
 -- format --
 :PROCEDURE Fetch;
 	:DECLARE vOut, sXml;
+
 	vOut := DoProc("Refresh", {});
 	vOut := ExecFunction("Stock.Count", {});
 	sXml := GetDataSet("SELECT id FROM lots", {  /* none;
 	});
+
 	:RETURN sXml;
 :ENDPROC;
 -- diagnostics --

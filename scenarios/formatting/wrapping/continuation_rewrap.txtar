@@ -12,9 +12,11 @@ vResult := DoProc("CalculateTotals",
 -- format --
 :PROCEDURE Rewrap;
 	:DECLARE vResult;
+
 	vResult := DoProc("CalculateTotals",
 	                  {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue,
 	                   nFourthQuarterRevenue, nFifth});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

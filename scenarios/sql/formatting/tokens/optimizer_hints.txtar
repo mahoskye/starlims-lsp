@@ -11,12 +11,14 @@ stripped or re-cased as comments (reference §4.7, sql_optimizer_hints).
 :PROCEDURE Hinted;
 	:PARAMETERS sStatus;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT /*+ index(t idx_ordtask_status) */ t.ordno, t.testcode, t.status
 	    FROM ordtask t
 	    WHERE t.status = ?sStatus?
 	    ORDER BY t.ordno
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

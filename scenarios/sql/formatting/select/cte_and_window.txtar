@@ -12,6 +12,7 @@ level and the main SELECT returns to the clause column (reference §2.7,
 :PROCEDURE Ranking;
 	:PARAMETERS sOrdNo;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    WITH task_summary AS (
 	        SELECT ordno, COUNT(*) AS total_tasks
@@ -26,6 +27,7 @@ level and the main SELECT returns to the clause column (reference §2.7,
 	           ) AS rn
 	    FROM task_summary ts
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

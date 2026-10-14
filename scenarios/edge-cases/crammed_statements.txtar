@@ -9,12 +9,15 @@ indentation must still follow the block structure.
 :PROCEDURE Crammed;
 	:PARAMETERS nA, nB;
 	:DECLARE nSum, sOut;
+
 	nSum := nA + nB;
+
 	:IF nSum > 10;
 		sOut := "big";
 	:ELSE;
 		sOut := "small";
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

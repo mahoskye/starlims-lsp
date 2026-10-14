@@ -25,6 +25,7 @@ nested :TRY within the outer :CATCH (the nested handler catches it), in
 :PROCEDURE PostEntry;
 	:PARAMETERS oLog, nAmount;
 	:DECLARE oErr;
+
 	:TRY;
 		nAmount := nAmount * 1;
 	:CATCH;

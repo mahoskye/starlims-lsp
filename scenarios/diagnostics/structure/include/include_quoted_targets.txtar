@@ -15,6 +15,7 @@ nCount := 0;
 :INCLUDE Common.MathHelpers;
 :INCLUDE MathHelpers;
 :DECLARE nCount;
+
 nCount := 0;
 -- diagnostics --
 1:10-1:32 error include_quoted_target: ':INCLUDE' target must be an identifier, not a string: write ':INCLUDE Common.StringHelpers;'

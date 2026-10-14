@@ -12,6 +12,7 @@ reflows, and the skipped connection argument keeps its adjacent commas.
 :PROCEDURE CustomerName;
 	:PARAMETERS sOrdNo;
 	:DECLARE sName;
+
 	sName := LSearch("
 	    SELECT c.custname
 	    FROM customers c
@@ -19,6 +20,7 @@ reflows, and the skipped connection argument keeps its adjacent commas.
 	      ON o.custid = c.custid
 	    WHERE o.ordno = ?
 	", "select a fallback name from the list",, {sOrdNo});
+
 	:RETURN sName;
 :ENDPROC;
 -- diagnostics --

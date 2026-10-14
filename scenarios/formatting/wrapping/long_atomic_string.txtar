@@ -13,8 +13,10 @@ DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNin
 -- format --
 :PROCEDURE Notify;
 	:DECLARE sMessage;
+
 	sMessage := "This message text is long enough by itself to run past the ninety column limit easily";
 	DoProc("ThisIsAVeryLongProcedureNameArgumentThatByItselfPushesTheLineWellPastNinetyColumns");
+
 	:RETURN sMessage;
 :ENDPROC;
 -- diagnostics --

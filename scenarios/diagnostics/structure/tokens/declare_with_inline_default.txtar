@@ -11,7 +11,9 @@ failure. Known issue: #323 (validates clean, a regression).
 -- format --
 :PROCEDURE StartCounter;
 	:DECLARE nCount :DEFAULT 0;
+
 	nCount := nCount + 1;
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

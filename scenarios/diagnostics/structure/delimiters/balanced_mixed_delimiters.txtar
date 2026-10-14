@@ -21,14 +21,18 @@ diag.unmatched_delimiter "Does not flag").
 :PROCEDURE ScaleAll;
 	:PARAMETERS aValues, nFactor;
 	:DECLARE fnScale, aScaled, sNote, nIdx;
+
 	/* a stray ( or } in a comment is just text;
 	sNote := "a stray ) or ] in a string is just text";
 	fnScale := {|n| (n * nFactor) + 0};
 	aScaled := {};
+
 	:FOR nIdx := 1 :TO Len(aValues);
 		AAdd(aScaled, Eval(fnScale, aValues[nIdx]));
 	:NEXT;
+
 	sNote := [ratio (a/b) and set {x} stay text];
+
 	:RETURN {aScaled[1], (aScaled[Len(aScaled)] + 0), sNote};
 :ENDPROC;
 -- diagnostics --

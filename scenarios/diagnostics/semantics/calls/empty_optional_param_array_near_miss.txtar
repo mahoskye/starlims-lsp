@@ -17,11 +17,13 @@ function or in another position.
 -- format --
 :PROCEDURE Fetch;
 	:DECLARE vOut, aEmpty;
+
 	vOut := DoProc("Refresh");
 	vOut := DoProc("Refresh", {1, 2});
 	vOut := GetDataSet("SELECT id FROM lots", {}, .T.);
 	aEmpty := {};
 	vOut := Len({});
+
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --

@@ -11,6 +11,7 @@ nCount := 0;
 /* Section: totals */
 =========================================;
 :DECLARE nCount;
+
 nCount := 0;
 -- diagnostics --
 -- diagnostics [--strict --info] --

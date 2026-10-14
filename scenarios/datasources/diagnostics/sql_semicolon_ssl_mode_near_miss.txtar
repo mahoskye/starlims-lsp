@@ -11,7 +11,9 @@ nUses := LSearch("SELECT COUNT(*) FROM gate_pass WHERE gate_code = ?", 0,, {sGat
 /* Data source: gate usage (SSL) */;
 :PARAMETERS sGate := "G1";
 :DECLARE nUses;
+
 nUses := LSearch("SELECT COUNT(*) FROM gate_pass WHERE gate_code = ?", 0,, {sGate});
+
 :RETURN nUses;
 -- diagnostics --
 -- diagnostics [--strict --info] --

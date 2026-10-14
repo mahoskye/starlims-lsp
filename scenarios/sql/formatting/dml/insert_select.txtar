@@ -9,6 +9,7 @@ SELECT that feeds it returns to the clause column (reference §2.9).
 -- format --
 :PROCEDURE ArchiveTasks;
 	:DECLARE bOk;
+
 	bOk := RunSQL("
 	    INSERT INTO ordtask_archive (
 	        ordno, testcode, status, logdate
@@ -18,6 +19,7 @@ SELECT that feeds it returns to the clause column (reference §2.9).
 	    WHERE status = 'Complete'
 	      AND logdate < SYSDATE - 365
 	");
+
 	:RETURN bOk;
 :ENDPROC;
 -- diagnostics --

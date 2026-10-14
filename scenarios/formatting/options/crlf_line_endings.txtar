@@ -12,10 +12,13 @@ nValue += 1;
 -- format --
 :PROCEDURE Windows;
 	:DECLARE nValue;
+
 	nValue := 1;
+
 	:IF nValue > 0;
 		nValue += 1;
 	:ENDIF;
+
 	:RETURN nValue;
 :ENDPROC;
 -- diagnostics --

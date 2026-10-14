@@ -15,8 +15,10 @@ closing piece also carries a balanced 'Z' literal.
 :PROCEDURE Lookup;
 	:PARAMETERS sName, sCode;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
 	aRows := SQLExecute("SELECT id FROM c WHERE code IN ('" + sCode + "', 'Z')");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

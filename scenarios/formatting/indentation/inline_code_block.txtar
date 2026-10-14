@@ -15,12 +15,15 @@ sCode := GetInlineCode("HelperBody");
 -- format --
 :PROCEDURE BuildScript;
 	:DECLARE sCode;
+
 	:BEGININLINECODE HelperBody;
 		:DECLARE nTotal;
+
 		nTotal := 1 + 2;
 		:RETURN nTotal;
 	:ENDINLINECODE;
 	sCode := GetInlineCode("HelperBody");
+
 	:RETURN sCode;
 :ENDPROC;
 -- diagnostics --

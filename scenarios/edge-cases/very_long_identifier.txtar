@@ -7,8 +7,10 @@ sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineL
 :RETURN sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
 -- format --
 :DECLARE sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
+
 sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar :=
 	"x";
+
 :RETURN sThisIsAnExtraordinarilyLongVariableNameThatKeepsGoingWellPastAnyReasonableLineLengthLimitForAnyCodebaseEverWrittenSoFar;
 -- diagnostics --
 -- diagnostics [--strict --info] --

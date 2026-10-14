@@ -15,6 +15,7 @@ string holding double-quoted SQL identifiers is recorded as-is.
 :PROCEDURE Quotes;
 	:PARAMETERS sStatus;
 	:DECLARE aOne, aTwo, aThree;
+
 	aOne := SQLExecute("
 	    SELECT ordno, status, logdate
 	    FROM orders
@@ -35,6 +36,7 @@ string holding double-quoted SQL identifiers is recorded as-is.
 	      AND status IN ('A', 'B')
 	    ORDER BY ordno
 	]);
+
 	:RETURN {aOne, aTwo, aThree};
 :ENDPROC;
 -- diagnostics --

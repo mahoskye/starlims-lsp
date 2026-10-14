@@ -24,6 +24,11 @@ type FormattingOptions struct {
 	// is inserted between the closing keyword of the previous block and the
 	// opening keyword of the next block. Default true.
 	BlankLineBetweenBlocks bool
+	// BlankLinesBetweenSections inserts one blank line at the boundaries
+	// between logical sections of a body: after the declarations, around a
+	// control block, before a section comment and before the final
+	// :RETURN (style guide blank_line_between_sections).
+	BlankLinesBetweenSections bool
 	// TrimTrailingWhitespace removes trailing space/tab characters from
 	// every formatted line. Default true.
 	TrimTrailingWhitespace bool
@@ -44,18 +49,19 @@ type FormattingOptions struct {
 // DefaultFormattingOptions returns default formatting options.
 func DefaultFormattingOptions() FormattingOptions {
 	return FormattingOptions{
-		IndentStyle:              "tab",
-		IndentSize:               4,
-		MaxLineLength:            90,
-		OperatorSpacing:          true,
-		CommaSpacing:             true,
-		SemicolonEnforcement:     true,
-		BlankLinesBetweenProcs:   1,
-		BlankLineBetweenBlocks:   true,
-		TrimTrailingWhitespace:   true,
-		MaxConsecutiveBlankLines: 0,
-		BuiltinFunctionCase:      "PascalCase",
-		SQL:                      DefaultSQLFormattingOptions(),
+		IndentStyle:               "tab",
+		IndentSize:                4,
+		MaxLineLength:             90,
+		OperatorSpacing:           true,
+		CommaSpacing:              true,
+		SemicolonEnforcement:      true,
+		BlankLinesBetweenProcs:    1,
+		BlankLineBetweenBlocks:    true,
+		BlankLinesBetweenSections: true,
+		TrimTrailingWhitespace:    true,
+		MaxConsecutiveBlankLines:  2,
+		BuiltinFunctionCase:       "PascalCase",
+		SQL:                       DefaultSQLFormattingOptions(),
 	}
 }
 
@@ -2139,10 +2145,123 @@ func applyPostFormatPasses(text string, opts FormattingOptions) string {
 	if opts.BlankLineBetweenBlocks {
 		text = blankLineBetweenSiblingBlocks(text)
 	}
+	if opts.BlankLinesBetweenSections {
+		text = blankLinesBetweenSections(text)
+	}
 	if opts.MaxConsecutiveBlankLines > 0 {
 		text = capConsecutiveBlankLines(text, opts.MaxConsecutiveBlankLines)
 	}
 	return text
+}
+
+// Section-boundary keyword sets (blankLinesBetweenSections).
+var (
+	sectionDecls = map[string]bool{"PARAMETERS": true, "DEFAULT": true, "DECLARE": true, "PUBLIC": true, "INCLUDE": true}
+	// sectionBodyStarts open a body: the line after one never gets a blank.
+	sectionBodyStarts = map[string]bool{
+		"IF": true, "WHILE": true, "FOR": true, "BEGINCASE": true, "TRY": true, "ELSE": true, "CASE": true,
+		"OTHERWISE": true, "CATCH": true, "FINALLY": true, "PROCEDURE": true, "REGION": true,
+		"BEGININLINECODE": true, "ERROR": true, "RESUME": true, "CLASS": true,
+	}
+	// sectionBodyEnds close a body or branch: no blank before one.
+	sectionBodyEnds = map[string]bool{
+		"ENDIF": true, "ENDWHILE": true, "NEXT": true, "ENDCASE": true, "ENDTRY": true, "ENDPROC": true,
+		"ENDREGION": true, "ENDINLINECODE": true, "ELSE": true, "CASE": true, "OTHERWISE": true,
+		"CATCH": true, "FINALLY": true, "EXITCASE": true, "RESUME": true, "ENDFOR": true,
+	}
+)
+
+// blankLinesBetweenSections inserts one blank line at each boundary between
+// logical sections of a body (style guide blank_line_between_sections):
+// after the declarations, before a control block that follows code and
+// after its closer, before a standalone comment that follows code, and
+// before a procedure's final :RETURN. Nothing is inserted at the start or
+// end of a body, where a blank line already exists, or inside a
+// multi-line literal; continuation lines are part of their statement.
+func blankLinesBetweenSections(text string) string {
+	lines := strings.Split(text, "\n")
+	mask := literalLineMask(text, literalTokenTypes...)
+	tokens := lexer.NewLexer(text).Tokenize()
+	cont, _ := statementContinuations(tokens)
+
+	type item struct {
+		line    int
+		comment bool
+		kw      string
+		indent  string
+	}
+	first := map[int]lexer.Token{}
+	for _, t := range tokens {
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenEOF {
+			continue
+		}
+		if _, ok := first[t.Line-1]; !ok {
+			first[t.Line-1] = t
+		}
+	}
+	var items []item
+	for l := range lines {
+		t, ok := first[l]
+		if !ok || mask[l] || cont[l] {
+			continue
+		}
+		it := item{line: l, comment: t.Type == lexer.TokenComment, indent: leadingIndentString(lines[l])}
+		if t.Type == lexer.TokenKeyword && strings.HasPrefix(t.Text, ":") && !isLabelKeywordMashed(t.Text) {
+			it.kw = strings.ToUpper(strings.TrimPrefix(t.Text, ":"))
+		}
+		items = append(items, it)
+	}
+	nextCode := func(k int) *item {
+		for m := k + 1; m < len(items); m++ {
+			if !items[m].comment {
+				return &items[m]
+			}
+		}
+		return nil
+	}
+
+	insert := map[int]bool{}
+	for k := 1; k < len(items); k++ {
+		p, j := items[k-1], items[k]
+		if p.indent != j.indent || sectionBodyStarts[p.kw] || sectionBodyEnds[j.kw] {
+			continue
+		}
+		gap := false
+		for l := p.line + 1; l < j.line; l++ {
+			if !mask[l] && strings.TrimSpace(lines[l]) == "" {
+				gap = true
+				break
+			}
+		}
+		if gap {
+			continue
+		}
+		nc := nextCode(k)
+		ncDecl := nc != nil && sectionDecls[nc.kw]
+		switch {
+		case sectionDecls[p.kw] && !sectionDecls[j.kw] && !(j.comment && ncDecl):
+			insert[j.line] = true // after the declarations
+		case !p.comment && innerBlockOpeners[j.kw]:
+			insert[j.line] = true // before a control block
+		case innerBlockClosers[p.kw]:
+			insert[j.line] = true // after a control block
+		case j.comment && !p.comment && !(sectionDecls[p.kw] && ncDecl):
+			insert[j.line] = true // before a section comment
+		case j.kw == "RETURN" && !p.comment && (nextCode(k) == nil || nextCode(k).kw == "ENDPROC"):
+			insert[j.line] = true // before the final :RETURN
+		}
+	}
+	if len(insert) == 0 {
+		return text
+	}
+	out := make([]string, 0, len(lines)+len(insert))
+	for l, line := range lines {
+		if insert[l] {
+			out = append(out, "")
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
 
 // innerBlockOpeners and innerBlockClosers cover the control-flow constructs

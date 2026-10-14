@@ -20,8 +20,10 @@ after the :DECLARE, a redeclared parameter, and a local nobody uses
 	:DEFAULT nQty, 1;
 	:DEFAULT sBin, "DOCK";
 	:DECLARE sLotNo, sUnused;
+
 	nReceived := nReceived + nQty;
 	sBin := "RACK-" + sLotNo;
+
 	:RETURN {sBin, nReceived};
 :ENDPROC;
 -- diagnostics --

@@ -27,6 +27,7 @@ me:isValid := .t.;
 
 :PROCEDURE Init;
 	:PARAMETERS sOrderNo;
+
 	Me:orderNo := sOrderNo;
 	Me:isValid := .F.;
 	Base:Init();
@@ -36,7 +37,9 @@ me:isValid := .t.;
 	:IF Empty(Me:orderNo);
 		:RETURN .F.;
 	:ENDIF;
+
 	Me:isValid := .T.;
+
 	:RETURN Me:isValid;
 :ENDPROC;
 -- diagnostics --

@@ -17,11 +17,13 @@ fence). The :CATCH form is correct, so catch_clause_form is silent.
 :PROCEDURE StoreResult;
 	:PARAMETERS nValue;
 	:DECLARE nStored;
+
 	nStored := nValue;
 :CATCH;
 	nStored := 0;
 :FINALLY;
 	nStored := nStored + 0;
+
 	:RETURN nStored;
 :ENDPROC;
 -- diagnostics --

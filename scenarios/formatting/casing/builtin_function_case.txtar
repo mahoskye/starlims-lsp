@@ -22,6 +22,7 @@ nDay := datediff(dDate, today(), "dd");
 :PROCEDURE Casing;
 	:PARAMETERS sInput, dDate, aItems, oText;
 	:DECLARE nFlags, nDay, sOut, len;
+
 	nFlags := _AND(5, 3) + _OR(1, 2) + _XOR(6, 3) + _NOT(0);
 	nDay := DOW(dDate) + DOY(dDate);
 	sOut := LIMSDate(dDate) + AllTrim(Upper(sInput)) + LimsString(nDay);
@@ -30,6 +31,7 @@ nDay := datediff(dDate, today(), "dd");
 	len := 3;
 	sOut := oText:upper() + "call upper(x) first";
 	nDay := DateDiff(dDate, Today(), "dd");
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

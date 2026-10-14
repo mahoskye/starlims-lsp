@@ -22,17 +22,20 @@ aStops := SQLExecute(sSQL);
 -- format --
 :PARAMETERS sRoute := "R1", nMaxStops := 20;
 :DECLARE aStops, sSQL;
+
 sSQL := "
     SELECT stop_id, stop_seq
     FROM route_stop
     WHERE route_code = ?sRoute?
       AND stop_seq <= ?nMaxStops?
 ";
+
 :IF Empty(sRoute) or nMaxStops < 1;
 	aStops := {};
 :ELSE;
 	aStops := SQLExecute(sSQL);
 :ENDIF;
+
 :RETURN aStops;
 -- diagnostics --
 2:1-2:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DECLARE'

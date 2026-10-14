@@ -18,6 +18,7 @@ Parameters:dRunDate - the run date;
 
 :PROCEDURE BuildSummary;
 	:PARAMETERS dRunDate;
+
 	:RETURN DateToString(dRunDate, "yyyyMMdd");
 :ENDPROC;
 -- diagnostics --

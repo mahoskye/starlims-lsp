@@ -22,6 +22,7 @@ LSelect instead.
 :PROCEDURE Archive;
 	:PARAMETERS sOrdNo, oSql;
 	:DECLARE bOk, sSQL, aRows;
+
 	bOk := RunSQL("UPDATE orders SET status = 'X' WHERE ordno = ?",, {sOrdNo});
 	bOk := RunSQL("DELETE FROM ordtask WHERE ordno = ?",, {sOrdNo});
 	bOk := RunSQL("
@@ -52,6 +53,7 @@ LSelect instead.
 	bOk := RunSQL(sSQL);
 	bOk := oSql:RunSql("SELECT ordno FROM orders");
 	aRows := LSelect("SELECT status FROM orders WHERE ordno = ?",,, {sOrdNo});
+
 	:RETURN {bOk, aRows};
 :ENDPROC;
 -- diagnostics --

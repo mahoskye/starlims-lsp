@@ -15,8 +15,10 @@ parameter has its inline default. The procedure is called with DoProc.
 
 :PROCEDURE BuildCode;
 	:PARAMETERS sHead, nSeq;
+
 	:RETURN sHead + "-" + LimsString(nSeq);
 :ENDPROC;
+
 :RETURN DoProc("BuildCode", {sPrefix, 1});
 -- diagnostics --
 -- diagnostics [--strict --info] --

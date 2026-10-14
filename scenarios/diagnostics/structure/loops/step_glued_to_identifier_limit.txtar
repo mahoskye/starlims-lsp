@@ -17,10 +17,13 @@ block-pairing noise follows (diag.step_spacing, diag.unexpected_token).
 :PROCEDURE OddTotal;
 	:PARAMETERS nMax;
 	:DECLARE nIdx, nTotal;
+
 	nTotal := 0;
+
 	:FOR nIdx := 1 :TO nMax :STEP 2;
 		nTotal := nTotal + nIdx;
 	:NEXT;
+
 	:RETURN nTotal;
 :ENDPROC;
 -- diagnostics --

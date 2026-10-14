@@ -12,7 +12,9 @@ diag.include_early hand-off).
 :PROCEDURE FormatAll;
 	:INCLUDE Common.StringHelpers;
 	:DECLARE nCount;
+
 	nCount := 0;
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

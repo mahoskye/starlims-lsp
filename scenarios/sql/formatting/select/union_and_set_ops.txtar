@@ -12,6 +12,7 @@ sql_set_operation_spacing asks for blank lines around the operator).
 :PROCEDURE AllTasks;
 	:PARAMETERS sStatus;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT ordno, testcode
 	    FROM ordtask
@@ -24,6 +25,7 @@ sql_set_operation_spacing asks for blank lines around the operator).
 	    WHERE status = ?sStatus?
 	    ORDER BY ordno
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

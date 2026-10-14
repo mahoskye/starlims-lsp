@@ -18,11 +18,13 @@ introduces the mismatch.
 :PROCEDURE Caption;
 	:PARAMETERS nCount, dWhen, oRec;
 	:DECLARE sCaption, dLater;
+
 	sCaption := "Total: " + 5;
 	sCaption := sCaption + nCount;
 	dLater := 7 + dWhen;
 	sCaption := nCount * 2 + sCaption;
 	sCaption := oRec:Name + " - " + nCount + " items";
+
 	:RETURN sCaption + LimsString(dLater);
 :ENDPROC;
 -- diagnostics --

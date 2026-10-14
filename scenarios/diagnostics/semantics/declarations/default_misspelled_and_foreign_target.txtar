@@ -21,12 +21,14 @@ Names compare case-insensitively, so SREGION is fine.
 	:DEFAULT sRegoin, "north";
 	:DEFAULT SREGION, "north";
 	:DEFAULT nYear, 2024;
+
 	:RETURN sRegion;
 :ENDPROC;
 
 :PROCEDURE YearTotal;
 	:PARAMETERS nYear;
 	:DEFAULT nYear, 2024;
+
 	:RETURN nYear;
 :ENDPROC;
 -- diagnostics --

@@ -15,8 +15,10 @@ sLabel := "🧪" + sMissing;
 -- format --
 /* Résumé des échantillons — 样品摘要 🧪;
 :DECLARE sGreeting, sLabel, sUnused;
+
 sGreeting := "Grüße aus Zürich 👋";
 sLabel := "試料番号: " + sGreeting + " café";
+
 /* naïve — combining: é → é;
 sLabel := sLabel + "🧪🧫";
 :RETURN sLabel;

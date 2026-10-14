@@ -14,9 +14,11 @@ inside an IIF (the code block is one opaque token).
 :PROCEDURE Describe;
 	:PARAMETERS bShort, bUpper, sName;
 	:DECLARE sOut, fnPick;
+
 	sOut := IIf(bShort, "S", "L") + IIf(bUpper, "U", "l");
 	sOut := IIf(bShort, Left(AllTrim(sName), 3), Upper(sName));
 	fnPick := IIf(bShort, {|s| IIf(Empty(s), "-", s)}, {|s| s});
+
 	:RETURN sOut + Eval(fnPick, sName);
 :ENDPROC;
 -- diagnostics --

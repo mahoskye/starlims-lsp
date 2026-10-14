@@ -25,7 +25,9 @@ nSum -= i;
 	:PARAMETERS nLimit, sMode;
 	:DEFAULT nLimit, 10;
 	:DECLARE i, nSum;
+
 	nSum := 0;
+
 	:FOR i := 1 :TO nLimit :STEP 2;
 		:BEGINCASE;
 		:CASE sMode == "ADD";
@@ -36,6 +38,7 @@ nSum -= i;
 			:EXITCASE;
 		:ENDCASE;
 	:NEXT;
+
 	:RETURN nSum;
 :ENDPROC;
 -- diagnostics --

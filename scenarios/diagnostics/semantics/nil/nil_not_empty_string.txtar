@@ -15,10 +15,12 @@ equals_empty_string stay quiet on NIL = "".
 -- format --
 :PROCEDURE Probe;
 	:DECLARE bA;
+
 	bA := NIL = "";
 	bA := NIL == 0;
 	bA := .F. == NIL;
 	bA := NIL = '';
+
 	:RETURN bA;
 :ENDPROC;
 -- diagnostics --

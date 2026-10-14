@@ -27,24 +27,30 @@ nPass := nPass + 1;
 :ENDPROC;
 -- format --
 :DECLARE nPass;
+
 nPass := 0;
 :LABEL TOP;
 nPass := nPass + 1;
+
 :IF nPass < 2;
 	Branch("LABEL TOP");
 :ENDIF;
 
 :PROCEDURE Loop;
 	:DECLARE nCount;
+
 	nCount := 0;
 	Branch("LABEL  SKIP");
 	:LABEL SKIP;
 	nCount := nCount + 1;
+
 	:IF nCount < 3;
 		Branch("LABELAGAIN");
 	:ENDIF;
+
 	:LABELAGAIN;
 	Branch("");
+
 	:RETURN nCount;
 :ENDPROC;
 -- diagnostics --

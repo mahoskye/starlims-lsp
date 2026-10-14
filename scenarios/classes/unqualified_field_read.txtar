@@ -27,13 +27,16 @@ flag.
 	:IF bReady;
 		UsrMes("ready");
 	:ENDIF;
+
 	:RETURN aSlots[nPos];
 :ENDPROC;
 
 :PROCEDURE OwnerName;
 	:DECLARE sName;
+
 	sName := oOwner:GetName();
 	UsrMes(LimsString(Len(aSlots)));
+
 	:RETURN sName;
 :ENDPROC;
 -- diagnostics --

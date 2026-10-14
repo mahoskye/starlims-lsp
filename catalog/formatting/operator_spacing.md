@@ -172,6 +172,7 @@ bSame := 1===1;
 
 ```ssl
 :DECLARE bSame;
+
 bSame := 1 === 1;
 ```
 
@@ -192,8 +193,10 @@ bR := ! bR;
 
 ```ssl
 :DECLARE nR, bR, i;
+
 nR := -5;
 bR := !bR;
+
 :FOR i := 1 :TO 5 :STEP -1;
 :NEXT;
 ```

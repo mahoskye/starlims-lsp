@@ -17,10 +17,13 @@ correctly cased keywords and keyword names used as plain words
 :PROCEDURE CheckStock;
 	:PARAMETERS nOnHand;
 	:DECLARE sMessage;
+
 	sMessage := "Return to supplier";
+
 	:IF nOnHand > 0;
 		sMessage := "In stock";
 	:ENDIF;
+
 	:RETURN sMessage;
 :ENDPROC;
 -- diagnostics --

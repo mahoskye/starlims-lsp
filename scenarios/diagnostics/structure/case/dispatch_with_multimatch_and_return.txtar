@@ -30,8 +30,10 @@ diag.exitcase_after_return, diag.exitcase_last_in_branch).
 :PROCEDURE DispatchAction;
 	:PARAMETERS sAction, nQty;
 	:DECLARE nScore, sLog;
+
 	nScore := 0;
 	sLog := "";
+
 	:BEGINCASE;
 	:CASE sAction == "CANCEL";
 		:RETURN -1;
@@ -46,6 +48,7 @@ diag.exitcase_after_return, diag.exitcase_last_in_branch).
 		sLog := sLog + "default;";
 		:EXITCASE;
 	:ENDCASE;
+
 	:RETURN nScore;
 :ENDPROC;
 -- diagnostics --

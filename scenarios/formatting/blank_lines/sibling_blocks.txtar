@@ -34,6 +34,7 @@ sOut := "none";
 :PROCEDURE Siblings;
 	:PARAMETERS nValue;
 	:DECLARE i, sOut;
+
 	:IF nValue > 0;
 		sOut := "positive";
 	:ENDIF;
@@ -61,6 +62,7 @@ sOut := "none";
 	:IF Empty(sOut);
 		sOut := "none";
 	:ENDIF;
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

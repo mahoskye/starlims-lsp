@@ -13,6 +13,7 @@ empty-looking :CATCH body is legal and must not be flagged
 -- format --
 :PROCEDURE NotifyOwner;
 	:PARAMETERS sOwner;
+
 	:TRY;
 		/* send the notification here;
 	:CATCH;

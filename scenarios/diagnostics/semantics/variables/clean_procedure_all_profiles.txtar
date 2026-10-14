@@ -41,21 +41,26 @@ positive on idiomatic code is a regression.
 	:DEFAULT sSite, "MAIN";
 	:DEFAULT nLimit, 50;
 	:DECLARE sResult, nCount, aRows, i, oErr;
+
 	sResult := "";
 	nCount := 0;
+
 	:TRY;
 		aRows := SQLExecute("SELECT lot_id, state FROM lots WHERE site = ?sSite?");
+
 		:FOR i := 1 :TO Min(Len(aRows), nLimit);
 			:IF aRows[i][2] == "OPEN" .AND. .NOT. Empty(aRows[i][1]);
 				nCount += 1;
 			:ENDIF;
 		:NEXT;
+
 		sResult := "Open lots: " + LimsString(nCount);
 	:CATCH;
 		oErr := GetLastSSLError();
 		sResult := "Error: " + oErr:Description;
 		DoProc("ReportFailure", {sSite, sResult});
 	:ENDTRY;
+
 	:RETURN sResult;
 :ENDPROC;
 -- diagnostics --

@@ -14,8 +14,10 @@ text outside any placeholder (here in a character literal).
 :PROCEDURE Stamp;
 	:PARAMETERS sUser;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("INSERT INTO auditlog (who, active) VALUES (?sUser?, ?'Y'?)");
 	aRows := SQLExecute("UPDATE auditlog SET note = '<<pending>>' WHERE who = ?sUser?");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

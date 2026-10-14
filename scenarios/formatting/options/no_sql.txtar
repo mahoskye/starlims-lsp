@@ -15,14 +15,17 @@ bOk:=RunSQL("update samples set flag = 'Y' where status = ?",,{sStatus});
 :PROCEDURE LoadSamples;
 	:PARAMETERS sStatus;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("select sampleid, status from samples where status = ?sStatus? order by sampleid");
 	bOk := RunSQL("update samples set flag = 'Y' where status = ?",, {sStatus});
+
 	:RETURN aRows;
 :ENDPROC;
 -- format --
 :PROCEDURE LoadSamples;
 	:PARAMETERS sStatus;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("
 	    SELECT sampleid, status
 	    FROM samples
@@ -30,6 +33,7 @@ bOk:=RunSQL("update samples set flag = 'Y' where status = ?",,{sStatus});
 	    ORDER BY sampleid
 	");
 	bOk := RunSQL("update samples set flag = 'Y' where status = ?",, {sStatus});
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

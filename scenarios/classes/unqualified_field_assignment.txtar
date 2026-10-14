@@ -27,14 +27,17 @@ reads in that method are not reported.
 
 :PROCEDURE Post;
 	:PARAMETERS nDelta;
+
 	nTotal := nTotal + 1;
 	nTotal += nDelta;
+
 	:RETURN nTotal;
 :ENDPROC;
 
 :PROCEDURE Bump;
 	nTotal++;
 	aItems[1] := 5;
+
 	:FOR nIndex := 1 :TO 3;
 		Me:nTotal += nIndex;
 	:NEXT;

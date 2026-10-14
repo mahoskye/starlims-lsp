@@ -17,11 +17,14 @@ bA := .f.;
 :PROCEDURE Flags;
 	:PARAMETERS bX, bY, bZ, vValue;
 	:DECLARE bA;
+
 	bA := bX .AND. bY .OR. .NOT. bZ;
 	bA := bX .AND. .NOT. bY .OR. .T.;
+
 	:IF vValue == NIL .OR. vValue == NIL;
 		bA := .F.;
 	:ENDIF;
+
 	:RETURN bA;
 :ENDPROC;
 -- diagnostics --

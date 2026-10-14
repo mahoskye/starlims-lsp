@@ -14,7 +14,9 @@ nTotal := Len(sFleet) + nLimit;
 :DEFAULT sFleet, "F1";
 :DEFAULT nLimit, 5;
 :DECLARE nTotal;
+
 nTotal := Len(sFleet) + nLimit;
+
 :RETURN nTotal;
 -- diagnostics --
 -- diagnostics [--strict --info] --

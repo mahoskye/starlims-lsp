@@ -20,14 +20,17 @@ protect the use (only a top-level .AND. chain does).
 :PROCEDURE Teardown;
 	:PARAMETERS bChanged;
 	:DECLARE oConn, oPrev, sText;
+
 	sText := NIL:ToString();
 	oConn := CreateUdObject();
 	oConn := NIL;
 	oConn:Close();
 	oPrev := NIL;
+
 	:IF bChanged .OR. !Empty(oPrev);
 		oPrev:Reset();
 	:ENDIF;
+
 	:RETURN sText;
 :ENDPROC;
 -- diagnostics --

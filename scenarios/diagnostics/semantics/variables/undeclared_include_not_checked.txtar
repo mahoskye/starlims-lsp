@@ -16,7 +16,9 @@ aShelfCodes would otherwise flag.
 :PROCEDURE ShelfLabel;
 	:PARAMETERS nSlot;
 	:DECLARE sLabel;
+
 	sLabel := aShelfCodes[nSlot];
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

@@ -23,7 +23,9 @@ diag.finally_empty).
 :PROCEDURE ExportInvoices;
 	:PARAMETERS dFrom;
 	:DECLARE aRows, nExported;
+
 	nExported := 0;
+
 	:TRY;
 		aRows := SQLExecute("SELECT INVOICEID FROM INVOICES WHERE CREATED >= ?dFrom?");
 		nExported := Len(aRows);
@@ -33,6 +35,7 @@ diag.finally_empty).
 		nExported := -2;
 	:FINALLY;
 	:ENDTRY;
+
 	:RETURN nExported;
 :ENDPROC;
 -- diagnostics --

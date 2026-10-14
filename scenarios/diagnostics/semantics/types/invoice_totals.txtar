@@ -25,11 +25,14 @@ them are correct and stay quiet.
 :PROCEDURE InvoiceTotals;
 	:PARAMETERS aLines, dIssued, sCurrency;
 	:DECLARE nSum, nIdx, sSummary, dDue, aTaxRates, nRate;
+
 	nSum := 0;
 	aTaxRates := {0.2, 0.1};
+
 	:FOR nIdx := 1 :TO "12";
 		nSum := nSum + aLines[nIdx];
 	:NEXT;
+
 	nRate := aTaxRates[0];
 	nSum := nSum * (1 + nRate) + NIL;
 	dDue := 30 + dIssued;
@@ -37,6 +40,7 @@ them are correct and stay quiet.
 	sSummary := "Total " + nSum;
 	sSummary := "Total " + LimsString(nSum) + " " + sCurrency;
 	sSummary := sSummary + " (" + LimsString(aTaxRates:Count) + " rates)";
+
 	:RETURN sSummary + " due " + DToC(dDue);
 :ENDPROC;
 -- diagnostics --

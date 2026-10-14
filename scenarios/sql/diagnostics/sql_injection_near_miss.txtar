@@ -21,6 +21,7 @@ and identifier + identifier with no string literal.
 :PROCEDURE Lookup;
 	:PARAMETERS sName, aIds, sConn;
 	:DECLARE sSQL, sWhere, aRows, bOk;
+
 	aRows := SQLExecute("SELECT custid FROM customers" + " WHERE status = 'OPEN'");
 	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = ?sName?");
 	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds));
@@ -29,6 +30,7 @@ and identifier + identifier with no string literal.
 	bOk := RunSQL("UPDATE customers SET status = 'X'", "LIMS" + sConn);
 	sWhere := " WHERE status = 'OPEN'";
 	aRows := SQLExecute(sSQL + sWhere);
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

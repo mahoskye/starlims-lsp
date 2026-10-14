@@ -16,11 +16,13 @@ MYUSERNAME := "report-bot";
 :PARAMETERS sReportName;
 :PUBLIC gReportRuns;
 :DECLARE sHeader, sBody, nLines, sScratch;
+
 gReportRuns := gReportRuns + 1;
 sHeader := sReportName + " by " + MYUSERNAME + CRLF;
 nLines := nRowCount;
 sBody := sHeader + "lines: " + LimsString(nLines);
 MYUSERNAME := "report-bot";
+
 :RETURN sBody;
 -- diagnostics --
 8:1-8:11 warning global_assignment: Assignment to global variable 'MYUSERNAME' changes it for every routine that reads it

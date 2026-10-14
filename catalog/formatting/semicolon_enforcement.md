@@ -132,7 +132,9 @@ nValue := 1
 
 ```ssl
 :DECLARE nValue;
+
 nValue := 1;
+
 :RETURN nValue;
 ```
 
@@ -238,6 +240,7 @@ nValue;
 		bReady;
 		nValue := 1;
 	:ENDIF;
+
 	:RETURN
 		nValue;
 :ENDPROC;
@@ -260,6 +263,7 @@ sOut := txt:ToString()
 
 ```ssl
 :DECLARE txt, sTitle, sUser, sOut;
+
 sOut := txt:ToString()
 	:Replace("##TITLE##", sTitle)
 	:Replace("##USER##", sUser);
@@ -283,6 +287,7 @@ sOut := "waiting";
 
 ```ssl
 :DECLARE bReady, sOut;
+
 :IF bReady;
 	sOut := "ready";
 :ELSE;
@@ -296,6 +301,7 @@ Stray semicolons stay where they are (issue #326):
 
 ```ssl
 :DECLARE nCount;;
+
 nCount := 1;;
 ```
 

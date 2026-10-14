@@ -11,11 +11,14 @@ keyword statements on a crammed line are indented.
 -- format --
 :PROCEDURE Crammed;
 	:DECLARE nA, nB;
+
 	nA := 1;
 	nB := 2;
+
 	:IF nA > 0;
 		nB := nA;
 	:ENDIF;
+
 	:RETURN nA + nB;
 :ENDPROC;
 -- diagnostics --

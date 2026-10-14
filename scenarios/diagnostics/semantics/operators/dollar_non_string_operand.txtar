@@ -16,6 +16,7 @@ a boolean on the left; the intended test is .NOT. ("a" $ sList).
 -- format --
 :PROCEDURE HasCode;
 	:PARAMETERS nCode, sList;
+
 	:IF nCode $ sList;
 		:RETURN .T.;
 	:ENDIF;
@@ -23,6 +24,7 @@ a boolean on the left; the intended test is .NOT. ("a" $ sList).
 	:IF .NOT. "a" $ sList;
 		:RETURN .F.;
 	:ENDIF;
+
 	:RETURN .NOT. ("b" $ sList);
 :ENDPROC;
 -- diagnostics --

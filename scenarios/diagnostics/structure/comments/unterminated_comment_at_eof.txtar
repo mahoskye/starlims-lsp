@@ -11,8 +11,10 @@ nTotal := 2
 -- format --
 :PROCEDURE Demo;
 	:DECLARE nTotal;
+
 	nTotal := 1;
 :ENDPROC;
+
 /* trailing note that never ends
 nTotal := 2
 -- diagnostics --

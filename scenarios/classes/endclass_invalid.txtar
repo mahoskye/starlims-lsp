@@ -18,6 +18,7 @@ a receiver).
 
 :PROCEDURE Push;
 	:PARAMETERS vItem;
+
 	AAdd(Me:aItems, vItem);
 	Me:oList:EndClass();
 :ENDPROC;

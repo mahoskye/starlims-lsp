@@ -13,8 +13,10 @@ sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString, oCo
 :PROCEDURE Connect;
 	:PARAMETERS oConfiguration;
 	:DECLARE sValue;
+
 	sValue := SomeFunctionWithLongName(oConfiguration:database:connectionString,
 	                                   oConfiguration:database:timeout);
+
 	:RETURN sValue;
 :ENDPROC;
 -- diagnostics --

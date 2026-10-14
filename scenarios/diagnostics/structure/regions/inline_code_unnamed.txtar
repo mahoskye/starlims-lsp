@@ -9,6 +9,7 @@ sGreeting := "hello";
 -- format --
 :BEGININLINECODE;
 	:DECLARE sGreeting;
+
 	sGreeting := "hello";
 :ENDINLINECODE;
 -- diagnostics --

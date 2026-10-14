@@ -19,14 +19,17 @@ Branch("LABELRETRY");
 -- format --
 :PROCEDURE Retry;
 	:DECLARE nTries;
+
 	nTries := 0;
 	:LABEL RetryPoint;
 	:LABELRETRY;
 	:labelSecondTry;
 	nTries += 1;
+
 	:IF nTries < 3;
 		Branch("LABELRETRY");
 	:ENDIF;
+
 	:RETURN nTries;
 :ENDPROC;
 -- diagnostics --

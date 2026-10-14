@@ -9,14 +9,18 @@ vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenu
 -- format [--max-line-length 0] --
 :PROCEDURE NoWrap;
 	:DECLARE vResult;
+
 	vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue, nThirdQuarterRevenue, nFourthQuarter});
+
 	:RETURN vResult;
 :ENDPROC;
 -- format --
 :PROCEDURE NoWrap;
 	:DECLARE vResult;
+
 	vResult := DoProc("CalculateTotals", {nFirstQuarterRevenue, nSecondQuarterRevenue,
 	                                      nThirdQuarterRevenue, nFourthQuarter});
+
 	:RETURN vResult;
 :ENDPROC;
 -- diagnostics --

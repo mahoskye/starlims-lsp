@@ -15,6 +15,7 @@ call, and positional ? markers in a RunSQL call.
 :PROCEDURE LoadOrders;
 	:PARAMETERS sStatus, oUser, aIds;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("
 	    SELECT ordno
 	    FROM orders
@@ -28,6 +29,7 @@ call, and positional ? markers in a RunSQL call.
 	      AND logdate < ?Today()?
 	");
 	bOk := RunSQL("UPDATE orders SET status = ? WHERE ordno = ?",, {sStatus, aIds[1]});
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

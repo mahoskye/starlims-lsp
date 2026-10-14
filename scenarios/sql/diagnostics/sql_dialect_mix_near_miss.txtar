@@ -15,6 +15,7 @@ a character literal or a SQL comment.
 -- format --
 :PROCEDURE Recent;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT ordno, NVL(status, 'X')
 	    FROM orders
@@ -32,6 +33,7 @@ a character literal or a SQL comment.
 	    WHERE note = 'GETDATE'
 	      AND logdate > SYSDATE -- not getdate()
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

@@ -17,9 +17,11 @@ correct pattern beside it.
 :PROCEDURE Recalculate;
 	:PARAMETERS nSampleId;
 	:DECLARE oTools, vResult;
+
 	vResult := ExecFunction("Lab.SampleTools", {nSampleId});
 	vResult := ExecFunction("Lab.SampleTools.Recalculate", {nSampleId});
 	oTools := CreateUdObject("Lab.SampleTools");
+
 	:RETURN oTools:Recalculate(nSampleId);
 :ENDPROC;
 -- diagnostics --

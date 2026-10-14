@@ -31,18 +31,22 @@ AAdd(aLow, Me:aStock[i][1]);
 :PROCEDURE Constructor;
 	:PARAMETERS nLevel;
 	:DEFAULT nLevel, 5;
+
 	Me:nReorderAt := nLevel;
 	Me:aStock := {};
 :ENDPROC;
 
 :PROCEDURE NeedsReorder;
 	:DECLARE i, aLow;
+
 	aLow := {};
+
 	:FOR i := 1 :TO Len(Me:aStock);
 		:IF Me:aStock[i][2] < Me:nReorderAt;
 			AAdd(aLow, Me:aStock[i][1]);
 		:ENDIF;
 	:NEXT;
+
 	:RETURN aLow;
 :ENDPROC;
 -- diagnostics --
@@ -87,17 +91,21 @@ AAdd(aLow, Me:aStock[i][1]);
 :PROCEDURE Constructor;
   :PARAMETERS nLevel;
   :DEFAULT nLevel, 5;
+
   Me:nReorderAt := nLevel;
   Me:aStock := {};
 :ENDPROC;
 
 :PROCEDURE NeedsReorder;
   :DECLARE i, aLow;
+
   aLow := {};
+
   :FOR i := 1 :TO Len(Me:aStock);
     :IF Me:aStock[i][2] < Me:nReorderAt;
       AAdd(aLow, Me:aStock[i][1]);
     :ENDIF;
   :NEXT;
+
   :RETURN aLow;
 :ENDPROC;

@@ -22,8 +22,10 @@ from this input: range-formatting the line before it appends a `;`.)
 	:DECLARE
 		sJoined,
 		sSeparator;
+
 	sSeparator := "-";
 	sJoined := sPrefix + sSeparator + sStem + sSeparator + sSuffix;
+
 	:RETURN sJoined;
 :ENDPROC;
 -- diagnostics --

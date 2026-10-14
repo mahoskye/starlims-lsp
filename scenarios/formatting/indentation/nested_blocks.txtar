@@ -25,6 +25,7 @@ sLabel := "none";
 :PROCEDURE Demo;
     :PARAMETERS nValue;
     :DECLARE sLabel, i;
+
     :IF nValue > 0;
         :FOR i := 1 :TO nValue;
             :BEGINCASE;
@@ -39,12 +40,14 @@ sLabel := "none";
     :ELSE;
         sLabel := "none";
     :ENDIF;
+
     :RETURN sLabel;
 :ENDPROC;
 -- format --
 :PROCEDURE Demo;
 	:PARAMETERS nValue;
 	:DECLARE sLabel, i;
+
 	:IF nValue > 0;
 		:FOR i := 1 :TO nValue;
 			:BEGINCASE;
@@ -59,6 +62,7 @@ sLabel := "none";
 	:ELSE;
 		sLabel := "none";
 	:ENDIF;
+
 	:RETURN sLabel;
 :ENDPROC;
 -- diagnostics --

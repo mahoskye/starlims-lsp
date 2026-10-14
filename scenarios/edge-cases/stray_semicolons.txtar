@@ -13,12 +13,15 @@ nCount := 1;;
 :RETURN nCount;
 -- format --
 :DECLARE nCount;;
+
 nCount := 1;;
 ;;;
 ;
+
 :IF nCount > 0;;
 	nCount += 1;
 :ENDIF;;
+
 :RETURN nCount;
 -- diagnostics --
 -- diagnostics [--strict --info] --

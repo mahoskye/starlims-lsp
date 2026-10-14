@@ -13,9 +13,11 @@ aPair := {1,2};
 -- format --
 :PROCEDURE Braces;
 	:DECLARE fnOpen, fnClose, aPair;
+
 	fnOpen := {|s| s + "{"};
 	fnClose := {|s| "}" + s};
 	aPair := {1, 2};
+
 	:RETURN aPair;
 :ENDPROC;
 -- diagnostics --

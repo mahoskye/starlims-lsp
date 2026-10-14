@@ -19,10 +19,13 @@ flag" fences).
 /* second comment block;
 :PROCEDURE Helper;
 	:DECLARE nCount;
+
 	/* explains the assignment below;
 	nCount := 1;
+
 	:RETURN nCount;
 :ENDPROC;
+
 /* endregion;
 -- diagnostics --
 -- diagnostics [--strict --info] --

@@ -21,7 +21,9 @@ exitwhile_outside_loop is silent (diag.exitwhile_in_finally).
 :PROCEDURE PollJob;
 	:PARAMETERS nJobId;
 	:DECLARE sState;
+
 	sState := "RUNNING";
+
 	:WHILE sState == "RUNNING";
 		:TRY;
 			sState := LSearch("SELECT STATE FROM JOBS WHERE JOBID = ?", "DONE",,
@@ -32,6 +34,7 @@ exitwhile_outside_loop is silent (diag.exitwhile_in_finally).
 			:ENDIF;
 		:ENDTRY;
 	:ENDWHILE;
+
 	:RETURN sState;
 :ENDPROC;
 -- diagnostics --

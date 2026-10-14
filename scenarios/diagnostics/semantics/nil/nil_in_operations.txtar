@@ -17,12 +17,14 @@ under a unary minus.
 :PROCEDURE Sum;
 	:PARAMETERS nBase;
 	:DECLARE nOut, sMsg;
+
 	nOut := NIL + 1;
 	nOut := nBase - NIL;
 	nOut := NIL * nBase;
 	nOut := nBase / NIL;
 	sMsg := "Total: " + NIL;
 	nOut := -NIL;
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

@@ -659,6 +659,7 @@ aRows := SQLExecute("select ordno, ordkey, ordseq, status from orders where ordk
 
 ```ssl
 :DECLARE aRows, sPrefix, sSuffix, nBase;
+
 aRows := SQLExecute("
     SELECT ordno, ordkey, ordseq, status
     FROM orders
@@ -680,6 +681,7 @@ bOk := RunSQL("/* recent orders */ WITH recent AS (SELECT ordno FROM orders) SEL
 
 ```ssl
 :DECLARE bOk;
+
 bOk := RunSQL("
     /* recent orders */
     WITH recent AS (
@@ -705,6 +707,7 @@ bOk := RunSQL("merge into ordtask_summary tgt using source src on (tgt.ordno = s
 
 ```ssl
 :DECLARE bOk;
+
 bOk := RunSQL("
     MERGE INTO ordtask_summary tgt
     USING source src

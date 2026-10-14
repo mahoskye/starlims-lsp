@@ -28,6 +28,7 @@ between that comment and the :PROCEDURE (fmt.blank_lines_between_procs).
 :PROCEDURE Second;
 	:RETURN 2;
 :ENDPROC;
+
 /* Loose note about Third;
 
 :PROCEDURE Third;

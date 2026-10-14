@@ -22,7 +22,9 @@ multi-line :PARAMETERS list with inline comments (issue #170).
 	:DEFAULT nCopies, 1;
 	:DEFAULT sPrinter, "LBL01";
 	:DECLARE sJob;
+
 	sJob := sCode + ":" + LimsString(nCopies) + "@" + sPrinter;
+
 	:RETURN sJob;
 :ENDPROC;
 -- diagnostics --

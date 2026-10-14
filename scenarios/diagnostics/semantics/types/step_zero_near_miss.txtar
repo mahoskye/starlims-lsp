@@ -24,9 +24,11 @@ an expression that merely starts with a zero literal.
 -- format --
 :PROCEDURE Spin;
 	:DECLARE i, nStep, nInc, nHits;
+
 	nHits := 0;
 	nStep := 0;
 	nInc := 2;
+
 	:FOR i := 1 :TO 10 :STEP 0.5;
 		nHits := nHits + 1;
 	:NEXT;
@@ -42,6 +44,7 @@ an expression that merely starts with a zero literal.
 	:FOR i := 1 :TO 10 :STEP 0 + nInc;
 		nHits := nHits + 1;
 	:NEXT;
+
 	:RETURN nHits;
 :ENDPROC;
 -- diagnostics --

@@ -86,6 +86,7 @@ interface FormattingOptions {
   semicolonEnforcement: boolean;
   blankLinesBetweenProcs: number;
   blankLineBetweenBlocks: boolean;
+  blankLinesBetweenSections: boolean;
   trimTrailingWhitespace: boolean;
   maxConsecutiveBlankLines: number;
   builtinFunctionCase: "preserve" | "PascalCase";
@@ -260,6 +261,27 @@ blocks read as distinct units. See catalog entry
 { "ssl.format.blankLineBetweenBlocks": true }
 ```
 
+### 3.8.1 ssl.format.blankLinesBetweenSections
+
+| Property | Value |
+|----------|-------|
+| **Type** | `boolean` |
+| **Default** | `true` |
+| **File** | `internal/providers/formatting.go` |
+
+Insert one blank line at each boundary between logical sections of a body
+(style guide `blank_line_between_sections`): after the declarations
+(`:PARAMETERS`/`:DEFAULT`/`:DECLARE`/`:PUBLIC`/`:INCLUDE`), before a
+control block that follows code and after its closer, before a standalone
+comment that follows code, and before a procedure's final `:RETURN`.
+Nothing is inserted at the start or end of a body or where a blank line
+already exists; the author's blank lines are never removed. See catalog
+entry `fmt.blank_lines_between_sections`.
+
+```json
+{ "ssl.format.blankLinesBetweenSections": true }
+```
+
 ### 3.9 ssl.format.trimTrailingWhitespace
 
 | Property | Value |
@@ -282,11 +304,13 @@ or `:REGION` body are user content and are never trimmed. See catalog entry
 | Property | Value |
 |----------|-------|
 | **Type** | `number` |
-| **Default** | `0` (disabled) |
+| **Default** | `2` |
 | **File** | `internal/providers/formatting.go` |
 
 Collapse runs of blank lines longer than this threshold. `0` preserves all
-existing vertical whitespace. See catalog entry
+existing vertical whitespace. The default was `0` (disabled) before the
+section-spacing rules; a run of up to two blank lines now survives, and a
+longer one collapses to two. See catalog entry
 `fmt.max_consecutive_blank_lines`.
 
 ```json
@@ -1048,7 +1072,8 @@ the names a VS Code user writes in `settings.json`. Mapping as of extension
 | `ssl.intellisense.signatureHelp.autoTrigger` | `ssl.intellisense.signatureHelp.autoTrigger` | restart to apply (see 7.1) |
 
 Not settable from VS Code (server defaults always apply):
-`ssl.format.blankLineBetweenBlocks` (`true`) and
+`ssl.format.blankLineBetweenBlocks` (`true`),
+`ssl.format.blankLinesBetweenSections` (`true`) and
 `ssl.format.sql.detectSQLStrings` (`true`).
 
 The two Hungarian defaults differ deliberately: the server keeps noisy
@@ -1102,8 +1127,9 @@ and `starlims-lsp --format --help`.
 | `ssl.format.semicolonEnforcement` | `true` |
 | `ssl.format.blankLinesBetweenProcs` | `1` |
 | `ssl.format.blankLineBetweenBlocks` | `true` |
+| `ssl.format.blankLinesBetweenSections` | `true` |
 | `ssl.format.trimTrailingWhitespace` | `true` |
-| `ssl.format.maxConsecutiveBlankLines` | `0` (disabled) |
+| `ssl.format.maxConsecutiveBlankLines` | `2` |
 | `ssl.format.builtinFunctionCase` | `"PascalCase"` |
 | `ssl.format.sql.enabled` | `true` |
 | `ssl.format.sql.style` | `"canonicalCompact"` |

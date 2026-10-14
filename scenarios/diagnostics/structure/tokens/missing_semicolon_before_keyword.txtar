@@ -16,10 +16,13 @@ lexer guard).
 -- format --
 :PROCEDURE BumpVersion;
 	:PARAMETERS nVersion;
+
 	nVersion := nVersion + 1;
+
 	:IF nVersion > 99;
 		nVersion := 1;
 	:ENDIF;
+
 	:RETURN nVersion;
 :ENDPROC;
 -- diagnostics --

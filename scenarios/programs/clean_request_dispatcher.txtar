@@ -103,6 +103,7 @@ bSuccess := .T.;
 :DECLARE vPayload, bSuccess, oErr;
 
 bSuccess := .T.;
+
 :TRY;
 	:BEGINCASE;
 	:CASE sAction == "PING";
@@ -139,11 +140,14 @@ bSuccess := .T.;
 :PROCEDURE SampleXml;
 	:PARAMETERS aArgs;
 	:DECLARE sSampleId, oPattern;
+
 	sSampleId := AllTrim(aArgs[1]);
 	oPattern := SSLRegex{"^[A-Z]{2}[0-9]{6}$"};
+
 	:IF .NOT. oPattern:IsMatch(sSampleId);
 		RaiseError("Malformed sample id: " + sSampleId);
 	:ENDIF;
+
 	:RETURN GetDataSet("
 	    SELECT SampleId, Status, LoggedOn
 	    FROM LabSamples
@@ -160,7 +164,9 @@ bSuccess := .T.;
 :PROCEDURE OwnerName;
 	:PARAMETERS aArgs;
 	:DECLARE sSampleId;
+
 	sSampleId := AllTrim(aArgs[1]);
+
 	:RETURN LSearch("
 	    SELECT u.DisplayName
 	    FROM LabSamples s
@@ -179,7 +185,9 @@ bSuccess := .T.;
 :PROCEDURE UnknownAction;
 	:PARAMETERS sAction;
 	:DECLARE sFmt;
+
 	sFmt := "Unknown action '{0}'";
+
 	:RETURN sFmt:Format({sAction});
 :ENDPROC;
 -- diagnostics --

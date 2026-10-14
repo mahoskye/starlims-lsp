@@ -19,9 +19,12 @@ fine too.
 	:PARAMETERS sName;
 	:DEFAULT sName, "";
 	:DECLARE sLocal;
+
 	sLocal := sName + sTopMode;
+
 	:RETURN sLocal;
 :ENDPROC;
+
 :RETURN sTopMode;
 -- diagnostics --
 -- diagnostics [--strict --info] --

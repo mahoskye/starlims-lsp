@@ -20,6 +20,7 @@ must not flag (diag.raiseerror_in_catch).
 :PROCEDURE ValidateOrder;
 	:PARAMETERS nQty;
 	:DECLARE oErr;
+
 	:TRY;
 		:IF nQty <= 0;
 			RaiseError("Quantity must be positive");
@@ -28,6 +29,7 @@ must not flag (diag.raiseerror_in_catch).
 		oErr := GetLastSSLError();
 		RaiseError("ValidateOrder failed: " + oErr:Description);
 	:ENDTRY;
+
 	:RETURN .T.;
 :ENDPROC;
 -- diagnostics --

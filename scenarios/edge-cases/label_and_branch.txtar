@@ -16,14 +16,18 @@ Branch("LABEL Missing");
 :RETURN nTry;
 -- format --
 :DECLARE nTry;
+
 nTry := 0;
 :LABEL Retry;
 nTry += 1;
+
 :IF nTry < 3;
 	Branch("LABEL Retry");
 	Branch("Retry");
 :ENDIF;
+
 Branch("LABEL Missing");
+
 :RETURN nTry;
 -- diagnostics --
 3:1-3:7 warning deprecated_keyword: ':LABEL' is legacy flow control used with Branch(); prefer structured control flow in new code

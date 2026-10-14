@@ -12,8 +12,10 @@ tier), upper- and lowercase prefix, via SQLExecute and RunSQL.
 :PROCEDURE Notes;
 	:PARAMETERS nId;
 	:DECLARE aRows, bOk;
+
 	aRows := SQLExecute("UPDATE samples SET note = N'checked' WHERE sampleid = ?nId?");
 	bOk := RunSQL("UPDATE samples SET note = n'rechecked' WHERE sampleid = ?",, {nId});
+
 	:RETURN {aRows, bOk};
 :ENDPROC;
 -- diagnostics --

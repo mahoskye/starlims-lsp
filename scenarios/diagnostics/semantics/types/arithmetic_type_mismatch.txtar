@@ -19,12 +19,14 @@ pair - still rejects), and a call operand typed by its documented return
 :PROCEDURE Crunch;
 	:PARAMETERS sText, bDone;
 	:DECLARE nOut, bFlag;
+
 	nOut := "abc" - 1;
 	nOut := bDone * 2;
 	nOut := 10 % "3";
 	bFlag := .T. - .F.;
 	nOut := Len(sText) * "2";
 	nOut := 2 ^ "3";
+
 	:RETURN nOut;
 :ENDPROC;
 -- diagnostics --

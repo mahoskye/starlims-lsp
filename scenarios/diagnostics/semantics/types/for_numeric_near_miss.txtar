@@ -24,7 +24,9 @@ numeric).
 :PROCEDURE Walk;
 	:PARAMETERS vStart, vEnd, aRows, oCfg, MAX_PASSES;
 	:DECLARE nIdx, nMax, i, sPos;
+
 	nMax := 10;
+
 	:FOR nIdx := 1 :TO nMax :STEP 2;
 	:NEXT;
 
@@ -39,6 +41,7 @@ numeric).
 
 	:FOR sPos := 1 :TO nMax;
 	:NEXT;
+
 	:RETURN nIdx;
 :ENDPROC;
 -- diagnostics --

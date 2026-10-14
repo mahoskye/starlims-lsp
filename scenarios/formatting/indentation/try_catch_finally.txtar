@@ -25,9 +25,12 @@ nIndex := nIndex;
 :PROCEDURE ProcessQueue;
 	:PARAMETERS aQueue;
 	:DECLARE nIndex, oErr, sMessage;
+
 	nIndex := 0;
+
 	:WHILE nIndex < Len(aQueue);
 		nIndex += 1;
+
 		:TRY;
 			DoProc("ProcessItem", {aQueue[nIndex]});
 		:CATCH;
@@ -38,6 +41,7 @@ nIndex := nIndex;
 			nIndex := nIndex;
 		:ENDTRY;
 	:ENDWHILE;
+
 	:RETURN nIndex;
 :ENDPROC;
 -- diagnostics --

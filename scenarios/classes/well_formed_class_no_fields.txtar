@@ -16,7 +16,9 @@ uses parameters and locals. Unqualified-field rules have nothing to say
 :PROCEDURE Shout;
 	:PARAMETERS sText;
 	:DECLARE sOut;
+
 	sOut := Upper(AllTrim(sText)) + "!";
+
 	:RETURN sOut;
 :ENDPROC;
 -- diagnostics --

@@ -20,12 +20,14 @@ the quoted splice, deliberately.
 :PROCEDURE Lookup;
 	:PARAMETERS sName, aIds, sAnd;
 	:DECLARE sSQL, aRows, sFound, bOk;
+
 	sSQL := "SELECT custid FROM customers";
 	aRows := SQLExecute("SELECT custid FROM customers WHERE custname = '" + sName + "'");
 	sFound := LSearch(sSQL + " WHERE status = 'OPEN'", "");
 	aRows := SQLExecute("SELECT id FROM c WHERE id IN " + BuildStringForIn(aIds) + sAnd);
 	aRows := SQLExecute(Upper(sSQL) + " WHERE custname = ?sName?");
 	bOk := RunSQL("DELETE FROM customers WHERE custid = " + LimsString(aIds[1]));
+
 	:RETURN {aRows, sFound, bOk};
 :ENDPROC;
 -- diagnostics --

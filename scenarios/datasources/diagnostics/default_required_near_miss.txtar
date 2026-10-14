@@ -10,6 +10,7 @@ aRows := SQLExecute("SELECT crate_id FROM crate WHERE crate_status IN (?aCodes?)
 -- format --
 :PARAMETERS sStatus := "A", aCodes := {"A", "B"}, sMode := Upper("x,y");
 :DECLARE aRows;
+
 aRows := SQLExecute("
     SELECT crate_id
     FROM crate
@@ -17,6 +18,7 @@ aRows := SQLExecute("
       AND mode_code = ?sMode?
       AND status = ?sStatus?
 ");
+
 :RETURN aRows;
 -- diagnostics --
 -- diagnostics [--strict --info] --

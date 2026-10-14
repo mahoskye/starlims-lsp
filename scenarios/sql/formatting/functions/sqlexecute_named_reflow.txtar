@@ -13,6 +13,7 @@ the closing quote glued to ');'. Placeholders survive verbatim.
 :PROCEDURE OpenOrders;
 	:PARAMETERS sStatus, sSite;
 	:DECLARE aRows;
+
 	aRows := SQLExecute("
 	    SELECT ordno, custid, logdate
 	    FROM orders
@@ -20,6 +21,7 @@ the closing quote glued to ');'. Placeholders survive verbatim.
 	      AND site = ?sSite?
 	    ORDER BY logdate DESC
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

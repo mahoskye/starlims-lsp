@@ -16,6 +16,7 @@ SQL comment, and COLLATE in a non-SQL string.
 -- format --
 :PROCEDURE Names;
 	:DECLARE aRows, sMsg;
+
 	/* the server default is case-sensitive, so this report sorts case-insensitively;
 	aRows := SQLExecute("
 	    SELECT custname
@@ -29,6 +30,7 @@ SQL comment, and COLLATE in a non-SQL string.
 	    WHERE kind = 'COLLATE' -- collate not needed here
 	");
 	sMsg := "Select a collate order for the report";
+
 	:RETURN {aRows, sMsg};
 :ENDPROC;
 -- diagnostics --

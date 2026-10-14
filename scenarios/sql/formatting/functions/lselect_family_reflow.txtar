@@ -14,6 +14,7 @@ trailing skipped arguments and value arrays (4th for LSelect/LSelectC,
 :PROCEDURE TaskLists;
 	:PARAMETERS sOrdNo, sStatus;
 	:DECLARE aTasks, aCodes, aOpen;
+
 	aTasks := LSelect("
 	    SELECT testcode, status, analyst
 	    FROM ordtask
@@ -35,6 +36,7 @@ trailing skipped arguments and value arrays (4th for LSelect/LSelectC,
 	      AND duedate < SYSDATE
 	    ORDER BY duedate, ordno
 	",, {sStatus});
+
 	:RETURN {aTasks, aCodes, aOpen};
 :ENDPROC;
 -- diagnostics --

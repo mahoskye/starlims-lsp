@@ -21,15 +21,18 @@ how the Branch literals against these labels are judged.
 -- format --
 :PROCEDURE ReadLoop;
 	:DECLARE nRound, sLabelText;
+
 	nRound := 0;
 	sLabelText := "caption";
 	:labelRetry;
 	:LabelAgain;
 	:LABELRetry;
 	nRound := nRound + 1;
+
 	:IF nRound < 3;
 		Branch("LABELRetry");
 	:ENDIF;
+
 	:RETURN nRound;
 :ENDPROC;
 -- diagnostics --

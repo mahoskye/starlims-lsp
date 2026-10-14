@@ -26,6 +26,7 @@ diag.prefer_exitcase, diag.unmatched_block_end).
 	sColor := "grey";
 	:EXITCASE;
 :ENDCASE;
+
 :RETURN sColor;
 :ENDPROC;
 -- diagnostics --

@@ -81,6 +81,7 @@ finding is worth scrutiny.
 	:PARAMETERS sName, nMax;
 	:DEFAULT sName, "Batch";
 	:DEFAULT nMax, 50;
+
 	Me:sBatchName := sName;
 	Me:nLimit := nMax;
 	Me:aSampleIds := {};
@@ -94,10 +95,13 @@ finding is worth scrutiny.
 ;
 :PROCEDURE Add;
 	:PARAMETERS sSampleId;
+
 	:IF Me:IsFull();
 		:RETURN .F.;
 	:ENDIF;
+
 	AAdd(Me:aSampleIds, AllTrim(sSampleId));
+
 	:RETURN .T.;
 :ENDPROC;
 
@@ -115,12 +119,15 @@ finding is worth scrutiny.
 ;
 :PROCEDURE Summary;
 	:DECLARE sFmt, sResult;
+
 	sFmt := "{0}: {1} samples";
+
 	:TRY;
 		sResult := sFmt:Format({Me:sBatchName, LimsString(Len(Me:aSampleIds))});
 	:CATCH;
 		sResult := "Error: " + GetLastSSLError():Description;
 	:ENDTRY;
+
 	:RETURN sResult;
 :ENDPROC;
 -- diagnostics --

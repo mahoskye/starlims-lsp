@@ -28,6 +28,7 @@ so unexpected_token reports it, and the formatter does not treat it as a handler
 -- format --
 :PROCEDURE LegacyLoad;
 	:DECLARE nLoaded;
+
 	nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
 	:RETURN nLoaded;
 	:ERROR;
@@ -37,12 +38,14 @@ so unexpected_token reports it, and the formatter does not treat it as a handler
 
 :PROCEDURE ModernLoad;
 	:DECLARE nLoaded, sResult;
+
 	:TRY;
 		nLoaded := LSearch("SELECT COUNT(*) FROM STAGING", 0);
 	:CATCH;
 		sResult := "Error: " + LimsString(:ERROR);
 		ErrorMes("ModernLoad", sResult);
 	:ENDTRY;
+
 	:RETURN nLoaded;
 :ENDPROC;
 -- diagnostics --

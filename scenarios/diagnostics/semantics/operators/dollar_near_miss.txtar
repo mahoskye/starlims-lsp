@@ -16,11 +16,13 @@ a loop counter, an UPPER_SNAKE constant, and an array element.
 :PROCEDURE Lookup;
 	:PARAMETERS ALLOWED_CODES, oRecord, aCodes, sHay;
 	:DECLARE x, bHit;
+
 	x := DoProc("NextCode");
 	bHit := "A" $ ALLOWED_CODES .OR. "B" $ x;
 	bHit := bHit .OR. oRecord:nCode $ sHay;
 	bHit := bHit .OR. aCodes[1] $ sHay;
 	bHit := bHit .OR. "C" $ sHay;
+
 	:RETURN bHit;
 :ENDPROC;
 -- diagnostics --

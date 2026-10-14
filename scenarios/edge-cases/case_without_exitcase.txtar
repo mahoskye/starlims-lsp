@@ -20,6 +20,7 @@ nCount := 0;
 :RETURN nCount;
 -- format --
 :DECLARE nCount;
+
 nCount := 1;
 :CASE nCount == 1;
 	nCount := 2;
@@ -28,7 +29,9 @@ nCount := 1;
 		nCount += 1;
 		:EXITCASE;
 	:ENDWHILE;
+
 	:LOOP;
+
 	:IF nCount > 1;
 		nCount := 0;
 	:ENDIF;

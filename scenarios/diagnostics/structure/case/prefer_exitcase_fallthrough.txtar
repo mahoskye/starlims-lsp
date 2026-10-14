@@ -20,6 +20,7 @@ held to the same rule even though nothing follows it (diag.prefer_exitcase).
 :PROCEDURE UnitFactor;
 	:PARAMETERS sUnit;
 	:DECLARE nFactor;
+
 	:BEGINCASE;
 	:CASE sUnit == "mg";
 		nFactor := 0.001;
@@ -29,6 +30,7 @@ held to the same rule even though nothing follows it (diag.prefer_exitcase).
 	:OTHERWISE;
 		nFactor := 0;
 	:ENDCASE;
+
 	:RETURN nFactor;
 :ENDPROC;
 -- diagnostics --

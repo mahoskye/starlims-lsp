@@ -13,6 +13,7 @@ names also report datasource_default_required.
 :PARAMETERS sAisle, nLevel;
 :DEFAULT sAisle, "A";
 :DEFAULT nLevel, 1;
+
 :RETURN sAisle + LimsString(nLevel);
 -- diagnostics --
 1:13-1:19 error datasource_default_required: Data source parameter 'sAisle' needs an inline ':=' default; without one the data source fails when it runs (No default value for one or more parameters)

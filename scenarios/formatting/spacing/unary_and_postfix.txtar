@@ -23,6 +23,7 @@ nR := ( nA + 1 ) * ( nA - 1 ) ;
 :PROCEDURE Unary;
 	:PARAMETERS nA;
 	:DECLARE nR, aR, bR;
+
 	nR := -5;
 	nR := nA * -1;
 	nR := nA * -1;
@@ -34,6 +35,7 @@ nR := ( nA + 1 ) * ( nA - 1 ) ;
 	bR := !bR;
 	bR := !bR;
 	nR := (nA + 1) * (nA - 1);
+
 	:RETURN nR;
 :ENDPROC;
 -- diagnostics --

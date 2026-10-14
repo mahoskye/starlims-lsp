@@ -22,6 +22,7 @@ sStatus := "";
 :DECLARE sStatus, nAttempt,
          bDone,
          aRows;
+
 sStatus := "";
 -- diagnostics --
 -- diagnostics [--strict --info] --

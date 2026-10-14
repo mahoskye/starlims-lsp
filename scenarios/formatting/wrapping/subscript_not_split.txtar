@@ -14,12 +14,14 @@ vRes := DoProc("Wrapper", {aLookupTable[DoProc("ResolveIndex", {sConfigurationKe
 :PROCEDURE BuildChild;
 	:PARAMETERS oParentObject, nChildIndex, sConfigurationKey;
 	:DECLARE vRes;
+
 	vRes := CreateUdObject("Common.ChildRecord",
 	                       {oParentObject:ChildCollection[nChildIndex],
 	                        sConfigurationKey});
 	vRes := DoProc(
 		"Wrapper",
 		{aLookupTable[DoProc("ResolveIndex", {sConfigurationKey, nChildIndex})]});
+
 	:RETURN vRes;
 :ENDPROC;
 -- diagnostics --

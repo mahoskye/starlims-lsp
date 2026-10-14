@@ -18,14 +18,18 @@ above it is fine (diag.region_end_mismatch).
 /* region Lookups;
 :PROCEDURE LookupName;
 	:PARAMETERS nId;
+
 	:RETURN LSearch("SELECT NAME FROM PEOPLE WHERE PEOPLEID = ?", "",, {nId});
 :ENDPROC;
+
 /* endregion;
 
 :PROCEDURE LookupEmail;
 	:PARAMETERS nId;
+
 	:RETURN LSearch("SELECT EMAIL FROM PEOPLE WHERE PEOPLEID = ?", "",, {nId});
 :ENDPROC;
+
 /* endregion;
 -- diagnostics --
 12:1-12:14 hint region_end_mismatch: 'endregion' has no open '/* region' to close

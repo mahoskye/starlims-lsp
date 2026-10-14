@@ -10,7 +10,9 @@ cascades into unclosed_delimiter (diag.mismatched_delimiter).
 -- format --
 :PROCEDURE DefaultUnits;
 	:DECLARE aUnits;
+
 	aUnits := {"mg", "g", "kg");
+
 	:RETURN aUnits;
 :ENDPROC;
 -- diagnostics --

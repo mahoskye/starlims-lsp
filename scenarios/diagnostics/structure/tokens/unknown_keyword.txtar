@@ -18,11 +18,13 @@ the block pairing is unaffected (diag.unknown_keyword).
 :PROCEDURE SizeBand;
 	:PARAMETERS nSize;
 	:DECLARE sBand;
+
 	:IF nSize < 10;
 		sBand := "S";
 		:ELSEIF;
 		sBand := "M";
 	:ENDIF;
+
 	:RETURN sBand;
 :ENDPROC;
 -- diagnostics --

@@ -11,6 +11,7 @@ sql_in_clause_array_expansion).
 -- format --
 :PROCEDURE Filter;
 	:DECLARE aCodes, aRows;
+
 	aCodes := {"pH", "TOC", "COND"};
 	aRows := SQLExecute("
 	    SELECT ordno, testcode, status
@@ -19,6 +20,7 @@ sql_in_clause_array_expansion).
 	      AND testcode IN (?aCodes?)
 	      AND site NOT IN ('LAB2', 'LAB3')
 	");
+
 	:RETURN aRows;
 :ENDPROC;
 -- diagnostics --

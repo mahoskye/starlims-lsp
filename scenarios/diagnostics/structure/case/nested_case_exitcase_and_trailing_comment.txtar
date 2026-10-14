@@ -29,6 +29,7 @@ and a comment after the last :EXITCASE is not a statement. Clean
 :PROCEDURE PackagingCode;
 	:PARAMETERS nKind, bFragile;
 	:DECLARE sCode;
+
 	:BEGINCASE;
 	:CASE nKind == 1;
 		:BEGINCASE;
@@ -43,8 +44,10 @@ and a comment after the last :EXITCASE is not a statement. Clean
 	:OTHERWISE;
 		sCode := "BAG";
 		:EXITCASE;
+
 		/* bags are the fallback for every other kind;
 	:ENDCASE;
+
 	:RETURN sCode;
 :ENDPROC;
 -- diagnostics --

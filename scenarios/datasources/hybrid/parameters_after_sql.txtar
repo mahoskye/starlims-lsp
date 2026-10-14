@@ -18,6 +18,7 @@ WHERE tag_label = @sLabel
 SELECT tag_id, tag_label;
 FROM asset_tag;
 :PARAMETERS sLabel := "";
+
 WHERE tag_label = @sLabel;
 -- diagnostics --
 5:19-5:20 error unknown_token: Unknown token: '@'
