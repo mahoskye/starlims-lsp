@@ -30,6 +30,13 @@ history:
       The invalid `===` / `!==` (which lex as `==`/`!=` then `=`) stay
       glued. Spacing them apart (`== =`) split invalid_operator_sequence's
       one operator into two and added an unexpected_token error.
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      Source spaces after a unary operator (or before a postfix ++/--) are
+      removed, as the behavior already required; a known colon keyword
+      glued to its neighbors (`1:TO 5`, `:IF(`, `:RETURN-1`) is spaced, so
+      step_spacing no longer fires on formatted output.
 issues: ["#83", "#88", "#326"]
 ---
 
@@ -44,6 +51,14 @@ each side. Exceptions:
   delimiter, a comma, a keyword, or at line start) attach directly to their
   operand: `nOffset := -5;`.
 - `!`, `++`, `--` attach to their operand and get no spacing treatment.
+  A source space between a unary operator and its operand is removed
+  (`- 5` → `-5`, `! bR` → `!bR`, `nA ++` → `nA++`), except where gluing
+  would re-lex as another token (`! =`, `- -5`) (issue #326).
+- A known colon keyword glued to the code around it is set apart by one
+  space: `1:TO 5:STEP-1` → `1 :TO 5 :STEP -1`, `:IF(j > 1)` →
+  `:IF (j > 1)` (schema `spaces.before_step_keyword`, issue #326). A
+  colon after `)` or `]` lexes as member access, so `Len(a):STEP` is left
+  to `step_spacing`.
 - The member-access `:` is not an operator: it never gains spaces, and
   spaces around it are removed (`oUser : firstName` → `oUser:firstName`).
 - No space is inserted before `;` or a closing delimiter, or after an
@@ -149,6 +164,29 @@ bSame := 1===1;
 ```ssl
 :DECLARE bSame;
 bSame := 1 === 1;
+```
+
+Unary operators attach to their operand, and a glued keyword is set
+apart (issue #326):
+
+### Before
+
+```ssl
+:DECLARE nR, bR, i;
+nR := - 5;
+bR := ! bR;
+:FOR i := 1:TO 5:STEP-1;
+:NEXT;
+```
+
+### After
+
+```ssl
+:DECLARE nR, bR, i;
+nR := -5;
+bR := !bR;
+:FOR i := 1 :TO 5 :STEP -1;
+:NEXT;
 ```
 
 ## Rationale

@@ -564,6 +564,7 @@ type formatState struct {
 	lineStart             bool
 	prevToken             lexer.Token
 	lastNonWSToken        lexer.Token
+	beforeLastNonWS       lexer.Token // the code token before lastNonWSToken
 	prevKeyword           string
 	inProcedure           bool
 	afterEndProc          bool
@@ -954,6 +955,13 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 			s.continuationIndent = 0
 		}
 	} else if !s.lineStart {
+		// Unary operators attach to their operand (fmt.operator_spacing):
+		// a source space after `!`, a unary sign or a prefix `++`/`--`,
+		// or before a postfix `++`/`--`, is dropped (issue #326).
+		if next := findNextNonWS(tokens, index); next != nil && s.attachesUnary(*next) {
+			s.prevToken = token
+			return true
+		}
 		// Suppress space before ( in function calls: "MyFunc (" -> "MyFunc("
 		if s.lastNonWSToken.Type == lexer.TokenIdentifier {
 			if next := findNextNonWS(tokens, index); next != nil && next.Text == "(" {
@@ -1023,6 +1031,54 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 
 	s.prevToken = token
 	return true
+}
+
+// gluedBefore reports whether a colon keyword follows code on its line
+// with no space between them.
+func (s *formatState) gluedBefore(kw lexer.Token) bool {
+	p := s.prevToken
+	return !s.lineStart && !s.lineHasOnlyIndent() && p.Type != 0 &&
+		p.Type != lexer.TokenWhitespace && !isOpenParen(p) && p.Line == kw.Line
+}
+
+// gluedAfter reports whether the colon keyword at tokens[i] is directly
+// followed by an operand on its line — anything but whitespace, ';', a
+// closing delimiter or a comma.
+func gluedAfter(tokens []lexer.Token, i int) bool {
+	if i+1 >= len(tokens) {
+		return false
+	}
+	n := tokens[i+1]
+	return n.Type != lexer.TokenWhitespace && n.Type != lexer.TokenEOF &&
+		n.Type != lexer.TokenComment && n.Text != ";" && n.Text != "," && !isCloseParen(n)
+}
+
+// attachesUnary reports whether the source space between the last code
+// token and next separates a unary operator from its operand, so it is
+// dropped. The space stays wherever gluing would re-lex as a different
+// token (`! =` -> `!=`, `- -5` -> `--5`).
+func (s *formatState) attachesUnary(next lexer.Token) bool {
+	if !s.opts.OperatorSpacing || next.Type == lexer.TokenComment || next.Type == lexer.TokenEOF {
+		return false
+	}
+	last, before := s.lastNonWSToken, s.beforeLastNonWS
+	operandEnd := func(t lexer.Token) bool {
+		return t.Type == lexer.TokenIdentifier || t.Text == ")" || t.Text == "]"
+	}
+	switch {
+	case (next.Text == "++" || next.Text == "--") && operandEnd(last):
+		return true // postfix: `nA ++` -> `nA++`
+	case last.Type == lexer.TokenOperator && last.Text == "!":
+		return !strings.HasPrefix(next.Text, "=")
+	case (last.Text == "-" || last.Text == "+") && before.Type != 0 &&
+		before.Line == last.Line && isUnaryContext(before, false) &&
+		// A value keyword (NIL, .T.) is an operand: the sign after it is binary.
+		!(before.Type == lexer.TokenKeyword && !strings.HasPrefix(before.Text, ":")):
+		return !strings.ContainsAny(next.Text[:1], "+-=")
+	case (last.Text == "++" || last.Text == "--") && !operandEnd(before):
+		return !strings.ContainsAny(next.Text[:1], "+-=") // prefix: `++ nA`
+	}
+	return false
 }
 
 // shouldJoinSQLStringBreak reports whether a newline whitespace token sits at
@@ -1271,8 +1327,13 @@ func (s *formatState) writeTokenWithSQLFormatting(token lexer.Token) bool {
 	// quote at baseIndent). Otherwise the next token's wrap logic sees a
 	// huge length and forces a newline between the closing '"' and a
 	// trailing ',' / remaining call args.
+	// It is measured in columns, a tab as indentSize, like the indent
+	// writeIndentLen counts; counting bytes made a range format, which
+	// narrows its budget by its base indent in columns, disagree with a
+	// full format on the next string's fit (issue #325 follow-up, found
+	// by FuzzFormatRangeStable).
 	if idx := strings.LastIndex(formattedSQL, "\n"); idx >= 0 {
-		s.currentLineLen = len(formattedSQL) - idx - 1
+		s.currentLineLen = visualWidth(formattedSQL[idx+1:], s.opts)
 	} else {
 		s.currentLineLen += len(formattedSQL)
 	}
@@ -1318,6 +1379,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 
 	s.orphanColon = isMemberAccessColon(token) && !s.colonHasReceiver()
 	s.prevToken = token
+	s.beforeLastNonWS = s.lastNonWSToken
 	s.lastNonWSToken = token
 }
 
@@ -1440,10 +1502,22 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
 			} else if token.Type == lexer.TokenKeyword {
-				// Colon-prefixed keyword: :if -> :IF, :endIf -> :ENDIF
+				// Colon-prefixed keyword: :if -> :IF, :endIf -> :ENDIF.
+				// A keyword glued to the code around it is spaced apart
+				// (`1:TO 5`, `:STEP-1`, `:IF(j > 1)`; schema
+				// spaces.before_step_keyword, issue #326).
+				known := constants.IsKeyword(strings.ToUpper(strings.TrimPrefix(token.Text, ":")))
+				if known && state.gluedBefore(token) {
+					state.builder.WriteString(" ")
+					state.currentLineLen++
+				}
 				normalized := ":" + strings.ToUpper(strings.TrimPrefix(token.Text, ":"))
 				state.builder.WriteString(normalized)
 				state.currentLineLen += len(normalized)
+				if known && gluedAfter(tokens, i) {
+					state.builder.WriteString(" ")
+					state.currentLineLen++
+				}
 			} else if canonical, ok := canonicalReceiver(token, tokens, i); ok {
 				// Me/Base as member-access receivers take their canonical
 				// casing (issue #90, schema R41).
