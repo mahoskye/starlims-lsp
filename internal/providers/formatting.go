@@ -588,6 +588,7 @@ type formatState struct {
 	tokenIndex            int
 	pendingStatementBreak bool
 	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
+	errorBodyIndent       int  // indent level of the :ERROR / :RESUME body
 	// commentBlockStart is the builder offset where the current run of
 	// standalone comment lines began, or -1 when the output does not
 	// currently end in such a run. A blank line or any non-comment content
@@ -627,8 +628,11 @@ func (s *formatState) updateForKeyword(token lexer.Token) {
 	// Handle block end keywords - dedent before.
 	// If we're in an :ERROR handler, the scope-based handler ends too,
 	// so we need an extra dedent to close it.
+	// Only the block end that closes the block holding the :ERROR —
+	// reached at the handler body's own depth — ends the handler; a closer
+	// of a block nested in the handler body does not (issue #326).
 	if constants.IsBlockEndKeyword(normalized) {
-		if s.inErrorHandler {
+		if s.inErrorHandler && s.indent == s.errorBodyIndent {
 			s.indent--
 			s.inErrorHandler = false
 		}
@@ -1281,6 +1285,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		// :ERROR and :RESUME are scope-based — indent body after them
 		if s.prevKeyword == "ERROR" || s.prevKeyword == "RESUME" {
 			s.indent++
+			s.errorBodyIndent = s.indent
 		}
 	}
 

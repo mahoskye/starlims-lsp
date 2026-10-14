@@ -63,7 +63,14 @@ history:
       its hanging lines with the list's first item, per the style guide's
       wrapped_list_alignment; it used to take the one-level continuation
       indent like any other statement.
-issues: ["#36", "#86", "#101"]
+  - date: 2026-10-13
+    ref: "issue #326"
+    note: >-
+      A block nested in an :ERROR handler body keeps its depth: any block
+      end used to close the handler scope too, so a nested :ENDIF and
+      everything after it dedented one level too far. Only the end of the
+      block holding the :ERROR closes it.
+issues: ["#36", "#86", "#101", "#326"]
 ---
 
 ## Behavior
@@ -233,6 +240,35 @@ sSuffix, sTitle;
 :PROCEDURE Demo;
 	:DECLARE sFirstName, sLastName, sMiddleName,
 	         sSuffix, sTitle;
+:ENDPROC;
+```
+
+A block nested in an `:ERROR` handler body keeps the handler's depth
+(issue #326):
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:DECLARE nCount;
+:ERROR;
+:IF nCount > 1;
+nCount := 2;
+:ENDIF;
+nCount := 3;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:DECLARE nCount;
+	:ERROR;
+		:IF nCount > 1;
+			nCount := 2;
+		:ENDIF;
+		nCount := 3;
 :ENDPROC;
 ```
 
