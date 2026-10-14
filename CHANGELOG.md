@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Formatting changes
+
+This release changes formatted output substantially: on the production
+corpus, 3,642 of 6,228 files format differently from v0.25.0. Formatting
+stays idempotent and adds no errors.
+
+The largest changes:
+- brackets and declaration lists align their contents;
+- blank lines separate logical sections;
+- embedded SQL packs within the line limit;
+- unary operators attach to their operands;
+- format-selection now matches a full format.
+
+Each change is listed under Added, Changed and Fixed below. To adopt it:
+1. Reformat each codebase in one commit that contains nothing else.
+2. Add that commit's hash to `.git-blame-ignore-revs`, so `git blame`
+   skips it.
+3. Then turn on format-on-save or a `--format --check` gate.
+
+Layout changes ship in announced batches like this one (DECISIONS.md D18).
+
 ### Added
+- **Reasons on suppression comments.** A rule list may be followed by a
+  reason after `--`, `—` or `:`, which matching ignores:
+  `/* @ssl-disable-next-line sql_injection -- the table name is a constant;`.
 - **Blank lines between sections** (`ssl.format.blankLinesBetweenSections`,
   default on). The formatter inserts one blank line at each boundary
   between logical sections of a body, following the style guide's
@@ -47,6 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line.
 
 ### Fixed
+- **Suppression comment syntax in the docs.** The documented form
+  `/* @ssl-disable <rule>; */` left a stray `*/` after the comment, which
+  is code and was reported as such, because SSL comments end at `;`. The
+  correct form is `/* @ssl-disable <rule>;` (DECISIONS.md D3,
+  CONFIGURATION.md).
 - **Range formatting no longer corrupts multi-line statements or literal
   text** (#325). Formatting a selection used to treat one line of a
   multi-line statement as a whole statement. It added a `;` mid-statement,

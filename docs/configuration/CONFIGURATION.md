@@ -761,10 +761,18 @@ diagnostic can be suppressed in the source itself (added in v0.5.0,
 catalog: DECISIONS.md D3).
 
 ```ssl
-/* @ssl-disable hungarian_notation; */          suppresses for the whole file
-/* @ssl-disable-next-line sql_injection; */     suppresses the next line only
-/* @ssl-disable *; */                           wildcard: all rules
+/* @ssl-disable hungarian_notation;
+/* @ssl-disable-next-line sql_injection -- the table name is a constant;
+/* @ssl-disable *;
 ```
+
+The first suppresses a rule for the whole file, the second for the next
+line only (with a reason), and the third is the wildcard for all rules.
+Several rules are comma-separated. The comment ends at its `;` like any
+SSL comment: do not add a closing `*/`, which would be code after the
+comment. An optional reason follows the rule list after `--`, `—` or `:`
+and is ignored by matching; writing one is recommended, so a later reader
+knows whether the suppression still applies.
 
 ---
 

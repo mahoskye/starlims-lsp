@@ -8630,14 +8630,14 @@ nLocal := 1;
 }
 
 // TestSuppressionComments_FileScopeAndNextLine verifies that
-// /* @ssl-disable <slug>; */ suppresses every matching diagnostic file-wide,
-// and /* @ssl-disable-next-line <slug>; */ suppresses only the next line.
+// /* @ssl-disable <slug>; suppresses every matching diagnostic file-wide,
+// and /* @ssl-disable-next-line <slug>; suppresses only the next line.
 // [spec feature.diagnostics_pipeline/A4] — file-scope suppression.
 // [spec feature.diagnostics_pipeline/A5] — next-line scope only.
 // [spec feature.diagnostics_pipeline/A6] — wildcard '*' silences everything.
 func TestSuppressionComments_FileScopeAndNextLine(t *testing.T) {
 	// File-scope: silence every parameters_first finding in the file.
-	fileWide := `/* @ssl-disable parameters_first; */
+	fileWide := `/* @ssl-disable parameters_first;
 :PROCEDURE Test;
 nLocal := 1;
 :PARAMETERS sFoo;
@@ -8661,7 +8661,7 @@ nLocal := 1;
 	// first should be suppressed.
 	nextLine := `:PROCEDURE Test;
 nA := 1;
-/* @ssl-disable-next-line not_preferred_operator; */
+/* @ssl-disable-next-line not_preferred_operator;
 :IF nA <> 1;
 :ENDIF;
 :IF nA <> 2;
@@ -8679,13 +8679,32 @@ nA := 1;
 	}
 
 	// Wildcard '*' silences everything (file scope).
-	star := `/* @ssl-disable *; */
+	star := `/* @ssl-disable *;
 :PROCEDURE Test;
 nLocal := 1;
 :PARAMETERS sFoo;
 :ENDPROC;`
 	if got := codeCount(GetDiagnostics(star, DefaultDiagnosticOptions()), CodeParametersFirst); got != 0 {
 		t.Errorf("wildcard '*' should silence all diagnostics; got %d for parameters_first", got)
+	}
+}
+
+// A suppression may give its reason after `--`, `—` or `:`; matching ignores
+// it, several rules are comma-separated, and a correctly written comment
+// (ending at its `;`, with no closing `*/`) raises nothing of its own.
+// [spec feature.diagnostics_pipeline/A5]
+func TestSuppressionComments_ReasonAndList(t *testing.T) {
+	for _, directive := range []string{
+		"/* @ssl-disable-next-line bare_logical_operator -- legacy query, rewrite in #12;",
+		"/* @ssl-disable-next-line bare_logical_operator: legacy query;",
+		"/* @ssl-disable-next-line keyword_uppercase, bare_logical_operator — kept for the diff;",
+	} {
+		src := ":DECLARE bA, bB;\n" + directive + "\n:IF bA AND bB;\n:ENDIF;\n"
+		if diags := GetDiagnostics(src, infoEnabledOptions()); len(diags) != 0 {
+			for _, d := range diags {
+				t.Errorf("%q: unexpected %s on line %d: %s", directive, d.Code, d.Range.Start.Line+1, d.Message)
+			}
+		}
 	}
 }
 

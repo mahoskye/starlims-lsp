@@ -558,11 +558,15 @@ func applyRuleOverrides(diagnostics []Diagnostic, overrides map[string]string) [
 // applySuppressionComments drops diagnostics silenced by user-authored
 // suppression comments embedded in the source. Two forms are recognized:
 //
-//	/* @ssl-disable <rule_slug>[, <rule_slug>...] ; */
+//	/* @ssl-disable <rule_slug>[, <rule_slug>...] [-- reason];
 //	    File-scope suppression. Any diagnostic with a matching Code is dropped.
-//	/* @ssl-disable-next-line <rule_slug>[, <rule_slug>...] ; */
+//	/* @ssl-disable-next-line <rule_slug>[, <rule_slug>...] [-- reason];
 //	    Line-scope: applies to diagnostics on the line immediately following
 //	    the comment.
+//
+// The comment ends at its `;` like any SSL comment. An optional reason
+// follows the rule list after `--`, `—` or `:` (issue: suppressions should
+// say why); it is ignored by matching.
 //
 // Slug `*` matches any code and silences every coded diagnostic in scope.
 // Diagnostics without a Code (defensive — every emit should set one) bypass
@@ -635,6 +639,12 @@ func applySuppressionComments(tokens []lexer.Token, diagnostics []Diagnostic) []
 func parseRuleList(s string) []string {
 	if i := strings.Index(s, ";"); i >= 0 {
 		s = s[:i]
+	}
+	// An optional reason follows the rule list after `--`, `—` or `:`.
+	for _, sep := range []string{"--", "—", ":"} {
+		if i := strings.Index(s, sep); i >= 0 {
+			s = s[:i]
+		}
 	}
 	var out []string
 	for _, part := range strings.Split(s, ",") {
