@@ -35,6 +35,12 @@ history:
       Corrected: `:ERROR` in expression position is not a corpus-observed
       form; the grammar admits only the statement marker and
       unexpected_token reports the operand. This rule still ignores it.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      For the top-level span the message names the top-level script code
+      and asks for one family in the script body; it said "the same
+      procedure".
 issues: []
 ---
 

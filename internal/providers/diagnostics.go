@@ -7907,7 +7907,7 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 	// span tracks the first occurrence of each family; -1 means not seen.
 	type span struct{ legacy, structured int }
 	newSpan := func() span { return span{-1, -1} }
-	flush := func(sp span) {
+	flush := func(sp span, where, advice string) {
 		if sp.legacy < 0 || sp.structured < 0 {
 			return
 		}
@@ -7918,7 +7918,7 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		diagnostics = append(diagnostics, Diagnostic{
 			Severity: SeverityWarning,
 			Range:    tokenToRange(tokens[later]),
-			Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in the same procedure - the legacy handler can intercept errors before ':CATCH' sees them; use one family per procedure",
+			Message:  "Legacy ':ERROR'/':RESUME' and structured ':TRY'/':CATCH' are mixed in " + where + " - the legacy handler can intercept errors before ':CATCH' sees them; use one family " + advice,
 			Source:   "ssl-lsp",
 			Code:     CodeMixedErrorHandlingFamilies,
 		})
@@ -7940,13 +7940,13 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		switch strings.ToUpper(strings.TrimPrefix(token.Text, ":")) {
 		case "PROCEDURE":
 			if inProc {
-				flush(proc)
+				flush(proc, "the same procedure", "per procedure")
 			}
 			proc = newSpan()
 			inProc = true
 		case "ENDPROC":
 			if inProc {
-				flush(proc)
+				flush(proc, "the same procedure", "per procedure")
 				proc = newSpan()
 			}
 			inProc = false
@@ -7970,9 +7970,10 @@ func checkMixedErrorHandlingFamilies(tokens []lexer.Token) []Diagnostic {
 		}
 	}
 	if inProc {
-		flush(proc)
+		flush(proc, "the same procedure", "per procedure")
 	}
-	flush(topLevel)
+	// The top-level span is the script body, not a procedure (issue #328).
+	flush(topLevel, "the top-level script code", "in the script body")
 
 	return diagnostics
 }
