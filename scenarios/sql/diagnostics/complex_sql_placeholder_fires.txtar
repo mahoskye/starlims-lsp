@@ -1,10 +1,8 @@
-Known failure: placeholders-verbatim — SQL reflow respaces a complex placeholder's interior ('?a + b?' -> '? a + b ?'), changing the bound expression (fmt.sql_in_strings; #327)
 SQLExecute named placeholders that hold arithmetic or concatenation
 (diag.complex_sql_placeholder): one on a single-line string, one on a
 later line of a multi-line string, where the range must sit on the
 placeholder's own line (issue #255). Info tier, so only the
 [--strict --info] profile reports it.
-Suspected issue: #327 — the SQL reflow respaces the placeholders to '? sPrefix + sSuffix ?' and '? nBase * 2 ?' (fmt.sql_in_strings: "SQL parameter placeholders (?param?) are preserved verbatim — as an atomic span whatever the interior holds").
 Suspected issue: #328 — unused_variable reports sPrefix, sSuffix and nBase although the complex placeholders read them at run time (unused_variable: a "Deliberately generous notion of use", "trading false negatives for zero false positives").
 -- input.ssl --
 :PROCEDURE LoadByKey;
@@ -25,12 +23,12 @@ Suspected issue: #328 — unused_variable reports sPrefix, sSuffix and nBase alt
 	aRows := SQLExecute("
 	    SELECT ordno, status
 	    FROM orders
-	    WHERE ordkey = ? sPrefix + sSuffix ?
+	    WHERE ordkey = ?sPrefix + sSuffix?
 	");
 	aLater := SQLExecute("
 	    SELECT ordno, status
 	    FROM orders
-	    WHERE ordseq > ? nBase * 2 ?
+	    WHERE ordseq > ?nBase * 2?
 	");
 	:RETURN {aRows, aLater};
 :ENDPROC;

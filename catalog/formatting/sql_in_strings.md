@@ -110,7 +110,14 @@ history:
       as the style guide's §5.2 example does; only an overflowing
       predicate breaks before each AND/OR (Rule B). Corpus: 30 of 6,228
       files format differently, all idempotent.
-issues: ["#81", "#82"]
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A complex placeholder (`?sPrefix + sSuffix?`) is atomic. The SQL
+      lexer's lookahead stopped at the first space or operator, so the
+      reflow respaced its interior (`? sPrefix + sSuffix ?`), changing the
+      expression SSL binds.
+issues: ["#81", "#82", "#327"]
 ---
 
 ## Behavior
@@ -164,7 +171,12 @@ are considered. Within the exception:
   arrays are byte-preserved even when they look like SQL (issue #82).
 - SQL parameter placeholders (`?param?`) are preserved verbatim — as an
   atomic span whatever the interior holds, quoted content included
-  (`?'<<name>>'?`, a corpus pattern of dubious validity: the formatter
+  (`?'<<name>>'?`), and a complex expression too (`?sPrefix + sSuffix?`,
+  recognized by the same grammar complex_sql_placeholder uses, so the
+  diagnostic and the formatter agree on its extent; issue #327). A
+  positional `?` is never merged with what follows it: an interior holding
+  `=`, `<` or `>` is not a placeholder (`a=?AND b=?`). (`?'<<name>>'?` is
+  a corpus pattern of dubious validity: the formatter
   neither legitimizes nor rewrites it; byte-preservation is the only
   safe treatment for suspect spans, and flagging them is diagnostic
   territory, not layout).
@@ -583,6 +595,27 @@ aRows := SQLExecute("
                ELSE 'normal'
            END AS label
     FROM samples s
+");
+```
+
+A complex placeholder keeps its interior byte for byte (issue #327):
+
+### Before
+
+```ssl
+:DECLARE aRows, sPrefix, sSuffix, nBase;
+aRows := SQLExecute("select ordno, ordkey, ordseq, status from orders where ordkey = ?sPrefix + sSuffix? and ordseq > ?nBase * 2?");
+```
+
+### After
+
+```ssl
+:DECLARE aRows, sPrefix, sSuffix, nBase;
+aRows := SQLExecute("
+    SELECT ordno, ordkey, ordseq, status
+    FROM orders
+    WHERE ordkey = ?sPrefix + sSuffix?
+      AND ordseq > ?nBase * 2?
 ");
 ```
 
