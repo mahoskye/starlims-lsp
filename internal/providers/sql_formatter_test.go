@@ -2649,16 +2649,29 @@ func TestSQLFormatter_DecodePairAlignment(t *testing.T) {
 // and aligns the rest under it.
 func TestSQLFormatter_MergeOnAndSetAlignment(t *testing.T) {
 	f := NewSQLFormatter(DefaultSQLFormattingOptions())
+	// An ON condition that fits stays on the ON line (reference §2.12,
+	// issue #327); one that does not aligns its AND under the first
+	// condition (S45, issue #95).
 	got := f.FormatSQL("MERGE INTO samples_target t USING samples_source s ON (t.sample_id = s.sample_id AND t.site_code = s.site_code) WHEN MATCHED THEN UPDATE SET t.sample_status = s.sample_status, t.modified_on = s.modified_on", "")
 	want := "MERGE INTO samples_target t\n" +
 		"USING samples_source s\n" +
-		"ON (t.sample_id = s.sample_id\n" +
-		"    AND t.site_code = s.site_code)\n" +
+		"ON (t.sample_id = s.sample_id AND t.site_code = s.site_code)\n" +
 		"WHEN MATCHED THEN\n" +
 		"    UPDATE SET t.sample_status = s.sample_status,\n" +
 		"               t.modified_on = s.modified_on"
 	if got != want {
 		t.Errorf("MERGE alignment:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+	got = f.FormatSQL("MERGE INTO samples_target t USING samples_source s ON (t.sample_id = s.sample_id AND t.site_code = s.site_code AND t.collection_date = s.collection_date) WHEN MATCHED THEN UPDATE SET t.sample_status = s.sample_status", "")
+	want = "MERGE INTO samples_target t\n" +
+		"USING samples_source s\n" +
+		"ON (t.sample_id = s.sample_id\n" +
+		"    AND t.site_code = s.site_code\n" +
+		"    AND t.collection_date = s.collection_date)\n" +
+		"WHEN MATCHED THEN\n" +
+		"    UPDATE SET t.sample_status = s.sample_status"
+	if got != want {
+		t.Errorf("MERGE long ON alignment:\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
 

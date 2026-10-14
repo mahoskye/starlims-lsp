@@ -141,6 +141,9 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 	// column stays findable.
 	parenBrokeInside := []bool{}
 	groupJustClosedMultiline := false
+	// inlineGroups marks paren depths whose predicate group fits on its
+	// line, so AND/OR inside it do not break (issue #327).
+	inlineGroups := map[int]bool{}
 	pendingItemBreak := false
 
 	subqueryParenDepths := make(map[int]bool)
@@ -258,6 +261,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		if t.Text == "(" {
 			parenDepth++
 		} else if t.Text == ")" {
+			delete(inlineGroups, parenDepth)
 			parenDepth--
 			if parenDepth < 0 {
 				parenDepth = 0
@@ -453,6 +457,11 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 				// Suppress line break for AND that is part of BETWEEN...AND
 				if upperText == "AND" && afterBetween {
 					afterBetween = false
+				} else if (upperText == "AND" || upperText == "OR") && inlineGroups[parenDepth] {
+					// A parenthesized predicate group that fits on its line
+					// stays there (reference §2.3 compound conditions, §2.12
+					// MERGE ON; issue #327).
+					needsBreak = false
 				} else if upperText == "ON" && i+1 < len(nonWSTokens) &&
 					strings.ToUpper(nonWSTokens[i+1].Text) == "OVERFLOW" {
 					// LISTAGG's `ON OVERFLOW` is not a join ON (issue #119).
@@ -493,7 +502,7 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// MERGE sub-statement indentation: UPDATE SET / INSERT / DELETE indented under WHEN
 			if rootCommand == "MERGE" && parenDepth == 0 &&
 				(style == "canonicalCompact" || style == "expanded") {
-				if upperText == "UPDATE" || upperText == "INSERT" || upperText == "DELETE" {
+				if upperText == "UPDATE" || upperText == "INSERT" || upperText == "DELETE" || upperText == "VALUES" {
 					needsBreak = true
 					extraIndent = f.indentString
 				}
@@ -526,12 +535,19 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 			// (S34/S35, issue #93): the '(' stays on its keyword's line,
 			// the list starts on the next line indented one level, and the
 			// ')' closes on its own line at the parent indent.
-			if rootCommand != "MERGE" && t.Text == "(" &&
-				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)) {
+			// MERGE's INSERT has no table name — its column list follows the
+			// keyword — and both lists close one level in, under their WHEN
+			// branch (reference §2.12, §7.4; issue #327).
+			mergeList := rootCommand == "MERGE" && (style == "canonicalCompact" || style == "expanded") &&
+				(prevUpper == "VALUES" || prevUpper == "INSERT")
+			if t.Text == "(" && (mergeList || (rootCommand != "MERGE" &&
+				(prevUpper == "VALUES" || (currentClause == "INSERT" && prev != nil && prev.Type == SQLTokenIdentifier)))) {
 				subqueryParenDepths[parenDepth] = true
 				closerIndent := ""
 				if insertAll {
 					closerIndent = strings.Repeat(f.indentString, 2) // S37: ')' at 8
+				} else if mergeList {
+					closerIndent = f.indentString
 				}
 				blockParens[parenDepth] = closerIndent
 			}
@@ -1015,6 +1031,16 @@ func (f *SQLFormatter) FormatSQL(sql string, baseIndent string) string {
 		// the calling function's start column so the OVER anchor resolves to
 		// the outer window function even mid-expression (issue #122).
 		if t.Text == "(" {
+			// A predicate group — a paren that is not a call, a subquery
+			// or a block list — stays on one line when it fits from here.
+			if (prev == nil || (prev.Type != SQLTokenFunction && prev.Type != SQLTokenIdentifier)) &&
+				!isSQLSubqueryOpen(nonWSTokens, i) {
+				if closeIdx := matchingSQLParen(nonWSTokens, i); nonWSTokens[closeIdx].Text == ")" &&
+					f.opts.MaxLineLength > 0 &&
+					currentLineLen+f.projectionRenderLen(nonWSTokens, i+1, closeIdx+1) <= f.opts.MaxLineLength {
+					inlineGroups[parenDepth] = true
+				}
+			}
 			parenBrokeInside = append(parenBrokeInside, false)
 			parenOpenCols = append(parenOpenCols, currentLineLen)
 			funcCol := -1

@@ -141,6 +141,15 @@ history:
       A multi-line CASE in the SELECT list counts as a multi-line group, so
       the item after its END starts a fresh continuation line (C3,
       reference §2.1); it used to stay on the END line.
+  - date: 2026-10-13
+    ref: "issue #327"
+    note: >-
+      A parenthesized predicate group that fits on its line keeps its
+      AND/OR inline (`AND (a = 1 OR b = 2)`, MERGE `ON (… AND …)`;
+      reference §2.3, §2.12); one that does not still aligns under its
+      first condition (S45). MERGE's INSERT column list and VALUES list
+      take the block-paren layout, both indented under their WHEN branch
+      (reference §2.12, §7.4); VALUES used to drop to the clause column.
 issues: ["#81", "#82", "#327"]
 ---
 

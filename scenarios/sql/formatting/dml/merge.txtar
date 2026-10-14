@@ -1,7 +1,6 @@
 MERGE in SSL (reference §2.12, §7.4, sql_merge_layout): MERGE INTO,
 USING, ON and the WHEN branches at the clause column, UPDATE SET /
 INSERT indented 4 under WHEN, the USING inline view laid out flat.
-Suspected issue: #327 — VALUES of the WHEN NOT MATCHED branch dedents to the MERGE clause column instead of sitting under its INSERT, neither list takes the open-paren layout, and the ON condition breaks before AND although it fits; reference §7.4 shows 'ON (tgt.ordno = src.ordno AND tgt.testcode = src.testcode)' inline and 'INSERT (' / 'VALUES (' both indented 4 under WHEN.
 -- input.ssl --
 :PROCEDURE Summarize;
 	:PARAMETERS sOrdNo;
@@ -21,14 +20,17 @@ Suspected issue: #327 — VALUES of the WHEN NOT MATCHED branch dedents to the M
 	        WHERE ordno = ?
 	        GROUP BY ordno, testcode
 	    ) src
-	    ON (tgt.ordno = src.ordno
-	        AND tgt.testcode = src.testcode)
+	    ON (tgt.ordno = src.ordno AND tgt.testcode = src.testcode)
 	    WHEN MATCHED THEN
 	        UPDATE SET tgt.result_count = src.cnt,
 	                   tgt.updated_date = SYSDATE
 	    WHEN NOT MATCHED THEN
-	        INSERT (ordno, testcode, result_count, created_date)
-	    VALUES (src.ordno, src.testcode, src.cnt, SYSDATE)
+	        INSERT (
+	            ordno, testcode, result_count, created_date
+	        )
+	        VALUES (
+	            src.ordno, src.testcode, src.cnt, SYSDATE
+	        )
 	",, {sOrdNo});
 	:RETURN bOk;
 :ENDPROC;
