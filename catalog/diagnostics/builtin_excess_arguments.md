@@ -53,6 +53,12 @@ history:
     note: >-
       Rationale notes Branch as the exception: the reference makes a
       second Branch argument a compile-time error.
+  - date: 2026-10-13
+    ref: "issue #328"
+    note: >-
+      Trailing skipped slots no longer count as surplus: `DoProc("P",
+      {1},,)` is exactly `DoProc("P", {1})` (trailing_skip_commas reports
+      it); a real surplus argument before them still fires.
 issues: []
 ---
 

@@ -200,6 +200,12 @@ func checkBuiltinExcessArguments(tokens []lexer.Token, calls []parser.CallSite) 
 			continue
 		}
 		args := call.EffectiveArgs()
+		// Trailing skipped slots pass nothing: `DoProc("P", {1},,)` is
+		// exactly `DoProc("P", {1})` and trailing_skip_commas reports it,
+		// so only real surplus arguments count (issue #328).
+		for len(args) > 0 && args[len(args)-1].Kind == parser.ExprSkipped {
+			args = args[:len(args)-1]
+		}
 		if len(args) <= maxArgs {
 			continue
 		}
