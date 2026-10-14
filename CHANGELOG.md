@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-13
+
+The formatter release. A new scenario suite pins what the formatter and
+validator produce for 496 realistic inputs, checks every one for
+idempotence, whitespace-only changes, intact SQL placeholders, no added
+errors and stable format-selection, and found the defects fixed here
+(#325–#329).
+
+A side-by-side preview of the new output against v0.25.0 was then
+reviewed. That review settled the layout rules this release applies:
+- brackets align their contents;
+- blank lines separate logical sections;
+- a comment that leads embedded SQL sits on its own line;
+- MERGE `UPDATE SET` lays out like a plain `UPDATE`.
+
+Format-selection now gives exactly what a full format does. The
+diagnostics changes remove false positives and repeated findings without
+changing the default profile's results on the production corpus.
+
+Nothing in the CLI contract breaks (D16), but formatted output changes for
+most files, so read **Formatting changes** first.
+
 ### Formatting changes
 
 This release changes formatted output substantially: on the production
@@ -29,6 +51,12 @@ Each change is listed under Added, Changed and Fixed below. To adopt it:
 Layout changes ship in announced batches like this one (DECISIONS.md D18).
 
 ### Added
+- **Scenario suite** (`scenarios/`, #330). Each of 496 `.txtar` files holds
+  an SSL input with its expected `--format` output and `--validate`
+  diagnostics. The suite runs in `go test` through the CLI's own code
+  paths, checks invariants on every input, and ratchets diagnostic-code
+  coverage (139 of 141 active codes). `make scenarios-update` regenerates
+  the expected sections for review.
 - **Reasons on suppression comments.** A rule list may be followed by a
   reason after `--`, `—` or `:`, which matching ignores:
   `/* @ssl-disable-next-line sql_injection -- the table name is a constant;`.
@@ -56,9 +84,15 @@ Layout changes ship in announced batches like this one (DECISIONS.md D18).
   that ends its line hangs, with its items one level past the line it
   opened on, and a closing delimiter that leads a line returns to that
   line's indentation. When an item would not fit at the aligned column,
-  the line wrapper breaks right after the bracket instead. Continuation
-  lines inside brackets used to sit one fixed tab past the statement line
-  whatever the nesting.
+  the line wrapper breaks right after the bracket instead, and a bracket
+  whose first item sits past half the line limit hangs rather than
+  aligning. Continuation lines inside brackets used to sit one fixed tab
+  past the statement line whatever the nesting. The formatter now allows
+  up to five passes to settle, since nested alignment can take four.
+- **Formatter options policy** (DECISIONS.md D18). New formatter options
+  are only for compatibility or accessibility, never style preferences.
+  New layout rules ship on by default, and layout changes ship in
+  announced batches.
 - **Wrapped declaration lists align under their first item.** The
   hanging lines of a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list now line
   up with the list's first item (the statement's indent, then spaces), as
@@ -103,7 +137,9 @@ Layout changes ship in announced batches like this one (DECISIONS.md D18).
   - **Unary operators:** they attach to their operand (`- 5` → `-5`,
     `! bR` → `!bR`, `nA ++` → `nA++`).
   - **Glued keywords:** a keyword glued to its neighbors is spaced
-    (`1:TO 5:STEP-1` → `1 :TO 5 :STEP -1`, `:IF(` → `:IF (`).
+    (`1:TO 5:STEP-1` → `1 :TO 5 :STEP -1`, `:IF(` → `:IF (`), including a
+    `:STEP` or `:TO` glued to a call or name in a `:FOR` header
+    (`:TO Len(aRows):STEP 2` → `:TO Len(aRows) :STEP 2`).
   - **Stray semicolons:** they stay on their statement's line instead of
     becoming lines of their own.
   - **Declaration lists started on the next line:** such a list takes one
@@ -2901,7 +2937,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.22.0...v0.23.0
