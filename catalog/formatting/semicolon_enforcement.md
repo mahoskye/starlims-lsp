@@ -68,7 +68,7 @@ history:
     note: >-
       Stray semicolons stay on their statement's line; the statement
       break after a ';' used to put each extra ';' on a line of its own.
-  - date: 2026-10-15
+  - date: 2026-10-14
     ref: "issue #351"
     note: >-
       A line end gets its ';' only while the code since the last

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-10-14
+
+A formatting fix (#351) and a documentation update (#350). Formatting no
+longer adds errors to code that does not parse, and CONFIGURATION.md now
+maps the VS Code extension 1.25.0's settings. Nothing in the CLI contract
+changes, and no diagnostic changes.
+
 ### Fixed
 - **CONFIGURATION.md matches the VS Code extension 1.25.0** (#350):
   - §10.2 maps the size-review settings (`maxProcedureCodeLines`,
@@ -3072,7 +3079,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.25.0...v0.26.0
