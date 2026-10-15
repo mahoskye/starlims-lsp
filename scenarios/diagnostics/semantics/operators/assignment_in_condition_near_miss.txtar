@@ -40,3 +40,4 @@ parenthesized assign-and-test idiom, := inside a call argument, the
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --
+5:7-5:37 info one_assignment_per_statement: Assignment ':=' is used inside a larger expression - give it a statement of its own

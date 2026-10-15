@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The rest of the atoms of confusion (#339, #347): four style rules for small
+expression shapes that readers reliably misread, each verified on STARLIMS
+12, with severities set by the style guide. None is an error, so nothing in
+the CLI contract changes. On the production corpus, the default profile
+gains 3 warnings.
+
+### Added
+- **`parenthesize_mixed_logical`** (warning). An `.AND.` group that is an
+  operand of `.OR.` without parentheses: `bA .OR. bB .AND. bC` is
+  `bA .OR. (bB .AND. bC)`, and in `.T. .OR. X .AND. Y` neither `X` nor `Y`
+  runs. Corpus: 3 findings.
+- **`increment_as_statement`** (info; warning on reuse). A `++`/`--` inside
+  a larger expression (`aRows[i++]`, `:WHILE ++i <= n;`) is info. It is a
+  warning when the statement increments the same variable again or reads it
+  (`i++ + i++`, `aSeen[i++] := i;`), because operands evaluate left to right
+  and each increment lands before the next is read. Corpus (`--info`): 147,
+  135 of them in the `:WHILE ++i <= n` loop idiom.
+- **`one_assignment_per_statement`** (info). An assignment whose value a
+  larger expression uses (`(n := 5) * 2`, `{n := 1}`, `F(n := 3)`,
+  `:WHILE (i += 1) <= n;`). A pure chain (`a := b := v`) and a whole-condition
+  assignment (`assignment_in_condition`'s) do not count. Corpus (`--info`):
+  446, 444 of them in loop conditions.
+- **`prefer_explicit_trim_concat`** (info). String `-` between two known
+  strings, which trims the left operand's trailing spaces and appends.
+  Suggest `Trim(a) + b`. `s`-prefixed names count only with
+  `--hungarian-types`. Corpus: 0.
+
 ## [0.27.0] - 2026-10-14
 
 The verified-behavior release. It adds diagnostics for run-time behaviors

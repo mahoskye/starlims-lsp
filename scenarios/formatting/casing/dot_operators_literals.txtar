@@ -28,4 +28,8 @@ bA := .f.;
 	:RETURN bA;
 :ENDPROC;
 -- diagnostics --
+4:7-4:18 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
+5:7-5:24 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
 -- diagnostics [--strict --info] --
+4:7-4:18 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
+5:7-5:24 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping

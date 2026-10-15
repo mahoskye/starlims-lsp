@@ -45,3 +45,5 @@ bare `:RETURN;` is complete (issue #240). Clean.
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --
+4:14-4:21 info one_assignment_per_statement: Assignment '+=' is used inside a larger expression - give it a statement of its own
+11:24-11:31 info one_assignment_per_statement: Assignment ':=' is used inside a larger expression - give it a statement of its own

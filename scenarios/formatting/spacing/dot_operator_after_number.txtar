@@ -23,4 +23,8 @@ nCount:=-nCount;
 	:RETURN bFlag;
 :ENDPROC;
 -- diagnostics --
+3:5-3:26 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
+3:30-3:55 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
 -- diagnostics [--strict --info] --
+3:5-3:26 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
+3:30-3:55 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping

@@ -38,4 +38,6 @@ literals, and dotted text inside a :REGION body (issue #164).
 	:RETURN vOut;
 :ENDPROC;
 -- diagnostics --
+8:6-8:23 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
 -- diagnostics [--strict --info] --
+8:6-8:23 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping

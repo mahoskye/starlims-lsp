@@ -1,0 +1,28 @@
+An assignment whose value a larger expression uses
+(diag.one_assignment_per_statement, info) and string `-` between two
+known strings (diag.prefer_explicit_trim_concat, info); a pure chain and
+numeric `-` stay silent (issue #347).
+-- input.ssl --
+:PROCEDURE Build;
+	:DECLARE nTotal, nCount, sStatus, sDefault, sJoined;
+	nTotal := (nCount := 5) * 2;
+	sStatus := sDefault := "PENDING";
+	sJoined := "Sample   " - "Analysis";
+	nTotal := nTotal - 1;
+	:RETURN sJoined;
+:ENDPROC;
+-- format --
+:PROCEDURE Build;
+	:DECLARE nTotal, nCount, sStatus, sDefault, sJoined;
+
+	nTotal := (nCount := 5) * 2;
+	sStatus := sDefault := "PENDING";
+	sJoined := "Sample   " - "Analysis";
+	nTotal := nTotal - 1;
+
+	:RETURN sJoined;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+3:13-3:24 info one_assignment_per_statement: Assignment ':=' is used inside a larger expression - give it a statement of its own
+5:25-5:26 info prefer_explicit_trim_concat: String '-' trims trailing spaces from the left operand, then appends the right - write Trim(a) + b to say so (Trim also removes trailing tabs and line breaks, which '-' keeps)

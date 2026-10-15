@@ -57,4 +57,5 @@ two findings.
 7:16-7:18 warning assignment_in_condition: Assignment ':=' used in WHILE condition - did you mean '=' or '=='?
 11:14-11:16 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
 11:17-11:18 error non_logical_condition: Left operand of '.OR.' is a number literal - '.AND.' and '.OR.' raise at run time on a non-logical left operand
+11:17-11:33 info one_assignment_per_statement: Assignment ':=' is used inside a larger expression - give it a statement of its own
 11:29-11:31 warning assignment_in_condition: Assignment ':=' used in CASE condition - did you mean '=' or '=='?
