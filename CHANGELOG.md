@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-10-15
+
+A follow-up to the v0.28.1 formatting fix (#355). Formatting no longer adds
+a `;` after a stray closing delimiter, and range formatting a keyword line
+after code that does not parse agrees with a full format. Nothing in the
+CLI contract changes, and no diagnostic changes.
+
 ### Fixed
 - **A stray closing delimiter no longer gets a `;`** (#355). The #351 fix
   missed a statement that starts with `}`, `)` or `]`, such as the end of a
@@ -3090,7 +3097,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...HEAD
+[0.28.2]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...v0.27.0
