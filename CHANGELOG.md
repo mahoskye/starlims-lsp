@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The rest of the atoms of confusion (#339, #347): four style rules for small
-expression shapes that readers reliably misread, each verified on STARLIMS
-12, with severities set by the style guide. None is an error, so nothing in
-the CLI contract changes. On the production corpus, the default profile
-gains 3 warnings.
+## [0.28.0] - 2026-10-14
+
+The atoms-of-confusion release (#339, #347). It adds four style rules for
+small expression shapes that readers reliably misread. Each shape was
+verified on STARLIMS 12, and the style guide set the severities. None is an
+error, so nothing in the CLI contract changes. On the production corpus,
+the default profile gains 3 warnings.
 
 ### Added
 - **`parenthesize_mixed_logical`** (warning). An `.AND.` group that is an
@@ -3048,7 +3050,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.24.0...v0.25.0
