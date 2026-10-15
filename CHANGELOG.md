@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CONFIGURATION.md matches the VS Code extension 1.25.0** (#350):
+  - §10.2 maps the size-review settings (`maxProcedureCodeLines`,
+    `maxScriptCodeLines`, `maxScriptProcedures`).
+  - It notes that `ssl.diagnostics.rules` is applied by the server only, and
+    that `style` no longer offers `compact`.
+  - It lists the extension-only settings that never reach the server.
+  - The example uses `maxConsecutiveBlankLines: 2`.
+  - §4.2 records that step 1 of the `compact` removal shipped in extension
+    1.25.0, so the next minor release can drop the alias.
+  - The `maxNumberOfProblems` note says the extension's setting is gone.
+
 ## [0.28.0] - 2026-10-14
 
 The atoms-of-confusion release (#339, #347). It adds four style rules for
