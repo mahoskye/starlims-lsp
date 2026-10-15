@@ -461,10 +461,9 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 				// The code before ends mid-expression: writeIndentIfNeeded
 				// indents this line as a continuation, keyword or not.
 				cont[line] = true
-			case kw && haveCode && unparsed.noTerminator[lastCodeIdx]:
-				// The line before was left unterminated because its code
-				// does not parse, so the keyword's line is decided with it
-				// (issue #351).
+			case kw && unparsed.joined[i]:
+				// The keyword's line stays in the statement of the unparsed
+				// code before it (issues #351, #355).
 				cont[line] = true
 			case kw || !haveCode:
 				cont[line] = false

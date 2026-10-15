@@ -1,0 +1,23 @@
+A stray `}` ending a C-style block saved as a server script (issue #355,
+the #351 follow-up found by the VS Code extension's corpus harness). The
+parser forms no statement that starts with a closing delimiter, so the
+line does not parse, and it gets no `;`: terminated, it left the next
+line to start a statement of its own and formatting added an error. The
+C-style line after it does not parse either and is left as written. The
+input's only error, unmatched_delimiter, is all the output has.
+-- input.ssl --
+}
+if (bReady) sText = Build(sText);
+-- format --
+}
+if (bReady) sText = Build(sText);
+-- diagnostics --
+1:1-1:2 error unmatched_delimiter: Unmatched '}'
+2:1-2:3 warning direct_procedure_call: 'if' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+2:21-2:26 warning direct_procedure_call: 'Build' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+-- diagnostics [--strict --info] --
+1:1-1:2 error unmatched_delimiter: Unmatched '}'
+2:1-2:3 warning direct_procedure_call: 'if' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+2:5-2:11 warning undeclared_variable: Variable 'bReady' is not declared
+2:13-2:18 warning undeclared_variable: Variable 'sText' is not declared
+2:21-2:26 warning direct_procedure_call: 'Build' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.

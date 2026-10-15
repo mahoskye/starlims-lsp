@@ -1,0 +1,31 @@
+Keyword lines among lines that do not parse, with no `;` written anywhere
+(issues #351, #355). `:IF bReady` parses, so it is terminated. The raw
+`delete` lines are not, and neither is `:ELSE`, because the raw line after
+it fails too: terminating `:ELSE` would make that line a second failing
+statement. `:ENDIF` has only parsing code after it, so it is decided on
+its own and terminated. The run from the first `delete` to `:ENDIF;`
+stays one statement and one unexpected_token, and the keyword lines keep
+their block indentation.
+-- input.ssl --
+:DECLARE bReady;
+:IF bReady
+  delete from STAGING
+:ELSE
+  delete from ARCHIVE
+:ENDIF
+-- format --
+:DECLARE bReady;
+
+:IF bReady;
+  delete from STAGING
+:ELSE
+  delete from ARCHIVE
+:ENDIF;
+-- diagnostics --
+3:3-3:9 error unexpected_token: Unexpected identifier 'delete' - expected an operator or ';' (is the previous statement missing its ';'?)
+-- diagnostics [--strict --info] --
+3:3-3:9 warning undeclared_variable: Variable 'delete' is not declared
+3:3-3:9 error unexpected_token: Unexpected identifier 'delete' - expected an operator or ';' (is the previous statement missing its ';'?)
+3:10-3:14 warning undeclared_variable: Variable 'from' is not declared
+3:15-3:22 warning undeclared_variable: Variable 'STAGING' is not declared
+5:15-5:22 warning undeclared_variable: Variable 'ARCHIVE' is not declared

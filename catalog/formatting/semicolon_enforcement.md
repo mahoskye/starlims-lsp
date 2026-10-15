@@ -77,7 +77,17 @@ history:
       outside a string used to get a ';' on every line, so one parse error
       became one per line (found by the VS Code extension's corpus
       harness: 2 of 10,170 production files gained errors).
-issues: ["#38", "#89", "#326", "#351"]
+  - date: 2026-10-15
+    ref: "issue #355"
+    note: >-
+      A statement that starts with a closing delimiter (a stray `}` after
+      C-style code) counts as one that does not parse. The parser forms no
+      statement there, so the #351 gate missed it and the `}` still got a
+      ';', leaving the next line to start a statement of its own. A colon
+      keyword line after unparsed code is now decided by its own code
+      when nothing after it fails to parse, so range formatting it alone
+      agrees with a full format.
+issues: ["#38", "#89", "#326", "#351", "#355"]
 ---
 
 ## Behavior
@@ -125,9 +135,14 @@ A line the parser cannot accept gets no `;` (issue #351). A line end is
 terminated only while the code since the last terminator parses as a
 statement, so a missing `;` after a parsing statement is still repaired,
 but once the code does not parse, nothing more is terminated up to the `;`
-the source wrote (or end of file). Splitting such code at each line end
+the source wrote (or end of file). The exception is a line led by a colon
+keyword: when no code after it in the statement fails to parse, it starts
+afresh and is terminated by its own code, the way range formatting decides
+it alone (issue #355). Splitting such code at each line end
 made one parse error into one per line — raw SQL written outside a string
-is the usual shape. Each line of that run that does not parse on its own
+is the usual shape. A statement that starts with a closing delimiter (a
+stray `}`) is one that does not parse, though the parser forms no
+statement there to report (issue #355). Each line of that run that does not parse on its own
 is written as the source has it: indentation, spacing and casing are
 kept, and it is never wrapped. A line holding a colon keyword or an
 unbalanced delimiter still goes through the formatter, which needs it for
@@ -339,6 +354,15 @@ delete  from STAGING
 nCount := 1;
 delete  from STAGING
    where ID = 1
+```
+
+A stray closing delimiter gets no `;` either (issue #355):
+
+### Idempotent
+
+```ssl
+}
+if (bReady) sText = Build(sText);
 ```
 
 Stray semicolons stay where they are (issue #326):
