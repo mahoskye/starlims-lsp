@@ -3,10 +3,12 @@ datasource_sql_body_after_parameters, reviewer-enforced; no LSP rule owns
 it). Only :DSN forms the header; the misplaced :PARAMETERS sits in the
 body, where its inline `:=` is a strong SSL marker (D15: a `:=` anywhere
 in the body is decisive; only a header :PARAMETERS has its defaults
-excluded). So the document classifies as SSL: the formatter appends `;`
-to the SQL lines and SSL diagnostics run, of which only unknown_token on
-`@` surfaces (unexpected_token is off in data sources). Recorded so a
-change to how this broken layout classifies is visible.
+excluded). So the document classifies as SSL: SSL diagnostics run, of
+which only unknown_token on `@` surfaces (unexpected_token is off in data
+sources), and the SQL lines, which do not parse as SSL, are left as
+written with no `;` added (issue #351). The :PARAMETERS line between them
+belongs to that unterminated run, so no section blank line follows it.
+Recorded so a change to how this broken layout classifies is visible.
 -- input.ds --
 :DSN := DATABASE;
 SELECT tag_id, tag_label
@@ -15,11 +17,10 @@ FROM asset_tag
 WHERE tag_label = @sLabel
 -- format --
 :DSN := DATABASE;
-SELECT tag_id, tag_label;
-FROM asset_tag;
+SELECT tag_id, tag_label
+FROM asset_tag
 :PARAMETERS sLabel := "";
-
-WHERE tag_label = @sLabel;
+WHERE tag_label = @sLabel
 -- diagnostics --
 5:19-5:20 error unknown_token: Unknown token: '@'
 -- diagnostics [--strict --info] --

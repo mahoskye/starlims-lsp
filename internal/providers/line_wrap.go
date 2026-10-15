@@ -39,7 +39,8 @@ func wrapLongLines(text string, opts FormattingOptions) string {
 	tokens := lexer.NewLexer(text).Tokenize()
 	lines := strings.Split(text, "\n")
 
-	frozen := make([]bool, len(lines))
+	// Lines the parser cannot accept stay as written (issue #351).
+	frozen := planUnparsed(tokens).verbatimLines(tokens, len(lines))
 	perLine := make(map[int][]lexer.Token)
 	var stack []byte
 	stackAtLine := make(map[int]int)  // line index -> open '[' count at first token
