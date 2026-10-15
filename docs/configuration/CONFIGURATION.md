@@ -377,13 +377,12 @@ SQL formatting style to apply. `"compact"` was retired in the 2026-08-28
 style review (its half-multiline output was internally inconsistent) and
 is accepted as an alias for `canonicalCompact`.
 
-**Deprecation and removal plan for `"compact"`** (issue #257): the alias
-stays while the VS Code extension still lists `compact` in its
-`ssl.format.sql.style` enum. Removal order: (1) the extension drops the
-enum value and migrates a stored `compact` to `canonicalCompact`; (2) the
-next LSP minor release after that extension release drops the alias, at
-which point an unrecognized style formats as `standard`. Both steps are
-called out in each distribution's release notes.
+**Deprecation and removal plan for `"compact"`** (issue #257): (1) the VS
+Code extension drops the enum value and migrates a stored `compact` to
+`canonicalCompact` (done in extension 1.25.0, 2026-10-14); (2) the next LSP
+minor release drops the alias, at which point an unrecognized style formats
+as `standard`. Both steps are called out in each distribution's release
+notes.
 
 #### Style Comparison
 
@@ -994,9 +993,9 @@ Checks named SQL placeholders against declared variables (`invalid_sql_param`). 
 | **File** | `internal/server/server.go` |
 
 Maximum number of diagnostics the server publishes per document. Not
-client-configurable: the VS Code extension's own `ssl.maxNumberOfProblems`
-setting is not forwarded to the server and only caps the extension's
-built-in fallback diagnostics (used when the language server is disabled).
+client-configurable. (VS Code extensions before 1.25.0 had an
+`ssl.maxNumberOfProblems` setting; it was never forwarded to the server and
+only capped the extension's own fallback diagnostics, which 1.25.0 removed.)
 `--validate` applies no cap.
 
 ---
@@ -1126,7 +1125,7 @@ names and rebuilds the `ssl.*` tree above from them; it sends that tree in
 `initializationOptions` at startup and again on every relevant
 configuration change. The server keys in sections 3–7 are therefore **not**
 the names a VS Code user writes in `settings.json`. Mapping as of extension
-1.23.0:
+1.25.0:
 
 | VS Code setting | Server key | Notes |
 |-----------------|------------|-------|
@@ -1134,14 +1133,15 @@ the names a VS Code user writes in `settings.json`. Mapping as of extension
 | `editor.tabSize` (tab mode) / `ssl.format.indentWidth` (space mode) | `ssl.format.indentSize` | |
 | `ssl.format.wrapLength` | `ssl.format.maxLineLength` **and** `ssl.format.sql.maxLineLength` | one setting drives both |
 | `ssl.format.operatorSpacing`, `commaSpacing`, `semicolonEnforcement`, `blankLinesBetweenProcs`, `trimTrailingWhitespace`, `maxConsecutiveBlankLines`, `builtinFunctionCase` | same name under `ssl.format` | |
-| `ssl.format.sql.enabled`, `style`, `keywordCase`, `identifierCase` | same name under `ssl.format.sql` | `style` still offers the deprecated `compact` (see 4.2) |
+| `ssl.format.sql.enabled`, `style`, `keywordCase`, `identifierCase` | same name under `ssl.format.sql` | `style` no longer offers `compact`; a stored `compact` is sent as `canonicalCompact` (see 4.2) |
 | `ssl.format.sql.indentSpaces` | `ssl.format.sql.indentSize` | |
 | `ssl.naming.hungarianNotation.enabled` | `ssl.diagnostics.hungarianNotation` | extension default `true`; server default `false` |
 | `ssl.naming.hungarianNotation.checkTypes` | `ssl.diagnostics.hungarianTypes` | extension default `true`; server default `false` |
 | `ssl.naming.hungarianNotation.prefixes` | `ssl.diagnostics.hungarianPrefixes` | |
 | `ssl.globals` | `ssl.diagnostics.globals` | |
 | `ssl.styleGuide.limitBlockDepth` | `ssl.diagnostics.maxBlockDepth` | |
-| `ssl.diagnostics.rules`, `endpointPatterns`, `unusedVariables`, `infoDiagnostics` | same name | the extension also re-applies `rules` client-side |
+| `ssl.diagnostics.rules`, `endpointPatterns`, `unusedVariables`, `infoDiagnostics` | same name | `rules` is applied by the server only (the extension re-applied it client-side before 1.25.0) |
+| `ssl.diagnostics.maxProcedureCodeLines`, `maxScriptCodeLines`, `maxScriptProcedures` | same name | since extension 1.24.0 |
 | `ssl.intellisense.inlayHints.enabled`, `minParameterCount` | `ssl.inlayHints.enabled`, `minParameterCount` | |
 | `ssl.intellisense.signatureHelp.autoTrigger` | `ssl.intellisense.signatureHelp.autoTrigger` | restart to apply (see 7.1) |
 
@@ -1149,6 +1149,11 @@ Not settable from VS Code (server defaults always apply):
 `ssl.format.blankLineBetweenBlocks` (`true`),
 `ssl.format.blankLinesBetweenSections` (`true`) and
 `ssl.format.sql.detectSQLStrings` (`true`).
+
+Extension-only settings, never sent to the server:
+`ssl.format.formatOnSave`, `ssl.editor.autoInsertBlockClosers`,
+`ssl.intellisense.codeLens.enabled` and `ssl.trace.server` (which sets the
+client's LSP message tracing).
 
 The two Hungarian defaults differ deliberately: the server keeps noisy
 checks opt-in for every client (DECISIONS.md D5), and the extension, whose
@@ -1163,7 +1168,7 @@ audience is authors writing new SSL, turns them on.
   "ssl.format.semicolonEnforcement": true,
   "ssl.format.blankLinesBetweenProcs": 1,
   "ssl.format.trimTrailingWhitespace": true,
-  "ssl.format.maxConsecutiveBlankLines": 0,
+  "ssl.format.maxConsecutiveBlankLines": 2,
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.format.sql.enabled": true,
   "ssl.format.sql.style": "canonicalCompact",
