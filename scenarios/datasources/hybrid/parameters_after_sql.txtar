@@ -7,8 +7,9 @@ excluded). So the document classifies as SSL: SSL diagnostics run, of
 which only unknown_token on `@` surfaces (unexpected_token is off in data
 sources), and the SQL lines, which do not parse as SSL, are left as
 written with no `;` added (issue #351). The :PARAMETERS line between them
-belongs to that unterminated run, so no section blank line follows it.
-Recorded so a change to how this broken layout classifies is visible.
+is a statement of its own, decided by its own code (issue #355), so the
+section blank line still follows it. Recorded so a change to how this
+broken layout classifies is visible.
 -- input.ds --
 :DSN := DATABASE;
 SELECT tag_id, tag_label
@@ -20,6 +21,7 @@ WHERE tag_label = @sLabel
 SELECT tag_id, tag_label
 FROM asset_tag
 :PARAMETERS sLabel := "";
+
 WHERE tag_label = @sLabel
 -- diagnostics --
 5:19-5:20 error unknown_token: Unknown token: '@'

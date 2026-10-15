@@ -23,103 +23,181 @@ type unparsedPlan struct {
 	// to the run's last code token. The formatter writes such a run as the
 	// source has it: no re-indent, no respacing, no wrapping, no casing.
 	verbatim map[int]int
+	// joined holds the colon keyword leading each line that stays in the
+	// statement of the unparsed code before it, so range widening keeps the
+	// line with that code instead of deciding it alone.
+	joined map[int]bool
+}
+
+// linePiece is the code of a statement between two points where semicolon
+// enforcement would split it, as token indices.
+type linePiece struct {
+	start, end int
+	keyword    bool // led by a colon keyword
 }
 
 // planUnparsed walks each statement the parser could not accept and splits
 // it where semicolon enforcement would: after every line whose last code
 // token needsSemicolonAtLineEnd terminates. A line end gets its ';' only
 // while the code since the last terminator parses as a statement, so a
-// missing ';' is still repaired; once that code does not parse, the rest
-// of the statement keeps its source terminators, and the statement stays
-// one parse error. A piece between split points that does not parse on its
-// own is left verbatim when the statement had a terminator withheld, and
-// when doing so cannot confuse the block structure: the piece holds no
+// missing ';' is still repaired; once that code does not parse, later line
+// ends stay unterminated and the statement stays one parse error. A line
+// led by a colon keyword starts afresh after such code when nothing after
+// it fails to parse, so the keyword line is decided by its own code, as
+// range formatting decides it (issue #355). A piece that does not parse on
+// its own is left verbatim when the statement had a terminator withheld,
+// and when doing so cannot confuse the block structure: the piece holds no
 // colon keyword and its delimiters balance.
 func planUnparsed(tokens []lexer.Token) unparsedPlan {
-	plan := unparsedPlan{noTerminator: map[int]bool{}, verbatim: map[int]int{}}
-	for _, se := range parser.ExtractStatementExpressions(tokens) {
-		if se.Unexpected < 0 {
+	plan := unparsedPlan{noTerminator: map[int]bool{}, verbatim: map[int]int{}, joined: map[int]bool{}}
+	for _, se := range unparsedStatements(tokens) {
+		pieces := statementPieces(tokens, se)
+		if len(pieces) == 0 {
 			continue
 		}
-		groupStart, pieceStart, lastCode := -1, -1, -1
-		failed := false  // the code since the last terminator can never parse
-		lineEnd := false // a newline has followed lastCode
+		// sourceEnded: the last piece carries the ';' the source wrote.
+		sourceEnded := tokens[pieces[len(pieces)-1].end].Text == ";"
+		// cleanFrom reports whether every group from piece k on parses, so
+		// starting afresh there adds no error.
+		cleanFrom := func(k int) bool {
+			groupStart := pieces[k].start
+			for m := k; m < len(pieces); m++ {
+				ok, atEnd := statementParses(tokens, groupStart, pieces[m].end)
+				switch {
+				case ok && m+1 < len(pieces):
+					groupStart = pieces[m+1].start
+				case !ok && (!atEnd || m == len(pieces)-1):
+					return false
+				}
+			}
+			return true
+		}
+		groupStart := pieces[0].start
+		failed := false // the code since the last terminator can never parse
 		withheld := false
-		var unparsedPieces [][2]int
-		closePiece := func() {
-			if pieceStart >= 0 && lastCode >= pieceStart {
-				if ok, _ := statementParses(tokens, pieceStart, lastCode); !ok && verbatimSafe(tokens, pieceStart, lastCode) {
-					unparsedPieces = append(unparsedPieces, [2]int{pieceStart, lastCode})
-				}
-			}
-			pieceStart = -1
-		}
-		// terminates reports whether the formatter may end the group at
-		// lastCode, latching failed once no later code can make it parse.
-		terminates := func() bool {
-			if failed {
-				return false
-			}
-			ok, atEnd := statementParses(tokens, groupStart, lastCode)
-			if !ok && !atEnd {
-				failed = true
-			}
-			return ok
-		}
-		for j := se.Start; j <= se.End && j < len(tokens); j++ {
-			t := tokens[j]
-			switch t.Type {
-			case lexer.TokenEOF, lexer.TokenComment:
-				continue
-			case lexer.TokenWhitespace:
-				if lastCode < 0 || lineEnd || !strings.Contains(t.Text, "\n") {
-					continue
-				}
-				lineEnd = true
-				if !needsSemicolonAtLineEnd(tokens[lastCode], tokens, j) {
-					continue
-				}
-				closePiece()
-				if terminates() {
-					groupStart = -1
+		for k, p := range pieces {
+			if failed && p.keyword {
+				if cleanFrom(k) {
+					failed, groupStart = false, p.start
 				} else {
-					plan.noTerminator[lastCode] = true
-					withheld = true
+					plan.joined[p.start] = true
 				}
-				continue
 			}
-			if groupStart < 0 {
-				groupStart = j
+			last := k == len(pieces)-1
+			if last && sourceEnded {
+				break
 			}
-			if pieceStart < 0 {
-				pieceStart = j
+			if !failed {
+				ok, atEnd := statementParses(tokens, groupStart, p.end)
+				if ok {
+					if !last {
+						groupStart = pieces[k+1].start
+					}
+					continue
+				}
+				failed = !atEnd
 			}
-			lastCode = j
-			lineEnd = false
-		}
-		closePiece()
-		// A statement running to end of file gets the ';' the formatter
-		// adds there only when it parses (formatTokens' EOF check).
-		if lastCode >= 0 && groupStart >= 0 && tokens[lastCode].Text != ";" && !terminates() {
-			plan.noTerminator[lastCode] = true
+			plan.noTerminator[p.end] = true
 			withheld = true
 		}
 		// Only a run the formatter could not delimit is left as written; a
 		// statement that is malformed but whole keeps the normalization
 		// that often repairs it (`1===1`, `9E + 1`).
-		if withheld {
-			for _, p := range unparsedPieces {
-				plan.verbatim[p[0]] = p[1]
+		if !withheld {
+			continue
+		}
+		for _, p := range pieces {
+			if ok, _ := statementParses(tokens, p.start, p.end); !ok && verbatimSafe(tokens, p.start, p.end) {
+				plan.verbatim[p.start] = p.end
 			}
 		}
 	}
 	return plan
 }
 
+// statementPieces splits a statement where semicolon enforcement would: at
+// the first line break after each line whose last code token
+// needsSemicolonAtLineEnd terminates. Comments belong to no piece.
+func statementPieces(tokens []lexer.Token, se parser.StatementExprs) []linePiece {
+	var pieces []linePiece
+	start, lastCode := -1, -1
+	lineEnd := false // a newline has followed lastCode
+	for j := se.Start; j <= se.End && j < len(tokens); j++ {
+		t := tokens[j]
+		switch t.Type {
+		case lexer.TokenEOF, lexer.TokenComment:
+			continue
+		case lexer.TokenWhitespace:
+			if start < 0 || lineEnd || !strings.Contains(t.Text, "\n") {
+				continue
+			}
+			lineEnd = true
+			if needsSemicolonAtLineEnd(tokens[lastCode], tokens, j) {
+				pieces = append(pieces, newLinePiece(tokens, start, lastCode))
+				start = -1
+			}
+			continue
+		}
+		if start < 0 {
+			start = j
+		}
+		lastCode = j
+		lineEnd = false
+	}
+	if start >= 0 {
+		pieces = append(pieces, newLinePiece(tokens, start, lastCode))
+	}
+	return pieces
+}
+
+func newLinePiece(tokens []lexer.Token, start, end int) linePiece {
+	t := tokens[start]
+	return linePiece{start: start, end: end,
+		keyword: t.Type == lexer.TokenKeyword && strings.HasPrefix(t.Text, ":")}
+}
+
+// unparsedStatements returns the statements the parser cannot accept: those
+// it parsed with an unexpected token, and those it declines to parse that
+// start with a closing delimiter. A stray `}` (C-style code saved as a
+// script) starts no statement the parser forms, so it reports none, but
+// the formatter would still terminate the line (issue #355).
+func unparsedStatements(tokens []lexer.Token) []parser.StatementExprs {
+	parsed := map[int]parser.StatementExprs{}
+	for _, se := range parser.ExtractStatementExpressions(tokens) {
+		parsed[se.Start] = se
+	}
+	var out []parser.StatementExprs
+	for i := 0; i < len(tokens); i++ {
+		t := tokens[i]
+		if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment ||
+			t.Type == lexer.TokenRegionBody || t.Type == lexer.TokenEOF ||
+			(t.Type == lexer.TokenPunctuation && t.Text == ";") {
+			continue
+		}
+		end := i
+		for end < len(tokens)-1 && !(tokens[end].Type == lexer.TokenPunctuation && tokens[end].Text == ";") {
+			end++
+		}
+		if se, ok := parsed[i]; ok {
+			if se.Unexpected >= 0 {
+				out = append(out, se)
+			}
+		} else if isCloseParen(t) {
+			out = append(out, parser.StatementExprs{Start: i, End: end, Unexpected: i})
+		}
+		i = end
+	}
+	return out
+}
+
 // statementParses reports whether tokens[start..end] parse as one complete
 // statement, and, when they do not, whether the parser only ran out of
-// input (more code could still complete it).
+// input (more code could still complete it). A statement cannot start with
+// a closing delimiter (issue #355).
 func statementParses(tokens []lexer.Token, start, end int) (ok, atEnd bool) {
+	if isCloseParen(tokens[start]) {
+		return false, false
+	}
 	sub := make([]lexer.Token, 0, end-start+2)
 	sub = append(sub, tokens[start:end+1]...)
 	sub = append(sub, lexer.Token{Type: lexer.TokenEOF})

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A stray closing delimiter no longer gets a `;`** (#355). The #351 fix
+  missed a statement that starts with `}`, `)` or `]`, such as the end of a
+  C-style block saved as a server script, because the parser forms no
+  statement there. The `}` got a `;`, the next line then started a statement
+  of its own, and formatting added an error. Found by the VS Code
+  extension's corpus harness on v0.28.1: 1 file, 19 → 20 errors. A colon
+  keyword line after code that does not parse is now terminated by its own
+  code when nothing after it fails to parse, so range formatting the line
+  alone agrees with a full format (fmt.semicolon_enforcement).
+
 ## [0.28.1] - 2026-10-14
 
 A formatting fix (#351) and a documentation update (#350). Formatting no
