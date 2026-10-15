@@ -204,6 +204,10 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// body) are literal text: they neither set nor take the base indent,
 	// or re-indenting would change a string's value (issue #325, A13).
 	docMask := literalInteriorMask(docTokens, len(lines), nil)
+	// So are lines left as written because they do not parse (issue #351).
+	for l, v := range planUnparsed(docTokens).verbatimLines(docTokens, len(lines)) {
+		docMask[l] = docMask[l] || v
+	}
 	var codeLines []string
 	for i, line := range rangeLines {
 		if !docMask[startLine+i] {
@@ -271,6 +275,10 @@ func FormatDocumentRange(text string, startLine, startChar, endLine, endChar int
 	// Re-apply the base indentation to each line
 	formattedLines := strings.Split(formatted, "\n")
 	outMask := verbatimInteriorMask(toLex, formatted)
+	outTokens := lexer.NewLexer(formatted).Tokenize()
+	for l, v := range planUnparsed(outTokens).verbatimLines(outTokens, len(formattedLines)) {
+		outMask[l] = outMask[l] || v
+	}
 	reindentedLines := make([]string, 0, len(formattedLines))
 	for i, line := range formattedLines {
 		if outMask[i] {
@@ -412,7 +420,9 @@ func widenRangeToStatements(tokens []lexer.Token, startLine, endLine int) (int, 
 // lookahead does.
 func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[int]int) {
 	cont, prev = map[int]bool{}, map[int]int{}
+	unparsed := planUnparsed(tokens)
 	var last, lastCode lexer.Token
+	lastCodeIdx := -1
 	haveLast, haveCode := false, false
 	lastEnd := -1   // 0-based line on which `last` ends
 	codeWsIdx := -1 // first newline whitespace token after lastCode
@@ -451,11 +461,17 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 				// The code before ends mid-expression: writeIndentIfNeeded
 				// indents this line as a continuation, keyword or not.
 				cont[line] = true
+			case kw && haveCode && unparsed.noTerminator[lastCodeIdx]:
+				// The line before was left unterminated because its code
+				// does not parse, so the keyword's line is decided with it
+				// (issue #351).
+				cont[line] = true
 			case kw || !haveCode:
 				cont[line] = false
 			default:
 				ended := lastCode.Text == ";" ||
-					(codeWsIdx >= 0 && needsSemicolonAtLineEnd(lastCode, tokens, codeWsIdx))
+					(codeWsIdx >= 0 && !unparsed.noTerminator[lastCodeIdx] &&
+						needsSemicolonAtLineEnd(lastCode, tokens, codeWsIdx))
 				cont[line] = !ended
 			}
 		} else if line > lastEnd {
@@ -471,6 +487,7 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 		lastEnd = line + strings.Count(strings.TrimSuffix(t.Text, "\n"), "\n")
 		if t.Type != lexer.TokenComment {
 			lastCode, haveCode = t, true
+			lastCodeIdx = i
 			codeWsIdx = -1
 		}
 	}
@@ -598,8 +615,14 @@ type formatState struct {
 	orphanColon bool
 	// tokens and tokenIndex expose the token stream and the position of
 	// the token being formatted to helpers called without them.
-	tokens                []lexer.Token
-	tokenIndex            int
+	tokens     []lexer.Token
+	tokenIndex int
+	// lastNonWSIndex is lastNonWSToken's index in tokens.
+	lastNonWSIndex int
+	// unparsed says where semicolon enforcement stays out of code the
+	// parser cannot accept, and which of it is written verbatim (issue
+	// #351).
+	unparsed              unparsedPlan
 	pendingStatementBreak bool
 	inErrorHandler        bool // Tracks :ERROR scope-based handler for indent
 	errorBodyIndent       int  // indent level of the :ERROR / :RESUME body
@@ -846,8 +869,7 @@ func (s *formatState) normalizeProcBoundary() {
 	// line end here, so it takes the semicolon a source newline would have
 	// given it — otherwise the next pass adds it (issue #256, found by
 	// FuzzFormat).
-	if !s.pendingStatementBreak && !s.lineStart && s.opts.SemicolonEnforcement &&
-		needsSemicolonAtLineEnd(s.lastNonWSToken, s.tokens, s.tokenIndex-1) {
+	if !s.pendingStatementBreak && !s.lineStart && s.terminates(s.tokens, s.tokenIndex-1) {
 		// Drop the separator space already written (`:ENDPROC :PROCEDURE`).
 		built := strings.TrimRight(s.builder.String(), " \t")
 		s.builder.Reset()
@@ -1127,7 +1149,7 @@ func (s *formatState) handleWhitespace(token lexer.Token, tokens []lexer.Token, 
 	}
 
 	if strings.Contains(token.Text, "\n") {
-		if s.opts.SemicolonEnforcement && needsSemicolonAtLineEnd(s.lastNonWSToken, tokens, index) {
+		if s.terminates(tokens, index) {
 			s.builder.WriteString(";")
 			s.currentLineLen++
 		}
@@ -1600,6 +1622,16 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 	s.prevToken = token
 	s.beforeLastNonWS = s.lastNonWSToken
 	s.lastNonWSToken = token
+	s.lastNonWSIndex = s.tokenIndex
+}
+
+// terminates reports whether the formatter ends the line at tokens[wsIndex]
+// with a ';': semicolon enforcement is on, the line's code ends a
+// statement (needsSemicolonAtLineEnd), and that code is not a line the
+// parser cannot accept (issue #351).
+func (s *formatState) terminates(tokens []lexer.Token, wsIndex int) bool {
+	return s.opts.SemicolonEnforcement && !s.unparsed.noTerminator[s.lastNonWSIndex] &&
+		needsSemicolonAtLineEnd(s.lastNonWSToken, tokens, wsIndex)
 }
 
 // formatTokens formats tokens according to options.
@@ -1607,7 +1639,12 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 	state := newFormatState(opts)
 
 	state.tokens = tokens
+	state.unparsed = planUnparsed(tokens)
+	skipThrough := -1
 	for i, token := range tokens {
+		if i <= skipThrough {
+			continue
+		}
 		state.tokenIndex = i
 		// A leading byte-order mark is an encoding marker the lexer keeps
 		// as zero-width whitespace; write it back untouched (issue #255).
@@ -1618,8 +1655,7 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 		if token.Type == lexer.TokenEOF {
 			// A final statement with no trailing newline still gets its
 			// semicolon (issue #38) — mirror the newline-triggered check.
-			if opts.SemicolonEnforcement && !state.lineStart &&
-				needsSemicolonAtLineEnd(state.lastNonWSToken, tokens, i-1) {
+			if !state.lineStart && state.terminates(tokens, i-1) {
 				state.builder.WriteString(";")
 			}
 			break
@@ -1683,6 +1719,13 @@ func formatTokens(tokens []lexer.Token, opts FormattingOptions) string {
 			state.lineStart = strings.HasSuffix(token.Text, "\n")
 			state.prevToken = token
 			state.lastNonWSToken = token
+			state.lastNonWSIndex = i
+			continue
+		}
+
+		if end, ok := state.unparsed.verbatim[i]; ok {
+			state.writeVerbatim(tokens, i, end)
+			skipThrough = end
 			continue
 		}
 
@@ -2475,13 +2518,19 @@ func canonicalizeBuiltinCasing(text string) string {
 		return text
 	}
 	tokens := lexer.NewLexer(text).Tokenize()
+	// Code the parser cannot accept keeps its casing (issue #351).
+	verbatimEnd := -1
+	verbatim := planUnparsed(tokens).verbatim
 	var b strings.Builder
 	b.Grow(len(text))
 	for i, tok := range tokens {
 		if tok.Type == lexer.TokenEOF {
 			break
 		}
-		if tok.Type == lexer.TokenIdentifier && isCallSite(tokens, i) && !isMemberName(tokens, i) {
+		if end, ok := verbatim[i]; ok {
+			verbatimEnd = end
+		}
+		if tok.Type == lexer.TokenIdentifier && i > verbatimEnd && isCallSite(tokens, i) && !isMemberName(tokens, i) {
 			if pascal, ok := canonical[strings.ToLower(tok.Text)]; ok {
 				b.WriteString(pascal)
 				continue

@@ -1,0 +1,36 @@
+Lines that do not parse among lines that do (issue #351). A line end gets
+its `;` only while the code since the last terminator parses: `nCount :=
+1` is still terminated, but the raw `delete from` line is not, nor is
+anything after it up to the `;` the source wrote, so that run stays one
+unexpected_token. The unparsed line keeps its source indentation and
+spacing; the parsed lines around it, including the :IF block it sits in,
+are formatted as usual. A malformed statement that is whole
+(`nTotal := nCount +* 2;`) is not a run the formatter could not
+delimit, so it is still normalized.
+-- input.ssl --
+:DECLARE nCount, nTotal, bReady;
+nCount := 1
+:IF bReady;
+  delete  from STAGING   where ID = 1
+    nTotal := nCount;
+:ENDIF;
+nTotal :=   nCount +* 2;
+-- format --
+:DECLARE nCount, nTotal, bReady;
+
+nCount := 1;
+
+:IF bReady;
+  delete  from STAGING   where ID = 1
+	nTotal := nCount;
+:ENDIF;
+
+nTotal := nCount + * 2;
+-- diagnostics --
+3:1-3:4 error unexpected_token: Unexpected keyword ':IF' - expected an operator or ';' (is the previous statement missing its ';'?)
+4:11-4:15 error unexpected_token: Unexpected identifier 'from' - expected an operator or ';'
+7:21-7:22 error unexpected_token: Unexpected operator '*' - expected an expression
+-- diagnostics [--strict --info] --
+3:1-3:4 error unexpected_token: Unexpected keyword ':IF' - expected an operator or ';' (is the previous statement missing its ';'?)
+4:11-4:15 error unexpected_token: Unexpected identifier 'from' - expected an operator or ';'
+7:21-7:22 error unexpected_token: Unexpected operator '*' - expected an expression

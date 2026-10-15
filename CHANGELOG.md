@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - §4.2 records that step 1 of the `compact` removal shipped in extension
     1.25.0, so the next minor release can drop the alias.
   - The `maxNumberOfProblems` note says the extension's setting is gone.
+- **Formatting no longer adds errors to lines that do not parse** (#351).
+  Semicolon enforcement put a `;` on every line of code the parser cannot
+  accept, such as raw SQL written outside a string. Each line then became
+  a statement of its own, so one parse error became one per line. Found by
+  the VS Code extension's corpus harness: 2 of 10,170 production files
+  gained errors. A line end now gets its `;` only while the code since the
+  last terminator parses, so a missing `;` after a statement that parses
+  is still added. The lines of such a run that do not parse are left as
+  written: no `;`, no re-indent, no respacing, no wrapping and no casing
+  change (fmt.semicolon_enforcement).
 
 ## [0.28.0] - 2026-10-14
 
