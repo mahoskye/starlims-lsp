@@ -27,4 +27,6 @@ correct dotted operators never fire.
 	:RETURN {sSql, bBoth};
 :ENDPROC;
 -- diagnostics --
+8:11-8:35 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping
 -- diagnostics [--strict --info] --
+8:11-8:35 warning parenthesize_mixed_logical: '.AND.' binds tighter than '.OR.', so this group is evaluated first - parenthesize it to state the grouping

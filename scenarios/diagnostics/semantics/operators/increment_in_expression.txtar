@@ -1,0 +1,35 @@
+`++`/`--` inside a larger expression (diag.increment_as_statement): info
+for a single use, warning when the same statement uses the variable again,
+since operands evaluate left to right and each increment lands before the
+next is read. Whole-statement increments stay silent (issue #347).
+-- input.ssl --
+:PROCEDURE Walk;
+	:PARAMETERS aRows;
+	:DECLARE nIndex, vItem, aSeen, nSum;
+	nIndex := 1;
+	vItem := aRows[nIndex++];
+	aSeen[nIndex++] := nIndex;
+	nSum := nIndex++ + nIndex++;
+	nIndex++;
+	:RETURN vItem;
+:ENDPROC;
+-- format --
+:PROCEDURE Walk;
+	:PARAMETERS aRows;
+	:DECLARE nIndex, vItem, aSeen, nSum;
+
+	nIndex := 1;
+	vItem := aRows[nIndex++];
+	aSeen[nIndex++] := nIndex;
+	nSum := nIndex++ +nIndex++;
+	nIndex++;
+
+	:RETURN vItem;
+:ENDPROC;
+-- diagnostics --
+6:8-6:16 warning increment_as_statement: 'nIndex' is incremented and used again in the same expression - operands evaluate left to right and each '++' lands before the next is read; increment it in its own statement
+7:10-7:18 warning increment_as_statement: 'nIndex' is incremented and used again in the same expression - operands evaluate left to right and each '++' lands before the next is read; increment it in its own statement
+-- diagnostics [--strict --info] --
+5:17-5:25 info increment_as_statement: '++' is used inside a larger expression - postfix yields the old value and prefix the new; write the increment as its own statement
+6:8-6:16 warning increment_as_statement: 'nIndex' is incremented and used again in the same expression - operands evaluate left to right and each '++' lands before the next is read; increment it in its own statement
+7:10-7:18 warning increment_as_statement: 'nIndex' is incremented and used again in the same expression - operands evaluate left to right and each '++' lands before the next is read; increment it in its own statement

@@ -720,7 +720,9 @@ Info-tier rules: `equals_vs_strict_equals`, `not_preferred_operator`,
 `c_style_comment_closer`, `unicode_literal_prefix`,
 `unjustified_collate`, `spaced_skip_commas`,
 `visibility_annotation_usage`, `procedure_length_review`,
-`script_size_review`.
+`script_size_review`, `one_assignment_per_statement`,
+`prefer_explicit_trim_concat`, and the single-use tier of
+`increment_as_statement` (its repeated-use tier is a warning).
 
 ```json
 { "ssl.diagnostics.infoDiagnostics": true }

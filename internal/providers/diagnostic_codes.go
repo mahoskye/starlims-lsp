@@ -178,8 +178,8 @@ const (
 	CodeBuilderDirectiveOutsideDatasource = "builder_directive_outside_datasource"
 )
 
-// Run-time behaviors verified on STARLIMS 12, and the info-tier size review
-// triggers (issues #321, #322, #339, #344). A separate block so adding
+// Run-time behaviors verified on STARLIMS 12, the info-tier size review
+// triggers, and the atoms of confusion (issues #321, #322, #339, #344, #347). A separate block so adding
 // them does not realign the stable-code tables above.
 const (
 	CodeBranchLiteralTarget           = "branch_literal_target"
@@ -188,6 +188,10 @@ const (
 	CodeArrayIndexWholeNumber         = "array_index_whole_number"
 	CodeProcedureLengthReview         = "procedure_length_review"
 	CodeScriptSizeReview              = "script_size_review"
+	CodeIncrementAsStatement          = "increment_as_statement"
+	CodeParenthesizeMixedLogical      = "parenthesize_mixed_logical"
+	CodeOneAssignmentPerStatement     = "one_assignment_per_statement"
+	CodePreferExplicitTrimConcat      = "prefer_explicit_trim_concat"
 )
 
 // Pipeline-level codes: emitted by the diagnostics pipeline itself rather

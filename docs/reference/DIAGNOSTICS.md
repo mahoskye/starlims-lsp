@@ -77,6 +77,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `include_quoted_target` | :INCLUDE target written as a string | error | authoritative | active | [diag.include_quoted_target](../../catalog/diagnostics/include_quoted_target.md) |
+| `increment_as_statement` | ++ or -- inside a larger expression | info | style_only | active | [diag.increment_as_statement](../../catalog/diagnostics/increment_as_statement.md) |
 | `inherit_position` | :INHERIT not directly after :CLASS | error | authoritative | active | [diag.inherit_position](../../catalog/diagnostics/inherit_position.md) |
 | `inherit_qualified_name` | :INHERIT parent written as a plain class name | error | authoritative | active | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | authoritative | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
@@ -110,10 +111,13 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `non_logical_condition` | Literal non-logical condition or .AND./.OR. left operand | error | authoritative | active | [diag.non_logical_condition](../../catalog/diagnostics/non_logical_condition.md) |
 | `not_preferred_operator` | Discouraged inequality operator form | info | style_only | active | [diag.not_preferred_operator](../../catalog/diagnostics/not_preferred_operator.md) |
 | `nullasblank_value` | :NULLASBLANK value other than true or false | warning | authoritative | active | [diag.nullasblank_value](../../catalog/diagnostics/nullasblank_value.md) |
+| `one_assignment_per_statement` | Assignment used inside a larger expression | info | style_only | active | [diag.one_assignment_per_statement](../../catalog/diagnostics/one_assignment_per_statement.md) |
 | `one_class_per_file` | More than one CLASS definition in a file | error | authoritative | active | [diag.one_class_per_file](../../catalog/diagnostics/one_class_per_file.md) |
 | `parameters_first` | PARAMETERS not first in its scope | error | authoritative | active | [diag.parameters_first](../../catalog/diagnostics/parameters_first.md) |
+| `parenthesize_mixed_logical` | .AND. and .OR. mixed without parentheses | warning | style_only | active | [diag.parenthesize_mixed_logical](../../catalog/diagnostics/parenthesize_mixed_logical.md) |
 | `parenthesize_negated_comparison` | .NOT. before a comparison without parentheses | warning | authoritative | active | [diag.parenthesize_negated_comparison](../../catalog/diagnostics/parenthesize_negated_comparison.md) |
 | `prefer_exitcase` | CASE block without EXITCASE | warning | style_only | active | [diag.prefer_exitcase](../../catalog/diagnostics/prefer_exitcase.md) |
+| `prefer_explicit_trim_concat` | String minus instead of Trim() and + | info | style_only | active | [diag.prefer_explicit_trim_concat](../../catalog/diagnostics/prefer_explicit_trim_concat.md) |
 | `procedure_declaration_syntax` | Malformed procedure declaration | error | tool | active | [diag.procedure_declaration_syntax](../../catalog/diagnostics/procedure_declaration_syntax.md) |
 | `procedure_length_review` | Long procedure review trigger | info | advisory | active | [diag.procedure_length_review](../../catalog/diagnostics/procedure_length_review.md) |
 | `raiseerror_in_catch` | RaiseError called inside :CATCH | warning | style_only | active | [diag.raiseerror_in_catch](../../catalog/diagnostics/raiseerror_in_catch.md) |
