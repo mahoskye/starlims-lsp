@@ -1,20 +1,19 @@
 A .ssl script whose content is a one-line SQL statement. SQL-mode
 classification is scoped to data sources (feature.diagnostics_pipeline
-A12, feature.formatting A11), so this stays SSL: it is formatted as SSL
-(a terminating `;` is added) and the SSL checks run and report on the SQL
-syntax. The flag variants run the same content under `--ds`, which
-declares any input a data source (feature.cli_contract A15): then it is
-SQL, passes through unchanged and reports nothing. Kept to one line: a
-multi-line SQL body in a .ssl file trips the "formatting introduces no
-new error" invariant (each line gains a `;` and becomes its own
-unexpected_token statement), reported separately.
+A12, feature.formatting A11), so this stays SSL: the SSL checks run and
+report on the SQL syntax, and the formatter treats it as SSL that does
+not parse, so the line is left as written, with no `;` added (issue #351;
+formatting/semicolons/unparsed_sql_lines covers the multi-line form). The
+flag variants run the same content under `--ds`, which declares any input
+a data source (feature.cli_contract A15): then it is SQL, passes through
+unchanged and reports nothing.
 -- input.ssl --
 select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU'
 -- format [--ds] --
 select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU'
 -- diagnostics [--ds] --
 -- format --
-select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU';
+select v.vendor_id from vendor v where v.active = 'Y' and v.region = 'EU'
 -- diagnostics --
 1:8-1:9 error unexpected_token: Unexpected identifier 'v' - expected an operator or ';'
 1:9-1:19 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:vendor_id' instead of 'object.vendor_id'

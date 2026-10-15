@@ -68,7 +68,16 @@ history:
     note: >-
       Stray semicolons stay on their statement's line; the statement
       break after a ';' used to put each extra ';' on a line of its own.
-issues: ["#38", "#89", "#326"]
+  - date: 2026-10-15
+    ref: "issue #351"
+    note: >-
+      A line end gets its ';' only while the code since the last
+      terminator parses as a statement, and a line that does not parse in
+      a run the formatter could not delimit is left as written. Raw SQL
+      outside a string used to get a ';' on every line, so one parse error
+      became one per line (found by the VS Code extension's corpus
+      harness: 2 of 10,170 production files gained errors).
+issues: ["#38", "#89", "#326", "#351"]
 ---
 
 ## Behavior
@@ -111,6 +120,20 @@ An empty statement — a stray `;` directly after a `;` — stays on its
 statement's line (`:IF bReady;;` keeps both); the formatter neither
 deletes it nor breaks before it, which used to turn `;;;` into lines
 holding a lone `;` (issue #326).
+
+A line the parser cannot accept gets no `;` (issue #351). A line end is
+terminated only while the code since the last terminator parses as a
+statement, so a missing `;` after a parsing statement is still repaired,
+but once the code does not parse, nothing more is terminated up to the `;`
+the source wrote (or end of file). Splitting such code at each line end
+made one parse error into one per line — raw SQL written outside a string
+is the usual shape. Each line of that run that does not parse on its own
+is written as the source has it: indentation, spacing and casing are
+kept, and it is never wrapped. A line holding a colon keyword or an
+unbalanced delimiter still goes through the formatter, which needs it for
+indentation, and so does a malformed statement that is whole (`nA := 1 +*
+2;`), whose normalization often repairs it. Statements that parse are
+formatted as usual around the run.
 
 Semicolons are never inserted inside strings or comments. The check runs at
 every line break and at end-of-file, so a final statement with no trailing
@@ -295,6 +318,29 @@ sOut := "waiting";
 :ENDIF;
 ```
 
+Lines that do not parse are left as written, with no `;` added, so
+the run stays one parse error; the statement before them is still
+terminated (issue #351):
+
+### Before
+
+```ssl
+:DECLARE nCount;
+nCount := 1
+delete  from STAGING
+   where ID = 1
+```
+
+### After
+
+```ssl
+:DECLARE nCount;
+
+nCount := 1;
+delete  from STAGING
+   where ID = 1
+```
+
 Stray semicolons stay where they are (issue #326):
 
 ### Idempotent
@@ -314,4 +360,7 @@ meaning, which the formatter must never do. That is why enforcement keys on
 both what the line ends with and what the next line starts with. The
 end-of-file case (issue #38) closes the one hole in the trigger: enforcement
 used to fire only on newline tokens, so a document whose last line had no
-trailing newline kept its unterminated final statement.
+trailing newline kept its unterminated final statement. The parse gate
+(issue #351) keeps the repair from going the other way: terminating lines
+that do not parse cannot make them parse, only multiply the errors, and
+formatting must never add an error.

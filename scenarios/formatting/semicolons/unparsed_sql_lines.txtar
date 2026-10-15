@@ -1,0 +1,44 @@
+Raw SQL written outside any string in a server script (issue #351,
+found by the VS Code extension's corpus harness). The lines do not parse
+as SSL, and no split at their line ends makes them parse, so semicolon
+enforcement leaves them alone: no `;` is added and the lines keep their
+source spacing and indentation (`WIDGET_TEMP (NAME, SIZE)` and
+`in ('A','B')` are not respaced as calls). The run stays one
+unexpected_token, as in the input; terminating each line made it five.
+-- input.ssl --
+:PARAMETERS sIds := "1,2";
+
+delete from WIDGET_TEMP
+
+insert Into WIDGET_TEMP (NAME, SIZE)
+   select WIDGETS.NAME, SIZE
+   from   WIDGETS, BINS
+   where  WIDGETS.BIN = BINS.BIN and BINS.STATE in ('A','B')
+-- format --
+:PARAMETERS sIds := "1,2";
+
+delete from WIDGET_TEMP
+
+insert Into WIDGET_TEMP (NAME, SIZE)
+   select WIDGETS.NAME, SIZE
+   from   WIDGETS, BINS
+   where  WIDGETS.BIN = BINS.BIN and BINS.STATE in ('A','B')
+-- diagnostics --
+1:13-1:20 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'sIds' to a ':DEFAULT' line after ':PARAMETERS'
+3:8-3:12 error unexpected_token: Unexpected identifier 'from' - expected an operator or ';'
+5:13-5:24 warning direct_procedure_call: 'WIDGET_TEMP' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+6:18-6:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:NAME' instead of 'object.NAME'
+8:18-8:22 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:BIN' instead of 'object.BIN'
+8:29-8:33 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:BIN' instead of 'object.BIN'
+8:42-8:48 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:STATE' instead of 'object.STATE'
+8:49-8:51 warning direct_procedure_call: 'in' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+-- diagnostics [--strict --info] --
+1:13-1:20 error inline_default_outside_datasource: Inline ':=' defaults on ':PARAMETERS' are valid only in data source files; move the default for 'sIds' to a ':DEFAULT' line after ':PARAMETERS'
+1:13-1:17 hint unused_variable: Variable 'sIds' is declared but never used
+3:8-3:12 error unexpected_token: Unexpected identifier 'from' - expected an operator or ';'
+5:13-5:24 warning direct_procedure_call: 'WIDGET_TEMP' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
+6:18-6:23 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:NAME' instead of 'object.NAME'
+8:18-8:22 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:BIN' instead of 'object.BIN'
+8:29-8:33 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:BIN' instead of 'object.BIN'
+8:42-8:48 error dot_property_access: SSL uses colon ':' for property access, not dot '.'. Use 'object:STATE' instead of 'object.STATE'
+8:49-8:51 warning direct_procedure_call: 'in' is not a known built-in function or in-file procedure. If it is a custom procedure, dispatch it via DoProc/ExecFunction; if it is a legacy vendor built-in, this call is valid as written.
