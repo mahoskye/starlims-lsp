@@ -271,6 +271,14 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	capabilities.RenameProvider = &protocol.RenameOptions{
 		PrepareProvider: ptrTo(true),
 	}
+	// The custom requests, each with the version of its result's shape
+	// (feature.syntax_tree, feature.call_graph).
+	capabilities.Experimental = map[string]any{
+		"ssl": map[string]int{
+			"syntaxTree": 1,
+			"callGraph":  1,
+		},
+	}
 
 	// Return extended capabilities with inlay hint support
 	return ExtendedInitializeResult{

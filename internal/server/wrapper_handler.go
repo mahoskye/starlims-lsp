@@ -55,6 +55,26 @@ func (w *WrapperHandler) Handle(context *glsp.Context) (r any, validMethod bool,
 		return result, true, true, err
 	}
 
+	// The custom requests of feature.syntax_tree and feature.call_graph.
+	switch context.Method {
+	case MethodSyntaxTree:
+		var params SyntaxTreeParams
+		if err = json.Unmarshal(context.Params, &params); err != nil {
+			return nil, true, false, err
+		}
+		result, err := w.server.handleSyntaxTree(&params)
+		return result, true, true, err
+	case MethodCallGraph:
+		var params CallGraphParams
+		if len(context.Params) > 0 {
+			if err = json.Unmarshal(context.Params, &params); err != nil {
+				return nil, true, false, err
+			}
+		}
+		result, err := w.server.handleCallGraph(&params)
+		return result, true, true, err
+	}
+
 	// Delegate to standard handler for all other methods
 	return w.inner.Handle(context)
 }
