@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"slices"
 	"sync"
 
 	"starlims-lsp/internal/lexer"
@@ -54,6 +55,19 @@ func (dm *DocumentManager) GetDocument(uri string) (string, bool) {
 
 	content, ok := dm.documents[uri]
 	return content, ok
+}
+
+// URIs returns the URI of every open document, sorted.
+func (dm *DocumentManager) URIs() []string {
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+
+	uris := make([]string, 0, len(dm.documents))
+	for uri := range dm.documents {
+		uris = append(uris, uri)
+	}
+	slices.Sort(uris)
+	return uris
 }
 
 // RemoveDocument removes a document and its cache.

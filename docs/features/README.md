@@ -31,6 +31,8 @@ optional and written afterwards.
 | Formatting | [formatting.md](./formatting.md) | [feature.formatting](../../catalog/features/formatting.md) |
 | Diagnostics | [diagnostics.md](./diagnostics.md) | [feature.diagnostics_pipeline](../../catalog/features/diagnostics_pipeline.md) |
 | Snippets | [snippets.md](./snippets.md) | [feature.snippets](../../catalog/features/snippets.md) |
+| Syntax Tree (`ssl/syntaxTree`) | [custom-requests.md](./custom-requests.md) | [feature.syntax_tree](../../catalog/features/syntax_tree.md) |
+| Call Graph (`ssl/callGraph`) | [custom-requests.md](./custom-requests.md) | [feature.call_graph](../../catalog/features/call_graph.md) |
 
 Cross-file resolution, which definition, references, and rename share,
 has no guide; its contract is
