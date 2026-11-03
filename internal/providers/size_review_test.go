@@ -101,3 +101,61 @@ func TestScriptSizeReview(t *testing.T) {
 		t.Errorf("disabled: want none, got %+v", got)
 	}
 }
+
+// [spec diag.script_size_ceiling] A file over 50 KB, line endings
+// included, warns once on line 1, class files and data sources too; the
+// setting moves or disables it (issue #358).
+func TestScriptSizeCeiling(t *testing.T) {
+	opts := DefaultDiagnosticOptions()
+	line := "UsrMes(\"0123456789\");\n" // 22 bytes
+	fits := strings.Repeat(line, 51200/len(line))
+	fits += strings.Repeat(" ", 51200-len(fits))
+	if got := diagsWithCode(GetDiagnostics(fits, opts), CodeScriptSizeCeiling); len(got) != 0 {
+		t.Errorf("51,200 bytes: want none, got %+v", got)
+	}
+	got := diagsWithCode(GetDiagnostics(fits+"\n", opts), CodeScriptSizeCeiling)
+	if len(got) != 1 {
+		t.Fatalf("51,201 bytes: want 1, got %+v", got)
+	}
+	if got[0].Severity != SeverityWarning || got[0].Range.Start.Line != 0 || got[0].Range.End != (Position{Line: 0, Character: 21}) {
+		t.Errorf("got %+v, want a warning over line 1", got[0])
+	}
+	if want := "This file is 51 KB; the limit is 50 KB. Split it by responsibility until each part fits"; got[0].Message != want {
+		t.Errorf("message = %q, want %q", got[0].Message, want)
+	}
+
+	// CRLF counts one byte more per line than LF.
+	crlf := strings.ReplaceAll(fits, "\n", "\r\n")
+	if got := diagsWithCode(GetDiagnostics(crlf, opts), CodeScriptSizeCeiling); len(got) != 1 {
+		t.Errorf("CRLF copy of a fitting LF file: want 1, got %+v", got)
+	}
+
+	// Class files and data sources are measured, SQL-mode bodies whole.
+	if got := diagsWithCode(GetDiagnostics(":CLASS Big;\n"+fits, opts), CodeScriptSizeCeiling); len(got) != 1 {
+		t.Errorf("class file: want 1, got %+v", got)
+	}
+	ds := opts
+	ds.IsDataSourceFile = true
+	sql := strings.Repeat("SELECT name FROM samples\n", 2100)
+	for name, src := range map[string]string{
+		"SQL body":       sql,
+		"header and SQL": ":PARAMETERS sId;\n" + sql,
+		"SSL":            fits + "\n",
+	} {
+		if got := diagsWithCode(GetDiagnostics(src, ds), CodeScriptSizeCeiling); len(got) != 1 {
+			t.Errorf("data source, %s: want 1, got %+v", name, got)
+		}
+	}
+
+	// A limit that is no whole number of KB reads in bytes.
+	opts.MaxScriptBytes = 1000
+	got = diagsWithCode(GetDiagnostics(strings.Repeat(line, 48), opts), CodeScriptSizeCeiling)
+	if len(got) != 1 || !strings.HasPrefix(got[0].Message, "This file is 1056 bytes; the limit is 1000 bytes.") {
+		t.Errorf("1,000-byte limit: got %+v", got)
+	}
+
+	opts.MaxScriptBytes = 0
+	if got := diagsWithCode(GetDiagnostics(fits+"\n", opts), CodeScriptSizeCeiling); len(got) != 0 {
+		t.Errorf("disabled: want none, got %+v", got)
+	}
+}

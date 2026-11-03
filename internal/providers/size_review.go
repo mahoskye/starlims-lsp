@@ -133,7 +133,7 @@ func checkSizeReview(tokens []lexer.Token, maxProcLines, maxScriptLines, maxProc
 		out = append(out, Diagnostic{
 			Severity: SeverityInfo,
 			Range:    Range{Start: Position{Line: 0, Character: 0}, End: Position{Line: 0, Character: firstLineWidth(tokens)}},
-			Message: fmt.Sprintf("This script has %d code lines and %d procedures (review triggers: %d lines, %d procedures). Check its responsibilities: use regions first, and a separate script only for a reusable responsibility",
+			Message: fmt.Sprintf("This script has %d code lines and %d procedures (review triggers: %d lines, %d procedures). Check its responsibilities and move each one that stands alone into its own script",
 				total, procCount, maxScriptLines, maxProcs),
 			Source: "ssl-lsp",
 			Code:   CodeScriptSizeReview,

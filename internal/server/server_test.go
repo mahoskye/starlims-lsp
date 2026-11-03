@@ -130,6 +130,7 @@ func TestApplySettings_FullSettings(t *testing.T) {
 				"maxProcedureCodeLines": 60,
 				"maxScriptCodeLines":    0,
 				"maxScriptProcedures":   20,
+				"maxScriptBytes":        0,
 			},
 		},
 	}
@@ -187,6 +188,9 @@ func TestApplySettings_FullSettings(t *testing.T) {
 	}
 	if d := s.settings.Diagnostics; d.MaxProcedureCodeLines != 60 || d.MaxScriptCodeLines != 0 || d.MaxScriptProcedures != 20 {
 		t.Errorf("size review triggers = %d/%d/%d, want 60/0/20", d.MaxProcedureCodeLines, d.MaxScriptCodeLines, d.MaxScriptProcedures)
+	}
+	if s.settings.Diagnostics.MaxScriptBytes != 0 {
+		t.Errorf("size ceiling = %d, want 0 (disabled)", s.settings.Diagnostics.MaxScriptBytes)
 	}
 }
 

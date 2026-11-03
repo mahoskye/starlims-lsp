@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`script_size_ceiling`, warning** (#358): a file over
+  `ssl.diagnostics.maxScriptBytes` bytes (default 51,200, which is 50 KB; `0`
+  disables it) is past the limit ssl-style-guide sets. Unlike
+  `script_size_review`, every file is measured: server scripts, class files
+  and data sources (SSL or SQL), test scripts included. The size is the
+  file's bytes as the server receives it, line endings included, so a CRLF
+  file counts one byte more per line than the same file with LF. It reports
+  once, on line 1. In the production corpus, 27 of 6,228 files are over the
+  limit.
 - **`ssl/syntaxTree`** (#359): the statement-level tree of an open
   document's current parse, with its version, for clients that draw a
   script's structure (SSL Studio's blocks view). Procedures, comment regions,
@@ -21,8 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nodes. Whole workspace, or scoped to a document or procedure, a depth and
   a direction ([feature.call_graph](catalog/features/call_graph.md)).
 - Both are advertised under `capabilities.experimental.ssl`, each with the
-  version of its result's shape ([D19](catalog/DECISIONS.md)). Nothing in
-  the CLI contract changes, and no diagnostic changes.
+  version of its result's shape ([D19](catalog/DECISIONS.md)). Neither
+  changes the CLI contract.
+
+### Changed
+- **`script_size_review` gives the style guide's new advice** (#358): *"Check
+  its responsibilities and move each one that stands alone into its own
+  script"*, in place of putting regions first. The thresholds and severity
+  are unchanged.
 
 ## [0.28.2] - 2026-10-15
 

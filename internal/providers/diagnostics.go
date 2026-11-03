@@ -82,7 +82,11 @@ type DiagnosticOptions struct {
 	MaxProcedureCodeLines int
 	MaxScriptCodeLines    int
 	MaxScriptProcedures   int
-	IsDataSourceFile      bool
+	// MaxScriptBytes is the size ceiling (diag.script_size_ceiling, issue
+	// #358): a file over this many bytes, line endings included, is past
+	// the limit. 0 disables it.
+	MaxScriptBytes   int
+	IsDataSourceFile bool
 	// IsEndpointFile marks the file as an SSL endpoint script. When true,
 	// `Request` and `Response` are treated as pre-injected runtime
 	// ambients (not declared, not flagged as undeclared, not assignable).
@@ -125,6 +129,11 @@ type DiagnosticOptions struct {
 	// absent. Diagnostics whose Code is not in the map pass through
 	// unchanged.
 	RuleOverrides map[string]string
+
+	// documentBytes is the size of the whole document when the pipeline
+	// reads only part of it (a data source's SSL header); 0 means the
+	// tokens hold the whole document.
+	documentBytes int
 }
 
 // DefaultDiagnosticOptions returns default diagnostic options.
@@ -142,6 +151,7 @@ func DefaultDiagnosticOptions() DiagnosticOptions {
 		MaxProcedureCodeLines:  defaultMaxProcedureCodeLines,
 		MaxScriptCodeLines:     defaultMaxScriptCodeLines,
 		MaxScriptProcedures:    defaultMaxScriptProcedures,
+		MaxScriptBytes:         defaultMaxScriptBytes,
 	}
 }
 
@@ -221,6 +231,8 @@ func GetDiagnostics(text string, opts DiagnosticOptions) (result []Diagnostic) {
 					// the SSL pipeline below never sees either.
 					checkDataSourceHeaderSemicolons(text[:len(header)]),
 				), opts.RuleOverrides), opts)
+				// The size ceiling measures the whole file, not the header.
+				opts.documentBytes = len(text)
 				text = header
 			} else {
 				// Whole-document SQL body (or a comment-only stub): no SSL
@@ -231,6 +243,7 @@ func GetDiagnostics(text string, opts DiagnosticOptions) (result []Diagnostic) {
 					checkDataSourceBodySQLContent(text, 0),
 					checkDataSourceUndeclaredPlaceholders(text, nil, 0),
 					checkDataSourceQuestionPlaceholders(text, 0),
+					checkScriptSizeCeiling(len(text), firstTextLineWidth(text), opts.MaxScriptBytes),
 				), opts.RuleOverrides), opts)
 			}
 		}
@@ -309,6 +322,13 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	if opts.MaxBlockDepth > 0 {
 		diagnostics = append(diagnostics, checkBlockDepth(ast, opts.MaxBlockDepth)...)
 	}
+
+	// Size ceiling (issue #358), for every file, data sources included.
+	size := opts.documentBytes
+	if size == 0 {
+		size = tokensByteLen(tokens)
+	}
+	diagnostics = append(diagnostics, checkScriptSizeCeiling(size, firstLineWidth(tokens), opts.MaxScriptBytes)...)
 
 	// Size review triggers (issue #344). Data sources are out of scope.
 	if !opts.IsDataSourceFile {
