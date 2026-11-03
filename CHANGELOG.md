@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-03
+
+Semantic tokens, so a client that highlights with a TextMate grammar can
+colour the names a grammar cannot tell apart. Editors whose theme has semantic
+highlighting on will show names differently. The CLI and the formatter's
+output are unchanged.
+
 ### Added
 - **Semantic tokens** (#366): `textDocument/semanticTokens/full` and `/range`
   colour the names a TextMate grammar cannot tell apart: procedures,
@@ -3158,7 +3165,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...v0.29.0
 [0.28.2]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...v0.28.1
