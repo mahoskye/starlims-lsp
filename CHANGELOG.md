@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its responsibilities and move each one that stands alone into its own
   script"*, in place of putting regions first. The thresholds and severity
   are unchanged.
+- **Element metadata refreshed** from starlims-ssl-reference@27b6931: hover
+  for `++`, `--` and `.AND.` now carries the reference's caveats on
+  evaluation order and on how `.AND.` groups under `.OR.`.
 
 ## [0.28.2] - 2026-10-15
 

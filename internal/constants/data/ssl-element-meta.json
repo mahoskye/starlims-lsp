@@ -14,7 +14,7 @@
       "returns": 12
     },
     "with_exceptions": 267,
-    "with_caveats": 404,
+    "with_caveats": 405,
     "with_best_practices": 458
   },
   "elements": [
@@ -13382,6 +13382,7 @@
         "A non-boolean right operand does not raise. When the left operand is .F., the right side is not evaluated and the result is .F., so .F. .AND. \"x\" returns .F.. When the left operand is .T., .AND. returns the right operand unchanged, so .T. .AND. \"x\" returns \"x\" and .T. .AND. 5 returns 5, not a boolean. This mirrors .OR..",
         "A non-boolean left operand raises a runtime error. The message ends invalid operand: <value> (of type <type>) for operator: asBool.",
         "Only the right operand is skipped. Any side effects in the left operand still happen.",
+        "Because .AND. groups first, in .T. .OR. X .AND. Y the whole X .AND. Y is the right operand of .OR.. The .T. short-circuits the .OR., so neither X nor Y is evaluated.",
         ".AND. is not the integer bitwise AND operator. For bitwise integer operations, use _AND(a, b)."
       ],
       "best_practices": {
@@ -13469,7 +13470,8 @@
         "dont": [
           "Assume postfix (variable--) also returns the updated value. The postfix form returns the original before decrementing.",
           "Use -- on literals, expression results, or values other than numbers and dates. The target must be a variable, an array element, or an object property holding a number or a date.",
-          "Use -- when a non-unit decrement is needed. Use subtract-assign (-=) instead."
+          "Use -- when a non-unit decrement is needed. Use subtract-assign (-=) instead.",
+          "Apply -- to the same variable more than once in one expression. The result depends on evaluation order, as with ++."
         ]
       }
     },
@@ -13668,7 +13670,9 @@
       "doc_status": "published",
       "source_path": "content/reference/operators/increment.md",
       "exceptions": [],
-      "caveats": [],
+      "caveats": [
+        "Operands are evaluated left to right, and each ++ takes effect before the next operand is read. With i = 1, i++ + i++ returns 3 (1 + 2) and leaves i at 3."
+      ],
       "best_practices": {
         "do": [
           "Use ++ for concise incrementing of loop counters or numeric accumulators.",
@@ -13676,7 +13680,8 @@
         ],
         "dont": [
           "Use ++ on literals, expression results, or values other than numbers and dates. The target must be a variable, an array element, or an object property holding a number or a date.",
-          "Assume prefix and postfix always behave identically inside expressions. Prefix returns the new value; postfix returns the old value."
+          "Assume prefix and postfix always behave identically inside expressions. Prefix returns the new value; postfix returns the old value.",
+          "Apply ++ to the same variable more than once in one expression. The result depends on evaluation order."
         ]
       }
     },
@@ -13739,7 +13744,8 @@
       "source_path": "content/reference/operators/minus.md",
       "exceptions": [],
       "caveats": [
-        "For strings, only trailing space characters on the left operand are trimmed; leading spaces and the right operand are left unchanged."
+        "For strings, only trailing space characters on the left operand are trimmed. A trailing tab is not trimmed, so \"Lot\" + Chr(9) - \"A\" keeps the tab before \"A\".",
+        "Leading spaces and the right operand are left unchanged: \"  Lot  \" - \"  A\" returns \"  Lot  A\"."
       ],
       "best_practices": {
         "do": [
@@ -13907,17 +13913,19 @@
       "exceptions": [],
       "caveats": [
         ".NOT. is a prefix unary operator, not a postfix operator.",
-        "Double negation such as .NOT. .NOT. bFlag is valid and evaluates back to the original boolean value."
+        "Double negation such as .NOT. .NOT. bFlag is valid and evaluates back to the original boolean value.",
+        ".NOT. binds before a comparison. With a string s, .NOT. s = \"AB\" raises the operator/method: .NOT. is not implemented on type: SSLString. With a boolean b, .NOT. b = .F. runs as (.NOT. b) = .F., so with b = .T. it returns .T.."
       ],
       "best_practices": {
         "do": [
           "Use .NOT. for clear boolean negation in conditions such as .NOT. bIsReleased.",
-          "Wrap compound expressions in parentheses: .NOT. (bReady .AND. bReleased).",
+          "Wrap compound expressions and comparisons in parentheses: .NOT. (bReady .AND. bReleased), .NOT. (sStatus = \"AB\").",
           "Keep .NOT. for boolean logic only; convert or compare values to booleans before negating."
         ],
         "dont": [
           "Apply .NOT. to strings, numbers, arrays, objects, or dates. It only supports boolean operands.",
           "Rely on readers to infer grouping in longer expressions. Add parentheses around the expression being negated.",
+          "Write .NOT. sStatus = \"AB\" to negate a comparison. .NOT. applies to sStatus alone and raises an error. Write .NOT. (sStatus = \"AB\"). Replacing it with != or # is not equivalent for strings: those compare exactly, while = matches a prefix.",
           "Confuse .NOT. with _NOT(), which is the bitwise integer operation rather than logical negation."
         ]
       }
@@ -13931,6 +13939,7 @@
       "source_path": "content/reference/operators/or.md",
       "exceptions": [],
       "caveats": [
+        ".AND. groups before .OR., so .T. .OR. .T. .AND. .F. returns .T.. In .T. .OR. X .AND. Y, the whole X .AND. Y is the right operand, so neither X nor Y is evaluated.",
         "A non-boolean right operand does not raise. When the left operand is .T., the right side is not evaluated; when it is .F., .OR. returns the right operand unchanged, so .F. .OR. \"x\" returns \"x\", not a boolean."
       ],
       "best_practices": {

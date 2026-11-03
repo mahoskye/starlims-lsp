@@ -1,12 +1,12 @@
 {
   "reference": {
     "repo": "mahoskye/starlims-ssl-reference",
-    "commit": "893fd22b8b39594a5ecbfb271a50dd4f960e6900",
-    "date": "2026-10-13"
+    "commit": "27b6931695d6b7d31948775a1a25bf3982cff041",
+    "date": "2026-10-14"
   },
   "generator": {
     "repo": "mahoskye/ssl-style-guide",
-    "commit": "b29ec9be9ad4809fb4c73805d5933b45f76532d8",
-    "date": "2026-10-13"
+    "commit": "de96edfe9c5314e8572cf73140361dfb38d17d14",
+    "date": "2026-10-15"
   }
 }
