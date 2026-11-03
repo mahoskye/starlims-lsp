@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-03
+
+Semantic tokens, so a client that highlights with a TextMate grammar can
+colour the names a grammar cannot tell apart. Editors whose theme has semantic
+highlighting on will show names differently. The CLI and the formatter's
+output are unchanged.
+
 ### Added
 - **Semantic tokens** (#366): `textDocument/semanticTokens/full` and `/range`
   colour the names a TextMate grammar cannot tell apart: procedures,
