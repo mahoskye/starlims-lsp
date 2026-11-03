@@ -17,12 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file counts one byte more per line than the same file with LF. It reports
   once, on line 1. In the production corpus, 27 of 6,228 files are over the
   limit.
-
-### Changed
-- **`script_size_review` gives the style guide's new advice** (#358): *"Check
-  its responsibilities and move each one that stands alone into its own
-  script"*, in place of putting regions first. The thresholds and severity
-  are unchanged.
 - **`ssl/syntaxTree`** (#359): the statement-level tree of an open
   document's current parse, with its version, for clients that draw a
   script's structure (SSL Studio's blocks view). Procedures, comment regions,
@@ -36,8 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nodes. Whole workspace, or scoped to a document or procedure, a depth and
   a direction ([feature.call_graph](catalog/features/call_graph.md)).
 - Both are advertised under `capabilities.experimental.ssl`, each with the
-  version of its result's shape ([D19](catalog/DECISIONS.md)). Nothing in
-  the CLI contract changes, and no diagnostic changes.
+  version of its result's shape ([D19](catalog/DECISIONS.md)). Neither
+  changes the CLI contract.
+
+### Changed
+- **`script_size_review` gives the style guide's new advice** (#358): *"Check
+  its responsibilities and move each one that stands alone into its own
+  script"*, in place of putting regions first. The thresholds and severity
+  are unchanged.
 
 ## [0.28.2] - 2026-10-15
 
