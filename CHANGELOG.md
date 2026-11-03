@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-03
+
+Two custom requests for clients that draw the server's own view of a
+script, a size limit, and refreshed element metadata. `ssl/syntaxTree` and
+`ssl/callGraph` serve SSL Studio's blocks and graph views and are
+advertised under `capabilities.experimental.ssl`. `--validate` gains one
+warning code, `script_size_ceiling`, which reports a file over 50 KB. The
+CLI flags and the formatter's output are unchanged.
+
 ### Added
 - **`script_size_ceiling`, warning** (#358): a file over
   `ssl.diagnostics.maxScriptBytes` bytes (default 51,200, which is 50 KB; `0`
@@ -3137,7 +3146,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...v0.29.0
 [0.28.2]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.27.0...v0.28.0
