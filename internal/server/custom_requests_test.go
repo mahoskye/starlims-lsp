@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/tliron/glsp"
@@ -263,5 +264,126 @@ func TestCallGraphOpenBufferWins(t *testing.T) {
 	}
 	if g.Edges[0].Location.Range.Start.Line != 1 {
 		t.Errorf("call site from the buffer = %+v, want line 1", g.Edges[0].Location)
+	}
+}
+
+func TestCallGraphRegionPath(t *testing.T) {
+	// [spec feature.call_graph/A8]
+	wi, dir := newResolverIndex(t)
+	uri := writeAndIndex(t, wi, dir, "Server Scripts/LIMS/Nested.srvscr",
+		"/* region Outer;\n/* region Inner;\n:PROCEDURE Deep;\n:ENDPROC;\n/* endregion;\n:PROCEDURE Shallow;\n:ENDPROC;\n/* endregion;\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+	for name, want := range map[string][]string{"Deep": {"Outer", "Inner"}, "Shallow": {"Outer"}} {
+		n := nodeByID(g.Nodes, procedureID(uri, name))
+		if n == nil || !slices.Equal(n.Regions, want) {
+			t.Errorf("%s = %+v, want regions %v", name, n, want)
+		}
+	}
+}
+
+func TestCallGraphUnresolvedDataSourceAndInclude(t *testing.T) {
+	// [spec feature.call_graph/A9]
+	wi, dir := newResolverIndex(t)
+	src := ":INCLUDE LIMS.NoSuchLib;\naRows := RunDS(\"LIMS.NoSuchQuery\");\n"
+	a := writeAndIndex(t, wi, dir, "Server Scripts/LIMS/A.srvscr", src)
+	b := writeAndIndex(t, wi, dir, "Server Scripts/LIMS/B.srvscr", src)
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+	for _, c := range []struct{ id, kind, target string }{
+		{"unresolved:include:lims.nosuchlib", "Include", "LIMS.NoSuchLib"},
+		{"unresolved:dataSource:lims.nosuchquery", "RunDS", "LIMS.NoSuchQuery"},
+	} {
+		if n := nodeByID(g.Nodes, c.id); n == nil || n.Kind != GraphUnresolved || n.Name != c.target {
+			t.Errorf("node %s = %+v, want unresolved %s", c.id, n, c.target)
+		}
+		from := map[string]bool{}
+		for _, e := range g.Edges {
+			if e.To == c.id {
+				if e.Kind != c.kind || e.Resolved {
+					t.Errorf("edge to %s = %+v, want unresolved %s", c.id, e, c.kind)
+				}
+				from[e.From] = true
+			}
+		}
+		if !from[a] || !from[b] || len(from) != 2 {
+			t.Errorf("edges to %s come from %v, want A and B", c.id, from)
+		}
+	}
+}
+
+func TestCallGraphIndexedFilePositionsInUTF16(t *testing.T) {
+	// [spec feature.call_graph/A10]
+	wi, dir := newResolverIndex(t)
+	uri := writeAndIndex(t, wi, dir, "Server Scripts/LIMS/Emoji.srvscr", ":PROCEDURE Main;\n\tsMsg := \"😀\"; DoProc(\"Helper\");\n:ENDPROC;\n:PROCEDURE Helper;\n:ENDPROC;\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi // the file is indexed, not open
+
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+	e := edgeTo(g.Edges, "Helper")
+	if e == nil || e.To != procedureID(uri, "Helper") {
+		t.Fatalf("edge to Helper = %+v", e)
+	}
+	// The emoji is one rune but two UTF-16 units: "Helper" starts at rune
+	// column 22, UTF-16 character 23.
+	if want := (protocol.Range{Start: protocol.Position{Line: 1, Character: 23}, End: protocol.Position{Line: 1, Character: 29}}); e.Location.Range != want {
+		t.Errorf("location = %+v, want %+v", e.Location.Range, want)
+	}
+}
+
+func TestCallGraphAmbiguousTarget(t *testing.T) {
+	// [spec feature.call_graph/A11]
+	wi, dir := newResolverIndex(t)
+	one := writeAndIndex(t, wi, dir, "site1/Server Scripts/LIMS/Dup.srvscr", ":RETURN 1;\n")
+	two := writeAndIndex(t, wi, dir, "site2/Server Scripts/LIMS/Dup.srvscr", ":RETURN 2;\n")
+	caller := writeAndIndex(t, wi, dir, "site1/Server Scripts/LIMS/Caller.srvscr", "ExecFunction(\"LIMS.Dup\");\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+	to := map[string]bool{}
+	for _, e := range g.Edges {
+		if e.From != caller {
+			continue
+		}
+		if !e.Resolved || !e.Ambiguous || e.Target != "LIMS.Dup" {
+			t.Errorf("edge = %+v, want resolved and ambiguous", e)
+		}
+		to[e.To] = true
+	}
+	if !to[one] || !to[two] || len(to) != 2 {
+		t.Errorf("edges from Caller go to %v, want both Dup scripts", to)
+	}
+}
+
+func TestCallGraphEmptyScopeAndBadParams(t *testing.T) {
+	// [spec feature.call_graph/A12] [spec feature.syntax_tree/A13]
+	s, _, _, _ := newCallGraphServer(t)
+
+	r, _, _, err := NewWrapperHandler(&s.handler, s).Handle(&glsp.Context{
+		Method: MethodCallGraph,
+		Params: json.RawMessage(`{"textDocument":{"uri":"file:///nowhere/Unknown.srvscr"}}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(r)
+	if want := `{"nodes":[],"edges":[],"indexing":false}`; string(encoded) != want {
+		t.Errorf("unknown scope = %s, want %s", encoded, want)
+	}
+
+	for _, method := range []string{MethodCallGraph, MethodSyntaxTree} {
+		_, validMethod, validParams, err := NewWrapperHandler(&s.handler, s).Handle(&glsp.Context{Method: method, Params: json.RawMessage(`["not", "an", "object"]`)})
+		if !validMethod || validParams || err == nil {
+			t.Errorf("%s with an array for params: (%v, %v, %v), want a known method, invalid params and an error", method, validMethod, validParams, err)
+		}
 	}
 }

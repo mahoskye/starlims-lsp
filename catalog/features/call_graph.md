@@ -83,6 +83,11 @@ each procedure reached, and every edge between two reached nodes.
 - A5: Given a document scope with depth 0, when the graph is built, then the result holds that file's nodes and the edges among them only; with direction `outgoing` and no depth it holds everything the file calls.
 - A6: Given an open document whose buffer differs from the file on disk, when the graph is built, then its procedures and call sites come from the buffer.
 - A7: Given an initialize request, when the server answers, then `capabilities.experimental.ssl.callGraph` is the shape version, 1.
+- A8: Given a procedure inside nested comment regions Outer and Inner, when the graph is built, then its `regions` is `["Outer", "Inner"]`, outermost first.
+- A9: Given a `RunDS` target and an `:INCLUDE` path that do not exist, each called from two files, when the graph is built, then each target is one `unresolved` node that both files' edges point at, with `resolved` false.
+- A10: Given a file the client has not opened, holding a character outside the Basic Multilingual Plane before a call's target string on the same line, when the graph is built, then the edge's location is in UTF-16 code units.
+- A11: Given a dotted target that names two scripts (the same `Category.Script` under two folders), when the graph is built, then the call has one edge per script, each `resolved` and `ambiguous`.
+- A12: Given a `textDocument` the graph holds no file for, when the graph is built, then `nodes` and `edges` are empty lists, not null; given params that are not a JSON object of this shape, the request fails with an error.
 
 ## Rationale
 

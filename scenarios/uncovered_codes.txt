@@ -3,4 +3,3 @@
 # go test ./cmd/starlims-lsp -run TestScenario -update to shrink it.
 execfunction_class_target
 internal_error
-script_size_ceiling

@@ -112,6 +112,8 @@ Rules:
 - A9: Given a `:PROCEDURE` holding an `:IF` that is never closed, when the tree is built, then the `if` has no closer and ends at its last statement, and the procedure still closes at its `:ENDPROC`.
 - A10: Given an open document at version 7, when the client sends `ssl/syntaxTree`, then the result carries its URI, version 7 and the tree with UTF-16 positions; for a document that is not open the result is null.
 - A11: Given an initialize request, when the server answers, then `capabilities.experimental.ssl.syntaxTree` is the shape version, 1.
+- A12: Given `/* region;` with no name, closed by `/* endregion;`, when the tree is built, then the `region` node is named `Region` and its name range covers the word `region`.
+- A13: Given params that are not a JSON object of this shape, when the client sends `ssl/syntaxTree`, then the request fails with an error.
 
 ## Rationale
 
