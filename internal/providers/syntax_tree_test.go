@@ -400,3 +400,15 @@ procedure PROCEDURE P
 		t.Errorf("unclosed if: closer %+v, range %+v; want no closer, ending at its last statement", ifNode.Closer, ifNode.Range)
 	}
 }
+
+func TestSyntaxTreeUnnamedRegion(t *testing.T) {
+	// [spec feature.syntax_tree/A12]
+	src := "/* region;\nx := 1;\n/* endregion;\n"
+	assertShape(t, src, `
+region Region
+  statement
+`)
+	if r := syntaxTree(src)[0]; r.NameRange == nil || *r.NameRange != (Range{Start: Position{0, 3}, End: Position{0, 9}}) {
+		t.Errorf("name range = %+v, want the word region", r.NameRange)
+	}
+}

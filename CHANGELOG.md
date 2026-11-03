@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its responsibilities and move each one that stands alone into its own
   script"*, in place of putting regions first. The thresholds and severity
   are unchanged.
+- **Element metadata refreshed** from starlims-ssl-reference@27b6931. Hover
+  carries the reference's new caveats:
+  - `++` and `--` evaluate left to right; using one twice on the same
+    variable in an expression depends on that order.
+  - String `-` trims only trailing spaces, not a trailing tab.
+  - `.NOT.` binds before a comparison: `.NOT. s = "AB"` raises an error on
+    a string, so write `.NOT. (s = "AB")`.
+  - `.AND.` groups before `.OR.`.
 
 ## [0.28.2] - 2026-10-15
 
