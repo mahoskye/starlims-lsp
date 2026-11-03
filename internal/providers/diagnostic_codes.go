@@ -192,6 +192,8 @@ const (
 	CodeParenthesizeMixedLogical      = "parenthesize_mixed_logical"
 	CodeOneAssignmentPerStatement     = "one_assignment_per_statement"
 	CodePreferExplicitTrimConcat      = "prefer_explicit_trim_concat"
+	// The size ceiling (issue #358).
+	CodeScriptSizeCeiling = "script_size_ceiling"
 )
 
 // Pipeline-level codes: emitted by the diagnostics pipeline itself rather

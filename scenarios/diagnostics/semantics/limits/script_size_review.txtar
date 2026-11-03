@@ -110,4 +110,4 @@ code lines are far under the 400-line trigger (issue #344).
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --
-1:1-1:25 info script_size_review: This script has 39 code lines and 13 procedures (review triggers: 400 lines, 12 procedures). Check its responsibilities: use regions first, and a separate script only for a reusable responsibility
+1:1-1:25 info script_size_review: This script has 39 code lines and 13 procedures (review triggers: 400 lines, 12 procedures). Check its responsibilities and move each one that stands alone into its own script

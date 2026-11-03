@@ -54,10 +54,12 @@ type DiagnosticsSettings struct {
 	HungarianPrefixes *[]string `json:"hungarianPrefixes"`
 	Globals           *[]string `json:"globals"`
 	MaxBlockDepth     *int      `json:"maxBlockDepth"`
-	// Size review triggers (issue #344); 0 disables each.
+	// Size review triggers (issue #344) and the size ceiling (issue #358);
+	// 0 disables each.
 	MaxProcedureCodeLines *int               `json:"maxProcedureCodeLines"`
 	MaxScriptCodeLines    *int               `json:"maxScriptCodeLines"`
 	MaxScriptProcedures   *int               `json:"maxScriptProcedures"`
+	MaxScriptBytes        *int               `json:"maxScriptBytes"`
 	Rules                 *map[string]string `json:"rules"`
 	// EndpointPatterns is a list of substrings/suffixes; any URI whose
 	// lowercased path contains one of these is treated as an endpoint
@@ -504,6 +506,7 @@ func (s *SSLServer) applySettings(settings interface{}) {
 		applyOptional(&s.settings.Diagnostics.MaxProcedureCodeLines, diagnostics.MaxProcedureCodeLines)
 		applyOptional(&s.settings.Diagnostics.MaxScriptCodeLines, diagnostics.MaxScriptCodeLines)
 		applyOptional(&s.settings.Diagnostics.MaxScriptProcedures, diagnostics.MaxScriptProcedures)
+		applyOptional(&s.settings.Diagnostics.MaxScriptBytes, diagnostics.MaxScriptBytes)
 		applyOptional(&s.settings.Diagnostics.RuleOverrides, diagnostics.Rules)
 		applyOptional(&s.settings.EndpointPatterns, diagnostics.EndpointPatterns)
 	}

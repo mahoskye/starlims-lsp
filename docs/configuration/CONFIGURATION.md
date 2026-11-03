@@ -114,6 +114,7 @@ interface DiagnosticOptions {
   maxProcedureCodeLines: number;
   maxScriptCodeLines: number;
   maxScriptProcedures: number;
+  maxScriptBytes: number;
   rules: { [slug: string]: "off" | "hint" | "info" | "warn" | "warning" | "error" };
   endpointPatterns: string[];
 }
@@ -815,7 +816,8 @@ Review trigger for server-script size, counted like
 `maxProcedureCodeLines` over the whole file. A server script over this
 many code lines, or over `maxScriptProcedures` local procedures, reports
 `script_size_review` (info tier) once, on line 1. Class files and data
-sources are not measured. The default is ssl-style-guide's
+sources are not measured. For the size limit in bytes, see
+`maxScriptBytes`. The default is ssl-style-guide's
 `script_size_review` threshold. Set to `0` to disable the line trigger.
 
 ```json
@@ -837,6 +839,27 @@ to disable the procedure-count trigger.
 
 ```json
 { "ssl.diagnostics.maxScriptProcedures": 12 }
+```
+
+### 5.14 ssl.diagnostics.maxScriptBytes
+
+| Property | Value |
+|----------|-------|
+| **Type** | `number` |
+| **Default** | `51200` (50 KB) |
+| **Range** | `0` (disabled) or greater |
+| **File** | `internal/server/server.go`, `internal/providers/size_ceiling.go` |
+
+The size limit for a file. Unlike the review triggers above, this is a
+limit, so `script_size_ceiling` is a warning. A file over this many bytes
+reports it once, on line 1. Every server script, class and data source
+(SSL or SQL) is measured, test scripts included. The size is the file's
+length in bytes as the server receives it, line endings included, so a
+CRLF file counts one byte more per line than the same file with LF. The
+default is ssl-style-guide's `script_size_ceiling`. Set to `0` to disable.
+
+```json
+{ "ssl.diagnostics.maxScriptBytes": 51200 }
 ```
 
 ---
@@ -1146,6 +1169,7 @@ the names a VS Code user writes in `settings.json`. Mapping as of extension
 | `ssl.intellisense.signatureHelp.autoTrigger` | `ssl.intellisense.signatureHelp.autoTrigger` | restart to apply (see 7.1) |
 
 Not settable from VS Code (server defaults always apply):
+`ssl.diagnostics.maxScriptBytes` (`51200`),
 `ssl.format.blankLineBetweenBlocks` (`true`),
 `ssl.format.blankLinesBetweenSections` (`true`) and
 `ssl.format.sql.detectSQLStrings` (`true`).
@@ -1227,6 +1251,7 @@ and `starlims-lsp --format --help`.
 | `ssl.diagnostics.maxProcedureCodeLines` | `80` |
 | `ssl.diagnostics.maxScriptCodeLines` | `400` |
 | `ssl.diagnostics.maxScriptProcedures` | `12` |
+| `ssl.diagnostics.maxScriptBytes` | `51200` |
 | `ssl.diagnostics.rules` | `{}` |
 | `ssl.diagnostics.endpointPatterns` | `[]` |
 | `ssl.inlayHints.enabled` | `true` |

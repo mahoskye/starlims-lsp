@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`script_size_ceiling`, warning** (#358): a file over
+  `ssl.diagnostics.maxScriptBytes` bytes (default 51,200, which is 50 KB; `0`
+  disables it) is past the limit ssl-style-guide sets. Unlike
+  `script_size_review`, every file is measured: server scripts, class files
+  and data sources (SSL or SQL), test scripts included. The size is the
+  file's bytes as the server receives it, line endings included, so a CRLF
+  file counts one byte more per line than the same file with LF. It reports
+  once, on line 1. In the production corpus, 27 of 6,228 files are over the
+  limit.
+
+### Changed
+- **`script_size_review` gives the style guide's new advice** (#358): *"Check
+  its responsibilities and move each one that stands alone into its own
+  script"*, in place of putting regions first. The thresholds and severity
+  are unchanged.
+
 ## [0.28.2] - 2026-10-15
 
 A follow-up to the v0.28.1 formatting fix (#355). Formatting no longer adds

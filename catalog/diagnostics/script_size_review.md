@@ -28,6 +28,14 @@ history:
       95th/99th percentiles (198/551 code lines, 5/15 procedures). The
       style guide's ideal of about 200 lines and 0-1 procedures is
       guidance for new code and has no diagnostic.
+  - date: 2026-11-03
+    ref: "issue #358"
+    note: >-
+      Message updated to the style guide's new advice: past about 400 code
+      lines, move each responsibility that stands alone into its own
+      script. The old message put regions first. Thresholds and severity
+      are unchanged. The size limit in bytes is
+      diag.script_size_ceiling.
 issues: []
 ---
 
@@ -38,8 +46,8 @@ code lines (default 400) or more than `ssl.diagnostics.maxScriptProcedures`
 local procedures (default 12), once per file, ranged on line 1. Code lines
 are counted as in `procedure_length_review`, over the whole file; local
 procedures are the file's `:PROCEDURE` statements. The message gives both
-counts and both thresholds and suggests regions first, and a separate
-script only for a reusable responsibility.
+counts and both thresholds and suggests moving each responsibility that
+stands alone into its own script.
 
 Info tier, like `procedure_length_review`. Class files (a file with a
 `:CLASS` statement) and data-source files are not measured; the style
@@ -102,9 +110,12 @@ nA := 1;
 ## Rationale
 
 A script past the triggers is well beyond the product's own top of normal
-and likely holds more than one responsibility. Regions make such a script
-navigable without changing how it runs, while moving a responsibility to
-its own script trades a local `DoProc` for a run-time `ExecFunction`
-target across a deployment unit, so the message puts regions first. Like
+and likely holds more than one responsibility. STARLIMS compiles a
+script as one unit, with its `:INCLUDE`d code, even when a caller needs a
+single procedure, so a responsibility that stands alone costs every
+caller a load until it moves into its own script. Procedures that other
+scripts call belong in small scripts. Regions make a script easier to
+navigate but do not change that cost (issue #358). Like
 `procedure_length_review` this is an advisory review trigger in the info
-tier, with configurable thresholds (issue #344).
+tier, with configurable thresholds (issue #344). The size limit itself is
+`script_size_ceiling`.
