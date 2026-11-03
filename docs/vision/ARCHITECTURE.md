@@ -41,6 +41,7 @@ and the editor report the same diagnostics and produce the same formatting.
 |----------|-------|
 | Library | [`github.com/tliron/glsp`](https://github.com/tliron/glsp), LSP 3.16 protocol types |
 | LSP 3.17 additions | `textDocument/inlayHint`, handled by `WrapperHandler` (`internal/server/wrapper_handler.go`) in front of glsp |
+| Semantic tokens | `textDocument/semanticTokens/full` and `/range`, standard requests with their own legend ([D20](../../catalog/DECISIONS.md)) |
 | Custom requests | `ssl/syntaxTree` and `ssl/callGraph`, also handled by `WrapperHandler`, advertised under `capabilities.experimental.ssl` ([D19](../../catalog/DECISIONS.md)) |
 | Transport | stdio |
 | Encoding | JSON-RPC 2.0 |

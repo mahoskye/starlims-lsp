@@ -199,6 +199,8 @@ func NewSSLServer() *SSLServer {
 		TextDocumentRangeFormatting:     s.handleRangeFormatting,
 		TextDocumentRename:              s.handleRename,
 		TextDocumentPrepareRename:       s.handlePrepareRename,
+		TextDocumentSemanticTokensFull:  s.handleSemanticTokensFull,
+		TextDocumentSemanticTokensRange: s.handleSemanticTokensRange,
 		WorkspaceSymbol:                 s.handleWorkspaceSymbol,
 		WorkspaceDidChangeConfiguration: s.handleDidChangeConfiguration,
 		WorkspaceDidChangeWatchedFiles:  s.handleDidChangeWatchedFiles,
@@ -273,6 +275,7 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	capabilities.RenameProvider = &protocol.RenameOptions{
 		PrepareProvider: ptrTo(true),
 	}
+	capabilities.SemanticTokensProvider = semanticTokensOptions()
 	// The custom requests, each with the version of its result's shape
 	// (feature.syntax_tree, feature.call_graph).
 	capabilities.Experimental = map[string]any{

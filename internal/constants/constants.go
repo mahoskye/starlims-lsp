@@ -123,7 +123,6 @@ var SSLStatusKeywords = []string{
 }
 
 // IsStatusKeyword checks if a string matches a status keyword (case-insensitive).
-// API (no production caller): the lookup that pairs with the exported SSLStatusKeywords table.
 func IsStatusKeyword(s string) bool {
 	upper := strings.ToUpper(s)
 	for _, kw := range SSLStatusKeywords {

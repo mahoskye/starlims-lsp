@@ -6712,9 +6712,45 @@ func checkGlobalAssignment(tokens []lexer.Token, declared []parser.VariableInfo,
 //   - Issue #56: :INCLUDE paths should be skipped from checking
 //   - Issue #2: 'Me' should be recognized as a built-in identifier
 //   - Issue #53: Function calls (identifier followed by '(') should be skipped
+//
+// It reports the first undeclared use of each name; undeclaredUses holds the
+// verdict, which feature.semantic_tokens shares.
 func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []Diagnostic {
-	pathTokens := unquotedPathTokens(tokens)
 	var diagnostics []Diagnostic
+
+	// Track which undeclared variables we've already reported (once per scope)
+	reported := make(map[string]bool)
+
+	for _, i := range undeclaredUses(tokens, p, globals, includeDeclared, isEndpoint) {
+		token := tokens[i]
+		upperName := strings.ToUpper(token.Text)
+
+		// Report undeclared variable (once per name)
+		if !reported[upperName] {
+			reported[upperName] = true
+			message := fmt.Sprintf("Variable '%s' is not declared", token.Text)
+			if use, ok := constants.SSLNonBaseGlobals[upperName]; ok {
+				message += fmt.Sprintf("; a base installation does not declare it as a global, use %s instead", use)
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Range:    tokenToRange(token),
+				Message:  message,
+				Source:   "ssl-lsp",
+				Code:     CodeUndeclaredVariable,
+			})
+		}
+	}
+
+	return diagnostics
+}
+
+// undeclaredUses returns the token index of every use of an undeclared
+// variable, in source order. An assignment declares its target from that
+// point on, so a use after it is declared and a use before it is not.
+func undeclaredUses(tokens []lexer.Token, p *parser.Parser, globals []string, includeDeclared []string, isEndpoint bool) []int {
+	pathTokens := unquotedPathTokens(tokens)
+	var uses []int
 
 	// Build set of declared variables from the token stream
 	declaredVars := make(map[string]bool)
@@ -6749,9 +6785,6 @@ func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []
 
 	// Token positions that bind a name rather than use one.
 	declarationSpans := parser.DeclarationSpans(tokens)
-
-	// Track which undeclared variables we've already reported (once per scope)
-	reported := make(map[string]bool)
 
 	// Track if we're inside an :INCLUDE / :INHERIT / :CLASS statement whose
 	// identifiers are declarations or module references, not variable uses
@@ -6872,24 +6905,10 @@ func checkUndeclaredVariables(tokens []lexer.Token, p *parser.Parser, globals []
 			continue
 		}
 
-		// Report undeclared variable (once per name)
-		if !reported[upperName] {
-			reported[upperName] = true
-			message := fmt.Sprintf("Variable '%s' is not declared", token.Text)
-			if use, ok := constants.SSLNonBaseGlobals[upperName]; ok {
-				message += fmt.Sprintf("; a base installation does not declare it as a global, use %s instead", use)
-			}
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityWarning,
-				Range:    tokenToRange(token),
-				Message:  message,
-				Source:   "ssl-lsp",
-				Code:     CodeUndeclaredVariable,
-			})
-		}
+		uses = append(uses, i)
 	}
 
-	return diagnostics
+	return uses
 }
 
 // buildBuiltinSet creates a case-insensitive set of all built-in identifiers.
