@@ -134,7 +134,6 @@ func isIdentifier(s string) bool {
 
 // IsPredefinedGlobal reports whether name (any case) is a base-installation
 // predefined global.
-// API (no production caller): the lookup that pairs with the exported SSLPredefinedGlobals table.
 func IsPredefinedGlobal(name string) bool {
 	up := strings.ToUpper(name)
 	for _, g := range SSLPredefinedGlobals {

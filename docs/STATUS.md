@@ -25,6 +25,7 @@ dropped (entry retains the history).
 | [feature.inlay_hints](../catalog/features/inlay_hints.md) | Parameter-name inlay hints | active |
 | [feature.references](../catalog/features/references.md) | Find references | active |
 | [feature.rename](../catalog/features/rename.md) | Rename | active |
+| [feature.semantic_tokens](../catalog/features/semantic_tokens.md) | Semantic tokens | active |
 | [feature.signature_help](../catalog/features/signature_help.md) | Signature help | active |
 | [feature.snippets](../catalog/features/snippets.md) | Snippets | active |
 | [feature.syntax_tree](../catalog/features/syntax_tree.md) | Syntax tree (ssl/syntaxTree) | active |

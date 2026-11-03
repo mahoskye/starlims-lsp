@@ -39,6 +39,7 @@ For comprehensive documentation, see the [`docs/`](docs/) directory:
 - **Document and range formatting** for SSL and embedded SQL
 - **Folding Ranges** for procedures, comment regions, control-flow blocks, and comments
 - **Code Snippets** for common SSL patterns
+- **Semantic tokens** that colour what a grammar cannot tell apart: procedures, parameters, `:PUBLIC` variables, built-ins, members and undeclared names. See [Semantic Tokens](docs/features/semantic-tokens.md)
 - **Custom requests** for clients that draw structure: `ssl/syntaxTree` (a document's statement-level tree) and `ssl/callGraph` (scripts, procedures and data sources joined by their calls). See [Custom Requests](docs/features/custom-requests.md)
 
 ## Installation

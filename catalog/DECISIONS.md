@@ -4,6 +4,30 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D20 — Semantic tokens add only what a grammar cannot know (2026-11-03, issue #366)
+
+Clients highlight SSL with a TextMate grammar, which sees text. The server
+answers the standard semantic-token requests so they can tell names apart,
+under three rules:
+
+- **Names only.** Keywords, operators, literals, strings and comments stay
+  with the grammar. The one string that gets a token is a `DoProc` /
+  `ExecFunction` target that resolves: it names code, and the colour change
+  is what tells the reader it resolves. A token changes no text, so D7 is not
+  at stake.
+- **Standard types, two server modifiers.** `public` marks a `:PUBLIC`
+  variable and `unknown` an undeclared name; LSP has no standard modifier for
+  either, and a client that does not know a modifier ignores it, so the token
+  still reads as a `variable`.
+- **`unknown` is not gated by D5.** D5 makes the undeclared-variable check
+  opt-in because a false finding is noise. A modifier is silent until a theme
+  colours it, so it follows the check's verdict whether the check is on or
+  off. The verdict is the check's own: the two share one walk.
+
+There is no setting to turn the feature off. A client that wants the grammar
+alone does not request tokens, and an editor has its own switch
+(`editor.semanticHighlighting.enabled`).
+
 ## D19 — Custom requests for structure-drawing clients (2026-11-01, issues #359/#360)
 
 Some clients draw what the server knows rather than edit text with it:

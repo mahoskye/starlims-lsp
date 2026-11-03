@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Semantic tokens** (#366): `textDocument/semanticTokens/full` and `/range`
+  colour the names a TextMate grammar cannot tell apart: procedures,
+  parameters, `:DECLARE` locals, `:PUBLIC` variables (a `public` modifier),
+  predefined globals, built-in functions and classes, members, the
+  `DoProc` / `ExecFunction` targets that resolve, and undeclared names (an
+  `unknown` modifier that agrees with `undeclared_variable`, whether or not
+  that check is on). Keywords, strings and comments stay with the grammar. A
+  theme with semantic highlighting on will change how names look in editors
+  that already use this server
+  ([feature.semantic_tokens](catalog/features/semantic_tokens.md), D20).
+
 ## [0.29.0] - 2026-11-03
 
 Two custom requests for clients that draw the server's own view of a
