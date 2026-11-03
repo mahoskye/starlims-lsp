@@ -12,6 +12,7 @@ dropped (entry retains the history).
 
 | Entry | Title | Status |
 |-------|-------|--------|
+| [feature.call_graph](../catalog/features/call_graph.md) | Call graph (ssl/callGraph) | active |
 | [feature.cli_contract](../catalog/features/cli_contract.md) | CLI contract for --validate and --format (gating and scoring consumers) | active |
 | [feature.completion](../catalog/features/completion.md) | Completion | active |
 | [feature.cross_file_resolution](../catalog/features/cross_file_resolution.md) | Cross-file target resolution | active |
@@ -26,6 +27,7 @@ dropped (entry retains the history).
 | [feature.rename](../catalog/features/rename.md) | Rename | active |
 | [feature.signature_help](../catalog/features/signature_help.md) | Signature help | active |
 | [feature.snippets](../catalog/features/snippets.md) | Snippets | active |
+| [feature.syntax_tree](../catalog/features/syntax_tree.md) | Syntax tree (ssl/syntaxTree) | active |
 | [feature.workspace_symbols](../catalog/features/workspace_symbols.md) | Workspace symbol search | active |
 
 ## Formatter behaviors

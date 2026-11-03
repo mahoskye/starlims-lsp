@@ -69,6 +69,13 @@ type FileSymbols struct {
 	// rename edits are always recomputed from current content at request
 	// time, never emitted from these indexed positions.
 	CallSites []IndexedCallSite
+	// Regions are the file's comment regions, for the region path of each
+	// call-graph node (feature.call_graph). HasAstral records whether the
+	// text holds a character outside the Basic Multilingual Plane, so the
+	// call graph reads a file again only when its positions need
+	// converting to UTF-16.
+	Regions   []providers.RegionInfo
+	HasAstral bool
 }
 
 // IndexedCallSite is one call site stored in the index. Kind mirrors
@@ -77,6 +84,7 @@ type FileSymbols struct {
 type IndexedCallSite struct {
 	Kind      providers.CallSiteKind
 	Raw       string
+	IsDoProc  bool
 	Line      int
 	StartChar int
 	EndChar   int
@@ -92,6 +100,7 @@ func indexedCallSites(sites []providers.CallSite) []IndexedCallSite {
 		out[i] = IndexedCallSite{
 			Kind:      s.Kind,
 			Raw:       s.Raw,
+			IsDoProc:  s.IsDoProc,
 			Line:      s.Range.Start.Line,
 			StartChar: s.Range.Start.Character,
 			EndChar:   s.Range.End.Character,
@@ -387,6 +396,8 @@ func (wi *WorkspaceIndex) indexFile(uri string, gen uint64) error {
 		DeclaredVars:    dedupeVariableNames(p.ExtractVariables()),
 		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
 		CallSites:       indexedCallSites(providers.ExtractCallSites(tokens)),
+		Regions:         providers.ExtractRegions(tokens),
+		HasAstral:       hasAstral(content),
 	}
 
 	wi.mu.Lock()
@@ -908,6 +919,19 @@ func (wi *WorkspaceIndex) ScriptsNamed(name string) []*FileSymbols {
 		if fs := wi.files[uri]; fs != nil {
 			out = append(out, fs)
 		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].URI < out[j].URI })
+	return out
+}
+
+// Files returns the FileSymbols of every indexed file, sorted by URI.
+func (wi *WorkspaceIndex) Files() []*FileSymbols {
+	wi.mu.RLock()
+	defer wi.mu.RUnlock()
+
+	out := make([]*FileSymbols, 0, len(wi.files))
+	for _, fs := range wi.files {
+		out = append(out, fs)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].URI < out[j].URI })
 	return out

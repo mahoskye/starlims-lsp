@@ -23,6 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its responsibilities and move each one that stands alone into its own
   script"*, in place of putting regions first. The thresholds and severity
   are unchanged.
+- **`ssl/syntaxTree`** (#359): the statement-level tree of an open
+  document's current parse, with its version, for clients that draw a
+  script's structure (SSL Studio's blocks view). Procedures, comment regions,
+  `:REGION` blocks, control flow with its branches, statements, comments,
+  doc blocks, the banner, blank-line runs and error nodes; the nodes and the
+  whitespace between them cover the document exactly
+  ([feature.syntax_tree](catalog/features/syntax_tree.md)).
+- **`ssl/callGraph`** (#360): scripts, procedures and data sources
+  joined by their `DoProc`, `ExecFunction`, `RunDS` and `:INCLUDE` calls,
+  resolved as go to definition resolves them, with unresolved targets as
+  nodes. Whole workspace, or scoped to a document or procedure, a depth and
+  a direction ([feature.call_graph](catalog/features/call_graph.md)).
+- Both are advertised under `capabilities.experimental.ssl`, each with the
+  version of its result's shape ([D19](catalog/DECISIONS.md)). Nothing in
+  the CLI contract changes, and no diagnostic changes.
 
 ## [0.28.2] - 2026-10-15
 

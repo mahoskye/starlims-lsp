@@ -4,6 +4,26 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D19 — Custom requests for structure-drawing clients (2026-11-01, issues #359/#360)
+
+Some clients draw what the server knows rather than edit text with it:
+SSL Studio's blocks view needs the parse, and its graph view the resolved
+calls. Such a client must not parse SSL itself, or it disagrees with the
+server at the edges, which are where malformed code lives. The server
+answers them with custom requests:
+
+- **Names** are `ssl/<camelCase>` (`ssl/syntaxTree`, `ssl/callGraph`), so
+  they cannot collide with a future standard method.
+- **Discovery** is `capabilities.experimental.ssl.<name>`, whose value is
+  the version of the result's shape. A change a client could misread
+  (a field changing meaning, a kind renamed) raises the version; adding a
+  field or a kind does not, so clients ignore what they do not know.
+- **Each request is a view of existing machinery** (the parse, the
+  workspace index), never a second implementation: it agrees with the
+  standard features by construction, and its catalog entry says which one
+  it agrees with.
+- **Positions are UTF-16**, as for every standard request.
+
 ## D18 — Formatter options are for compatibility, not taste; layout changes ship as announced batches (2026-10-14)
 
 The formatter's output is meant to be the one canonical SSL layout. A

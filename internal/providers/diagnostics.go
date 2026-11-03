@@ -7452,7 +7452,7 @@ func checkStepSpacing(tokens []lexer.Token) []Diagnostic {
 // checkRegionEndMismatch flags a /* endregion; marker with no open
 // /* region; to close. The canonical closer takes no name (trailing text
 // before the ';' is prose); pairing is innermost-first, mirroring
-// extractRegions (symbols.go). An orphan endregion closes nothing, so
+// ExtractRegions (symbols.go). An orphan endregion closes nothing, so
 // without this signal the broken region structure is silent.
 func checkRegionEndMismatch(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic

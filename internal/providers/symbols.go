@@ -108,7 +108,7 @@ func buildDocumentSymbols(tokens []lexer.Token, ast *parser.Node, p *parser.Pars
 	// Extract all elements first
 	procedures := p.ExtractProcedures(ast)
 	variables := p.ExtractVariables()
-	regions := extractRegions(tokens)
+	regions := ExtractRegions(tokens)
 
 	// Build procedure symbols
 	procSymbols := make([]DocumentSymbol, 0, len(procedures))
@@ -313,8 +313,10 @@ func procedureNameSelectionRange(tokens []lexer.Token, proc parser.ProcedureInfo
 	}
 }
 
-// extractRegions extracts region markers from tokens.
-func extractRegions(tokens []lexer.Token) []RegionInfo {
+// ExtractRegions pairs the region comment markers in tokens the way folding
+// does (feature.folding A5): each closer ends the innermost open region, and
+// a region left open runs to the last line. Lines are 1-based.
+func ExtractRegions(tokens []lexer.Token) []RegionInfo {
 	var events []regionEvent
 	lastLine := 0
 
@@ -469,7 +471,7 @@ func buildFoldingRanges(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	}
 
 	// Get region ranges (single-line region pairs produce no range)
-	regions := extractRegions(tokens)
+	regions := ExtractRegions(tokens)
 	for _, region := range regions {
 		if region.StartLine == region.EndLine {
 			continue

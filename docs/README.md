@@ -106,6 +106,7 @@ Descriptive guides. The normative contract for each feature is its
 | Diagnostics | [diagnostics.md](./features/diagnostics.md) |
 | Folding Ranges | [folding-ranges.md](./features/folding-ranges.md) |
 | Snippets | [snippets.md](./features/snippets.md) |
+| Syntax Tree and Call Graph (custom requests) | [custom-requests.md](./features/custom-requests.md) |
 
 ### SSL Language Reference
 
