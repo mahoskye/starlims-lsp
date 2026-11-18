@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-18
+
+Class edges in `ssl/callGraph`, so a client that draws the graph shows how a
+project built on classes hangs together: what creates an object, what calls
+its methods, and which class inherits which. The request's shape version
+stays 1. The CLI and the formatter's output are unchanged.
+
 ### Added
 - **Class edges in `ssl/callGraph`** (#369): `CreateUdObject` from the
   procedure that creates an object to its class file, `Inherit` from a class
@@ -3177,7 +3184,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...v0.29.0
 [0.28.2]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.1...v0.28.2
