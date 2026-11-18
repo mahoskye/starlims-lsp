@@ -69,6 +69,10 @@ type FileSymbols struct {
 	// rename edits are always recomputed from current content at request
 	// time, never emitted from these indexed positions.
 	CallSites []IndexedCallSite
+	// ClassSites are where the file creates an object of a user-defined
+	// class, calls a method on one, or inherits one: the call graph's
+	// class edges (issue #369).
+	ClassSites []providers.ClassSite
 	// Regions are the file's comment regions, for the region path of each
 	// call-graph node (feature.call_graph). HasAstral records whether the
 	// text holds a character outside the Basic Multilingual Plane, so the
@@ -396,6 +400,7 @@ func (wi *WorkspaceIndex) indexFile(uri string, gen uint64) error {
 		DeclaredVars:    dedupeVariableNames(p.ExtractVariables()),
 		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
 		CallSites:       indexedCallSites(providers.ExtractCallSites(tokens)),
+		ClassSites:      providers.ExtractClassSites(tokens),
 		Regions:         providers.ExtractRegions(tokens),
 		HasAstral:       hasAstral(content),
 	}
@@ -821,6 +826,44 @@ func (wi *WorkspaceIndex) ResolveDataSourceTarget(target string) []IndexResoluti
 		for _, uri := range wi.byScriptName[strings.ToLower(parts[len(parts)-1])] {
 			if fs := wi.files[uri]; fs != nil && fs.IsDataSource {
 				results = append(results, entryResolutionLocked(fs))
+			}
+		}
+	}
+
+	return orderResolutions(results)
+}
+
+// ResolveClassTarget resolves the class named by CreateUdObject or
+// :INHERIT ("Category.Class" or bare "Class") to class files only: the
+// category chain, degrading to a basename match, as for an :INCLUDE.
+// Targets resolve to the file (line 0).
+func (wi *WorkspaceIndex) ResolveClassTarget(target string) []IndexResolution {
+	parts := strings.Split(target, ".")
+	for _, p := range parts {
+		if strings.TrimSpace(p) == "" {
+			return nil
+		}
+	}
+
+	wi.mu.RLock()
+	defer wi.mu.RUnlock()
+
+	var results []IndexResolution
+
+	if len(parts) >= 2 {
+		category := strings.ToLower(strings.Join(parts[:len(parts)-1], "."))
+		name := strings.ToLower(parts[len(parts)-1])
+		for _, uri := range wi.byCategory[category][name] {
+			if fs := wi.files[uri]; fs != nil && fs.IsClass {
+				results = append(results, IndexResolution{URI: fs.URI, IsEntry: true, Anchored: fs.HasLayoutAnchor})
+			}
+		}
+	}
+	if len(results) == 0 {
+		// Bare name, or dotted target degrading to a basename match.
+		for _, uri := range wi.byScriptName[strings.ToLower(parts[len(parts)-1])] {
+			if fs := wi.files[uri]; fs != nil && fs.IsClass {
+				results = append(results, IndexResolution{URI: fs.URI, IsEntry: true, Anchored: fs.HasLayoutAnchor})
 			}
 		}
 	}

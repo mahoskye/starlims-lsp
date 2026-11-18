@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Class edges in `ssl/callGraph`** (#369): `CreateUdObject` from the
+  procedure that creates an object to its class file, `Inherit` from a class
+  file to the parent its `:INHERIT` names, and `Method` from the procedure
+  holding `Me:Name()`, `Base:Name()` or `oVar:Name()` to the method, in the
+  class or the nearest ancestor that declares it. A variable counts only
+  when every assignment to it in that procedure is a `CreateUdObject` of one
+  class. A class that is not in the workspace is an `unresolved` node. The
+  kinds are new and the shape version stays 1, so a client that reads only
+  the four call kinds should skip the ones it does not know
+  ([feature.call_graph](catalog/features/call_graph.md)).
+
 ## [0.30.0] - 2026-11-03
 
 Semantic tokens, so a client that highlights with a TextMate grammar can

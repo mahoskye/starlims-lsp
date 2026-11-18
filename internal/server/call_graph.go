@@ -2,7 +2,8 @@ package server
 
 // The ssl/callGraph request: scripts, procedures and data sources joined
 // by their DoProc, ExecFunction, RunDS and :INCLUDE calls, resolved the way
-// go to definition resolves them. Normative behavior:
+// go to definition resolves them, and classes joined to what creates them,
+// calls their methods and inherits them. Normative behavior:
 // catalog/features/call_graph.md.
 
 import (
@@ -32,6 +33,11 @@ const (
 	EdgeExecFunction = "ExecFunction"
 	EdgeRunDS        = "RunDS"
 	EdgeInclude      = "Include"
+	// Class edges (issue #369): an object created, a method called, a
+	// class inherited.
+	EdgeCreateUdObject = "CreateUdObject"
+	EdgeMethod         = "Method"
+	EdgeInherit        = "Inherit"
 )
 
 // CallGraphParams are the parameters of an ssl/callGraph request. With no
@@ -78,14 +84,16 @@ type CallGraphNode struct {
 	IsClass bool     `json:"isClass,omitempty"`
 }
 
-// CallGraphEdge is one call site.
+// CallGraphEdge is one call site, or one class site: a CreateUdObject, a
+// method call, an :INHERIT.
 type CallGraphEdge struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	Kind string `json:"kind"`
-	// Target is the call's target string as written.
+	// Target is the call's target as written: the target string, or
+	// receiver:Method for a method call.
 	Target string `json:"target"`
-	// Location is the target string at the call site.
+	// Location is the target at the call site.
 	Location protocol.Location `json:"location"`
 	Resolved bool              `json:"resolved"`
 	// Ambiguous is set on each edge of a call that resolved to more than
@@ -103,6 +111,7 @@ type graphFile struct {
 	procedures   []graphProcedure
 	regions      []providers.RegionInfo
 	sites        []providers.CallSite
+	classSites   []providers.ClassSite
 	mapper       *utf16Mapper
 }
 
@@ -113,13 +122,15 @@ type graphProcedure struct {
 
 // handleCallGraph answers ssl/callGraph.
 func (s *SSLServer) handleCallGraph(params *CallGraphParams) (*CallGraphResult, error) {
-	g := &callGraph{s: s, byID: map[string]int{}}
+	g := &callGraph{s: s, byID: map[string]int{}, files: map[string]*graphFile{}}
 	files := s.graphFiles()
-	for _, f := range files {
-		g.addFile(f)
+	for i := range files {
+		g.files[files[i].uri] = &files[i]
+		g.addFile(files[i])
 	}
 	for _, f := range files {
 		g.addCalls(f)
+		g.addClassSites(f)
 	}
 
 	result := &CallGraphResult{
@@ -181,6 +192,7 @@ func (s *SSLServer) openGraphFile(uri string) graphFile {
 		isDataSource: isDataSourceURI(uri),
 		regions:      providers.ExtractRegions(cache.Tokens),
 		sites:        providers.ExtractCallSites(cache.Tokens),
+		classSites:   providers.ExtractClassSites(cache.Tokens),
 		mapper:       newUTF16Mapper(content),
 	}
 	for _, p := range cache.Procedures {
@@ -196,6 +208,7 @@ func (s *SSLServer) indexedGraphFile(fs *FileSymbols) graphFile {
 		isClass:      fs.IsClass,
 		isDataSource: fs.IsDataSource,
 		regions:      fs.Regions,
+		classSites:   fs.ClassSites,
 	}
 	if fs.HasAstral {
 		f.mapper = newUTF16Mapper(s.documentText(fs.URI))
@@ -227,6 +240,7 @@ type callGraph struct {
 	nodes []CallGraphNode
 	edges []CallGraphEdge
 	byID  map[string]int // node id -> index in nodes
+	files map[string]*graphFile
 }
 
 func (g *callGraph) add(n CallGraphNode) {
@@ -293,18 +307,22 @@ func regionPath(regions []providers.RegionInfo, line int) []string {
 	return names
 }
 
+// holder is the node a site of f on the 0-based line starts from: the
+// procedure holding it, or the file for code outside every procedure.
+func holder(f graphFile, line int) string {
+	for _, p := range f.procedures {
+		if p.startLine <= line+1 && line+1 <= p.endLine {
+			return procedureID(f.uri, p.name)
+		}
+	}
+	return f.uri
+}
+
 // addCalls adds one edge per call site of f and resolution candidate.
 func (g *callGraph) addCalls(f graphFile) {
 	for _, site := range f.sites {
-		from := f.uri
-		for _, p := range f.procedures {
-			if line := site.Range.Start.Line + 1; p.startLine <= line && line <= p.endLine {
-				from = procedureID(f.uri, p.name)
-				break
-			}
-		}
 		edge := CallGraphEdge{
-			From:     from,
+			From:     holder(f, site.Range.Start.Line),
 			Kind:     edgeKind(site),
 			Target:   site.Raw,
 			Location: protocol.Location{URI: f.uri, Range: f.mapper.rng(site.Range)},
@@ -321,6 +339,126 @@ func (g *callGraph) addCalls(f graphFile) {
 			g.edges = append(g.edges, e)
 		}
 	}
+}
+
+// addClassSites adds the class edges of f: one per CreateUdObject and
+// :INHERIT and candidate class, and one per method call and method found.
+func (g *callGraph) addClassSites(f graphFile) {
+	for _, site := range f.classSites {
+		edge := CallGraphEdge{
+			From:     holder(f, site.Range.Start.Line),
+			Target:   site.Raw,
+			Location: protocol.Location{URI: f.uri, Range: f.mapper.rng(site.Range)},
+		}
+		var targets []string
+		switch site.Kind {
+		case providers.ClassCreate:
+			edge.Kind = EdgeCreateUdObject
+			targets = g.classes(site.Raw)
+		case providers.ClassInherit:
+			// Only a class inherits; the edge joins the two files.
+			if !f.isClass {
+				continue
+			}
+			edge.Kind, edge.From = EdgeInherit, f.uri
+			targets = g.classes(site.Raw)
+		case providers.ClassMethod:
+			edge.Kind = EdgeMethod
+			targets = g.methods(f, site)
+			// A method the class and its ancestors do not declare may be
+			// one every object has (AddProperty, IsMethod); it is no edge.
+			if len(targets) == 0 {
+				continue
+			}
+		}
+		if len(targets) == 0 {
+			id := "unresolved:class:" + strings.ToLower(site.Raw)
+			g.add(CallGraphNode{ID: id, Kind: GraphUnresolved, Name: site.Raw})
+			edge.To = id
+			g.edges = append(g.edges, edge)
+			continue
+		}
+		for _, to := range targets {
+			e := edge
+			e.To, e.Resolved, e.Ambiguous = to, true, len(targets) > 1
+			g.edges = append(g.edges, e)
+		}
+	}
+}
+
+// classes returns the file ids of the class files a class target names
+// (feature.cross_file_resolution).
+func (g *callGraph) classes(target string) []string {
+	if g.s.workspaceIndex == nil {
+		return nil
+	}
+	var ids []string
+	for _, r := range g.s.workspaceIndex.ResolveClassTarget(target) {
+		if _, ok := g.files[r.URI]; ok && !slices.Contains(ids, r.URI) {
+			ids = append(ids, r.URI)
+		}
+	}
+	return ids
+}
+
+// parents returns the classes the class file uri inherits.
+func (g *callGraph) parents(uri string) []string {
+	f := g.files[uri]
+	if f == nil || !f.isClass {
+		return nil
+	}
+	for _, site := range f.classSites {
+		if site.Kind == providers.ClassInherit {
+			return g.classes(site.Raw)
+		}
+	}
+	return nil
+}
+
+// methods returns the procedure ids a method call lands on: the method of
+// the receiver's class, or of the nearest ancestor that declares it. Me
+// starts at the class holding the call, Base at its parent, a variable at
+// the class it was created as.
+func (g *callGraph) methods(f graphFile, site providers.ClassSite) []string {
+	var start []string
+	switch {
+	case site.Class != "":
+		start = g.classes(site.Class)
+	case !f.isClass:
+		return nil
+	case strings.EqualFold(site.Receiver, "Base"):
+		start = g.parents(f.uri)
+	default:
+		start = []string{f.uri}
+	}
+	var ids []string
+	seen := map[string]bool{}
+	var find func(uri string)
+	find = func(uri string) {
+		if seen[uri] {
+			return
+		}
+		seen[uri] = true
+		class := g.files[uri]
+		if class == nil || !class.isClass {
+			return
+		}
+		for _, p := range class.procedures {
+			if strings.EqualFold(p.name, site.Method) {
+				if id := procedureID(uri, p.name); !slices.Contains(ids, id) {
+					ids = append(ids, id)
+				}
+				return
+			}
+		}
+		for _, parent := range g.parents(uri) {
+			find(parent)
+		}
+	}
+	for _, uri := range start {
+		find(uri)
+	}
+	return ids
 }
 
 func edgeKind(site providers.CallSite) string {

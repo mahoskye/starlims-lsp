@@ -192,7 +192,8 @@ positive is a click, while rename (the write side) skips them.
   instantiated class and `Base:Method()` after `:INHERIT` reference
   procedures in other scripts via bare identifiers. The LSP does not model
   this channel (definition/hover share the blind spot), so references
-  under-report for class files.
+  under-report for class files. The call graph draws the part it can
+  settle as `Method` edges (feature.call_graph, issue #369).
 - **Include-spliced 1-part calls.** `:INCLUDE` splices the included file's
   text, so a 1-part `DoProc("Foo")` in an includer of the definition file
   is a genuine runtime call — excluded by the 1-part scoping rule (A11).

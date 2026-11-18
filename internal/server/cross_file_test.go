@@ -1664,3 +1664,32 @@ func TestProcedureNamePosition_NonASCIIBeforeKeyword(t *testing.T) {
 		t.Errorf("expected (1, %d), got (%d, %d)", wantCol, line, col)
 	}
 }
+
+// [spec feature.cross_file_resolution/A24]
+func TestResolveClassTarget_ClassFilesOnly(t *testing.T) {
+	wi, dir := newResolverIndex(t)
+	class := ":CLASS DueRule;\n:PROCEDURE DueDate;\n:ENDPROC;\n"
+	anchoredURI := writeAndIndex(t, wi, dir, "Server Scripts/Rules/DueRule.srvscr", class)
+	flatURI := writeAndIndex(t, wi, dir, "lib/Holiday.ssl", ":CLASS Holiday;\n")
+	// A script and a data source of the same names are not classes.
+	writeAndIndex(t, wi, dir, "Server Scripts/Other/DueRule.srvscr", helperScript)
+	writeAndIndex(t, wi, dir, "Server Scripts/Rules/Plain.srvscr", helperScript)
+	writeAndIndex(t, wi, dir, "Data Sources/Rules/Holiday.ds", ordersDataSource)
+
+	for _, target := range []string{"Rules.DueRule", "RULES.duerule", "DueRule", "Elsewhere.DueRule"} {
+		res := wi.ResolveClassTarget(target)
+		if len(res) != 1 || res[0].URI != anchoredURI || !res[0].IsEntry || res[0].Line != 0 {
+			t.Errorf("%s: got %+v, want the class file at line 0", target, res)
+		}
+	}
+	for _, target := range []string{"Holiday", "Rules.Holiday"} {
+		if res := wi.ResolveClassTarget(target); len(res) != 1 || res[0].URI != flatURI {
+			t.Errorf("%s: got %+v, want the flat class file", target, res)
+		}
+	}
+	for _, target := range []string{"Rules.Plain", "Plain", "Rules.Missing", "Rules..DueRule", ""} {
+		if res := wi.ResolveClassTarget(target); len(res) != 0 {
+			t.Errorf("%s: got %+v, want nothing", target, res)
+		}
+	}
+}

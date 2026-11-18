@@ -387,3 +387,258 @@ func TestCallGraphEmptyScopeAndBadParams(t *testing.T) {
 		}
 	}
 }
+
+// --- Class edges (issue #369) ---
+
+const dueRuleClass = `:CLASS DueRule;
+:DECLARE nDays;
+
+:PROCEDURE DueDate;
+	:RETURN Me:Counts();
+:ENDPROC;
+
+:PROCEDURE Counts;
+	:RETURN Me:IsProperty("nDays");
+:ENDPROC;
+`
+
+const rushRuleClass = `:CLASS RushRule;
+:INHERIT Rules.DueRule;
+
+:PROCEDURE Counts;
+	:RETURN Base:Counts() .AND. Me:DueDate();
+:ENDPROC;
+`
+
+const plannerScript = `:PROCEDURE Plan;
+	:PARAMETERS oGiven;
+	:DECLARE oRule, oGone, oEither;
+	oRule := CreateUdObject("Rules.RushRule", {3});
+	oGone := CreateUdObject("Rules.Gone");
+	oEither := CreateUdObject("Rules.DueRule");
+	oEither := DoProc("Pick");
+	oGiven:DueDate();
+	oEither:DueDate();
+	oRule:AddProperty("sNote");
+	:RETURN oRule:DueDate() + oRule:Counts();
+:ENDPROC;
+
+:PROCEDURE Pick;
+:ENDPROC;
+`
+
+// newClassGraphServer indexes a class, a class that inherits it, and a
+// script that creates objects of both and calls their methods.
+func newClassGraphServer(t *testing.T) (s *SSLServer, due, rush, planner string) {
+	t.Helper()
+	wi, dir := newResolverIndex(t)
+	due = writeAndIndex(t, wi, dir, "Server Scripts/Rules/DueRule.srvscr", dueRuleClass)
+	rush = writeAndIndex(t, wi, dir, "Server Scripts/Rules/RushRule.srvscr", rushRuleClass)
+	planner = writeAndIndex(t, wi, dir, "Server Scripts/Rules/Planner.srvscr", plannerScript)
+	s = NewSSLServer()
+	s.workspaceIndex = wi
+	return s, due, rush, planner
+}
+
+// edgesOfKind returns the edges of one kind with their locations cleared.
+func edgesOfKind(edges []CallGraphEdge, kind string) []CallGraphEdge {
+	var out []CallGraphEdge
+	for _, e := range edges {
+		if e.Kind == kind {
+			e.Location = protocol.Location{}
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestCallGraphCreateAndInheritEdges(t *testing.T) {
+	// [spec feature.call_graph/A13] [spec feature.call_graph/A14]
+	s, due, rush, planner := newClassGraphServer(t)
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+
+	plan := procedureID(planner, "Plan")
+	wantCreates := []CallGraphEdge{
+		{From: plan, To: rush, Kind: "CreateUdObject", Target: "Rules.RushRule", Resolved: true},
+		{From: plan, To: "unresolved:class:rules.gone", Kind: "CreateUdObject", Target: "Rules.Gone"},
+		{From: plan, To: due, Kind: "CreateUdObject", Target: "Rules.DueRule", Resolved: true},
+	}
+	if got := edgesOfKind(g.Edges, "CreateUdObject"); !slices.Equal(got, wantCreates) {
+		t.Errorf("CreateUdObject edges = %+v, want %+v", got, wantCreates)
+	}
+	if n := nodeByID(g.Nodes, "unresolved:class:rules.gone"); n == nil || n.Kind != "unresolved" || n.Name != "Rules.Gone" {
+		t.Errorf("the class that is not there = %+v", n)
+	}
+	// The call site is the class name, quotes excluded.
+	e := edgeTo(g.Edges, "Rules.RushRule")
+	if e.Location.URI != planner || e.Location.Range != (protocol.Range{
+		Start: protocol.Position{Line: 3, Character: 26},
+		End:   protocol.Position{Line: 3, Character: 40},
+	}) {
+		t.Errorf("CreateUdObject location = %+v", e.Location)
+	}
+
+	// The class file inherits its parent's file; the site is the parent's name.
+	wantInherit := []CallGraphEdge{{From: rush, To: due, Kind: "Inherit", Target: "Rules.DueRule", Resolved: true}}
+	if got := edgesOfKind(g.Edges, "Inherit"); !slices.Equal(got, wantInherit) {
+		t.Errorf("Inherit edges = %+v, want %+v", got, wantInherit)
+	}
+	for _, e := range g.Edges {
+		if e.Kind == "Inherit" && (e.Location.URI != rush || e.Location.Range != (protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 9},
+			End:   protocol.Position{Line: 1, Character: 22},
+		})) {
+			t.Errorf("Inherit location = %+v", e.Location)
+		}
+	}
+}
+
+func TestCallGraphInheritUnresolvedAndOutsideAClass(t *testing.T) {
+	// [spec feature.call_graph/A14]
+	wi, dir := newResolverIndex(t)
+	orphan := writeAndIndex(t, wi, dir, "Server Scripts/Rules/Orphan.srvscr", ":CLASS Orphan;\n:INHERIT Rules.Nobody;\n")
+	writeAndIndex(t, wi, dir, "Server Scripts/Rules/Loose.srvscr", ":INHERIT Rules.Orphan;\n:PROCEDURE P;\n:ENDPROC;\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+
+	want := []CallGraphEdge{{From: orphan, To: "unresolved:class:rules.nobody", Kind: "Inherit", Target: "Rules.Nobody"}}
+	if got := edgesOfKind(g.Edges, "Inherit"); !slices.Equal(got, want) {
+		t.Errorf("Inherit edges = %+v, want %+v (none from a file that is not a class)", got, want)
+	}
+}
+
+func TestCallGraphMethodEdges(t *testing.T) {
+	// [spec feature.call_graph/A15] [spec feature.call_graph/A16] [spec feature.call_graph/A20]
+	s, due, rush, planner := newClassGraphServer(t)
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+
+	plan := procedureID(planner, "Plan")
+	want := []CallGraphEdge{
+		// Me: the class's own method.
+		{From: procedureID(due, "DueDate"), To: procedureID(due, "Counts"), Kind: "Method", Target: "Me:Counts", Resolved: true},
+		// A variable: the method its class inherits, then the one it overrides.
+		{From: plan, To: procedureID(due, "DueDate"), Kind: "Method", Target: "oRule:DueDate", Resolved: true},
+		{From: plan, To: procedureID(rush, "Counts"), Kind: "Method", Target: "oRule:Counts", Resolved: true},
+		// Base: the parent's method. Me: a method only the parent declares.
+		{From: procedureID(rush, "Counts"), To: procedureID(due, "Counts"), Kind: "Method", Target: "Base:Counts", Resolved: true},
+		{From: procedureID(rush, "Counts"), To: procedureID(due, "DueDate"), Kind: "Method", Target: "Me:DueDate", Resolved: true},
+	}
+	// No edge for Me:IsProperty and oRule:AddProperty (no class declares
+	// them), for oGiven (a parameter) or for oEither (not always created).
+	if got := edgesOfKind(g.Edges, "Method"); !slices.Equal(got, want) {
+		t.Errorf("Method edges = %+v, want %+v", got, want)
+	}
+	// The call site is receiver:Method.
+	e := edgeTo(g.Edges, "oRule:DueDate")
+	if e.Location.URI != planner || e.Location.Range != (protocol.Range{
+		Start: protocol.Position{Line: 10, Character: 9},
+		End:   protocol.Position{Line: 10, Character: 22},
+	}) {
+		t.Errorf("method call location = %+v", e.Location)
+	}
+	for _, n := range g.Nodes {
+		if n.Kind == "unresolved" && n.Name != "Rules.Gone" {
+			t.Errorf("unexpected unresolved node %+v", n)
+		}
+	}
+}
+
+func TestCallGraphClassEdgesInScope(t *testing.T) {
+	// [spec feature.call_graph/A17]
+	s, due, rush, planner := newClassGraphServer(t)
+	one := 1
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{
+		TextDocument: &TextDocumentIdentifier{URI: due}, Procedure: "DueDate", Depth: &one, Direction: "incoming",
+	}, &g)
+
+	var from []string
+	for _, e := range g.Edges {
+		if e.To == procedureID(due, "DueDate") {
+			from = append(from, e.From)
+		}
+	}
+	slices.Sort(from)
+	want := []string{procedureID(planner, "Plan"), procedureID(rush, "Counts")}
+	slices.Sort(want)
+	if !slices.Equal(from, want) {
+		t.Errorf("callers of DueDate = %v, want %v", from, want)
+	}
+	for _, id := range []string{due, rush, planner} {
+		if nodeByID(g.Nodes, id) == nil {
+			t.Errorf("missing the file node %s of a caller", id)
+		}
+	}
+}
+
+func TestCallGraphClassEdgesFromOpenBuffer(t *testing.T) {
+	// [spec feature.call_graph/A18]
+	s, due, rush, _ := newClassGraphServer(t)
+	// The buffer no longer inherits, and calls a method that is still there.
+	s.documents.SetDocument(rush, ":CLASS RushRule;\n:PROCEDURE Counts;\n\t:RETURN Me:Extra();\n:ENDPROC;\n:PROCEDURE Extra;\n:ENDPROC;\n", 2)
+	s.documentVersion[rush] = 2
+
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{TextDocument: &TextDocumentIdentifier{URI: rush}, Direction: "outgoing"}, &g)
+	if len(g.Edges) != 1 || g.Edges[0].Kind != "Method" || g.Edges[0].To != procedureID(rush, "Extra") || g.Edges[0].Location.Range.Start.Line != 2 {
+		t.Errorf("edges from the open buffer = %+v", g.Edges)
+	}
+	if nodeByID(g.Nodes, due) != nil {
+		t.Errorf("the buffer inherits nothing, yet %s is reached", due)
+	}
+}
+
+func TestCallGraphInheritanceCycleEnds(t *testing.T) {
+	// [spec feature.call_graph/A16]
+	wi, dir := newResolverIndex(t)
+	a := writeAndIndex(t, wi, dir, "Server Scripts/Rules/A.srvscr", ":CLASS A;\n:INHERIT Rules.B;\n:PROCEDURE Run;\n\tMe:Nowhere();\n:ENDPROC;\n")
+	writeAndIndex(t, wi, dir, "Server Scripts/Rules/B.srvscr", ":CLASS B;\n:INHERIT Rules.A;\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{TextDocument: &TextDocumentIdentifier{URI: a}}, &g)
+	if got := edgesOfKind(g.Edges, "Method"); len(got) != 0 {
+		t.Errorf("Method edges = %+v, want none", got)
+	}
+	if got := edgesOfKind(g.Edges, "Inherit"); len(got) != 2 {
+		t.Errorf("Inherit edges = %+v, want the two of the cycle", got)
+	}
+}
+
+func TestCallGraphAmbiguousClass(t *testing.T) {
+	// [spec feature.call_graph/A19]
+	wi, dir := newResolverIndex(t)
+	one := writeAndIndex(t, wi, dir, "one/Server Scripts/Rules/DueRule.srvscr", dueRuleClass)
+	two := writeAndIndex(t, wi, dir, "two/Server Scripts/Rules/DueRule.srvscr", dueRuleClass)
+	maker := writeAndIndex(t, wi, dir, "Server Scripts/Rules/Maker.srvscr", ":PROCEDURE Make;\n\to := CreateUdObject(\"Rules.DueRule\");\n\t:RETURN o:DueDate();\n:ENDPROC;\n")
+	s := NewSSLServer()
+	s.workspaceIndex = wi
+	var g CallGraphResult
+	callCustom(t, s, MethodCallGraph, CallGraphParams{}, &g)
+
+	from := procedureID(maker, "Make")
+	wantCreates := []CallGraphEdge{
+		{From: from, To: one, Kind: "CreateUdObject", Target: "Rules.DueRule", Resolved: true, Ambiguous: true},
+		{From: from, To: two, Kind: "CreateUdObject", Target: "Rules.DueRule", Resolved: true, Ambiguous: true},
+	}
+	if got := edgesOfKind(g.Edges, "CreateUdObject"); !slices.Equal(got, wantCreates) {
+		t.Errorf("CreateUdObject edges = %+v, want %+v", got, wantCreates)
+	}
+	var methods []CallGraphEdge
+	for _, e := range edgesOfKind(g.Edges, "Method") {
+		if e.From == from {
+			methods = append(methods, e)
+		}
+	}
+	wantMethods := []CallGraphEdge{
+		{From: from, To: procedureID(one, "DueDate"), Kind: "Method", Target: "o:DueDate", Resolved: true, Ambiguous: true},
+		{From: from, To: procedureID(two, "DueDate"), Kind: "Method", Target: "o:DueDate", Resolved: true, Ambiguous: true},
+	}
+	if !slices.Equal(methods, wantMethods) {
+		t.Errorf("Method edges = %+v, want %+v", methods, wantMethods)
+	}
+}
