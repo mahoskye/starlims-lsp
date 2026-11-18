@@ -117,6 +117,15 @@ asks for `Calc` and its direct callers. `depth` omitted means no bound;
   at the procedure holding the call, or at the file for code outside every
   procedure. A call with several candidates gives one edge each, marked
   `ambiguous`.
+- **Class edge kinds:** `CreateUdObject` (from the procedure holding
+  `CreateUdObject("Category.Class", …)` to the class file), `Inherit` (from
+  a class file to the parent its `:INHERIT` names) and `Method` (from the
+  procedure holding `Me:Name()`, `Base:Name()` or `oVar:Name()` to the
+  method, in the class or the nearest ancestor that declares it). `oVar`
+  counts only when every assignment to it in that procedure is a
+  `CreateUdObject` of one class. A `Method` edge's `target` is
+  `receiver:Name`. New kinds do not raise the shape version: a client
+  ignores the kinds it does not know.
 - **Resolution** is go to definition's
   ([feature.cross_file_resolution](../../catalog/features/cross_file_resolution.md)).
   Open documents are read from their buffers, other files from the workspace

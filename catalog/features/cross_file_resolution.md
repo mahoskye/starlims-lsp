@@ -83,6 +83,12 @@ history:
       found nothing. Index maintenance hardened (A22): a file whose parse
       panics is logged and skipped, watched-file re-indexing runs on the
       background worker, and a delete supersedes an in-flight parse.
+  - date: 2026-11-18
+    ref: "issue #369"
+    note: >-
+      Class resolution added for the class named by CreateUdObject and
+      :INHERIT (A24): class files only, by the category chain, degrading
+      to a basename match. First consumed by the call graph's class edges.
 issues: []
 ---
 
@@ -141,6 +147,12 @@ bare `Name` is a basename match — 1-part RunDS targets DO resolve, unlike
 dispatch targets, because a data source is always a separate file. Targets
 resolve to the data-source file's entry (the file-level `:PARAMETERS` line
 when present, else the first line).
+
+**Class resolution** (the class named by `CreateUdObject("…")` or after
+`:INHERIT`): dotted `Category.Class` uses the category chain, degrading to
+a basename match; bare `Class` is a basename match. Only `:CLASS` files
+are candidates, so a script or a data source of the same name is never
+one. Targets resolve to the file (line 0).
 
 **Script/data-source partition**: dispatch and include resolution consider
 only non-data-source files; data-source resolution considers only
@@ -222,6 +234,7 @@ so a stale parse cannot re-add a deleted file.
 - A21: Given workspace files under a path containing a space and a client that sends `%20`-escaped URIs (and, on Windows, `file:///c%3A/...` drive URIs), when the client opens, closes, renames across, or reports watched-file events for those files, then each file is indexed under exactly one key — the open-document overlay applies, cross-file rename reaches the closed callers, workspace symbols list an open file once, a didClose re-index leaves one entry, and a Delete event removes it — and the URIs in responses are the client's own spelling; Windows paths and URIs convert in both directions (drive letters, percent-encoding, UNC).
 - A22: Given background indexing, when a file's parse panics, then the panic is logged and only that file is skipped; when watched-file Created/Changed events arrive, then the handler returns without parsing and the files are indexed on the background worker; and when a Delete event arrives while a re-index of the same file is queued or parsing, then the file is not added back.
 - A23: Given a document with `:INCLUDE B;` and a name declared nowhere, when diagnostics run with undeclared checking on, then `undeclared_variable` flags the name only when B resolves through the workspace index (the closure is complete); when B does not resolve, or there is no workspace index, then the document gets no `undeclared_variable` finding, and a document without an `:INCLUDE` is checked as before (issue #304).
+- A24: Given a class file in a canonical layout, a class file in a flat folder, and a script and a data source that share their names, when a class target resolves, then `Category.Class` and the bare `Class` give the class file at line 0, a dotted target whose category matches nothing degrades to the basename, matching is case-insensitive, and a target that names only a script, a data source, nothing, or has an empty segment gives no candidate.
 
 ## Rationale
 
