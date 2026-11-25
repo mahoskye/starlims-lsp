@@ -395,6 +395,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens, calls)...)
+	diagnostics = append(diagnostics, checkDoProcArgsNotArrayLiteral(tokens, calls)...)
 	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens, calls)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
 	procedures := p.ExtractProcedures(ast)

@@ -108,6 +108,66 @@ func checkFormatArgNotArray(tokens []lexer.Token, calls []parser.CallSite) []Dia
 	return diagnostics
 }
 
+// checkDoProcArgsNotArrayLiteral flags `DoProc("Name", <arguments>)` when
+// the target is a one-part string literal and the arguments are not written
+// as an array literal (diag.doproc_args_not_array_literal, issue #372). A
+// literal one-part name is bound when the script compiles, and that form
+// takes its arguments only as `{...}`: an array held in a variable or built
+// by an expression stops the script from compiling. A name held in a
+// variable is resolved at run time and takes any array, so it is not
+// reported; nor is a dotted name, whose binding depends on how the server
+// compiles. Inside a class the call is already doproc_in_class, and one
+// finding per call is enough. A parenthesized or skipped argument, and one
+// the parser could not read, stay silent: unknown is not evidence (D17).
+func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
+	var diagnostics []Diagnostic
+
+	classLine := 0
+	for _, token := range tokens {
+		if token.Type == lexer.TokenKeyword && strings.EqualFold(token.Text, ":CLASS") {
+			classLine = token.Line
+			break
+		}
+	}
+
+	for _, call := range calls {
+		if call.Qualified() || !strings.EqualFold(call.Name, "DoProc") || len(call.Args) < 2 {
+			continue
+		}
+		target := call.Args[0]
+		if target.Kind != parser.ExprLiteral || target.Start != target.End ||
+			target.Start < 0 || target.Start >= len(tokens) {
+			continue
+		}
+		name := tokens[target.Start]
+		if name.Type != lexer.TokenString || strings.Contains(name.Text, ".") {
+			continue
+		}
+		if classLine > 0 && name.Line >= classLine {
+			continue
+		}
+		args := call.Args[1]
+		switch args.Kind {
+		case parser.ExprArrayLiteral, parser.ExprSkipped, parser.ExprGroup, parser.ExprUnknown:
+			continue
+		}
+		rng, ok := exprRange(tokens, args)
+		if !ok {
+			continue
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    rng,
+			Message: fmt.Sprintf("DoProc with a literal procedure name takes its arguments as an array literal: write DoProc(%s, {...}). "+
+				"An array held in a variable or built by an expression is a compile-time error here.", name.Text),
+			Source: "ssl-lsp",
+			Code:   CodeDoProcArgsNotArrayLiteral,
+		})
+	}
+
+	return diagnostics
+}
+
 // receiverDisplayName names a receiver for a message when it has a name of
 // its own — a bare variable or a member access. Composite receivers
 // (calls, subscripts, literals) return "" and the message drops the

@@ -1,0 +1,45 @@
+A test helper that builds its argument list once and passes the variable to
+`DoProc` by a literal name, the shape issue #372 found in a project that
+validated clean and did not compile. The literal call is bound at compile
+time and takes its arguments only as an array literal
+(diag.doproc_args_not_array_literal); the same array passed by a name held
+in a variable, and written out as a literal, are both fine.
+-- input.ssl --
+:PROCEDURE RunCheck;
+:PARAMETERS sLabel, vExpected, vActual;
+:DECLARE aCheck, aResult, sProc;
+aCheck := {sLabel, vExpected, vActual};
+aResult := DoProc("CheckEqual", aCheck);
+sProc := "CheckEqual";
+aResult := DoProc(sProc, aCheck);
+aResult := DoProc("CheckEqual", {aCheck[1], aCheck[2], aCheck[3]});
+:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+:PARAMETERS sLabel, vExpected, vActual;
+:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+-- format --
+:PROCEDURE RunCheck;
+	:PARAMETERS sLabel, vExpected, vActual;
+	:DECLARE aCheck, aResult, sProc;
+
+	aCheck := {sLabel, vExpected, vActual};
+	aResult := DoProc("CheckEqual", aCheck);
+	sProc := "CheckEqual";
+	aResult := DoProc(sProc, aCheck);
+	aResult := DoProc("CheckEqual", {aCheck[1], aCheck[2], aCheck[3]});
+
+	:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+-- diagnostics --
+5:33-5:39 error doproc_args_not_array_literal: DoProc with a literal procedure name takes its arguments as an array literal: write DoProc("CheckEqual", {...}). An array held in a variable or built by an expression is a compile-time error here.
+-- diagnostics [--strict --info] --
+5:33-5:39 error doproc_args_not_array_literal: DoProc with a literal procedure name takes its arguments as an array literal: write DoProc("CheckEqual", {...}). An array held in a variable or built by an expression is a compile-time error here.

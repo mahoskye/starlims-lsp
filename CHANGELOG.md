@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- **One new code can fail validation** (D16):
+  `doproc_args_not_array_literal` (#372). `DoProc("Name", aArgs)`, a
+  one-part literal name with its arguments in a variable or built by an
+  expression, does not compile: a literal name is bound when the script
+  compiles, and that form takes its arguments only as an array literal.
+  Write `DoProc("Name", {aArgs[1], aArgs[2]})`. A name held in a variable,
+  a dotted name and `ExecFunction` are not reported. On the production
+  corpus all 5,797 one-part literal calls that pass arguments already
+  write them as `{...}`, so nothing there changes
+  ([diag.doproc_args_not_array_literal](catalog/diagnostics/doproc_args_not_array_literal.md)).
+  **Downstream:** a consumer that lists the codes (a settings enum, a
+  rule table) gains one.
+
 ### Changed
 - **`visibility_annotation_usage` leaves a raise-only helper alone**
   (#371). The style guide prefers procedures without `/*@private;` and
