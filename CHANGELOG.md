@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in a file that already failed validation. Found by
   `FuzzFormatRangeStable`, whose failing input is now a regression seed
   ([diag.unexpected_token](catalog/diagnostics/unexpected_token.md)).
+- **A malformed declaration list or name header fails validation**
+  (PR #376). The same gap, in the other statements the parser does not
+  model. `:DECLARE 1;`, `:DECLARE nA nB;`, `:DECLARE nA,;`, `:PUBLIC;` and
+  `:PARAMETERS "x";` validated clean, and so did `:CLASS A B;`,
+  `:INHERIT;`, `:REGION;` and `:INCLUDE Lib.A Lib.B;`. `unexpected_token`
+  now judges a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list as names
+  separated by commas, and reports a missing name or a second word in
+  `:CLASS`, `:REGION`, `:INHERIT` and `:INCLUDE`. The name itself is not
+  judged, so a dotted name and a name the lexer cannot read whole are
+  left alone. Production corpus: one new finding, in a file that already
+  failed validation.
 - **A bracket left open no longer pushes the rest of the file in**
   (#375). A `(`, `{` or `[` that its statement never closed stayed open
   past the statement's `;`, so every later line was laid out as its

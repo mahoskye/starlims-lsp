@@ -131,15 +131,29 @@ var bareKeywords = map[string]bool{
 	"RESUME": true, "ENDREGION": true, "ENDINLINECODE": true,
 }
 
-// bareKeywordTails reports the token that follows a keyword statement
-// where only its `;` can: after a keyword that takes nothing
-// (`:ENDIF 1;`, `:ELSE nX := 1;`, an `:ENDIF` whose `;` is missing before
-// the next statement), and in a `:PROCEDURE` header, which is the keyword,
-// one name and the `;`. The statement extractor carries no expression for
-// these statements, so the parser never judges what follows the keyword,
-// and such code validated clean. A statement that ends at end of file is
-// not reported, as for any other statement. `:PROCEDURE Name(` is
-// procedure_declaration_syntax's finding.
+// bareKeywordTails reports the first token that cannot stand where it does
+// in a keyword statement the parser does not model. The statement extractor
+// carries no expression for these statements, so the parser never judges
+// what follows the keyword, and such code validated clean:
+//
+//   - a keyword that takes nothing, where only its `;` can follow
+//     (`:ENDIF 1;`, `:ELSE nX := 1;`, an `:ENDIF` whose `;` is missing
+//     before the next statement);
+//   - a `:PROCEDURE` header, which is the keyword, one name and the `;`;
+//   - a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list, which is names
+//     separated by commas (`:DECLARE 1;`, `:DECLARE nA nB;`, `:PUBLIC;`);
+//   - `:CLASS`, with an optional name; `:REGION`, with one name; and
+//     `:INHERIT` and `:INCLUDE`, each with one name that may be dotted.
+//     Here only a missing name and a second word are reported.
+//
+// A statement that ends at end of file is not reported, as for any other
+// statement. What another rule already names stays with it:
+// `:PROCEDURE Name(` (procedure_declaration_syntax), `:PARAMETERS;`
+// (empty_parameters), a `:=` in a list (declare_initializer,
+// inline_default_outside_datasource), a keyword in a list
+// (declarationListKeywords above), and a quoted `:INCLUDE` target
+// (include_quoted_target). A quoted `:INHERIT` parent is not reported at
+// all.
 func bareKeywordTails(tokens []lexer.Token, reported map[int]bool) []Diagnostic {
 	var out []Diagnostic
 
@@ -189,8 +203,83 @@ func bareKeywordTails(tokens []lexer.Token, reported map[int]bool) []Diagnostic 
 		return next
 	}
 
+	isColonKeyword := func(idx int) bool {
+		return tokens[idx].Type == lexer.TokenKeyword && strings.HasPrefix(tokens[idx].Text, ":")
+	}
+	// oneName judges a statement that is the keyword, one name and the
+	// `;`. The name is the identifier and whatever is written against it
+	// with no space: the lexer gives the rest of a dotted name
+	// (`Category.Level2Base`) as several tokens, and production code has
+	// names this check cannot vouch for (`:CLASS Name[];`), so only a
+	// second word, set apart by whitespace, is reported. what names the
+	// name for the message.
+	oneName := func(i int, head, what string, optional bool) {
+		next := following(i)
+		if next < 0 || (optional && tokens[next].Text == ";") {
+			return
+		}
+		if tokens[next].Type != lexer.TokenIdentifier {
+			expected := fmt.Sprintf("%s after ':%s'", what, head)
+			if optional {
+				expected = fmt.Sprintf("%s or ';' after ':%s'", what, head)
+			}
+			report(next, expected, "")
+			return
+		}
+		last := next
+		for last+1 < len(tokens) {
+			t := tokens[last+1]
+			if t.Type == lexer.TokenWhitespace || t.Type == lexer.TokenComment ||
+				t.Type == lexer.TokenEOF || t.Text == ";" {
+				break
+			}
+			last++
+		}
+		after := following(last)
+		if after < 0 || tokens[after].Text == ";" {
+			return
+		}
+		report(after, fmt.Sprintf("';' after the name in ':%s'", head),
+			fmt.Sprintf("(is the ':%s' line missing its ';'?)", head))
+	}
+	// nameList judges a declaration list: one or more names separated by
+	// commas.
+	nameList := func(i int, head string) {
+		item := following(i)
+		if item < 0 {
+			return
+		}
+		if tokens[item].Text == ";" {
+			if head != "PARAMETERS" { // empty_parameters reports that one
+				report(item, fmt.Sprintf("a name after ':%s'", head), "")
+			}
+			return
+		}
+		after := fmt.Sprintf("':%s'", head)
+		for {
+			if tokens[item].Type != lexer.TokenIdentifier {
+				if !isColonKeyword(item) { // a keyword is the list missing its ';'
+					report(item, "a name after "+after, "")
+				}
+				return
+			}
+			sep := following(item)
+			if sep < 0 || tokens[sep].Text == ";" || tokens[sep].Text == ":=" || isColonKeyword(sep) {
+				return
+			}
+			if tokens[sep].Text != "," {
+				report(sep, "',' or ';'", fmt.Sprintf("(is the ':%s' list missing its ';'?)", head))
+				return
+			}
+			if item = following(sep); item < 0 {
+				return
+			}
+			after = "','"
+		}
+	}
+
 	for i, t := range tokens {
-		if t.Type != lexer.TokenKeyword || !strings.HasPrefix(t.Text, ":") {
+		if !isColonKeyword(i) {
 			continue
 		}
 		head := strings.ToUpper(t.Text[1:])
@@ -215,6 +304,22 @@ func bareKeywordTails(tokens []lexer.Token, reported map[int]bool) []Diagnostic 
 			}
 			report(after, "';' after the procedure name",
 				"(is the ':PROCEDURE' line missing its ';'?)")
+		case declarationKeywords[head]:
+			nameList(i, head)
+		case head == "CLASS":
+			oneName(i, head, "a class name", true)
+		case head == "REGION":
+			oneName(i, head, "a region name", false)
+		case head == "INHERIT":
+			// A quoted parent is left alone: what the compiler makes of it
+			// is not documented (scenario classes/inherit_quoted_name).
+			if tokens[next].Type != lexer.TokenString {
+				oneName(i, head, "a class name", false)
+			}
+		case head == "INCLUDE":
+			if tokens[next].Type != lexer.TokenString { // include_quoted_target's
+				oneName(i, head, "a script name", false)
+			}
 		}
 	}
 	return out

@@ -148,6 +148,19 @@ history:
       53,343 such keywords and all 7,488 procedure headers already have
       the strict shape; the one new finding is in a file that already
       failed validation.
+  - date: 2026-11-26
+    ref: "PR #376"
+    note: >-
+      The same gap closed for the other statements the parser does not
+      model. A `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list is judged as
+      names separated by commas (`:DECLARE 1;`, `:DECLARE nA nB;`,
+      `:DECLARE nA,;` and `:PUBLIC;` validated clean), and `:CLASS`,
+      `:REGION`, `:INHERIT` and `:INCLUDE` are judged for a missing name
+      and for a second word. The name itself is not judged: a first
+      version read it token by token and flagged two shapes found in
+      production code, a dotted name with a digit in a segment and a
+      class named `Name[]`. On the production corpus the final rule adds
+      one finding, in a file that already failed validation.
 issues: ["#240", "#244", "#246", "#291"]
 ---
 
@@ -216,6 +229,31 @@ The statements in scope are the ones the parser models:
   `:PROCEDURE NIL;`), and so is a token that is not the `;` after the name
   (`:PROCEDURE Run Extra;`, or the next statement's keyword when the `;`
   is missing). `:PROCEDURE Name(` is `procedure_declaration_syntax`'s.
+
+- the items of a declaration list. A `:DECLARE`, `:PARAMETERS` or
+  `:PUBLIC` list is one or more names separated by commas (grammar:
+  `Identifier {"," Identifier}`). Flagged: a list with no name
+  (`:DECLARE;`, `:PUBLIC;`), an item that is not a name (`:DECLARE 1;`,
+  `:PARAMETERS "x";`), a name followed by anything but a `,` or the `;`
+  (`:DECLARE nA nB;`, `:DECLARE aX[10];`, or the next statement's first
+  word when the `;` is missing), and a comma with no name after it
+  (`:DECLARE nA,;`). Left to the rule that names them: `:PARAMETERS;`
+  (`empty_parameters`), a `:=` in the list (`declare_initializer`,
+  `inline_default_outside_datasource`), and a keyword in the list (the
+  missing-terminator finding above);
+
+- the headers that take one name: `:CLASS`, whose name is optional,
+  `:REGION`, and `:INHERIT` and `:INCLUDE`, whose name may be dotted. A
+  token that is not a name where the name is due is flagged (`:INHERIT;`,
+  `:REGION;`, `:INCLUDE;`, `:CLASS 123;`), and so is a second word after
+  the name (`:CLASS A B;`, `:INHERIT Rules.Base Extra;`). The name is the
+  identifier and everything written against it with no space, and it is
+  not judged: the lexer gives the rest of a dotted name as several
+  tokens, and a name it cannot read whole (`:CLASS Name[];`) is left
+  alone. A quoted `:INCLUDE` target is `include_quoted_target`'s, and
+  `:INHERIT` with an unqualified name is `inherit_qualified_name`'s. A
+  quoted `:INHERIT` parent is not reported: what the compiler makes of it
+  is not documented.
 
 A required operand that is missing is unexpected at whatever token stands
 in its place, including the `;` itself (`nCount := ;`, `:IF;`). Where the
@@ -605,6 +643,57 @@ of a file may end without one.
 
 	:RETURN nX;
 :ENDPROC
+```
+
+A declaration list is names separated by commas:
+
+### Flags
+
+```ssl
+:DECLARE nFirst nSecond;
+nFirst := 1;
+```
+
+### Flags
+
+```ssl
+:DECLARE nFirst, 2;
+nFirst := 1;
+```
+
+A header that takes one name has one:
+
+### Flags
+
+```ssl
+:CLASS DueRule Extra;
+
+:PROCEDURE Days;
+	:RETURN 1;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:INCLUDE;
+:RETURN 1;
+```
+
+### Does not flag
+
+A dotted name is one name however the lexer splits it, and `:CLASS` may
+stand without one.
+
+```ssl
+:CLASS;
+:INHERIT Rules.Level2Rule;
+:DECLARE nDays, nLimit,
+	sLabel;
+
+:PROCEDURE Days;
+	:RETURN Me:nDays;
+:ENDPROC;
 ```
 
 ### Does not flag

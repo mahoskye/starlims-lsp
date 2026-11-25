@@ -305,3 +305,121 @@ func TestUnexpectedToken_BareKeywordTailsDoNotFlag(t *testing.T) {
 		t.Errorf("a run with no ';' is one statement: want one finding, got %+v", got)
 	}
 }
+
+// [spec diag.unexpected_token] A declaration list is names separated by
+// commas.
+func TestUnexpectedToken_DeclarationLists(t *testing.T) {
+	tests := []struct {
+		name, script string
+		col          int
+		want         string
+	}{
+		{"empty :DECLARE", ":DECLARE;\n", 8, "Unexpected ';' - expected a name after ':DECLARE'"},
+		{"empty :PUBLIC", ":PUBLIC;\n", 7, "Unexpected ';' - expected a name after ':PUBLIC'"},
+		{"number in :DECLARE", ":DECLARE 1;\n", 9, "Unexpected number '1' - expected a name after ':DECLARE'"},
+		{"string in :PARAMETERS", ":PARAMETERS \"x\";\n", 12, "Unexpected string \"x\" - expected a name after ':PARAMETERS'"},
+		{"missing comma", ":DECLARE nA nB;\n", 12, "Unexpected identifier 'nB' - expected ',' or ';'"},
+		{"trailing comma", ":DECLARE nA,;\n", 12, "Unexpected ';' - expected a name after ','"},
+		{"number after a comma", ":DECLARE nA, 2;\n", 13, "Unexpected number '2' - expected a name after ','"},
+		{"subscript on a name", ":DECLARE aX[10], nB;\n", 11, "Unexpected '[' - expected ',' or ';'"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := unexpectedTokens(t, tc.script)
+			if len(got) != 1 {
+				t.Fatalf("want one finding, got %d: %+v", len(got), got)
+			}
+			if d := got[0]; d.Range.Start.Line != 0 || d.Range.Start.Character != tc.col || d.Message != tc.want {
+				t.Errorf("got %d:%d %q\nwant 0:%d %q", d.Range.Start.Line, d.Range.Start.Character, d.Message, tc.col, tc.want)
+			}
+		})
+	}
+
+	// The list's ';' missing: the next statement's first word is unexpected.
+	got := unexpectedTokens(t, ":DECLARE nA\nnA := 1;\n")
+	if len(got) != 1 || !strings.HasSuffix(got[0].Message, "(is the ':DECLARE' list missing its ';'?)") {
+		t.Errorf("missing list terminator: got %+v", got)
+	}
+
+	clean := []struct{ name, script string }{
+		{"lists on one line and several", ":PARAMETERS sIn, nMax;\n:DECLARE nA, nB,\n\tnC;\n:PUBLIC gRate;\n"},
+		{"comment inside a list", ":DECLARE nA, /* the first;\n\tnB;\n"},
+		{"list at end of file", ":DECLARE nA, nB"},
+	}
+	for _, tc := range clean {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unexpectedTokens(t, tc.script); len(got) != 0 {
+				t.Errorf("want no unexpected_token, got %+v", got)
+			}
+		})
+	}
+
+	// What another rule names stays with it, once.
+	owned := []struct{ name, script, code string }{
+		{"empty :PARAMETERS", ":PARAMETERS;\n", CodeEmptyParameters},
+		{"initializer in :DECLARE", ":DECLARE nA := 1;\n", CodeDeclareInitializer},
+		{"inline default in a script", ":PARAMETERS sIn := \"x\";\n", CodeInlineDefaultOutsideDatasource},
+	}
+	for _, tc := range owned {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unexpectedTokens(t, tc.script); len(got) != 0 {
+				t.Errorf("want no unexpected_token, got %+v", got)
+			}
+			if !hasCode(t, tc.script, tc.code) {
+				t.Errorf("want %s to report it", tc.code)
+			}
+		})
+	}
+	if got := unexpectedTokens(t, ":PARAMETERS sIn :DEFAULT sIn, \"\";\n"); len(got) != 1 {
+		t.Errorf("a keyword in a list is reported once: %+v", got)
+	}
+}
+
+// [spec diag.unexpected_token] :CLASS, :REGION, :INHERIT and :INCLUDE take
+// one name.
+func TestUnexpectedToken_NameHeaders(t *testing.T) {
+	tests := []struct {
+		name, script string
+		line, col    int
+		want         string
+	}{
+		{":CLASS with two names", ":CLASS A B;\n", 0, 9, "Unexpected identifier 'B' - expected ';' after the name in ':CLASS'"},
+		{":CLASS with a number", ":CLASS 123;\n", 0, 7, "Unexpected number '123' - expected a class name or ';' after ':CLASS'"},
+		{":INHERIT with no name", ":CLASS A;\n:INHERIT;\n", 1, 8, "Unexpected ';' - expected a class name after ':INHERIT'"},
+		{":INHERIT with two names", ":CLASS A;\n:INHERIT Rules.Base Extra;\n", 1, 20, "Unexpected identifier 'Extra' - expected ';' after the name in ':INHERIT'"},
+		{":REGION with no name", ":REGION;\n:ENDREGION;\n", 0, 7, "Unexpected ';' - expected a region name after ':REGION'"},
+		{":REGION with two names", ":REGION A B;\ntext\n:ENDREGION;\n", 0, 10, "Unexpected identifier 'B' - expected ';' after the name in ':REGION'"},
+		{":INCLUDE with no name", ":INCLUDE;\n", 0, 8, "Unexpected ';' - expected a script name after ':INCLUDE'"},
+		{":INCLUDE with two targets", ":INCLUDE Lib.A Lib.B;\n", 0, 15, "Unexpected identifier 'Lib' - expected ';' after the name in ':INCLUDE'"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := unexpectedTokens(t, tc.script)
+			if len(got) != 1 {
+				t.Fatalf("want one finding, got %d: %+v", len(got), got)
+			}
+			if d := got[0]; d.Range.Start.Line != tc.line || d.Range.Start.Character != tc.col || d.Message != tc.want {
+				t.Errorf("got %d:%d %q\nwant %d:%d %q", d.Range.Start.Line, d.Range.Start.Character, d.Message, tc.line, tc.col, tc.want)
+			}
+		})
+	}
+
+	clean := []struct{ name, script string }{
+		{":CLASS with no name", ":CLASS;\n"},
+		{"plain headers", ":CLASS DueRule;\n:INHERIT Rules.BaseRule;\n"},
+		{"a digit inside a dotted name", ":CLASS A;\n:INHERIT Rules.Level2Rule;\n"},
+		{"an underscore inside a dotted name", ":INCLUDE Lib.Date_Rules;\n"},
+		{"a class name the lexer cannot read whole", ":CLASS Units[];\n"},
+		{"a region with a name", ":REGION Query;\nSELECT 1\n:ENDREGION;\n"},
+		{"a quoted :INCLUDE target is include_quoted_target's", ":INCLUDE \"Lib.A\";\n"},
+		{"a quoted :INHERIT parent is left alone", ":CLASS A;\n:INHERIT \"Rules.Base\";\n"},
+		{"a header at end of file", ":INHERIT Rules.BaseRule"},
+	}
+	for _, tc := range clean {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unexpectedTokens(t, tc.script); len(got) != 0 {
+				t.Errorf("want no unexpected_token, got %+v", got)
+			}
+		})
+	}
+}
