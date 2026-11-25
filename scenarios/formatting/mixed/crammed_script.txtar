@@ -39,9 +39,11 @@ aRows := {"a", "b", "c"};
 3:38-3:43 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
 3:54-3:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
 4:1-4:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+4:1-4:5 error unexpected_token: Unexpected keyword ':for' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)
 4:11-4:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
 4:49-4:54 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
 5:1-5:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+5:1-5:8 error unexpected_token: Unexpected keyword ':return' - expected ';' after ':NEXT' (is ':NEXT' missing its ';'?)
 -- diagnostics [--strict --info] --
 1:1-1:12 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':PARAMETERS'
 1:19-1:27 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':DEFAULT'
@@ -53,6 +55,8 @@ aRows := {"a", "b", "c"};
 3:38-3:43 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
 3:54-3:60 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
 4:1-4:5 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':FOR'
+4:1-4:5 error unexpected_token: Unexpected keyword ':for' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)
 4:11-4:14 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':TO'
 4:49-4:54 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':NEXT'
 5:1-5:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
+5:1-5:8 error unexpected_token: Unexpected keyword ':return' - expected ';' after ':NEXT' (is ':NEXT' missing its ';'?)

@@ -135,6 +135,19 @@ history:
       comment_text_after_terminator, now an error that reports the cause
       once at the comment's `;`. A `*****` banner line after a comment is
       that rule's; the same line with no comment before it stays here.
+  - date: 2026-11-25
+    ref: "PR #376 (found by FuzzFormatRangeStable)"
+    note: >-
+      Keyword statements that take nothing, and the `:PROCEDURE` header,
+      are in scope. The statement extractor carries no expression for
+      them, so whatever followed the keyword went unjudged: `:ENDIF 1;`,
+      `:ELSE nX := 1;`, `:PROCEDURE 123;`, `:PROCEDURE Run Extra;`, and an
+      `:ENDIF` whose `;` is missing before the next statement all
+      validated clean. The first token that is not the `;` (or, in a
+      header, the name) is now reported. On the production corpus all
+      53,343 such keywords and all 7,488 procedure headers already have
+      the strict shape; the one new finding is in a file that already
+      failed validation.
 issues: ["#240", "#244", "#246", "#291"]
 ---
 
@@ -184,6 +197,26 @@ The statements in scope are the ones the parser models:
   `default_on_declare_line`'s finding, which names the fix, and is
   deferred to it.
 
+- keyword statements that take nothing: `:ELSE`, `:ENDIF`, `:ENDWHILE`,
+  `:EXITWHILE`, `:NEXT`, `:EXITFOR`, `:LOOP`, `:BEGINCASE`, `:OTHERWISE`,
+  `:ENDCASE`, `:EXITCASE`, `:TRY`, `:FINALLY`, `:ENDTRY`, `:ENDPROC`,
+  `:ERROR`, `:RESUME`, `:ENDREGION` and `:ENDINLINECODE`. Each is complete
+  at its keyword (grammar: `":" "ENDIF" ";"`), so the first token after it
+  that is not its `;` is flagged and the message names the keyword
+  (`Unexpected identifier 'i' - expected ';' after ':NEXT'`). That covers
+  an operand the keyword does not take (`:NEXT i;`, `:ENDPROC Run;`), a
+  statement written on the keyword's line (`:ELSE nX := 1;`), and a
+  keyword whose `;` is missing before the next statement, where the
+  message asks whether it is. `:CATCH` is such a keyword too;
+  `catch_clause_form` reports what follows it;
+
+- the `:PROCEDURE` header, which is the keyword, one name and the `;`
+  (grammar: `":" "PROCEDURE" Identifier ";"`). A token that is not a name
+  where the name is due is flagged (`:PROCEDURE;`, `:PROCEDURE 123;`,
+  `:PROCEDURE NIL;`), and so is a token that is not the `;` after the name
+  (`:PROCEDURE Run Extra;`, or the next statement's keyword when the `;`
+  is missing). `:PROCEDURE Name(` is `procedure_declaration_syntax`'s.
+
 A required operand that is missing is unexpected at whatever token stands
 in its place, including the `;` itself (`nCount := ;`, `:IF;`). Where the
 operand is optional the terminator is expected: `:RETURN;` is complete.
@@ -206,7 +239,9 @@ assignment operator is unexpected only where no operand precedes it.
 
 One diagnostic per statement, on the first unexpected token. The rest of
 the statement through its `;` is skipped and checking resumes at the next
-statement, so one bad line never cascades. When the unexpected token is
+statement, so one bad line never cascades. A run of keyword lines that
+have lost their `;` is one statement by that measure and gets one finding,
+whichever of them it is first found on. When the unexpected token is
 the first significant token on its line, the message adds that the
 previous statement may be missing its `;`.
 
@@ -500,6 +535,91 @@ A `:DEFAULT` inside a `:DECLARE` list is `default_on_declare_line`'s.
 ```ssl
 :DECLARE nCount :DEFAULT 0;
 :RETURN nCount;
+```
+
+A keyword that takes nothing is followed by its `;` and nothing else:
+
+### Flags
+
+```ssl
+:DECLARE i, nSum;
+:FOR i := 1 :TO 3;
+	nSum := nSum + i;
+:NEXT i;
+```
+
+### Flags
+
+```ssl
+:DECLARE nX;
+:IF nX > 1;
+	nX := 1;
+:ELSE nX := 2;
+:ENDIF;
+```
+
+An `:ENDIF` that has lost its `;` takes the next statement's first token:
+
+### Flags
+
+```ssl
+:DECLARE nX;
+:IF nX > 1;
+	nX := 1;
+:ENDIF
+nX := 2;
+```
+
+A `:PROCEDURE` header is the keyword, one name and the `;`:
+
+### Flags
+
+```ssl
+:PROCEDURE 123;
+	:RETURN 1;
+:ENDPROC;
+```
+
+### Flags
+
+```ssl
+:PROCEDURE Run Extra;
+	:RETURN 1;
+:ENDPROC;
+```
+
+### Does not flag
+
+A comment may stand between a keyword and its `;`, and the last statement
+of a file may end without one.
+
+```ssl
+:PROCEDURE Run;
+	:PARAMETERS nX;
+
+	:IF nX > 1;
+		nX := 1;
+	:ELSE /* nothing to cap;
+	;
+	:ENDIF;
+
+	:RETURN nX;
+:ENDPROC
+```
+
+### Does not flag
+
+`:PROCEDURE Name(` is `procedure_declaration_syntax`'s, and what follows
+`:CATCH` is `catch_clause_form`'s.
+
+```ssl
+:PROCEDURE Run(nX);
+	:TRY;
+		nX := 1;
+	:CATCH oErr;
+		nX := 0;
+	:ENDTRY;
+:ENDPROC;
 ```
 
 ## Rationale

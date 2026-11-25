@@ -66,6 +66,7 @@ func checkUnexpectedTokens(tokens []lexer.Token, stmts []parser.StatementExprs) 
 		})
 	}
 	diagnostics = append(diagnostics, declarationListKeywords(tokens, reported)...)
+	diagnostics = append(diagnostics, bareKeywordTails(tokens, reported)...)
 	return append(diagnostics, orphanColons(tokens, reported)...)
 }
 
@@ -113,6 +114,107 @@ func declarationListKeywords(tokens []lexer.Token, reported map[int]bool) []Diag
 			// there so a :DECLARE after it is judged on its own.
 			i = j - 1
 			break
+		}
+	}
+	return out
+}
+
+// bareKeywords are the keyword statements that are complete at the
+// keyword: the grammar gives each as the keyword and its `;`
+// (`EndIfStatement ::= ":" "ENDIF" ";"`). `:CATCH` is one too, and
+// catch_clause_form reports what follows it.
+var bareKeywords = map[string]bool{
+	"ELSE": true, "ENDIF": true, "ENDWHILE": true, "EXITWHILE": true,
+	"NEXT": true, "EXITFOR": true, "LOOP": true, "BEGINCASE": true,
+	"OTHERWISE": true, "ENDCASE": true, "EXITCASE": true, "TRY": true,
+	"FINALLY": true, "ENDTRY": true, "ENDPROC": true, "ERROR": true,
+	"RESUME": true, "ENDREGION": true, "ENDINLINECODE": true,
+}
+
+// bareKeywordTails reports the token that follows a keyword statement
+// where only its `;` can: after a keyword that takes nothing
+// (`:ENDIF 1;`, `:ELSE nX := 1;`, an `:ENDIF` whose `;` is missing before
+// the next statement), and in a `:PROCEDURE` header, which is the keyword,
+// one name and the `;`. The statement extractor carries no expression for
+// these statements, so the parser never judges what follows the keyword,
+// and such code validated clean. A statement that ends at end of file is
+// not reported, as for any other statement. `:PROCEDURE Name(` is
+// procedure_declaration_syntax's finding.
+func bareKeywordTails(tokens []lexer.Token, reported map[int]bool) []Diagnostic {
+	var out []Diagnostic
+
+	// One finding per statement, as for the statements the parser judges:
+	// a statement is the tokens up to a ';', and one that already has an
+	// unexpected token gets no second one here.
+	statement := make([]int, len(tokens))
+	for i, id := 0, 0; i < len(tokens); i++ {
+		statement[i] = id
+		if tokens[i].Type == lexer.TokenPunctuation && tokens[i].Text == ";" {
+			id++
+		}
+	}
+	judged := map[int]bool{}
+	for idx := range reported {
+		judged[statement[idx]] = true
+	}
+
+	report := func(idx int, expected, hint string) {
+		tok := tokens[idx]
+		// An unknown token is unknown_token's finding, and one finding
+		// per cause is enough.
+		if judged[statement[idx]] || tok.Type == lexer.TokenUnknown {
+			return
+		}
+		judged[statement[idx]] = true
+		reported[idx] = true
+		msg := "Unexpected " + describeToken(tok) + " - expected " + expected
+		if hint != "" && lineLeading(tokens, idx) {
+			msg += " " + hint
+		}
+		out = append(out, Diagnostic{
+			Severity: SeverityError,
+			Range:    tokenToRange(tok),
+			Message:  msg,
+			Source:   "ssl-lsp",
+			Code:     CodeUnexpectedToken,
+		})
+	}
+	// following returns the index of the first token after i that is
+	// neither whitespace nor a comment, or -1 at end of file.
+	following := func(i int) int {
+		next := nextSignificantTokenIndex(tokens, i+1)
+		if next < 0 || tokens[next].Type == lexer.TokenEOF {
+			return -1
+		}
+		return next
+	}
+
+	for i, t := range tokens {
+		if t.Type != lexer.TokenKeyword || !strings.HasPrefix(t.Text, ":") {
+			continue
+		}
+		head := strings.ToUpper(t.Text[1:])
+		next := following(i)
+		if next < 0 {
+			continue
+		}
+		switch {
+		case bareKeywords[head]:
+			if tokens[next].Text != ";" {
+				report(next, fmt.Sprintf("';' after ':%s'", head),
+					fmt.Sprintf("(is ':%s' missing its ';'?)", head))
+			}
+		case head == "PROCEDURE":
+			if tokens[next].Type != lexer.TokenIdentifier {
+				report(next, "a procedure name after ':PROCEDURE'", "")
+				continue
+			}
+			after := following(next)
+			if after < 0 || tokens[after].Text == ";" || tokens[after].Text == "(" {
+				continue
+			}
+			report(after, "';' after the procedure name",
+				"(is the ':PROCEDURE' line missing its ';'?)")
 		}
 	}
 	return out

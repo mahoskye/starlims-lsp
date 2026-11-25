@@ -188,3 +188,120 @@ func TestUnexpectedToken_DataSourceGate(t *testing.T) {
 		t.Errorf("same content as SSL should flag once, got %d", len(got))
 	}
 }
+
+// [spec diag.unexpected_token] A keyword statement that takes nothing is
+// complete at its keyword: the first token after it that is not its ';'
+// is unexpected.
+func TestUnexpectedToken_BareKeywordTails(t *testing.T) {
+	tests := []struct {
+		name, script string
+		line, col    int // 0-based position of the finding
+		want         string
+	}{
+		{"operand on :NEXT", ":DECLARE i;\n:FOR i := 1 :TO 2;\n:NEXT i;\n", 2, 6,
+			"Unexpected identifier 'i' - expected ';' after ':NEXT'"},
+		{"statement on the :ELSE line", ":DECLARE nX;\n:IF .T.;\n:ELSE nX := 1;\n:ENDIF;\n", 2, 6,
+			"Unexpected identifier 'nX' - expected ';' after ':ELSE'"},
+		{"name on :ENDPROC", ":PROCEDURE Run;\n:ENDPROC Run;\n", 1, 9,
+			"Unexpected identifier 'Run' - expected ';' after ':ENDPROC'"},
+		{"number on :ENDIF", ":IF .T.;\n:ENDIF 1;\n", 1, 7,
+			"Unexpected number '1' - expected ';' after ':ENDIF'"},
+		{"two closers in one statement", ":PROCEDURE Run;\n:IF .T.;\n:ENDIF :ENDPROC;\n", 2, 7,
+			"Unexpected keyword ':ENDPROC' - expected ';' after ':ENDIF'"},
+		{":ENDIF missing its ';'", ":DECLARE nX;\n:IF .T.;\n:ENDIF\nnX := 1;\n", 3, 0,
+			"Unexpected identifier 'nX' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)"},
+		{"lowercase keyword", ":if .T.;\n:endif 1;\n", 1, 7,
+			"Unexpected number '1' - expected ';' after ':ENDIF'"},
+		{":TRY with an operand", ":TRY 1;\n\tnX := 1;\n:CATCH;\n:ENDTRY;\n", 0, 5,
+			"Unexpected number '1' - expected ';' after ':TRY'"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := unexpectedTokens(t, tc.script)
+			if len(got) != 1 {
+				t.Fatalf("want one finding, got %d: %+v", len(got), got)
+			}
+			d := got[0]
+			if d.Range.Start.Line != tc.line || d.Range.Start.Character != tc.col || d.Message != tc.want {
+				t.Errorf("got %d:%d %q\nwant %d:%d %q", d.Range.Start.Line, d.Range.Start.Character, d.Message,
+					tc.line, tc.col, tc.want)
+			}
+			if d.Severity != SeverityError {
+				t.Errorf("severity = %v, want error", d.Severity)
+			}
+		})
+	}
+}
+
+// [spec diag.unexpected_token] A :PROCEDURE header is the keyword, one
+// name and the ';'.
+func TestUnexpectedToken_ProcedureHeader(t *testing.T) {
+	tests := []struct {
+		name, script string
+		col          int
+		want         string
+	}{
+		{"no name", ":PROCEDURE;\n:ENDPROC;\n", 10,
+			"Unexpected ';' - expected a procedure name after ':PROCEDURE'"},
+		{"number for a name", ":PROCEDURE 123;\n:ENDPROC;\n", 11,
+			"Unexpected number '123' - expected a procedure name after ':PROCEDURE'"},
+		{"literal word for a name", ":PROCEDURE NIL;\n:ENDPROC;\n", 11,
+			"Unexpected keyword 'NIL' - expected a procedure name after ':PROCEDURE'"},
+		{"string for a name", ":PROCEDURE \"Run\";\n:ENDPROC;\n", 11,
+			"Unexpected string \"Run\" - expected a procedure name after ':PROCEDURE'"},
+		{"two names", ":PROCEDURE Run Extra;\n:ENDPROC;\n", 15,
+			"Unexpected identifier 'Extra' - expected ';' after the procedure name"},
+		{"keyword in the header", ":PROCEDURE Run :IF .T.;\n:ENDIF;\n:ENDPROC;\n", 15,
+			"Unexpected keyword ':IF' - expected ';' after the procedure name"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := unexpectedTokens(t, tc.script)
+			if len(got) != 1 {
+				t.Fatalf("want one finding, got %d: %+v", len(got), got)
+			}
+			if d := got[0]; d.Range.Start.Line != 0 || d.Range.Start.Character != tc.col || d.Message != tc.want {
+				t.Errorf("got %d:%d %q\nwant 0:%d %q", d.Range.Start.Line, d.Range.Start.Character, d.Message, tc.col, tc.want)
+			}
+		})
+	}
+
+	// The header's ';' missing: the next statement's keyword is unexpected.
+	got := unexpectedTokens(t, ":PROCEDURE Run\n:PARAMETERS nX;\n:ENDPROC;\n")
+	if len(got) != 1 || !strings.HasSuffix(got[0].Message, "(is the ':PROCEDURE' line missing its ';'?)") {
+		t.Errorf("missing header terminator: got %+v", got)
+	}
+}
+
+// [spec diag.unexpected_token] What the keyword-tail check leaves alone.
+func TestUnexpectedToken_BareKeywordTailsDoNotFlag(t *testing.T) {
+	clean := []struct{ name, script string }{
+		{"well-formed blocks", ":PROCEDURE Run;\n\t:PARAMETERS nX;\n\t:IF nX > 1;\n\t\tnX := 1;\n\t:ELSE;\n\t\tnX := 2;\n\t:ENDIF;\n\t:RETURN nX;\n:ENDPROC;\n"},
+		{"comment between keyword and ';'", ":IF .T.;\n:ELSE /* nothing;\n;\n:ENDIF;\n"},
+		{"end-of-line comment after the ';'", ":IF .T.;\n:ENDIF; /* done;\n"},
+		{"last statement without ';'", ":PROCEDURE Run;\n:ENDPROC\n"},
+		{"header at end of file", ":PROCEDURE Run"},
+		{"keyword alone at end of file", ":PROCEDURE"},
+		{"member named like a keyword", ":DECLARE oX, vY;\nvY := oX:Next;\nvY := oX:EndIf(1);\n"},
+	}
+	for _, tc := range clean {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unexpectedTokens(t, tc.script); len(got) != 0 {
+				t.Errorf("want no unexpected_token, got %+v", got)
+			}
+		})
+	}
+
+	// Findings that belong to another rule stay with it, once.
+	if got := unexpectedTokens(t, ":PROCEDURE Run(nX);\n:ENDPROC;\n"); len(got) != 0 {
+		t.Errorf(":PROCEDURE Name( is procedure_declaration_syntax's: %+v", got)
+	}
+	if got := unexpectedTokens(t, ":TRY;\n\tnX := 1;\n:CATCH oErr;\n:ENDTRY;\n"); len(got) != 0 {
+		t.Errorf("what follows :CATCH is catch_clause_form's: %+v", got)
+	}
+	// One finding per statement: a run of keyword lines with no ';' at all
+	// is one statement.
+	if got := unexpectedTokens(t, ":IF .T.\n:ELSE\n:ENDIF\n:RETURN 1;\n"); len(got) != 1 {
+		t.Errorf("a run with no ';' is one statement: want one finding, got %+v", got)
+	}
+}

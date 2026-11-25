@@ -53,6 +53,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([diag.visibility_annotation_usage](catalog/diagnostics/visibility_annotation_usage.md)).
 
 ### Fixed
+- **Junk after a block keyword, and a malformed `:PROCEDURE` header, fail
+  validation** (PR #376). `:ENDIF 1;`, `:NEXT i;`, `:ELSE nX := 1;`,
+  `:ENDPROC Run;`, `:PROCEDURE 123;` and `:PROCEDURE Run Extra;` all
+  validated clean, and so did an `:ENDIF` whose `;` was missing before the
+  next statement. The parser carries no expression for these statements,
+  so nothing judged what followed the keyword. `unexpected_token` now
+  reports the first token after such a keyword that is not its `;`, and
+  the first token of a `:PROCEDURE` header that is not the name or the
+  `;`. No new code. Production corpus: all 53,343 such keywords and all
+  7,488 procedure headers already have the strict shape; one new finding,
+  in a file that already failed validation. Found by
+  `FuzzFormatRangeStable`, whose failing input is now a regression seed
+  ([diag.unexpected_token](catalog/diagnostics/unexpected_token.md)).
 - **A bracket left open no longer pushes the rest of the file in**
   (#375). A `(`, `{` or `[` that its statement never closed stayed open
   past the statement's `;`, so every later line was laid out as its
