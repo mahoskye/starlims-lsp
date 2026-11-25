@@ -80,3 +80,32 @@ func TestVisibilityAnnotationUsage_MessageNamesTheException(t *testing.T) {
 	}
 	t.Fatal("expected a visibility_annotation_usage note")
 }
+
+// A legacy :ERROR handler catches like a :CATCH: it goes last and protects
+// the statements before it, so a raise ahead of it does not leave the
+// procedure and the helper is not raise-only.
+func TestVisibilityAnnotationUsage_LegacyErrorHandler(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want int // usage notes
+	}{
+		{"raise ahead of the procedure's own :ERROR handler",
+			"/*@private;\n:PROCEDURE Helper;\n\t:PARAMETERS sId;\n\tRaiseError(\"x\");\n\t:RETURN .T.;\n\t:ERROR;\n\t:RETURN .F.;\n:ENDPROC;\n", 1},
+		{"raise inside the handler leaves the procedure",
+			"/*@private;\n:PROCEDURE Helper;\n\t:PARAMETERS sId;\n\tsId := Upper(sId);\n\t:RETURN .T.;\n\t:ERROR;\n\tRaiseError(\"x\");\n:ENDPROC;\n", 0},
+		{"a handler in another procedure does not count",
+			"/*@private;\n:PROCEDURE Helper;\n\tRaiseError(\"x\");\n:ENDPROC;\n:PROCEDURE Other;\n\t:RETURN .T.;\n\t:ERROR;\n\t:RETURN .F.;\n:ENDPROC;\n", 0},
+		{"a script-level handler does not catch for a procedure",
+			"/*@private;\n:PROCEDURE Helper;\n\tRaiseError(\"x\");\n:ENDPROC;\nDoProc(\"Helper\");\n:ERROR;\n:RETURN .F.;\n", 0},
+	}
+	opts := infoEnabledOptions()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := codeCounts(GetDiagnostics(tc.src, opts))
+			if got[CodeVisibilityAnnotationUsage] != tc.want {
+				t.Errorf("want %d usage note(s), got %d\n%s", tc.want, got[CodeVisibilityAnnotationUsage], tc.src)
+			}
+		})
+	}
+}

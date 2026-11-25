@@ -49,6 +49,13 @@ history:
       code carried a note that could not be cleared and that told an
       assistant to remove an annotation the guide asks for. The message
       now names the exception.
+  - date: 2026-11-26
+    ref: "PR #376"
+    note: >-
+      The legacy `:ERROR` handler is modelled. A procedure that raises
+      ahead of its own `:ERROR;` marker catches that raise, so it is not
+      raise-only and its annotation is flagged; the first version counted
+      any procedure with a handler as raise-only when it raised.
 issues: []
 ---
 
@@ -71,8 +78,10 @@ the procedure, which is one no `:TRY` body of that procedure with a
 `:CATCH` encloses. A raise in a `:TRY` that has only `:FINALLY`, in a
 `:CATCH`, or after the `:ENDTRY` leaves the procedure; a raise the
 procedure catches itself does not, and neither does a member call
-`oObject:RaiseError(...)`, which is not the built-in. The legacy `:ERROR`
-handler is not modelled: a procedure with one still counts when it raises.
+`oObject:RaiseError(...)`, which is not the built-in. A legacy `:ERROR;`
+marker in the procedure catches like a `:CATCH`: it goes last and protects
+the statements before it, so a raise ahead of it does not leave the
+procedure, while a raise inside the handler does.
 A helper that raises nothing itself and only lets an error from a call
 pass through is not one the server can tell from any other procedure, so
 its annotation is flagged.
@@ -213,7 +222,7 @@ that annotation is wrong twice over (issue #371): the code is as the
 convention asks, so the note can never be cleared, and the tier's readers
 are assistants (D13), which act on a note by removing the annotation. The
 server exempts what it can see, an explicit `RaiseError` that leaves the
-procedure, and errs toward silence where the raise's fate is unclear (the
-legacy `:ERROR` handler). It does not guess at a helper that only lets an
+procedure: past every `:TRY` with a `:CATCH` and past the procedure's own
+`:ERROR` handler. It does not guess at a helper that only lets an
 error pass through: every procedure without a `:TRY` does that, and the
 convention's own example of a procedure to leave unannotated is one.

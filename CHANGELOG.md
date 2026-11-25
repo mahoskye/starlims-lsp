@@ -48,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be cleared. It no longer fires on `/*@private;` when the procedure holds
   a `RaiseError` call that leaves it, one no `:TRY` of that procedure with
   a `:CATCH` encloses. `/*@protected;` and a helper that raises nothing
-  itself are still reported, and the message now names the exception.
+  itself are still reported, and the message now names the exception. A
+  procedure that raises ahead of its own legacy `:ERROR` handler catches
+  that raise, so it is not raise-only.
   Production corpus: 5 → 3 findings
   ([diag.visibility_annotation_usage](catalog/diagnostics/visibility_annotation_usage.md)).
 

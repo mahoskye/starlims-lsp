@@ -6119,8 +6119,9 @@ func checkVisibilityAnnotations(tokens []lexer.Token, calls []parser.CallSite) [
 // (private_raise_only_helpers), because only the entry point that catches
 // its error may call it. A raise the procedure catches itself does not
 // count, nor does a member call `recv:RaiseError(...)`, which is not the
-// built-in (D10). The legacy `:ERROR` handler is not modelled: with one, a
-// raise still counts.
+// built-in (D10). A legacy `:ERROR;` marker in the procedure catches like a
+// `:CATCH`: it goes last and protects the statements before it, so a raise
+// ahead of it does not leave, while one inside the handler does.
 func raiseOnlyProcedures(tokens []lexer.Token, calls []parser.CallSite) map[int]bool {
 	// Each :TRY's body, [start, end), and whether a :CATCH follows it.
 	type tryFrame struct {
@@ -6130,6 +6131,9 @@ func raiseOnlyProcedures(tokens []lexer.Token, calls []parser.CallSite) map[int]
 	var frames []tryFrame
 	var open []int // indices into frames, innermost last
 	procAt := make([]int, len(tokens))
+	// errorMarker is the procedure's first `:ERROR;` statement, by the
+	// procedure's keyword index. `:ERROR` in an expression is not one.
+	errorMarker := map[int]int{}
 	proc := -1
 	for i := range tokens {
 		procAt[i] = proc
@@ -6142,6 +6146,14 @@ func raiseOnlyProcedures(tokens []lexer.Token, calls []parser.CallSite) map[int]
 			procAt[i] = i
 		case "ENDPROC":
 			proc = -1
+		case "ERROR":
+			if _, seen := errorMarker[proc]; proc >= 0 && !seen {
+				next := nextSignificantTokenIndex(tokens, i+1)
+				prev := previousSignificantTokenIndex(tokens, i-1)
+				if next >= 0 && tokens[next].Text == ";" && (prev < 0 || tokens[prev].Text == ";") {
+					errorMarker[proc] = i
+				}
+			}
 		case "TRY":
 			frames = append(frames, tryFrame{start: i, end: len(tokens)})
 			open = append(open, len(frames)-1)
@@ -6175,7 +6187,8 @@ func raiseOnlyProcedures(tokens []lexer.Token, calls []parser.CallSite) map[int]
 		if idx < 0 || idx >= len(tokens) || procAt[idx] < 0 {
 			continue
 		}
-		caught := false
+		marker, hasMarker := errorMarker[procAt[idx]]
+		caught := hasMarker && idx < marker
 		for _, f := range frames {
 			// A :TRY of another procedure cannot enclose this call: a
 			// procedure's blocks end with it.
