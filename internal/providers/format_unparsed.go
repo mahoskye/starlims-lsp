@@ -313,6 +313,7 @@ func (s *formatState) writeVerbatim(tokens []lexer.Token, start, end int) {
 		s.pendingStatementBreak = true
 		s.prevKeyword = ""
 		s.declListAlign = 0
+		s.closeStatementDelims()
 	}
 	s.prevToken = last
 	s.beforeLastNonWS = s.lastNonWSToken

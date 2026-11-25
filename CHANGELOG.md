@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A bracket left open no longer pushes the rest of the file in**
+  (#375). A `(`, `{` or `[` that its statement never closed stayed open
+  past the statement's `;`, so every later line was laid out as its
+  continuation. Range formatting such a line answered for every line to
+  the end of the file. A `;` now ends the statement's brackets with it:
+  a range on the line is answered for that statement only, and a full
+  format keeps the indentation of the statements after it. This changes
+  formatted output only for a file that already reports
+  `unclosed_delimiter`: 3 of 6,228 files on the production corpus
+  ([feature.formatting](catalog/features/formatting.md) A15,
+  [fmt.indent_style](catalog/formatting/indent_style.md)).
 - **CONFIGURATION.md matches the VS Code extension 1.26.0** (#365): §10.2
   maps `ssl.diagnostics.maxScriptBytes`, which the extension has
   contributed since 1.26.0, and no longer lists it as not settable.
