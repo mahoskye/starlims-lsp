@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **CONFIGURATION.md matches the VS Code extension 1.26.0** (#365): §10.2
+  maps `ssl.diagnostics.maxScriptBytes`, which the extension has
+  contributed since 1.26.0, and no longer lists it as not settable.
+
 ## [0.31.0] - 2026-11-18
 
 Class edges in `ssl/callGraph`, so a client that draws the graph shows how a

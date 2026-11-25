@@ -1148,7 +1148,7 @@ names and rebuilds the `ssl.*` tree above from them; it sends that tree in
 `initializationOptions` at startup and again on every relevant
 configuration change. The server keys in sections 3–7 are therefore **not**
 the names a VS Code user writes in `settings.json`. Mapping as of extension
-1.25.0:
+1.26.0:
 
 | VS Code setting | Server key | Notes |
 |-----------------|------------|-------|
@@ -1165,11 +1165,11 @@ the names a VS Code user writes in `settings.json`. Mapping as of extension
 | `ssl.styleGuide.limitBlockDepth` | `ssl.diagnostics.maxBlockDepth` | |
 | `ssl.diagnostics.rules`, `endpointPatterns`, `unusedVariables`, `infoDiagnostics` | same name | `rules` is applied by the server only (the extension re-applied it client-side before 1.25.0) |
 | `ssl.diagnostics.maxProcedureCodeLines`, `maxScriptCodeLines`, `maxScriptProcedures` | same name | since extension 1.24.0 |
+| `ssl.diagnostics.maxScriptBytes` | same name | since extension 1.26.0 |
 | `ssl.intellisense.inlayHints.enabled`, `minParameterCount` | `ssl.inlayHints.enabled`, `minParameterCount` | |
 | `ssl.intellisense.signatureHelp.autoTrigger` | `ssl.intellisense.signatureHelp.autoTrigger` | restart to apply (see 7.1) |
 
 Not settable from VS Code (server defaults always apply):
-`ssl.diagnostics.maxScriptBytes` (`51200`),
 `ssl.format.blankLineBetweenBlocks` (`true`),
 `ssl.format.blankLinesBetweenSections` (`true`) and
 `ssl.format.sql.detectSQLStrings` (`true`).
