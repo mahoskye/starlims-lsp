@@ -163,5 +163,5 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unterminated_string` | String literal never closed | error | tool | active | [diag.unterminated_string](../../catalog/diagnostics/unterminated_string.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
 | `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | authoritative | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
-| `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
+| `visibility_annotation_usage` | Visibility annotation the convention does not require (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
 | `zero_based_array_index` | Array indexed with literal 0 | error | authoritative | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

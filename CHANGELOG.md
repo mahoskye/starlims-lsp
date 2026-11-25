@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`visibility_annotation_usage` leaves a raise-only helper alone**
+  (#371). The style guide prefers procedures without `/*@private;` and
+  requires it on a helper that reports failure only by raising. The info
+  note used to fire on both, so correct code carried a note that could not
+  be cleared. It no longer fires on `/*@private;` when the procedure holds
+  a `RaiseError` call that leaves it, one no `:TRY` of that procedure with
+  a `:CATCH` encloses. `/*@protected;` and a helper that raises nothing
+  itself are still reported, and the message now names the exception.
+  Production corpus: 5 → 3 findings
+  ([diag.visibility_annotation_usage](catalog/diagnostics/visibility_annotation_usage.md)).
+
 ### Fixed
 - **A bracket left open no longer pushes the rest of the file in**
   (#375). A `(`, `{` or `[` that its statement never closed stayed open

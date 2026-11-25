@@ -403,7 +403,7 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkRedeclaredVariables(tokens)...)
 	diagnostics = append(diagnostics, checkNestedIIF(tokens)...)
 	diagnostics = append(diagnostics, checkNegativeLogic(tokens, stmtExprs)...)
-	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens)...)
+	diagnostics = append(diagnostics, checkVisibilityAnnotations(tokens, calls)...)
 	diagnostics = append(diagnostics, checkNilMethodCalls(tokens)...)
 	diagnostics = append(diagnostics, checkParameterListAndDirectives(tokens, opts.IsDataSourceFile)...)
 
@@ -6016,12 +6016,14 @@ func checkNameLengths(variables []parser.VariableInfo, procedures []parser.Proce
 // procedure silently stays public (issue #255). Class methods are always
 // public, so any annotation in a class file is inert too. An effective
 // annotation instead gets the info-tier visibility_annotation_usage note
-// (issue #198) for teams that prefer procedures unannotated. Exactly one
-// of the two rules speaks per annotation, and the verdict matches
-// parser.ProcedureInfo.IsPrivate.
-func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
+// (issue #198) for teams that prefer procedures unannotated, unless it is
+// the `/*@private;` the style guide requires on a raise-only helper (issue
+// #371). At most one of the two rules speaks per annotation, and the
+// verdict matches parser.ProcedureInfo.IsPrivate.
+func checkVisibilityAnnotations(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
 	var diagnostics []Diagnostic
 
+	raiseOnly := raiseOnlyProcedures(tokens, calls)
 	inClass := false
 	warn := func(token lexer.Token, msg string) {
 		diagnostics = append(diagnostics, Diagnostic{
@@ -6073,10 +6075,15 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 
 		switch attach {
 		case parser.AnnotationAttached:
+			// The convention's one required exception: a raise-only helper
+			// is marked private, so its annotation is not a finding.
+			if content == "private" && raiseOnly[nextIdx] {
+				continue
+			}
 			diagnostics = append(diagnostics, Diagnostic{
 				Severity: SeverityInfo,
 				Range:    tokenToRange(token),
-				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' - this team convention prefers procedures unannotated", content),
+				Message:  fmt.Sprintf("Visibility annotation '/*@%s;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'", content),
 				Source:   "ssl-lsp",
 				Code:     CodeVisibilityAnnotationUsage,
 			})
@@ -6093,6 +6100,86 @@ func checkVisibilityAnnotations(tokens []lexer.Token) []Diagnostic {
 	}
 
 	return diagnostics
+}
+
+// raiseOnlyProcedures reports, by the token index of its `:PROCEDURE`
+// keyword, each procedure that reports failure by raising: its body holds a
+// `RaiseError(...)` call that no `:TRY` body of the same procedure with a
+// `:CATCH` encloses, so the error leaves the procedure. That is the helper
+// the style guide requires to be `/*@private;`
+// (private_raise_only_helpers), because only the entry point that catches
+// its error may call it. A raise the procedure catches itself does not
+// count, nor does a member call `recv:RaiseError(...)`, which is not the
+// built-in (D10). The legacy `:ERROR` handler is not modelled: with one, a
+// raise still counts.
+func raiseOnlyProcedures(tokens []lexer.Token, calls []parser.CallSite) map[int]bool {
+	// Each :TRY's body, [start, end), and whether a :CATCH follows it.
+	type tryFrame struct {
+		start, end int
+		hasCatch   bool
+	}
+	var frames []tryFrame
+	var open []int // indices into frames, innermost last
+	procAt := make([]int, len(tokens))
+	proc := -1
+	for i := range tokens {
+		procAt[i] = proc
+		if tokens[i].Type != lexer.TokenKeyword {
+			continue
+		}
+		switch strings.ToUpper(strings.TrimPrefix(tokens[i].Text, ":")) {
+		case "PROCEDURE":
+			proc = i
+			procAt[i] = i
+		case "ENDPROC":
+			proc = -1
+		case "TRY":
+			frames = append(frames, tryFrame{start: i, end: len(tokens)})
+			open = append(open, len(frames)-1)
+		case "CATCH", "FINALLY":
+			if len(open) > 0 {
+				f := &frames[open[len(open)-1]]
+				if f.end == len(tokens) {
+					f.end = i
+				}
+				if strings.EqualFold(strings.TrimPrefix(tokens[i].Text, ":"), "CATCH") {
+					f.hasCatch = true
+				}
+			}
+		case "ENDTRY":
+			if len(open) > 0 {
+				f := &frames[open[len(open)-1]]
+				if f.end == len(tokens) {
+					f.end = i
+				}
+				open = open[:len(open)-1]
+			}
+		}
+	}
+
+	raiseOnly := map[int]bool{}
+	for _, site := range calls {
+		if site.Qualified() || !strings.EqualFold(site.Name, "RaiseError") {
+			continue
+		}
+		idx := site.Call.Children[0].Start
+		if idx < 0 || idx >= len(tokens) || procAt[idx] < 0 {
+			continue
+		}
+		caught := false
+		for _, f := range frames {
+			// A :TRY of another procedure cannot enclose this call: a
+			// procedure's blocks end with it.
+			if f.hasCatch && f.start < idx && idx < f.end && procAt[f.start] == procAt[idx] {
+				caught = true
+				break
+			}
+		}
+		if !caught {
+			raiseOnly[procAt[idx]] = true
+		}
+	}
+	return raiseOnly
 }
 
 // checkNilMethodCalls detects patterns where methods are called on NIL values.
