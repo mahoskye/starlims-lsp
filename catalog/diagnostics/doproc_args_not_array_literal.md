@@ -18,7 +18,9 @@ history:
       passed `DoProc("CheckEqual", aCheck)` an argument array held in a
       variable. A one-part string-literal target is bound when the script
       compiles (reference functions/DoProc), and the compiler accepts that
-      form's arguments only as an array literal. On the production corpus
+      form's arguments only as an array literal. Verified on STARLIMS 12:
+      a script holding `DoProc("Name", aArgs)` stops with `Compile-time
+      error: Invalid arguments for: doproc`. On the production corpus
       all 5,797 one-part literal `DoProc` calls that pass arguments write
       them as `{...}`, so the rule reports nothing there. A new default-on
       error code, so a breaking change under D16.
@@ -176,7 +178,8 @@ literal is bound at compile time (the reference's `DoProc("NoSuchProc")`
 caveat is the same binding), and the bound form reads its arguments out
 of an array literal. So code that looks ordinary stops its whole script
 from compiling, and a validator that says nothing leaves the author to
-find that out in STARLIMS (issue #372).
+find that out in STARLIMS (issue #372). The behavior was verified on
+STARLIMS 12 before the rule was written.
 
 Error severity because it is a compile error, with no legitimate use to
 weigh against it: the corpus measurement in the history note found no

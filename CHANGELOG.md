@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `doproc_args_not_array_literal` (#372). `DoProc("Name", aArgs)`, a
   one-part literal name with its arguments in a variable or built by an
   expression, does not compile: a literal name is bound when the script
-  compiles, and that form takes its arguments only as an array literal.
+  compiles, and that form takes its arguments only as an array literal
+  (verified on STARLIMS 12).
   Write `DoProc("Name", {aArgs[1], aArgs[2]})`. A name held in a variable,
   a dotted name and `ExecFunction` are not reported. On the production
   corpus all 5,797 one-part literal calls that pass arguments already
