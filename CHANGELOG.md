@@ -77,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   judged, so a dotted name and a name the lexer cannot read whole are
   left alone. Production corpus: one new finding, in a file that already
   failed validation.
+- **A name ending in `Base` or `Me` is not the keyword** (PR #376).
+  `:INHERIT Rules.Level2Base;` reported `base_standalone`, and
+  `:INCLUDE Lib.Round2Me;` reported `me_outside_class`: the lexer splits a
+  dotted name at a digit or an underscore, and the last piece read as the
+  keyword. No such name occurs on the production corpus.
 - **A bracket left open no longer pushes the rest of the file in**
   (#375). A `(`, `{` or `[` that its statement never closed stayed open
   past the statement's `;`, so every later line was laid out as its

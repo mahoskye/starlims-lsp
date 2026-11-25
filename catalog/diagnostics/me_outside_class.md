@@ -42,6 +42,13 @@ history:
       record (me_inside_class_only, error), whose include-library
       exception matches the issue #171 warning tier. Closed issue #32
       dropped from issues.
+  - date: 2026-11-26
+    ref: "PR #376"
+    note: >-
+      The last piece of a dotted name no longer flags. The lexer splits a
+      dotted name at a digit or an underscore, so `:INCLUDE
+      Lib.Round2Me;` ended in an identifier token `Me` and was reported
+      as `Me` outside a class.
 issues: []
 ---
 
@@ -133,6 +140,15 @@ vResult := Me;
 
 ```ssl
 vValue := oConfig:Me;
+```
+
+### Does not flag
+
+An included script whose name ends in `Me` is a name, not the keyword.
+
+```ssl
+:INCLUDE Lib.Round2Me;
+:RETURN 1;
 ```
 
 ## Rationale

@@ -2658,6 +2658,14 @@ func checkClassReferenceForms(tokens []lexer.Token) []Diagnostic {
 		if token.Type != lexer.TokenIdentifier || isDeclarationIdentifier(tokens, i) {
 			continue
 		}
+		// The lexer splits a dotted name at a digit or an underscore, so
+		// `Rules.Level2Base` ends in an identifier token `Base`. A word
+		// written against a number or a `.Part` is the rest of that name,
+		// not `Me` or `Base`.
+		if i > 0 && (tokens[i-1].Type == lexer.TokenNumber ||
+			(tokens[i-1].Type == lexer.TokenUnknown && strings.HasPrefix(tokens[i-1].Text, "."))) {
+			continue
+		}
 
 		switch {
 		case strings.EqualFold(token.Text, "Me"):
