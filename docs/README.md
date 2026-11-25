@@ -107,7 +107,7 @@ Descriptive guides. The normative contract for each feature is its
 | Folding Ranges | [folding-ranges.md](./features/folding-ranges.md) |
 | Snippets | [snippets.md](./features/snippets.md) |
 | Semantic Tokens | [semantic-tokens.md](./features/semantic-tokens.md) |
-| Syntax Tree and Call Graph (custom requests) | [custom-requests.md](./features/custom-requests.md) |
+| Syntax Tree, Call Graph and Lexical Tokens (custom requests) | [custom-requests.md](./features/custom-requests.md) |
 
 ### SSL Language Reference
 

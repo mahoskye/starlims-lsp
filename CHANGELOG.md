@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Downstream:** a consumer that lists the codes (a settings enum, a
   rule table) gains one.
 
+### Added
+- **`ssl/lexicalTokens`** (#375): where an open document's comments,
+  strings and keywords are, as the lexer reads them, for a client that may
+  not read SSL itself and has to tell code from text. Kinds are `comment`,
+  `string`, `keyword`, `text` (a `:REGION` body) and `codeBlock`; a token
+  is reported whole, with a range that may span lines. The answers follow
+  SSL's rules: a comment ends at its first `;`, a string has no escapes,
+  and the `:` after a receiver is not a keyword. Advertised as
+  `capabilities.experimental.ssl.lexicalTokens: 1`
+  ([feature.lexical_tokens](catalog/features/lexical_tokens.md), D21).
+  The issue asked for these as semantic-token types. They are a request of
+  their own because a `string` or `keyword` semantic token would colour
+  over the client's grammar.
+- **Semantic tokens for the names `:CLASS` and `:LABEL` declare** (#375):
+  `class` and `label`, each with `declaration`. `label` joins the legend
+  as its last type, so the indices of the others do not move
+  ([feature.semantic_tokens](catalog/features/semantic_tokens.md) A18).
+
 ### Changed
 - **`visibility_annotation_usage` leaves a raise-only helper alone**
   (#371). The style guide prefers procedures without `/*@private;` and

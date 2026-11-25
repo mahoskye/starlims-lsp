@@ -23,6 +23,7 @@ dropped (entry retains the history).
 | [feature.formatting](../catalog/features/formatting.md) | Document and range formatting | active |
 | [feature.hover](../catalog/features/hover.md) | Hover | active |
 | [feature.inlay_hints](../catalog/features/inlay_hints.md) | Parameter-name inlay hints | active |
+| [feature.lexical_tokens](../catalog/features/lexical_tokens.md) | Lexical tokens (ssl/lexicalTokens) | active |
 | [feature.references](../catalog/features/references.md) | Find references | active |
 | [feature.rename](../catalog/features/rename.md) | Rename | active |
 | [feature.semantic_tokens](../catalog/features/semantic_tokens.md) | Semantic tokens | active |

@@ -382,3 +382,36 @@ func FuzzSemanticTokens(f *testing.F) {
 		checkTokenShape(t, "fuzz input", src, tokens)
 	})
 }
+
+func TestSemanticTokensClassAndLabelNames(t *testing.T) {
+	// [spec feature.semantic_tokens/A18]
+	src := `:CLASS DueRule;
+:INHERIT Rules.BaseRule;
+:DECLARE nCount;
+:PROCEDURE DueDate;
+	:LABEL Again;
+	nCount := nCount + 1;
+	:LABELOld;
+:ENDPROC;
+`
+	got := semanticDesc(src, SemanticTokenOptions{})
+	wantTokens(t, got,
+		"DueRule class declaration",
+		"nCount variable declaration",
+		"DueDate method declaration",
+		"Again label declaration",
+		"nCount variable",
+		"nCount variable",
+	)
+
+	// A label in a script, and a name that only follows the word.
+	src = `:DECLARE sLabel;
+:LABEL Retry;
+sLabel := "LABEL Retry";
+`
+	wantTokens(t, semanticDesc(src, SemanticTokenOptions{}),
+		"sLabel variable declaration",
+		"Retry label declaration",
+		"sLabel variable",
+	)
+}

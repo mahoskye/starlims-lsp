@@ -21,10 +21,13 @@ const (
 	SemanticVariable
 	SemanticProperty
 	SemanticClass
+	SemanticLabel
 )
 
-// SemanticTokenTypes names the token types, in the legend's order.
-var SemanticTokenTypes = []string{"function", "method", "parameter", "variable", "property", "class"}
+// SemanticTokenTypes names the token types, in the legend's order. `label`
+// is the newest of them (LSP 3.18) and sits last, so the earlier indices
+// are the ones every released legend had.
+var SemanticTokenTypes = []string{"function", "method", "parameter", "variable", "property", "class", "label"}
 
 // Semantic token modifiers, as bits; bit n is SemanticTokenModifiers[n].
 const (
@@ -107,6 +110,12 @@ func GetSemanticTokens(text string, tokens []lexer.Token, ast *parser.Node, opts
 			add(token, SemanticVariable, SemanticUnknown)
 			continue
 		}
+		// The name a `:CLASS` or `:LABEL` statement declares. The parser
+		// gives it no role, because it is no part of an expression.
+		if tokenType, ok := statementNameType(tokens, i); ok {
+			add(token, tokenType, SemanticDeclaration)
+			continue
+		}
 		switch roles[i] {
 		case parser.RoleProcedureName:
 			add(token, procedureType, SemanticDeclaration)
@@ -139,6 +148,27 @@ func GetSemanticTokens(text string, tokens []lexer.Token, ast *parser.Node, opts
 		return positionBefore(out[a].Range.Start, out[b].Range.Start)
 	})
 	return out
+}
+
+// statementNameType classifies the identifier at i when it is the name a
+// `:CLASS Name;` or `:LABEL Name;` statement declares: the first token
+// after the keyword that opens the statement.
+func statementNameType(tokens []lexer.Token, i int) (int, bool) {
+	prev := previousSignificantTokenIndex(tokens, i-1)
+	if prev < 0 || tokens[prev].Type != lexer.TokenKeyword {
+		return 0, false
+	}
+	before := previousSignificantTokenIndex(tokens, prev-1)
+	if before >= 0 && tokens[before].Text != ";" {
+		return 0, false // the keyword does not open its statement
+	}
+	switch strings.ToUpper(tokens[prev].Text) {
+	case ":CLASS":
+		return SemanticClass, true
+	case ":LABEL":
+		return SemanticLabel, true
+	}
+	return 0, false
 }
 
 func libraryModifier(inLibrary bool) int {
