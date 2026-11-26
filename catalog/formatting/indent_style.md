@@ -92,6 +92,13 @@ history:
       leading closer returns to that line's indentation. Continuations
       inside brackets used to sit one fixed level past the statement line,
       whatever the nesting.
+  - date: 2026-11-25
+    ref: "issue #375"
+    note: >-
+      A bracket stays open only to the end of its statement. A bracket
+      that was never closed used to stay open past the ';', so every later
+      line of the file was laid out as its continuation and pushed in
+      under it.
 issues: ["#36", "#86", "#101", "#326"]
 ---
 
@@ -144,6 +151,12 @@ decides. A closing delimiter that leads a line
 returns to the indentation of the line its bracket opened on. The line
 wrapper hangs a bracket — breaking right after it — only when one of its
 items would not fit at the aligned column (fmt.max_line_length).
+
+A bracket is open only to the end of its statement. The `;` that ends a
+statement closes every bracket the statement left open, so the statements
+after a bracket that was never closed keep their own indentation (issue
+#375). A `;` inside a string, a comment or a code block is part of that
+token and ends nothing.
 
 A declaration list is the exception (style guide wrapped_list_alignment,
 ssl-style-guide#120): every hanging line of a `:DECLARE`, `:PARAMETERS` or
@@ -243,6 +256,40 @@ sOut := txt:ToString()
 sOut := txt:ToString()
 	:Replace("##TITLE##", sTitle)
 	:Replace("##USER##", sUser);
+```
+
+A bracket that is never closed ends with its statement, so the lines after
+it are laid out as the statements they are:
+
+### Before
+
+```ssl
+:PROCEDURE Demo;
+:PARAMETERS nA, nB;
+:DECLARE nSum;
+nSum := Max(nA, nB;
+:IF nSum > 10;
+nSum := 10;
+:ENDIF;
+:RETURN nSum;
+:ENDPROC;
+```
+
+### After
+
+```ssl
+:PROCEDURE Demo;
+	:PARAMETERS nA, nB;
+	:DECLARE nSum;
+
+	nSum := Max(nA, nB;
+
+	:IF nSum > 10;
+		nSum := 10;
+	:ENDIF;
+
+	:RETURN nSum;
+:ENDPROC;
 ```
 
 A wrapped `:IF` condition anchors on the `:IF` line, so its continuation

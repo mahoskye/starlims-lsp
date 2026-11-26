@@ -34,6 +34,7 @@ func callCustom(t *testing.T, s *SSLServer, method string, params any, out any) 
 
 func TestInitialize_AdvertisesCustomRequests(t *testing.T) {
 	// [spec feature.syntax_tree/A11] [spec feature.call_graph/A7]
+	// [spec feature.lexical_tokens/A2]
 	s := NewSSLServer()
 	res, err := s.handleInitialize(nil, &protocol.InitializeParams{})
 	if err != nil {
@@ -51,8 +52,8 @@ func TestInitialize_AdvertisesCustomRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := decoded.Capabilities.Experimental.SSL
-	if got["syntaxTree"] != 1 || got["callGraph"] != 1 {
-		t.Errorf("experimental.ssl = %v, want syntaxTree and callGraph at version 1", got)
+	if got["syntaxTree"] != 1 || got["callGraph"] != 1 || got["lexicalTokens"] != 1 {
+		t.Errorf("experimental.ssl = %v, want syntaxTree, callGraph and lexicalTokens at version 1", got)
 	}
 }
 
@@ -83,6 +84,75 @@ func TestSyntaxTreeRequest(t *testing.T) {
 	callCustom(t, s, MethodSyntaxTree, SyntaxTreeParams{TextDocument: TextDocumentIdentifier{URI: "file:///not/open.ssl"}}, &missing)
 	if missing != nil {
 		t.Errorf("unopened document: got %+v, want null", missing)
+	}
+}
+
+func TestLexicalTokensRequest(t *testing.T) {
+	// [spec feature.lexical_tokens/A1]
+	s := newTestServerWithDocument(":PROCEDURE Greet;\n\tsMsg := \"😀\"; /* hi;\n:ENDPROC;\n")
+	s.documentVersion[testURI] = 7
+
+	var got LexicalTokensResult
+	callCustom(t, s, MethodLexicalTokens, LexicalTokensParams{TextDocument: TextDocumentIdentifier{URI: testURI}}, &got)
+	if got.URI != testURI || got.Version != 7 {
+		t.Fatalf("got uri %q version %d; want %q, 7", got.URI, got.Version, testURI)
+	}
+	type span struct {
+		kind                          string
+		startLine, startChar, endChar int
+	}
+	// The emoji is one rune but two UTF-16 units: the string ends at
+	// UTF-16 character 13 and the comment after it starts at 15.
+	want := []span{
+		{"keyword", 0, 0, 10},
+		{"string", 1, 9, 13},
+		{"comment", 1, 15, 21},
+		{"keyword", 2, 0, 8},
+	}
+	if len(got.Tokens) != len(want) {
+		t.Fatalf("tokens = %+v, want %d of them", got.Tokens, len(want))
+	}
+	for i, w := range want {
+		tk := got.Tokens[i]
+		if tk.Kind != w.kind || int(tk.Range.Start.Line) != w.startLine || int(tk.Range.End.Line) != w.startLine ||
+			int(tk.Range.Start.Character) != w.startChar || int(tk.Range.End.Character) != w.endChar {
+			t.Errorf("token %d = %+v, want %+v", i, tk, w)
+		}
+	}
+
+	var missing *LexicalTokensResult
+	callCustom(t, s, MethodLexicalTokens, LexicalTokensParams{TextDocument: TextDocumentIdentifier{URI: "file:///not/open.ssl"}}, &missing)
+	if missing != nil {
+		t.Errorf("unopened document: got %+v, want null", missing)
+	}
+
+	// A document with nothing to report answers an empty list, not null.
+	s.documents.SetDocument(testURI, "nCount := 1;\n", 8)
+	s.documentVersion[testURI] = 8
+	r, _, _, err := NewWrapperHandler(&s.handler, s).Handle(&glsp.Context{
+		Method: MethodLexicalTokens,
+		Params: json.RawMessage(`{"textDocument":{"uri":"` + testURI + `"}}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(r)
+	if want := `{"uri":"` + testURI + `","version":8,"tokens":[]}`; string(encoded) != want {
+		t.Errorf("no tokens = %s, want %s", encoded, want)
+	}
+}
+
+func TestLexicalTokensDataSourceByURI(t *testing.T) {
+	// [spec feature.lexical_tokens/A10]
+	s := NewSSLServer()
+	uri := "file:///workspace/Data%20Sources/LIMS/GetOrders.ds"
+	s.documents.SetDocument(uri, "SELECT ID, 'x' AS TAG FROM ORDERS /* all */\n", 1)
+	s.documentVersion[uri] = 1
+
+	var got LexicalTokensResult
+	callCustom(t, s, MethodLexicalTokens, LexicalTokensParams{TextDocument: TextDocumentIdentifier{URI: uri}}, &got)
+	if len(got.Tokens) != 0 {
+		t.Errorf("SQL data source: got %+v, want no tokens", got.Tokens)
 	}
 }
 
@@ -366,6 +436,7 @@ func TestCallGraphAmbiguousTarget(t *testing.T) {
 
 func TestCallGraphEmptyScopeAndBadParams(t *testing.T) {
 	// [spec feature.call_graph/A12] [spec feature.syntax_tree/A13]
+	// [spec feature.lexical_tokens/A13]
 	s, _, _, _ := newCallGraphServer(t)
 
 	r, _, _, err := NewWrapperHandler(&s.handler, s).Handle(&glsp.Context{
@@ -380,7 +451,7 @@ func TestCallGraphEmptyScopeAndBadParams(t *testing.T) {
 		t.Errorf("unknown scope = %s, want %s", encoded, want)
 	}
 
-	for _, method := range []string{MethodCallGraph, MethodSyntaxTree} {
+	for _, method := range []string{MethodCallGraph, MethodSyntaxTree, MethodLexicalTokens} {
 		_, validMethod, validParams, err := NewWrapperHandler(&s.handler, s).Handle(&glsp.Context{Method: method, Params: json.RawMessage(`["not", "an", "object"]`)})
 		if !validMethod || validParams || err == nil {
 			t.Errorf("%s with an array for params: (%v, %v, %v), want a known method, invalid params and an error", method, validMethod, validParams, err)

@@ -21,7 +21,7 @@ The legend, from the `initialize` result:
 {
   "semanticTokensProvider": {
     "legend": {
-      "tokenTypes": ["function", "method", "parameter", "variable", "property", "class"],
+      "tokenTypes": ["function", "method", "parameter", "variable", "property", "class", "label"],
       "tokenModifiers": ["declaration", "defaultLibrary", "readonly", "public", "unknown"]
     },
     "full": true,
@@ -47,7 +47,9 @@ nTotal := nQty * gRate;        /* variable, parameter, variable public;
 :ENDPROC;
 ```
 
-A class file's procedures are `method`. Predefined globals and status keywords
+A class file's procedures are `method`. The name a `:CLASS` statement declares
+is a `class` and the name a `:LABEL` statement declares a `label`, each with
+`declaration`. Predefined globals and status keywords
 are `variable` with `defaultLibrary` and `readonly`. After `:`, a name followed
 by `(` is a `method` and any other a `property`. `Email{}` is a `class`, with
 `defaultLibrary` because the reference lists it.
@@ -65,8 +67,10 @@ the string's own colour shows it does not.
   It is never set in a data source, nor in a file with an `:INCLUDE` the
   server could not read.
 - **No token means the grammar's colour stands.** That is what a statement
-  that does not parse, a name after `:CLASS` or `:LABEL`, and a plain SQL
-  file get.
+  that does not parse, a name after `:INHERIT`, and a plain SQL file get.
+- **Comments, strings and keywords have no token.** A client that needs to
+  know where they are asks `ssl/lexicalTokens`
+  ([custom-requests.md](./custom-requests.md)).
 - **Positions and lengths are UTF-16**, and a token lies on one line.
 - **`range` is a filter.** The server classifies the whole document either
   way, because a name's meaning depends on declarations elsewhere in it; a

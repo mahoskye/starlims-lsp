@@ -1,0 +1,94 @@
+An entry point that turns its helpers' errors into a result, as the style
+guide's raise doctrine asks. `RequireSample` reports failure only by
+raising, so its `/*@private;` is the annotation the convention requires and
+gets no visibility_annotation_usage note (issue #371). `FormatId` raises
+nothing and `TryRequire` catches its own raise, so their annotations are
+the ones the convention would rather not see.
+-- input.ssl --
+:PROCEDURE Main;
+:PARAMETERS sSampleId;
+:TRY;
+DoProc("RequireSample", {sSampleId});
+:CATCH;
+ClearLastSSLError();
+:RETURN {.F., "A sample is required."};
+:ENDTRY;
+:RETURN {.T., DoProc("FormatId", {sSampleId})};
+:ENDPROC;
+
+/*@private;
+:PROCEDURE RequireSample;
+:PARAMETERS sSampleId;
+:IF Empty(sSampleId);
+RaiseError("A sample is required");
+:ENDIF;
+:ENDPROC;
+
+/*@private;
+:PROCEDURE FormatId;
+:PARAMETERS sSampleId;
+:RETURN Upper(AllTrim(sSampleId));
+:ENDPROC;
+
+/*@private;
+:PROCEDURE TryRequire;
+:PARAMETERS sSampleId;
+:TRY;
+:IF Empty(sSampleId);
+RaiseError("A sample is required");
+:ENDIF;
+:CATCH;
+ClearLastSSLError();
+:RETURN .F.;
+:ENDTRY;
+:RETURN .T.;
+:ENDPROC;
+-- format --
+:PROCEDURE Main;
+	:PARAMETERS sSampleId;
+
+	:TRY;
+		DoProc("RequireSample", {sSampleId});
+	:CATCH;
+		ClearLastSSLError();
+		:RETURN {.F., "A sample is required."};
+	:ENDTRY;
+
+	:RETURN {.T., DoProc("FormatId", {sSampleId})};
+:ENDPROC;
+
+/*@private;
+:PROCEDURE RequireSample;
+	:PARAMETERS sSampleId;
+
+	:IF Empty(sSampleId);
+		RaiseError("A sample is required");
+	:ENDIF;
+:ENDPROC;
+
+/*@private;
+:PROCEDURE FormatId;
+	:PARAMETERS sSampleId;
+
+	:RETURN Upper(AllTrim(sSampleId));
+:ENDPROC;
+
+/*@private;
+:PROCEDURE TryRequire;
+	:PARAMETERS sSampleId;
+
+	:TRY;
+		:IF Empty(sSampleId);
+			RaiseError("A sample is required");
+		:ENDIF;
+	:CATCH;
+		ClearLastSSLError();
+		:RETURN .F.;
+	:ENDTRY;
+
+	:RETURN .T.;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --
+20:1-20:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'
+26:1-26:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'

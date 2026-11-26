@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- **One new code can fail validation** (D16):
+  `doproc_args_not_array_literal` (#372). `DoProc("Name", aArgs)`, a
+  one-part literal name with its arguments in a variable or built by an
+  expression, does not compile: a literal name is bound when the script
+  compiles, and that form takes its arguments only as an array literal
+  (verified on STARLIMS 12).
+  Write `DoProc("Name", {aArgs[1], aArgs[2]})`. A name held in a variable,
+  a dotted name and `ExecFunction` are not reported. On the production
+  corpus all 5,797 one-part literal calls that pass arguments already
+  write them as `{...}`, so nothing there changes
+  ([diag.doproc_args_not_array_literal](catalog/diagnostics/doproc_args_not_array_literal.md)).
+  **Downstream:** a consumer that lists the codes (a settings enum, a
+  rule table) gains one.
+
+### Added
+- **`ssl/lexicalTokens`** (#375): where an open document's comments,
+  strings and keywords are, as the lexer reads them, for a client that may
+  not read SSL itself and has to tell code from text. Kinds are `comment`,
+  `string`, `keyword`, `text` (a `:REGION` body) and `codeBlock`; a token
+  is reported whole, with a range that may span lines. The answers follow
+  SSL's rules: a comment ends at its first `;`, a string has no escapes,
+  and the `:` after a receiver is not a keyword. Advertised as
+  `capabilities.experimental.ssl.lexicalTokens: 1`
+  ([feature.lexical_tokens](catalog/features/lexical_tokens.md), D21).
+  The issue asked for these as semantic-token types. They are a request of
+  their own because a `string` or `keyword` semantic token would colour
+  over the client's grammar.
+- **Semantic tokens for the names `:CLASS` and `:LABEL` declare** (#375):
+  `class` and `label`, each with `declaration`. `label` joins the legend
+  as its last type, so the indices of the others do not move
+  ([feature.semantic_tokens](catalog/features/semantic_tokens.md) A18).
+
+### Changed
+- **`visibility_annotation_usage` leaves a raise-only helper alone**
+  (#371). The style guide prefers procedures without `/*@private;` and
+  requires it on a helper that reports failure only by raising. The info
+  note used to fire on both, so correct code carried a note that could not
+  be cleared. It no longer fires on `/*@private;` when the procedure holds
+  a `RaiseError` call that leaves it, one no `:TRY` of that procedure with
+  a `:CATCH` encloses. `/*@protected;` and a helper that raises nothing
+  itself are still reported, and the message now names the exception. A
+  procedure that raises ahead of its own legacy `:ERROR` handler catches
+  that raise, so it is not raise-only.
+  Production corpus: 5 → 3 findings
+  ([diag.visibility_annotation_usage](catalog/diagnostics/visibility_annotation_usage.md)).
+
+### Fixed
+- **Junk after a block keyword, and a malformed `:PROCEDURE` header, fail
+  validation** (PR #376). `:ENDIF 1;`, `:NEXT i;`, `:ELSE nX := 1;`,
+  `:ENDPROC Run;`, `:PROCEDURE 123;` and `:PROCEDURE Run Extra;` all
+  validated clean, and so did an `:ENDIF` whose `;` was missing before the
+  next statement. The parser carries no expression for these statements,
+  so nothing judged what followed the keyword. `unexpected_token` now
+  reports the first token after such a keyword that is not its `;`, and
+  the first token of a `:PROCEDURE` header that is not the name or the
+  `;`. No new code. Production corpus: all 53,343 such keywords and all
+  7,488 procedure headers already have the strict shape; one new finding,
+  in a file that already failed validation. Found by
+  `FuzzFormatRangeStable`, whose failing input is now a regression seed
+  ([diag.unexpected_token](catalog/diagnostics/unexpected_token.md)).
+- **A malformed declaration list or name header fails validation**
+  (PR #376). The same gap, in the other statements the parser does not
+  model. `:DECLARE 1;`, `:DECLARE nA nB;`, `:DECLARE nA,;`, `:PUBLIC;` and
+  `:PARAMETERS "x";` validated clean, and so did `:CLASS A B;`,
+  `:INHERIT;`, `:REGION;` and `:INCLUDE Lib.A Lib.B;`. `unexpected_token`
+  now judges a `:DECLARE`, `:PARAMETERS` or `:PUBLIC` list as names
+  separated by commas, and reports a missing name or a second word in
+  `:CLASS`, `:REGION`, `:INHERIT` and `:INCLUDE`. The name itself is not
+  judged, so a dotted name and a name the lexer cannot read whole are
+  left alone. Production corpus: one new finding, in a file that already
+  failed validation.
+- **A name ending in `Base` or `Me` is not the keyword** (PR #376).
+  `:INHERIT Rules.Level2Base;` reported `base_standalone`, and
+  `:INCLUDE Lib.Round2Me;` reported `me_outside_class`: the lexer splits a
+  dotted name at a digit or an underscore, and the last piece read as the
+  keyword. No such name occurs on the production corpus.
+- **A bracket left open no longer pushes the rest of the file in**
+  (#375). A `(`, `{` or `[` that its statement never closed stayed open
+  past the statement's `;`, so every later line was laid out as its
+  continuation. Range formatting such a line answered for every line to
+  the end of the file. A `;` now ends the statement's brackets with it:
+  a range on the line is answered for that statement only, and a full
+  format keeps the indentation of the statements after it. This changes
+  formatted output only for a file that already reports
+  `unclosed_delimiter`: 3 of 6,228 files on the production corpus
+  ([feature.formatting](catalog/features/formatting.md) A15,
+  [fmt.indent_style](catalog/formatting/indent_style.md)).
+- **CONFIGURATION.md matches the VS Code extension 1.26.0** (#365): §10.2
+  maps `ssl.diagnostics.maxScriptBytes`, which the extension has
+  contributed since 1.26.0, and no longer lists it as not settable.
+
 ## [0.31.0] - 2026-11-18
 
 Class edges in `ssl/callGraph`, so a client that draws the graph shows how a

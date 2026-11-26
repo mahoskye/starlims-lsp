@@ -18,6 +18,15 @@ history:
       New standard feature for editors that highlight with a TextMate
       grammar (SSL Studio, any LSP client with semantic highlighting): the
       server colours the names a grammar cannot tell apart (D20).
+  - date: 2026-11-25
+    ref: "issue #375"
+    note: >-
+      The name a `:CLASS` statement declares is a `class` and the name a
+      `:LABEL` statement declares a `label`, each with `declaration`; both
+      used to have no token, so a client could not tell a name being
+      declared there from any other word. `label` joins the legend, last.
+      The comment, string and keyword tokens the same issue asked for are
+      not added: they are feature.lexical_tokens' (D21).
 issues: []
 ---
 
@@ -35,15 +44,19 @@ stay with the client's grammar, with the one exception of a dispatch target.
 
 The legend:
 
-| Types | `function`, `method`, `parameter`, `variable`, `property`, `class` |
+| Types | `function`, `method`, `parameter`, `variable`, `property`, `class`, `label` |
 |-------|---|
 | Modifiers | `declaration`, `defaultLibrary`, `readonly`, `public`, `unknown` |
 
-`public` and `unknown` are this server's own (D20). What a name gets:
+`public` and `unknown` are this server's own (D20). The types are standard;
+`label` is the newest of them (LSP 3.18) and comes last, so the indices of
+the others are those of every earlier legend. What a name gets:
 
 | Name | Type | Modifiers |
 |------|------|-----------|
 | The name in a `:PROCEDURE` header | `function`, or `method` in a class file | `declaration` |
+| The name in a `:CLASS` statement | `class` | `declaration` |
+| The name in a `:LABEL` statement | `label` | `declaration` |
 | A name in `:PARAMETERS` | `parameter` | `declaration` |
 | A name in `:DECLARE` | `variable` | `declaration` |
 | A name in `:PUBLIC` | `variable` | `public`, `declaration` |
@@ -77,9 +90,11 @@ Rules:
 - **Unparsed statements** get no tokens: a statement diag.undeclared_variable
   would stay silent in, because it is text a comment's early `;` stranded or
   it fails to parse on its first line.
+- **Statement names.** The first word after a `:CLASS` or `:LABEL` keyword
+  that opens its statement is the name the statement declares. The joined
+  form `:LABELName` is one keyword to the lexer and has no name token.
 - **Unclassified names** get no token, so the grammar's colour stands: a name
-  the parser cannot place, such as one after `:CLASS`, `:INHERIT`, `:LABEL`
-  or `:REGION`.
+  the parser cannot place, such as one after `:INHERIT` or `:REGION`.
 - **Dispatch targets** resolve as go to definition resolves them
   (feature.definition): a one-part target names a procedure of this file, any
   other goes through the workspace index. The token covers the string's
@@ -111,6 +126,7 @@ Rules:
 - A15: Given any SSL fixture or fuzzed input, when tokens are built, then they lie in document order without overlap, each on one line, within the document, and each covers a name or a dispatch target.
 - A16: Given a range, when the client sends `textDocument/semanticTokens/range`, then the result holds only the tokens that touch the range, the first encoded from the document's start; a document that is not open answers null.
 - A17: Given keywords, operators and literals, when tokens are built, then none has a token, nor a function named without its call.
+- A18: Given a class file with `:CLASS Name;`, an `:INHERIT`, and a method holding `:LABEL Name;` and the joined `:LABELName;`, when tokens are built, then the class name is `class` with `declaration` and the label name `label` with `declaration`, and the `:INHERIT` parent and the joined label have no token; a string that holds a label's text has none either.
 
 ## Rationale
 
@@ -129,3 +145,9 @@ guards apply either way.
 Only names get tokens because the client's grammar colours the rest correctly
 and sooner. Sending keywords and strings too would repeat its work on every
 edit and take the colour of a half-typed statement away from the grammar.
+
+A client that needs to know where the comments, strings and keywords are,
+for something other than colour, asks `ssl/lexicalTokens`
+(feature.lexical_tokens, D21). The names `:CLASS` and `:LABEL` declare are
+names like a `:PROCEDURE` name, so they belong here: without them a client
+reading `declaration` to find the words being declared missed two kinds.

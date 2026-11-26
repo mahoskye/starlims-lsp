@@ -23,6 +23,7 @@ dropped (entry retains the history).
 | [feature.formatting](../catalog/features/formatting.md) | Document and range formatting | active |
 | [feature.hover](../catalog/features/hover.md) | Hover | active |
 | [feature.inlay_hints](../catalog/features/inlay_hints.md) | Parameter-name inlay hints | active |
+| [feature.lexical_tokens](../catalog/features/lexical_tokens.md) | Lexical tokens (ssl/lexicalTokens) | active |
 | [feature.references](../catalog/features/references.md) | Find references | active |
 | [feature.rename](../catalog/features/rename.md) | Rename | active |
 | [feature.semantic_tokens](../catalog/features/semantic_tokens.md) | Semantic tokens | active |
@@ -53,5 +54,5 @@ dropped (entry retains the history).
 
 ## Diagnostics
 
-155 rules cataloged: 152 active, 0 draft, 0 planned, 3 removed.
+156 rules cataloged: 153 active, 0 draft, 0 planned, 3 removed.
 Full table: [docs/reference/DIAGNOSTICS.md](reference/DIAGNOSTICS.md).

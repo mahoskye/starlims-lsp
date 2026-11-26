@@ -146,8 +146,10 @@ lastmatrix := code;
 60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
 60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
 61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+62:1-62:5 error unexpected_token: Unexpected identifier 'desc' - expected ';' after ':ELSE' (is ':ELSE' missing its ';'?)
 63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
 64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error unexpected_token: Unexpected keyword ':endif' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)
 66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
 -- format --
@@ -300,8 +302,10 @@ DoProc("Notify", {sampleid, priority});
 60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
 60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
 61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+62:1-62:5 error unexpected_token: Unexpected identifier 'desc' - expected ';' after ':ELSE' (is ':ELSE' missing its ';'?)
 63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
 64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error unexpected_token: Unexpected keyword ':endif' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)
 66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'
 -- diagnostics [--strict --info] --
@@ -366,7 +370,9 @@ DoProc("Notify", {sampleid, priority});
 60:6-60:8 warning assignment_in_condition: Assignment ':=' used in IF condition - did you mean '=' or '=='?
 60:9-60:21 warning direct_procedure_call: 'LookupMatrix' is called inside its own procedure. If this is recursion, dispatch it via DoProc("LookupMatrix", {args}); if the procedure wraps a vendor built-in of the same name, this call is valid as written.
 61:1-61:6 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ELSE'
+62:1-62:5 error unexpected_token: Unexpected identifier 'desc' - expected ';' after ':ELSE' (is ':ELSE' missing its ';'?)
 63:1-63:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
 64:1-64:7 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDIF'
+64:1-64:7 error unexpected_token: Unexpected keyword ':endif' - expected ';' after ':ENDIF' (is ':ENDIF' missing its ';'?)
 66:1-66:8 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':RETURN'
 67:1-67:9 error keyword_uppercase: SSL keywords are case-sensitive and must be uppercase: use ':ENDPROC'

@@ -4,6 +4,31 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D21 — Lexical facts are a custom request; semantic tokens stay names (2026-11-25, issue #375)
+
+A client that may not read SSL itself (D19) still has to tell code from a
+comment or a string, and a keyword from a name, for work that is not
+colouring: searching a script for a name outside its comments, or offering
+a hover only on a word that could be a name. SSL's rules here are not the
+ones a client would guess (a comment ends at its first `;`, a backslash
+escapes nothing), so the lexer has to answer.
+
+- **The answer is `ssl/lexicalTokens`** (feature.lexical_tokens), under
+  D19's conventions, not `comment`, `string` and `keyword` semantic-token
+  types. Semantic tokens are a colour channel. A `string` token over a
+  string paints over what the grammar colours inside it, such as the
+  `?name?` placeholders of an SQL string, and a `keyword` token flattens
+  the grammar's keyword scopes, in every client whose theme has semantic
+  highlighting on, the asking client included. D20 stands as written.
+- **Names stay with semantic tokens.** The name a `:CLASS` or `:LABEL`
+  statement declares gets a token like a `:PROCEDURE` name does
+  (feature.semantic_tokens A18). Both types are standard, so this is D20's
+  first rule applied, not an exception to it.
+- **What the client does with the answer is the client's.** The server
+  says where the comments, strings and keywords of an open document are.
+  It does not say which tables a script's SQL names (issue #370,
+  withdrawn), nor answer for files the client has not opened.
+
 ## D20 — Semantic tokens add only what a grammar cannot know (2026-11-03, issue #366)
 
 Clients highlight SSL with a TextMate grammar, which sees text. The server
@@ -36,8 +61,9 @@ calls. Such a client must not parse SSL itself, or it disagrees with the
 server at the edges, which are where malformed code lives. The server
 answers them with custom requests:
 
-- **Names** are `ssl/<camelCase>` (`ssl/syntaxTree`, `ssl/callGraph`), so
-  they cannot collide with a future standard method.
+- **Names** are `ssl/<camelCase>` (`ssl/syntaxTree`, `ssl/callGraph`,
+  `ssl/lexicalTokens`), so they cannot collide with a future standard
+  method.
 - **Discovery** is `capabilities.experimental.ssl.<name>`, whose value is
   the version of the result's shape. A change a client could misread
   (a field changing meaning, a kind renamed) raises the version; adding a

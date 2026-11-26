@@ -28,6 +28,13 @@ history:
       some receiver (`oUri:Base`) no longer flags (D10, issue #258), and
       every name in a :DECLARE / :PARAMETERS / :PUBLIC list is exempt,
       not only the first.
+  - date: 2026-11-26
+    ref: "PR #376"
+    note: >-
+      The last piece of a dotted name no longer flags. The lexer splits a
+      dotted name at a digit or an underscore, so `:INHERIT
+      Rules.Level2Base;` ended in an identifier token `Base` and was
+      reported as a standalone `Base`.
 issues: []
 ---
 
@@ -86,6 +93,19 @@ Base:Init();
 :DECLARE sHost, sRoot;
 sRoot := oUri:Base;
 sHost := oUri:Base:Host;
+:ENDPROC;
+```
+
+### Does not flag
+
+A parent class whose name ends in `Base` is a name, not the keyword.
+
+```ssl
+:CLASS RushRule;
+:INHERIT Rules.Level2Base;
+
+:PROCEDURE Days;
+	:RETURN 1;
 :ENDPROC;
 ```
 

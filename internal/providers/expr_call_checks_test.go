@@ -147,3 +147,87 @@ sOut := GetDoc():Left("a", "b", "c");
 		t.Fatalf("expected one diagnostic on line 2, got %v", got)
 	}
 }
+
+// diag.doproc_args_not_array_literal (issue #372): a one-part literal
+// DoProc target is bound at compile time and takes its arguments only as
+// an array literal.
+func TestDoProcArgsNotArrayLiteral(t *testing.T) {
+	script := `:PROCEDURE Run;
+:PARAMETERS aArgs, oCall, nOne;
+:DECLARE vOut, sName;
+vOut := DoProc("Target", aArgs);
+vOut := DoProc("Target", aArgs[1]);
+vOut := DoProc("Target", oCall:args);
+vOut := DoProc("Target", BuildArgs(nOne));
+vOut := DoProc("Target", {nOne} + aArgs);
+vOut := DoProc("Target", nOne);
+vOut := DoProc("Target", NIL);
+vOut := DoProc('Target', aArgs);
+vOut := doproc("Target", aArgs);
+vOut := DoProc("Target", {nOne});
+vOut := DoProc("Target", {});
+vOut := DoProc("Target", {nOne,
+	nOne});
+vOut := DoProc("Target");
+vOut := DoProc(sName, aArgs);
+vOut := DoProc("Cat.Script.Target", aArgs);
+vOut := ExecFunction("Target", aArgs);
+vOut := ExecFunction("Cat.Script.Target", aArgs);
+vOut := oCall:DoProc("Target", aArgs);
+vOut := DoProc("Target", (aArgs));
+vOut := DoProc("Target",);
+vOut := DoProc("Target",, aArgs);
+:ENDPROC;
+:PROCEDURE Target;
+:PARAMETERS nOne;
+:RETURN nOne;
+:ENDPROC;`
+
+	got := codesAt(t, CodeDoProcArgsNotArrayLiteral, script)
+	want := []int{3, 4, 5, 6, 7, 8, 9, 10, 11}
+	if len(got) != len(want) {
+		t.Fatalf("expected lines %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected lines %v, got %v", want, got)
+		}
+	}
+}
+
+// The finding is an error on the second argument, and names the target.
+func TestDoProcArgsNotArrayLiteralRangeAndMessage(t *testing.T) {
+	script := ":DECLARE aArgs;\nDoProc(\"Target\", aArgs);\n:PROCEDURE Target;\n:ENDPROC;"
+	for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+		if d.Code != CodeDoProcArgsNotArrayLiteral {
+			continue
+		}
+		if d.Severity != SeverityError {
+			t.Errorf("severity = %v, want error", d.Severity)
+		}
+		if d.Range.Start.Line != 1 || d.Range.Start.Character != 17 || d.Range.End.Character != 22 {
+			t.Errorf("range = %+v, want the second argument (1:17-1:22)", d.Range)
+		}
+		if !strings.Contains(d.Message, `DoProc("Target", {...})`) {
+			t.Errorf("message does not show the fix: %s", d.Message)
+		}
+		return
+	}
+	t.Fatal("expected a doproc_args_not_array_literal diagnostic")
+}
+
+// In a class file a one-part literal target is doproc_in_class, and the
+// call gets that finding only.
+func TestDoProcArgsNotArrayLiteralDefersToDoProcInClass(t *testing.T) {
+	script := `:CLASS Runner;
+:PROCEDURE Run;
+:PARAMETERS aArgs;
+:RETURN DoProc("Helper", aArgs);
+:ENDPROC;
+:PROCEDURE Helper;
+:ENDPROC;`
+	got := codeCounts(GetDiagnostics(script, DefaultDiagnosticOptions()))
+	if got[CodeDoProcArgsNotArrayLiteral] != 0 || got[CodeDoProcInClass] != 1 {
+		t.Errorf("want doproc_in_class only, got %v", got)
+	}
+}

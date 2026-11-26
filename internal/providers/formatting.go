@@ -409,7 +409,7 @@ func widenRangeToStatements(tokens []lexer.Token, startLine, endLine int) (int, 
 // starts a line, whether that line continues the statement of the code
 // before it (cont), and the line on which the preceding token ends (prev).
 // The decision mirrors formatTokens: a line led by a binary operator or a
-// member-access ':', inside an open delimiter, or after code ending in
+// member-access ':', inside a delimiter its statement has open, or after code ending in
 // ':=', ',' or a binary operator always continues; otherwise a line led by
 // any colon keyword but :TO/:STEP starts a statement;
 // otherwise the line continues unless the last code token before it is
@@ -481,6 +481,10 @@ func statementContinuations(tokens []lexer.Token) (cont map[int]bool, prev map[i
 			depth++
 		case isCloseParen(t) && depth > 0:
 			depth--
+		case t.Text == ";":
+			// A ';' ends the statement and with it every bracket the
+			// statement left open, as in formatTokens (issue #375).
+			depth = 0
 		}
 		last, haveLast = t, true
 		lastEnd = line + strings.Count(strings.TrimSuffix(t.Text, "\n"), "\n")
@@ -921,6 +925,19 @@ func (s *formatState) normalizeProcBoundary() {
 			s.continuationIndent = 0
 		}
 	}
+}
+
+// closeStatementDelims forgets every bracket still open at a statement's
+// ';'. The ';' ends the statement whether or not its brackets balance, so
+// the lines after it are other statements and keep their own indentation;
+// without this one bracket left open pushed the rest of the file in under
+// it (issue #375). A ';' inside a string, comment or code block is part of
+// that token and never reaches here.
+func (s *formatState) closeStatementDelims() {
+	s.parenDepth = 0
+	s.delims = s.delims[:0]
+	s.inSQLFunction = false
+	s.sqlFunctionParenDepth = 0
 }
 
 func (s *formatState) updateParenDepth(token lexer.Token) {
@@ -1590,6 +1607,7 @@ func (s *formatState) finalizeToken(token lexer.Token) {
 		s.pendingStatementBreak = true
 		s.prevKeyword = ""
 		s.declListAlign = 0
+		s.closeStatementDelims()
 	}
 
 	switch {

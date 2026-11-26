@@ -55,8 +55,16 @@ func (w *WrapperHandler) Handle(context *glsp.Context) (r any, validMethod bool,
 		return result, true, true, err
 	}
 
-	// The custom requests of feature.syntax_tree and feature.call_graph.
+	// The custom requests of feature.syntax_tree, feature.call_graph and
+	// feature.lexical_tokens.
 	switch context.Method {
+	case MethodLexicalTokens:
+		var params LexicalTokensParams
+		if err = json.Unmarshal(context.Params, &params); err != nil {
+			return nil, true, false, err
+		}
+		result, err := w.server.handleLexicalTokens(&params)
+		return result, true, true, err
 	case MethodSyntaxTree:
 		var params SyntaxTreeParams
 		if err = json.Unmarshal(context.Params, &params); err != nil {

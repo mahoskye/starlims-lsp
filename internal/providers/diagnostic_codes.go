@@ -194,6 +194,9 @@ const (
 	CodePreferExplicitTrimConcat      = "prefer_explicit_trim_concat"
 	// The size ceiling (issue #358).
 	CodeScriptSizeCeiling = "script_size_ceiling"
+	// A literal DoProc target with arguments not written as an array
+	// literal (issue #372).
+	CodeDoProcArgsNotArrayLiteral = "doproc_args_not_array_literal"
 )
 
 // Pipeline-level codes: emitted by the diagnostics pipeline itself rather

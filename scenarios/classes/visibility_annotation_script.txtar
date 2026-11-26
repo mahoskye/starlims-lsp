@@ -64,7 +64,7 @@ nCount := 1;
 21:1-21:12 warning visibility_annotation: Visibility annotation '/*@private;' must sit on its own line immediately before ':PROCEDURE' — a blank line, another comment, or a shared line breaks the association, so the procedure stays public
 -- diagnostics [--strict --info] --
 1:1-1:12 warning visibility_annotation: Visibility annotation '/*@private;' should appear on its own line immediately before ':PROCEDURE'
-6:1-6:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated
+6:1-6:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'
 11:1-11:12 warning visibility_annotation: '/*@Private;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@private;' (lowercase, no spaces)
 16:1-16:15 warning visibility_annotation: '/* @protected;' is not a recognized visibility annotation, so the procedure stays public — write exactly '/*@protected;' (lowercase, no spaces)
 21:1-21:12 warning visibility_annotation: Visibility annotation '/*@private;' must sit on its own line immediately before ':PROCEDURE' — a blank line, another comment, or a shared line breaks the association, so the procedure stays public

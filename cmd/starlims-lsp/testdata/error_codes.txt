@@ -33,6 +33,7 @@ declare_initializer
 default_after_parameters
 default_on_declare_line
 direct_procedure_call
+doproc_args_not_array_literal
 doproc_in_class
 dot_property_access
 empty_parameters

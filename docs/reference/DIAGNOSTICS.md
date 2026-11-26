@@ -49,6 +49,7 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `deprecated_keyword` | Legacy keyword discouraged in new code | warning | advisory | active | [diag.deprecated_keyword](../../catalog/diagnostics/deprecated_keyword.md) |
 | `direct_procedure_call` | Procedure called directly instead of via DoProc/ExecFunction | error | authoritative | active | [diag.direct_procedure_call](../../catalog/diagnostics/direct_procedure_call.md) |
 | `dollar_string_only` | $ containment operator with non-string operands | warning | authoritative | active | [diag.dollar_string_only](../../catalog/diagnostics/dollar_string_only.md) |
+| `doproc_args_not_array_literal` | DoProc with a literal name and arguments not written as an array literal | error | authoritative | active | [diag.doproc_args_not_array_literal](../../catalog/diagnostics/doproc_args_not_array_literal.md) |
 | `doproc_in_class` | DoProc call inside a class method | error | authoritative | active | [diag.doproc_in_class](../../catalog/diagnostics/doproc_in_class.md) |
 | `dot_property_access` | Dot notation used for property access | error | authoritative | active | [diag.dot_property_access](../../catalog/diagnostics/dot_property_access.md) |
 | `empty_optional_param_array` | Trailing empty array passed for an optional parameter | info | style_only | active | [diag.empty_optional_param_array](../../catalog/diagnostics/empty_optional_param_array.md) |
@@ -163,5 +164,5 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `unterminated_string` | String literal never closed | error | tool | active | [diag.unterminated_string](../../catalog/diagnostics/unterminated_string.md) |
 | `unused_variable` | Variable declared but never used | hint | tool | active | [diag.unused_variable](../../catalog/diagnostics/unused_variable.md) |
 | `visibility_annotation` | Misplaced or ineffective visibility annotation | warning | authoritative | active | [diag.visibility_annotation](../../catalog/diagnostics/visibility_annotation.md) |
-| `visibility_annotation_usage` | Visibility annotation used at all (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
+| `visibility_annotation_usage` | Visibility annotation the convention does not require (team-preference rule) | info | style_only | active | [diag.visibility_annotation_usage](../../catalog/diagnostics/visibility_annotation_usage.md) |
 | `zero_based_array_index` | Array indexed with literal 0 | error | authoritative | active | [diag.zero_based_array_index](../../catalog/diagnostics/zero_based_array_index.md) |

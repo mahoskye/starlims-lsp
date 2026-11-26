@@ -32,5 +32,5 @@ following :PROCEDURE.
 :ENDPROC;
 -- diagnostics --
 -- diagnostics [--strict --info] --
-4:1-4:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated
-8:1-8:14 info visibility_annotation_usage: Visibility annotation '/*@protected;' - this team convention prefers procedures unannotated
+4:1-4:12 info visibility_annotation_usage: Visibility annotation '/*@private;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'
+8:1-8:14 info visibility_annotation_usage: Visibility annotation '/*@protected;' - this team convention prefers procedures unannotated; the one exception is a raise-only helper, marked '/*@private;'

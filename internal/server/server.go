@@ -277,11 +277,12 @@ func (s *SSLServer) handleInitialize(context *glsp.Context, params *protocol.Ini
 	}
 	capabilities.SemanticTokensProvider = semanticTokensOptions()
 	// The custom requests, each with the version of its result's shape
-	// (feature.syntax_tree, feature.call_graph).
+	// (feature.syntax_tree, feature.call_graph, feature.lexical_tokens).
 	capabilities.Experimental = map[string]any{
 		"ssl": map[string]int{
-			"syntaxTree": 1,
-			"callGraph":  1,
+			"syntaxTree":    1,
+			"callGraph":     1,
+			"lexicalTokens": 1,
 		},
 	}
 

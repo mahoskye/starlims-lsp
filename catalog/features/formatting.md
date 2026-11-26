@@ -112,6 +112,14 @@ history:
       the production corpus, range-formatting each line of formatted
       output changed 5,032 lines in a 577-file sample before, and none
       across all 4,620 scripts after.
+  - date: 2026-11-25
+    ref: "issue #375"
+    note: >-
+      A range on a line whose bracket is never closed is answered for
+      that statement only. The bracket used to count as open past the
+      statement's ';', so the range widened to the end of the file and
+      the answer pushed every later line in under the bracket
+      (fmt.indent_style).
 issues: ["#325"]
 ---
 
@@ -139,9 +147,12 @@ not restate them.
   — it gains a ';', loses its continuation indent, and a leading
   `:Member` lexes as a keyword. A line continues the code before it
   exactly when the token formatter would neither find nor insert a ';'
-  there, or when it sits inside an open delimiter, or leads with a binary
-  operator or member-access ':'; a line led by any other colon keyword
-  than `:TO`/`:STEP` starts a statement. The interior lines of a
+  there, or when it sits inside a delimiter its statement has open, or
+  leads with a binary operator or member-access ':'; a line led by any
+  other colon keyword than `:TO`/`:STEP` starts a statement. A `;` ends
+  its statement whether or not the statement's brackets balance, so a
+  bracket that is never closed widens a range no further than that `;`
+  (issue #375). The interior lines of a
   multi-line token the formatter passes through unchanged keep their
   text: they neither set nor take the base indentation. Because the range
   is formatted dedented, its width budgets (`ssl.format.maxLineLength`
@@ -213,6 +224,7 @@ not restate them.
 - A12: Given a document whose last line holds an emoji (one character, two UTF-16 code units), when `textDocument/formatting` is requested, then the full-document edit ends at that line's UTF-16 length (issue #307).
 - A13: Given a range whose first or last line lies inside a multi-line comment or string literal, when range formatting runs, then the edit is widened to cover the whole token and the token's text is byte-identical in the result — no `;` or spacing change is ever written inside it (issue #258), and re-applying the base indentation never indents its interior lines (issue #325).
 - A14: Given the output of a full format of code that validates without errors, when any one of its lines is range-formatted under the same options, then the result is unchanged — and a range whose formatting does not converge is declined with no edit (issue #325).
+- A15: Given a statement that leaves a bracket open before its `;`, when a range on its lines is formatted, then the edit ends with that statement and does not reach the statements after it; a line after the `;` is range-formatted as a statement of its own; and a full format keeps the indentation of the statements after it (issue #375).
 
 ## Rationale
 

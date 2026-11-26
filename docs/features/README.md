@@ -34,6 +34,7 @@ optional and written afterwards.
 | Semantic Tokens | [semantic-tokens.md](./semantic-tokens.md) | [feature.semantic_tokens](../../catalog/features/semantic_tokens.md) |
 | Syntax Tree (`ssl/syntaxTree`) | [custom-requests.md](./custom-requests.md) | [feature.syntax_tree](../../catalog/features/syntax_tree.md) |
 | Call Graph (`ssl/callGraph`) | [custom-requests.md](./custom-requests.md) | [feature.call_graph](../../catalog/features/call_graph.md) |
+| Lexical Tokens (`ssl/lexicalTokens`) | [custom-requests.md](./custom-requests.md) | [feature.lexical_tokens](../../catalog/features/lexical_tokens.md) |
 
 Cross-file resolution, which definition, references, and rename share,
 has no guide; its contract is
