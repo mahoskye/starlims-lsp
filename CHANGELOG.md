@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-25
+
+The clean-should-compile release (#372, #375). A project that passed
+`--validate --strict` did not run, and this release closes the gaps that
+were found from it: a new error for a `DoProc` call that does not compile,
+and `unexpected_token` findings for keyword statements and declaration
+lists that used to validate clean. It also adds `ssl/lexicalTokens`, for a
+client that has to tell code from a comment or a string without reading
+SSL itself. On the production corpus no file moves between valid and
+invalid, the new code reports nothing, and formatted output changes in 3
+of 6,228 files, each of which already reports `unclosed_delimiter`.
+
 ### Breaking
 - **One new code can fail validation** (D16):
   `doproc_args_not_array_literal` (#372). `DoProc("Name", aArgs)`, a
@@ -3276,7 +3288,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.28.2...v0.29.0
