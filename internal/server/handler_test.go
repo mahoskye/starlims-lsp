@@ -760,46 +760,15 @@ func TestHandleCompletion_BuiltinClassMemberContext(t *testing.T) {
 	}
 }
 
-// [spec feature.completion/A4]
-func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
-	// Inside :CLASS Email, typing `Me:` should suggest Email members.
-	s := newTestServerWithDocument(`:CLASS Email;
-:PROCEDURE Demo;
-    Me:
+// [spec feature.completion/A4] — outside a class file, class-context forms
+// are not suggested. The class half of A4 (what `Me:` lists) is
+// TestHandleCompletion_MeColonListsOwnClassMembers; the test that stood
+// here used `:CLASS Email`, a built-in class's name, and passed whether or
+// not the class's own members were listed (issue #380).
+func TestHandleCompletion_ClassFormsNotSuggestedOutsideClass(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Test;
 :ENDPROC;`)
-
 	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
-		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
-			Position:     protocol.Position{Line: 2, Character: 7},
-		},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	items, ok := result.([]protocol.CompletionItem)
-	if !ok {
-		t.Fatalf("expected completion items, got %T", result)
-	}
-	if len(items) == 0 {
-		t.Fatal("expected Me: member completions inside :CLASS Email")
-	}
-	// Email has SendOutgoing or similar — confirm at least one method-kind item.
-	hasMethod := false
-	for _, item := range items {
-		if item.Kind != nil && *item.Kind == protocol.CompletionItemKindMethod {
-			hasMethod = true
-			break
-		}
-	}
-	if !hasMethod {
-		t.Error("expected at least one method-kind completion for Me:")
-	}
-
-	// Outside a :CLASS file, class-context forms must NOT be suggested.
-	s = newTestServerWithDocument(`:PROCEDURE Test;
-:ENDPROC;`)
-	result, err = s.handleCompletion(nil, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
 			Position:     protocol.Position{Line: 0, Character: 0},
@@ -808,7 +777,7 @@ func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	items, ok = result.([]protocol.CompletionItem)
+	items, ok := result.([]protocol.CompletionItem)
 	if !ok {
 		t.Fatalf("expected completion items, got %T", result)
 	}

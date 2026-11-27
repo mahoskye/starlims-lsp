@@ -55,6 +55,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operator tokens, which are ASCII, and behaved correctly; they use the
   same character count now. A defect fix under D16: no code is added and
   no finding appears or disappears, only its columns move.
+- **`Me:` and `Base:` complete the members of a class written in the
+  workspace** (#380). The class name was looked up among the built-in
+  classes only. In a class of your own, `Me:` listed nothing when the `:`
+  was typed and the whole inventory on explicit invocation, and a class
+  named like a built-in one (`:CLASS Email`) listed the built-in's
+  members. `Me:` now lists the class's own fields (names declared outside
+  every procedure) and methods, the procedures of scripts the class file
+  `:INCLUDE`s, and what it inherits up the `:INHERIT` chain; `Base:`
+  lists the inherited members, the parent `Constructor` among them. A
+  method inserts its call with its parameters as placeholders
+  (`Bump(${1:nBy})`). Inherited and included members come from the
+  workspace index, or from the open buffer when the file is open, and
+  only when the parent or the include resolves to exactly one file: an
+  accepted member the class does not have is a compile-time error. Not
+  offered, because the behavior has not been run: an included script's
+  `/*@private;` and `/*@protected;` procedures, what an included script
+  includes in turn, and what an ancestor includes. The test for this
+  criterion used `:CLASS Email` and passed either way; it is replaced. A
+  defect fix under D16
+  ([feature.completion](catalog/features/completion.md) A4, A15-A19).
+  **Downstream:** a client needs no change; the items are ordinary
+  `Field` and `Method` completions, methods as snippets.
 
 ## [0.33.0] - 2026-11-27
 

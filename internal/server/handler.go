@@ -49,7 +49,7 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 	// or after a member-access `:`, return the focused completion list
 	// instead of the full inventory. This produces better suggestions in
 	// editors that display unfiltered LSP results.
-	if focused := s.contextAwareCompletions(cache, line, column, endpointFile); focused != nil {
+	if focused := s.contextAwareCompletions(uri, cache, line, column, endpointFile); focused != nil {
 		return toProtocolCompletionItems(focused), nil
 	}
 
@@ -89,8 +89,8 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 // is in a context that maps cleanly to one of the new providers helpers:
 //
 //   - `<BuiltInClass>{`           — constructor signatures for that class
-//   - `Me:` / `Base:` (in a class) — method/field suggestions for the
-//     enclosing class declaration
+//   - `Me:` / `Base:` (in a class) — the members the document's class
+//     reaches: its own, included and inherited ones (issue #380)
 //   - `<BuiltInClass>:`           — methods/properties of that class
 //   - `Request:` / `Response:`    — the ambient's members (endpoint files)
 //   - `<typedVar>:`               — members of the class or returns object
@@ -98,7 +98,7 @@ func (s *SSLServer) handleCompletion(context *glsp.Context, params *protocol.Com
 //
 // Returns nil when no context applies; the caller falls back to the full
 // completion list.
-func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column int, endpointFile bool) []providers.CompletionItem {
+func (s *SSLServer) contextAwareCompletions(uri string, cache *DocumentCache, line, column int, endpointFile bool) []providers.CompletionItem {
 	// Find the most recently emitted token that ends at or before the
 	// cursor. We then peek at the token immediately before it for context.
 	idx := indexOfTokenBefore(cache.Tokens, line, column)
@@ -126,8 +126,14 @@ func (s *SSLServer) contextAwareCompletions(cache *DocumentCache, line, column i
 			}
 			switch {
 			case strings.EqualFold(tok.Text, "Me"), strings.EqualFold(tok.Text, "Base"):
+				// The class is the one this document declares, whatever
+				// its name — never a built-in class of the same name
+				// (issue #380). No member known falls through to the
+				// unknown-receiver response.
 				if className := enclosingClassName(cache.Tokens); className != "" {
-					if items := providers.GetClassMemberCompletions(className); items != nil {
+					base := strings.EqualFold(tok.Text, "Base")
+					sources := s.classMemberSources(uri, cache, className, base)
+					if items := providers.GetUserClassMemberCompletions(sources, base); items != nil {
 						return items
 					}
 				}
