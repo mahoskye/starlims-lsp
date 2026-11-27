@@ -1,6 +1,6 @@
 ---
 id: diag.doproc_args_not_array_literal
-title: DoProc with a literal name and arguments not written as an array literal
+title: DoProc call without the argument array it needs
 kind: diagnostic
 status: active
 authority: authoritative
@@ -38,6 +38,20 @@ history:
       a procedure that comes from an `:INCLUDE`. The production corpus has
       no call with the trailing comma, so the rule still reports nothing
       there.
+  - date: 2026-11-27
+    ref: "PR #381 follow-up"
+    note: >-
+      The last argument forms left as unknown were run on STARLIMS 12, and
+      the rule follows the result. With a literal one-part name, a
+      variable in parentheses (`DoProc("Name", (aArgs))`) and an empty
+      array slot followed by another argument (`DoProc("Name",, vExtra)`)
+      stop with the same compile-time error, so both are reported now.
+      With a name in a variable, `DoProc(sName,)` raises when the call
+      runs, so it is reported too, and the title no longer says "literal
+      name". What runs, and stays unreported: commas after the array, a
+      third argument after the array (it is ignored), an empty array
+      literal, and `DoProc(sName, aArgs,)`. None of the newly reported
+      shapes occurs in the production corpus.
 issues: []
 ---
 
@@ -53,14 +67,24 @@ script does not compile (`Invalid arguments for: doproc`), so no `:TRY`
 can catch it. The range covers the second argument. Error severity: a
 compile-time error.
 
+Parentheses change nothing. `DoProc("Name", (aArgs))` is still a variable
+and is flagged, parentheses included in the range; `DoProc("Name",
+({1, 2}))` is still an array literal and is not.
+
 The fix is to write the array out, `DoProc("Name", {aArgs[1], aArgs[2]})`,
 or to call by a name held in a variable when the argument list really is
 built at run time.
 
-A comma with no argument after it (`DoProc("Name",)`) is flagged too. The
-comma opens the argument slot and leaves it empty, and the call stops with
-the same compile error. The range covers the comma, and the message gives
-both fixes: drop the comma, or write the array.
+An empty array slot is flagged too, on the comma that opens it:
+
+- `DoProc("Name",)`, a comma with no argument after it, and
+  `DoProc("Name",, vExtra)`, an empty second position with something
+  after it. With a literal one-part name both stop with the same compile
+  error. The message gives both fixes: drop the comma, or write the array.
+- `DoProc(sName,)`, the same comma when the name is not a literal. That
+  name is resolved at run time, so the script compiles, and the call
+  raises when it runs. This is the only shape reported for a name that is
+  not a literal.
 
 It must NOT flag:
 
@@ -69,7 +93,8 @@ It must NOT flag:
 - a call with no second argument;
 - a target that is not a string literal (`DoProc(sName, aArgs)`): the name
   is resolved at run time, and that path takes any array (reference
-  functions/DoProc shows this form);
+  functions/DoProc shows this form), in parentheses or with a comma after
+  it. Only the empty slot above fails for it;
 - a target built by an expression (`DoProc("Check" + sKind, aArgs)`): it
   is resolved at run time like a name in a variable;
 - a dotted target (`DoProc("Category.Script.Procedure", aArgs)`): it
@@ -82,10 +107,15 @@ It must NOT flag:
 - a member call `oObject:DoProc(...)`, which is not the built-in (D10);
 - an array literal in parentheses (`DoProc("Name", ({1, 2}))`), which
   compiles and runs;
-- anything else in parentheses, a skipped second argument with another
-  argument after it (`DoProc("Name",, vExtra)`), or an argument the parser
-  could not read: what the compiler makes of these is not known, and
-  unknown is silence.
+- commas after the array (`DoProc("Name", {1, 2},)`), which compile and
+  run and are `trailing_skip_commas`'s to note, and a third argument after
+  the array (`DoProc("Name", {1, 2}, vExtra)`), which is ignored and is
+  `builtin_excess_arguments`'s;
+- an empty array literal (`DoProc("Name", {})`): the procedure's
+  parameters are NIL;
+- a dotted target with an empty slot or a parenthesized argument: those
+  shapes were not run for it (D17);
+- an argument the parser could not read: unknown is silence.
 
 ## Examples
 
@@ -145,6 +175,53 @@ A comma with nothing after it fails the same way.
 
 :PROCEDURE CheckAll;
 	:RETURN {};
+:ENDPROC;
+```
+
+### Flags
+
+A variable in parentheses is still a variable.
+
+```ssl
+:PROCEDURE RunCheck;
+	:PARAMETERS aCheck;
+
+	:RETURN DoProc("CheckEqual", (aCheck));
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+```
+
+### Flags
+
+An empty second position fails whatever follows it.
+
+```ssl
+:PROCEDURE RunAll;
+	:PARAMETERS vExtra;
+
+	:RETURN DoProc("CheckAll",, vExtra);
+:ENDPROC;
+
+:PROCEDURE CheckAll;
+	:RETURN {};
+:ENDPROC;
+```
+
+### Flags
+
+With a name in a variable the script compiles, and this call raises when
+it runs.
+
+```ssl
+:PROCEDURE CallByName;
+	:PARAMETERS sProcName;
+
+	:RETURN DoProc(sProcName,);
 :ENDPROC;
 ```
 
@@ -228,6 +305,28 @@ variable.
 
 ### Does not flag
 
+Commas after the array, and a third argument after it, compile and run.
+
+```ssl
+:PROCEDURE RunCheck;
+	:PARAMETERS sLabel, vExpected, vActual, vExtra;
+	:DECLARE aResult;
+
+	aResult := DoProc("CheckEqual", {sLabel, vExpected, vActual},);
+	aResult := DoProc("CheckEqual", {sLabel, vExpected, vActual}, vExtra);
+
+	:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+```
+
+### Does not flag
+
 ```ssl
 :PROCEDURE Forward;
 	:PARAMETERS aArgs;
@@ -269,4 +368,10 @@ server setting the file does not show, and the shapes of argument the
 parser or the compiler may read differently are left alone, following
 D17: where the behavior is not confirmed, the server stays silent. Each
 shape the rule reports, and each it deliberately passes, was run on
-STARLIMS 12; the 2026-11-27 history note lists them.
+STARLIMS 12; the 2026-11-27 history notes list them.
+
+`DoProc(sName,)` is the one finding that is not a compile error. It is
+here because it is the same mistake, an empty slot where the array
+belongs, and because it fails every time the call runs: there is no input
+for which it works. Error severity for that reason, as with a non-integer
+array index.
