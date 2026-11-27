@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-27
+
+The answers release (#372). The questions the last release left open were
+run on STARLIMS 12, and this release is what the answers changed. One new
+warning, `iif_guard_ineffective`, reports an `IIf` whose test guards
+nothing. Existing errors now report five constructs that validated clean
+and do not compile or do not run: four `DoProc` call shapes and a quoted
+`:INHERIT` parent. One question ends with a decision and no rule (D22). On
+the production corpus no file moves between valid and invalid, and the
+only new findings are 15 `iif_guard_ineffective` warnings in 11 scripts.
+
 ### Added
 - **`iif_guard_ineffective`: an `IIf` whose test guards nothing** (#372).
   `IIf` evaluates both value arguments, so in
@@ -3356,7 +3367,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.29.0...v0.30.0
