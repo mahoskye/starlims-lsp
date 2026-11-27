@@ -184,7 +184,7 @@ vOut := DoProc("Target",, aArgs);
 :ENDPROC;`
 
 	got := codesAt(t, CodeDoProcArgsNotArrayLiteral, script)
-	want := []int{3, 4, 5, 6, 7, 8, 9, 10, 11, 23}
+	want := []int{3, 4, 5, 6, 7, 8, 9, 10, 11, 22, 23, 24}
 	if len(got) != len(want) {
 		t.Fatalf("expected lines %v, got %v", want, got)
 	}
@@ -216,10 +216,94 @@ func TestDoProcArgsNotArrayLiteralRangeAndMessage(t *testing.T) {
 	t.Fatal("expected a doproc_args_not_array_literal diagnostic")
 }
 
-// A comma with no argument after it is reported on the comma, with a
+// An empty array slot is reported on the comma that opens it, with a
 // message of its own: there is no argument to point at.
-func TestDoProcArgsNotArrayLiteralTrailingComma(t *testing.T) {
-	script := ":PROCEDURE Target;\n:ENDPROC;\nDoProc(\"Target\" , /* none; );\nDoProc(\"Target\",, 1);\nDoProc(\"Target\", ({1}));"
+func TestDoProcArgsNotArrayLiteralEmptySlot(t *testing.T) {
+	cases := []struct {
+		script   string
+		start    int
+		contains []string
+	}{
+		{
+			"DoProc(\"Target\" , /* none; );",
+			16,
+			[]string{`DoProc("Target",)`, "compile-time error", `DoProc("Target")`, `DoProc("Target", {...})`},
+		},
+		{
+			"DoProc(\"Target\",, 1);",
+			15,
+			[]string{`DoProc("Target",, ...)`, "second position", "compile-time error"},
+		},
+		{
+			"DoProc(sName,);",
+			12,
+			[]string{"when the call runs", "drop the comma"},
+		},
+		{
+			"DoProc(\"Tar\" + \"get\" ,);",
+			21,
+			[]string{"when the call runs"},
+		},
+	}
+	for _, c := range cases {
+		script := ":PROCEDURE Target;\n:ENDPROC;\n:DECLARE sName;\nsName := \"Target\";\n" + c.script
+		var found []Diagnostic
+		for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+			if d.Code == CodeDoProcArgsNotArrayLiteral {
+				found = append(found, d)
+			}
+		}
+		if len(found) != 1 {
+			t.Errorf("%q: want one finding, got %d: %+v", c.script, len(found), found)
+			continue
+		}
+		d := found[0]
+		if d.Severity != SeverityError {
+			t.Errorf("%q: severity = %v, want error", c.script, d.Severity)
+		}
+		if d.Range.Start.Line != 4 || d.Range.Start.Character != c.start || d.Range.End.Character != c.start+1 {
+			t.Errorf("%q: range = %+v, want the comma at 4:%d", c.script, d.Range, c.start)
+		}
+		for _, want := range c.contains {
+			if !strings.Contains(d.Message, want) {
+				t.Errorf("%q: message %q does not contain %q", c.script, d.Message, want)
+			}
+		}
+	}
+}
+
+// What was run on STARLIMS and works stays unreported: an array literal in
+// parentheses, commas after the array, a third argument after the array,
+// and every argument form when the name is resolved at run time. A dotted
+// literal name was not run with an empty slot, so it stays silent too.
+func TestDoProcArgsNotArrayLiteralSilentShapes(t *testing.T) {
+	script := `:PROCEDURE Run;
+:PARAMETERS aArgs, sName, nOne;
+:DECLARE vOut;
+vOut := DoProc("Target", ({nOne}));
+vOut := DoProc("Target", (({nOne})));
+vOut := DoProc("Target", {nOne},);
+vOut := DoProc("Target", {nOne},,);
+vOut := DoProc("Target", {});
+vOut := DoProc(sName, aArgs,);
+vOut := DoProc(sName, (aArgs));
+vOut := DoProc("Cat.Script.Target",);
+vOut := DoProc("Cat.Script.Target", (aArgs));
+:RETURN vOut;
+:ENDPROC;
+:PROCEDURE Target;
+:PARAMETERS nOne;
+:RETURN nOne;
+:ENDPROC;`
+	if got := codesAt(t, CodeDoProcArgsNotArrayLiteral, script); len(got) != 0 {
+		t.Errorf("reported on lines %v, and must not be", got)
+	}
+}
+
+// A variable in parentheses is still a variable: the whole argument,
+// parentheses included, is the range.
+func TestDoProcArgsNotArrayLiteralParenthesized(t *testing.T) {
+	script := ":DECLARE aArgs;\nDoProc(\"Target\", ((aArgs)));\n:PROCEDURE Target;\n:ENDPROC;"
 	var found []Diagnostic
 	for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
 		if d.Code == CodeDoProcArgsNotArrayLiteral {
@@ -227,17 +311,39 @@ func TestDoProcArgsNotArrayLiteralTrailingComma(t *testing.T) {
 		}
 	}
 	if len(found) != 1 {
-		t.Fatalf("want one finding, on the trailing comma, got %d: %+v", len(found), found)
+		t.Fatalf("want one finding, got %d", len(found))
 	}
-	d := found[0]
-	if d.Severity != SeverityError {
-		t.Errorf("severity = %v, want error", d.Severity)
+	if r := found[0].Range; r.Start.Line != 1 || r.Start.Character != 17 || r.End.Character != 26 {
+		t.Errorf("range = %+v, want the parenthesized argument (1:17-1:26)", r)
 	}
-	if d.Range.Start.Line != 2 || d.Range.Start.Character != 16 || d.Range.End.Character != 17 {
-		t.Errorf("range = %+v, want the comma (2:16-2:17)", d.Range)
+}
+
+// The opt-in trailing-comma note says the call works without the comma.
+// For a DoProc whose array slot is the empty one that is false, whatever
+// the name is, so the note is not given there.
+func TestTrailingSkipCommasLeavesDoProcArraySlot(t *testing.T) {
+	script := `:PROCEDURE Run;
+:PARAMETERS sName, aArgs;
+:DECLARE vOut;
+vOut := DoProc("Target",);
+vOut := DoProc(sName,);
+vOut := DoProc("Cat.Script.Target",);
+vOut := DoProc("Target", {1},);
+vOut := DoProc(sName, aArgs,,);
+:RETURN vOut;
+:ENDPROC;
+:PROCEDURE Target;
+:ENDPROC;`
+	opts := DefaultDiagnosticOptions()
+	opts.IncludeInfoDiagnostics = true
+	var lines []int
+	for _, d := range GetDiagnostics(script, opts) {
+		if d.Code == CodeTrailingSkipCommas {
+			lines = append(lines, d.Range.Start.Line)
+		}
 	}
-	if !strings.Contains(d.Message, `DoProc("Target")`) || !strings.Contains(d.Message, `DoProc("Target", {...})`) {
-		t.Errorf("message does not show both fixes: %s", d.Message)
+	if len(lines) != 2 || lines[0] != 6 || lines[1] != 7 {
+		t.Errorf("trailing_skip_commas on lines %v, want [6 7]", lines)
 	}
 }
 

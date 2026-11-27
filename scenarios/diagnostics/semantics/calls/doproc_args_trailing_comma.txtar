@@ -1,14 +1,21 @@
 The argument forms around diag.doproc_args_not_array_literal that were run
-on STARLIMS 12 (issue #372). A comma with no argument after it stops the
-script from compiling, like an array in a variable. An array literal in
-parentheses, a name built by an expression, a dotted name and ExecFunction
-all compile and run with the array in a variable, so each stays unreported.
+on STARLIMS 12. With a literal name, a comma with no argument after it, an
+empty slot followed by another argument, and a variable in parentheses all
+stop the script from compiling, like an array in a variable. With the name
+in a variable the comma with no array raises when the call runs. An array
+literal in parentheses, commas after the array, a name built by an
+expression, a dotted name and ExecFunction all run, so each stays
+unreported.
 -- input.ssl --
 :PROCEDURE RunChecks;
-:PARAMETERS aArgs, sKind;
+:PARAMETERS aArgs, sKind, sName;
 :DECLARE aResult;
 aResult := DoProc("CheckEqual",);
+aResult := DoProc("CheckEqual",, sKind);
+aResult := DoProc("CheckEqual", (aArgs));
+aResult := DoProc(sName,);
 aResult := DoProc("CheckEqual", ({aArgs[1], aArgs[2]}));
+aResult := DoProc("CheckEqual", {aArgs[1], aArgs[2]},);
 aResult := DoProc("Check" + sKind, aArgs);
 aResult := DoProc("Common.Checks.CheckEqual", aArgs);
 aResult := ExecFunction("Common.Checks.CheckEqual", aArgs);
@@ -22,11 +29,15 @@ aResult := DoProc("CheckEqual");
 :ENDPROC;
 -- format --
 :PROCEDURE RunChecks;
-	:PARAMETERS aArgs, sKind;
+	:PARAMETERS aArgs, sKind, sName;
 	:DECLARE aResult;
 
 	aResult := DoProc("CheckEqual",);
+	aResult := DoProc("CheckEqual",, sKind);
+	aResult := DoProc("CheckEqual", (aArgs));
+	aResult := DoProc(sName,);
 	aResult := DoProc("CheckEqual", ({aArgs[1], aArgs[2]}));
+	aResult := DoProc("CheckEqual", {aArgs[1], aArgs[2]},);
 	aResult := DoProc("Check" + sKind, aArgs);
 	aResult := DoProc("Common.Checks.CheckEqual", aArgs);
 	aResult := ExecFunction("Common.Checks.CheckEqual", aArgs);
@@ -42,5 +53,14 @@ aResult := DoProc("CheckEqual");
 :ENDPROC;
 -- diagnostics --
 4:31-4:32 error doproc_args_not_array_literal: DoProc("CheckEqual",) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).
+5:31-5:32 error doproc_args_not_array_literal: DoProc("CheckEqual",, ...) has no argument array in its second position, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).
+5:34-5:39 warning builtin_excess_arguments: 'DoProc' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
+6:33-6:40 error doproc_args_not_array_literal: DoProc with a literal procedure name takes its arguments as an array literal: write DoProc("CheckEqual", {...}). An array held in a variable or built by an expression is a compile-time error here.
+7:24-7:25 error doproc_args_not_array_literal: DoProc(...,) has a comma and no argument array after it, which raises an error when the call runs: drop the comma, or pass the array.
 -- diagnostics [--strict --info] --
 4:31-4:32 error doproc_args_not_array_literal: DoProc("CheckEqual",) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).
+5:31-5:32 error doproc_args_not_array_literal: DoProc("CheckEqual",, ...) has no argument array in its second position, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).
+5:34-5:39 warning builtin_excess_arguments: 'DoProc' accepts at most 2 argument(s) - the compiler silently drops the surplus 1 argument (never evaluated)
+6:33-6:40 error doproc_args_not_array_literal: DoProc with a literal procedure name takes its arguments as an array literal: write DoProc("CheckEqual", {...}). An array held in a variable or built by an expression is a compile-time error here.
+7:24-7:25 error doproc_args_not_array_literal: DoProc(...,) has a comma and no argument array after it, which raises an error when the call runs: drop the comma, or pass the array.
+9:53-9:54 info trailing_skip_commas: Trailing skipped arguments before ')' are unnecessary - the runtime pads missing trailing arguments with NIL; omit them

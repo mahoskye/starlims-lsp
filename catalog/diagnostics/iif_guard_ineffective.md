@@ -30,6 +30,17 @@ history:
       query, which returns a row even when nothing matches, so they never
       raise and their test never fires. A new default-on warning: a
       behavior change under D16.
+  - date: 2026-11-27
+    ref: "PR #381 follow-up"
+    note: >-
+      The two forms the rule reported on reasoning alone were run on
+      STARLIMS 12, and both raise: an element read of NIL behind a NIL
+      test (`IIf(aRows != NIL, aRows[1], "")`) and a method call on NIL
+      behind one (`IIf(oOwner == NIL, "", oOwner:GetName())`). The silence
+      for `Empty` of a string was confirmed as well:
+      `IIf(Empty(sName), "", sName:Trim())` returns for an empty string and
+      for a declared name never assigned, and raises only when the name
+      holds NIL. No behavior change.
 issues: []
 ---
 

@@ -37,6 +37,16 @@ history:
       name that comma is a compile error (verified on STARLIMS 12), so
       `doproc_args_not_array_literal` reports it, and this note's message,
       which says the call works, was wrong for it.
+  - date: 2026-11-27
+    ref: "PR #381 follow-up"
+    note: >-
+      Checked for `DoProc` on STARLIMS 12. Commas after the argument array
+      are what this note says they are: `DoProc("Name", {1, 2},)`, the
+      same with two commas, and `DoProc(sName, aArgs,)` all run. A comma
+      in the array's own position is not: `DoProc(sName,)` raises at run
+      time, as the literal-name form fails to compile. So the note is no
+      longer given for any `DoProc` whose array slot is the empty one,
+      whatever the name is.
 issues: []
 ---
 
@@ -64,9 +74,11 @@ It must NOT flag:
 - a qualified member call (`sValue:Substring(1,)`) — the NIL padding of
   trailing arguments is a property of SSL calls, not of whatever a member
   call dispatches to (D10);
-- the comma in `DoProc("Name",)`, a literal one-part name with nothing
-  after the comma: that call does not compile, so the comma is
-  `doproc_args_not_array_literal`'s error and not a style note.
+- the comma in `DoProc("Name",)` or `DoProc(sName,)`, where the empty
+  slot is the argument array's: that call does not compile, or raises
+  when it runs, so the comma is `doproc_args_not_array_literal`'s error
+  and not a style note. The note is withheld for a dotted name there too,
+  where the error is not reported because that form was not run.
 
 ## Examples
 

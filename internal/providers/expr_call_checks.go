@@ -108,20 +108,25 @@ func checkFormatArgNotArray(tokens []lexer.Token, calls []parser.CallSite) []Dia
 	return diagnostics
 }
 
-// checkDoProcArgsNotArrayLiteral flags `DoProc("Name", <arguments>)` when
-// the target is a one-part string literal and the arguments are not written
-// as an array literal (diag.doproc_args_not_array_literal, issue #372). A
-// literal one-part name is bound when the script compiles, and that form
-// takes its arguments only as `{...}`: an array held in a variable or built
-// by an expression stops the script from compiling. A name held in a
-// variable is resolved at run time and takes any array, so it is not
-// reported; nor is a dotted name, whose binding depends on how the server
-// compiles. Inside a class the call is already doproc_in_class, and one
-// finding per call is enough. A comma with nothing after it
-// (`DoProc("Name",)`) fails the same way and is reported on the comma. An
-// array literal in parentheses compiles, so it is not reported; a skipped
-// slot with a third argument after it and an argument the parser could not
-// read stay silent: unknown is not evidence (D17).
+// checkDoProcArgsNotArrayLiteral flags a `DoProc(...)` call whose second
+// argument is not the array the call needs
+// (diag.doproc_args_not_array_literal, issue #372).
+//
+// A one-part string-literal name is bound when the script compiles, and
+// that form takes its arguments only as `{...}`. An array held in a
+// variable or built by an expression stops the script from compiling, in
+// parentheses or not, and so does an empty slot where the array belongs
+// (`DoProc("Name",)`, `DoProc("Name",, x)`). An array literal in
+// parentheses compiles.
+//
+// A name that is not a literal is resolved at run time and takes any
+// array, so only one shape fails for it: a comma with no array after it
+// (`DoProc(sName,)`), which raises when the call runs.
+//
+// A dotted literal name is left alone: how it is bound depends on how the
+// server compiles, and these shapes were not run for it (D17). Inside a
+// class a one-part literal target is already doproc_in_class, and the
+// other forms were not run there.
 func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -133,65 +138,84 @@ func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSit
 		}
 	}
 
+	report := func(rng Range, message string) {
+		diagnostics = append(diagnostics, Diagnostic{
+			Severity: SeverityError,
+			Range:    rng,
+			Message:  message,
+			Source:   "ssl-lsp",
+			Code:     CodeDoProcArgsNotArrayLiteral,
+		})
+	}
+
 	for _, call := range calls {
 		if call.Qualified() || !strings.EqualFold(call.Name, "DoProc") || len(call.Args) < 2 {
 			continue
 		}
-		target := call.Args[0]
-		if target.Kind != parser.ExprLiteral || target.Start != target.End ||
-			target.Start < 0 || target.Start >= len(tokens) {
+		if call.Call == nil || call.Call.Start < 0 || call.Call.Start >= len(tokens) {
+			continue
+		}
+		if classLine > 0 && tokens[call.Call.Start].Line >= classLine {
+			continue
+		}
+		target, args := call.Args[0], call.Args[1]
+
+		isString := target.Kind == parser.ExprLiteral && target.Start == target.End &&
+			target.Start >= 0 && target.Start < len(tokens) && tokens[target.Start].Type == lexer.TokenString
+		if !isString {
+			// A name resolved at run time. Only `DoProc(x,)` is known to fail.
+			named := target.Kind != parser.ExprLiteral && target.Kind != parser.ExprUnknown && target.Kind != parser.ExprSkipped
+			if named && args.Kind == parser.ExprSkipped && len(call.Args) == 2 {
+				if rng, ok := skippedSlotCommaRange(tokens, args); ok {
+					report(rng, "DoProc(...,) has a comma and no argument array after it, which raises an error when the call runs: "+
+						"drop the comma, or pass the array.")
+				}
+			}
 			continue
 		}
 		name := tokens[target.Start]
-		if name.Type != lexer.TokenString || strings.Contains(name.Text, ".") {
+		if strings.Contains(name.Text, ".") {
 			continue
 		}
-		if classLine > 0 && name.Line >= classLine {
-			continue
-		}
-		args := call.Args[1]
-		switch args.Kind {
-		case parser.ExprArrayLiteral, parser.ExprGroup, parser.ExprUnknown:
-			continue
-		case parser.ExprSkipped:
-			// Only the shape that was verified: the comma is the last thing
-			// in the call. `DoProc("Name",, x)` is left alone.
-			rng, ok := trailingCommaRange(tokens, args)
-			if len(call.Args) != 2 || !ok {
+
+		if args.Kind == parser.ExprSkipped {
+			rng, ok := skippedSlotCommaRange(tokens, args)
+			if !ok {
 				continue
 			}
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: SeverityError,
-				Range:    rng,
-				Message: fmt.Sprintf("DoProc(%s,) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: "+
-					"write DoProc(%s) or DoProc(%s, {...}).", name.Text, name.Text, name.Text),
-				Source: "ssl-lsp",
-				Code:   CodeDoProcArgsNotArrayLiteral,
-			})
+			if len(call.Args) == 2 {
+				report(rng, fmt.Sprintf("DoProc(%s,) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: "+
+					"write DoProc(%s) or DoProc(%s, {...}).", name.Text, name.Text, name.Text))
+			} else {
+				report(rng, fmt.Sprintf("DoProc(%s,, ...) has no argument array in its second position, which is a compile-time error with a literal procedure name: "+
+					"write DoProc(%s) or DoProc(%s, {...}).", name.Text, name.Text, name.Text))
+			}
+			continue
+		}
+
+		// Parentheses change nothing: `({1, 2})` is still an array literal,
+		// `(aArgs)` is still a variable.
+		switch unwrapGroup(args).Kind {
+		case parser.ExprArrayLiteral, parser.ExprUnknown, parser.ExprGroup:
 			continue
 		}
 		rng, ok := exprRange(tokens, args)
 		if !ok {
 			continue
 		}
-		diagnostics = append(diagnostics, Diagnostic{
-			Severity: SeverityError,
-			Range:    rng,
-			Message: fmt.Sprintf("DoProc with a literal procedure name takes its arguments as an array literal: write DoProc(%s, {...}). "+
-				"An array held in a variable or built by an expression is a compile-time error here.", name.Text),
-			Source: "ssl-lsp",
-			Code:   CodeDoProcArgsNotArrayLiteral,
-		})
+		report(rng, fmt.Sprintf("DoProc with a literal procedure name takes its arguments as an array literal: write DoProc(%s, {...}). "+
+			"An array held in a variable or built by an expression is a compile-time error here.", name.Text))
 	}
 
 	return diagnostics
 }
 
-// trailingCommaRange returns the range of the comma that opens a skipped
-// last argument (`f(a,)`). The skipped slot has no token of its own: its
-// node sits on the closing parenthesis, so the comma is the significant
-// token before it.
-func trailingCommaRange(tokens []lexer.Token, skipped *parser.Expr) (Range, bool) {
+// skippedSlotCommaRange returns the range of the comma that opens a
+// skipped argument slot (`f(a,)`, `f(a,, c)`). The slot has no token of
+// its own: its node sits on what follows it, the closing parenthesis or
+// the next comma, so the opening comma is the significant token before
+// that.
+func skippedSlotCommaRange(tokens []lexer.Token, skipped *parser.Expr) (Range, bool) {
 	if skipped == nil || skipped.Start <= 0 || skipped.Start > len(tokens) {
 		return Range{}, false
 	}

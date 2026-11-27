@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script defining the procedure is still a compile error, and
   `Me:Name(...)` reaches the included procedure, so `doproc_in_class`
   keeps no exemption. Each entry's history records it. No behavior change.
+  `iif_guard_ineffective`'s two forms behind a NIL test were run too, and
+  both raise.
 - **Decision D22: no rule for a script-level variable read in a procedure
   entered by name** (#372). The read fails when nothing up the call stack
   declared the name, and a variable is resolved through the whole call
@@ -52,6 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   literal in parentheses, a name built by an expression, a dotted name and
   `ExecFunction` all compile with the array in a variable. Production
   corpus: no findings
+  ([diag.doproc_args_not_array_literal](catalog/diagnostics/doproc_args_not_array_literal.md)).
+- **Two more `DoProc` shapes that do not compile, and one that raises**
+  (follow-up to #372). `DoProc("Name", (aArgs))`, a variable in
+  parentheses, and `DoProc("Name",, vExtra)`, an empty array slot with
+  something after it, stop with the same compile-time error as the forms
+  already reported (verified on STARLIMS 12).
+  `doproc_args_not_array_literal` now reports both. It also reports
+  `DoProc(sName,)`: with the name in a variable the script compiles and
+  the call raises when it runs. `trailing_skip_commas` no longer calls
+  that comma unnecessary. Confirmed as working and left alone: commas
+  after the array, a third argument after it, and an empty array literal.
+  No new code. Production corpus: none of these shapes occurs
   ([diag.doproc_args_not_array_literal](catalog/diagnostics/doproc_args_not_array_literal.md)).
 - **A quoted `:INHERIT` parent fails validation** (#372).
   `:INHERIT "Category.Parent";` was left unreported because its compile

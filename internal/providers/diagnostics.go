@@ -391,15 +391,11 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkOperatorOperandTypes(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkEqualsEmptyString(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
-	// A trailing comma that doproc_args_not_array_literal reports is a
-	// compile error, not an unnecessary comma: the error owns it, and the
-	// style note, whose message says the call works, is dropped there.
-	doProcArgs := checkDoProcArgsNotArrayLiteral(tokens, calls)
 	trailingRuns := trailingSkipCommaRuns(tokens, calls)
-	diagnostics = append(diagnostics, withoutStartsOf(checkTrailingSkipCommas(tokens, trailingRuns), doProcArgs)...)
+	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens, calls)...)
-	diagnostics = append(diagnostics, doProcArgs...)
+	diagnostics = append(diagnostics, checkDoProcArgsNotArrayLiteral(tokens, calls)...)
 	diagnostics = append(diagnostics, checkIIfGuardIneffective(tokens, calls)...)
 	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens, calls)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
@@ -8651,25 +8647,6 @@ func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
 	return diagnostics
 }
 
-// withoutStartsOf returns diags without the findings that start where one
-// of owners starts: the owner reports the same token for a stronger reason.
-func withoutStartsOf(diags, owners []Diagnostic) []Diagnostic {
-	if len(diags) == 0 || len(owners) == 0 {
-		return diags
-	}
-	owned := make(map[Position]bool, len(owners))
-	for _, o := range owners {
-		owned[o.Range.Start] = true
-	}
-	kept := diags[:0:0]
-	for _, d := range diags {
-		if !owned[d.Range.Start] {
-			kept = append(kept, d)
-		}
-	}
-	return kept
-}
-
 // skipCommaRun is an inclusive token-index span from the first to the last
 // comma of a run of skip-commas.
 type skipCommaRun struct{ first, last int }
@@ -8679,12 +8656,18 @@ type skipCommaRun struct{ first, last int }
 // skipped slots (`Foo(a,,)`, `Foo(a,)`). Call sites come from the
 // expression AST; qualified `recv:Name(...)` member calls are excluded —
 // the runtime's NIL padding of missing trailing arguments is a property of
-// SSL calls, not of whatever a member call dispatches to (D10).
+// SSL calls, not of whatever a member call dispatches to (D10). A `DoProc`
+// call whose array slot is the skipped one (`DoProc(x,)`) is excluded too:
+// that comma is not unnecessary, the call fails with it
+// (diag.doproc_args_not_array_literal).
 func trailingSkipCommaRuns(tokens []lexer.Token, calls []parser.CallSite) []skipCommaRun {
 	var runs []skipCommaRun
 	for _, site := range calls {
 		n := len(site.Args)
 		if site.Qualified() || n == 0 || site.Args[n-1].Kind != parser.ExprSkipped {
+			continue
+		}
+		if n >= 2 && site.Args[1].Kind == parser.ExprSkipped && strings.EqualFold(site.Name, "DoProc") {
 			continue
 		}
 		from := site.Call.Children[0].End + 1
