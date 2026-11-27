@@ -85,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as #379 requires, and positional `?` placeholders are numbered across
   the whole string. A defect fix under D16
   ([feature.hover](catalog/features/hover.md) A27).
+- **Go to definition on a UDObject property declared by a string key
+  ranges over the name, not its opening quote.** For
+  `oObj := CreateUDObject({{"Name", 1}});`, definition on a later
+  `oObj:Name` selected `"Nam`, one character left of the name, for `"`,
+  `'` and `[...]` keys alike. A property learned from `oObj:Name := ...`
+  was already right. A defect fix under D16
+  ([feature.definition](catalog/features/definition.md) A21).
 
 ## [0.33.0] - 2026-11-27
 

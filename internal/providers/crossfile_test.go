@@ -3,6 +3,7 @@ package providers
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -289,6 +290,40 @@ x := oObj:Unknown;
 	// Unknown is declared in the file (no word fallback).
 	if locs := FindDefinitionCrossFile(text, tokens, 7, 12, "file:///self.ssl", procedures, variables, nil); locs != nil {
 		t.Errorf("expected null for unknown member on shaped receiver, got %+v", locs)
+	}
+}
+
+// [spec feature.definition/A21] — a property declared by an initializer key
+// ranges over the name inside the quotes. The range started at the opening
+// quote, one character left of the name.
+func TestFindDefinitionCrossFile_UDObjectInitializerKeyRange(t *testing.T) {
+	for _, init := range []string{
+		`{{"Name", 1}}`,
+		`{{'Name', 1}}`,
+		`{{[Name], 1}}`,
+		`{{"Unit", "µg/L"}, {"Name", 1}}`,
+	} {
+		decl := "oObj := CreateUDObject(" + init + ");"
+		text := ":PROCEDURE Main;\n:DECLARE oObj;\n" + decl + "\noObj:Name := 2;\n:ENDPROC;"
+		tokens := lexer.NewLexer(text).Tokenize()
+		p := parser.NewParser(tokens)
+		ast := p.Parse()
+		procedures := p.ExtractProcedures(ast)
+		variables := p.ExtractVariables()
+
+		locs := FindDefinitionCrossFile(text, tokens, 4, len("oObj:")+2, "file:///self.ssl", procedures, variables, nil)
+		if len(locs) != 1 {
+			t.Errorf("%s: expected one location, got %+v", init, locs)
+			continue
+		}
+		key := strings.LastIndex(decl, "Name")
+		want := Range{
+			Start: Position{Line: 2, Character: utf8.RuneCountInString(decl[:key])},
+			End:   Position{Line: 2, Character: utf8.RuneCountInString(decl[:key]) + len("Name")},
+		}
+		if locs[0].Range != want {
+			t.Errorf("%s: range = %+v, want %+v (exactly the name inside the quotes)", init, locs[0].Range, want)
+		}
 	}
 }
 
