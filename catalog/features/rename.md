@@ -69,6 +69,18 @@ history:
       site on the same line could shift an edit; each document's edits
       are now converted against that document's own text, including
       closed files in a cross-file rename.
+  - date: 2026-11-27
+    ref: "issue #378"
+    note: >-
+      The dotted literals and operators are rejected as the behavior text
+      always required (A25). The word under the cursor was taken without
+      its dots, so the `T` of `.T.` and the `AND` of `.AND.` passed for
+      identifiers: prepare-rename offered them and a rename rewrote every
+      `.T.` in the file. The shared reference search had the same blind
+      spot from the other side: renaming a variable spelled `t`, `f`,
+      `and`, `or` or `not` also rewrote the dotted token of that spelling
+      (A26). The token under the cursor now decides, and a word match
+      inside a keyword, literal or operator token is never an occurrence.
 issues: ["#43", "#125"]
 ---
 
@@ -88,12 +100,18 @@ issues: ["#43", "#125"]
   rejects: script rename is a file rename, out of scope. 1-part dispatch
   strings also still reject — a same-file rename starts from the
   identifier, not the string.
+- A keyword, literal or operator is rejected on every part of its token.
+  The letters between the dots of `.T.`, `.F.`, `.AND.`, `.OR.` and `.NOT.`
+  are part of the token, not an identifier of their own, exactly as the
+  `IF` of `:IF` is. The one position that still renames is a cursor that
+  also touches an adjacent identifier (the end of `.NOT.` in
+  `.NOT.bDone` is the start of `bDone`): the identifier is the subject.
 - Prepare-rename MUST also reject the member name of a `:` access
   (`oRec:Name`): the receiver's type is not resolved, so a rename would
   edit every like-spelled member in the file, built-in .NET properties
   included (D10). `Rename` itself repeats these guards — a request from a
-  comment, a string, or a member name produces no edits even when the
-  client skipped prepare.
+  comment, a string, a member name, or a keyword, literal or operator
+  token produces no edits even when the client skipped prepare.
 - The new name MUST be validated: a legal SSL identifier (letter or `_`
   first, then alphanumerics/`_`), not a keyword, not a built-in function
   name, not a built-in class name, not `NIL`, and not
@@ -125,6 +143,8 @@ issues: ["#43", "#125"]
   matches are dropped, and string matches are dropped unless the string is
   the first argument of `DoProc`/`ExecFunction` (case-insensitive) and the
   match spans the entire string content — the dispatch-target case above.
+  A match inside a keyword, literal or operator token is dropped too:
+  renaming a variable `t` leaves every `.T.` as it is.
 - Procedure renames extend cross-file: dotted `DoProc`/`ExecFunction`
   sites across the workspace whose target resolves UNAMBIGUOUSLY (a single
   resolution candidate, equal to the renamed definition) are edited — the
@@ -176,6 +196,8 @@ issues: ["#43", "#125"]
 - A22: Given `:PUBLIC gCount;` used at file level and a procedure that declares its own `:DECLARE gCount;`, when the public is renamed, then that procedure's local declaration and uses are NOT edited.
 - A23: Given a rename request positioned inside a comment or a non-dispatch string (prepare skipped by the client), when the rename executes, then no edits are produced.
 - A24: Given an emoji (one character, two UTF-16 code units) before an occurrence on the same line — in the current document, or in a closed caller file reached by a cross-file rename — when prepare-rename or rename runs, then the returned range and every edit start and end at the occurrence's UTF-16 offsets, not one unit early (issue #307).
+- A25: Given the cursor on any letter of `.T.`, `.F.`, `.AND.`, `.OR.` or `.NOT.` (either side of the letters, in any casing), when prepare-rename is invoked, then it is rejected, and a rename request at the same position produces no edits — `NIL` and `:IF` behave the same; a cursor at the end of `.NOT.` that is also the start of `bDone` in `.NOT.bDone` still renames `bDone` (issue #378).
+- A26: Given a variable spelled like the letters of a dotted token (`t`, `f`, `and`, `or`, `not`) used beside `.T.`, `.F.`, `.AND.`, `.OR.` and `.NOT.`, when the variable is renamed, then its declaration and uses are edited and no dotted token is — the result still compiles (issue #378).
 
 ## Rationale
 

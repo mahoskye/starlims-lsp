@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Rename no longer accepts `.T.`, `.F.`, `.AND.`, `.OR.` or `.NOT.`**
+  (#378). `prepareRename` with the cursor on the letters of one of these
+  answered a range and the letters as the placeholder (`T`, `AND`), and
+  `rename` then rewrote every such token in the file: `.T.` became `.Z.`,
+  which does not compile. Both now answer null, as they always did for
+  `NIL` and as the catalog required. The cause was shared with the
+  reference search, so two more things change with it. Renaming a
+  variable spelled `t`, `f`, `and`, `or` or `not` used to rewrite the
+  dotted token of that spelling as well, and now edits the variable only.
+  Find references on such a variable no longer lists the dotted tokens,
+  and a request with the cursor on a keyword, literal or operator returns
+  nothing. A defect fix under D16
+  ([feature.rename](catalog/features/rename.md) A25, A26,
+  [feature.references](catalog/features/references.md) A20).
+
 ## [0.33.0] - 2026-11-27
 
 The answers release (#372). The questions the last release left open were

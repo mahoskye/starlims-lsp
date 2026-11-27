@@ -863,3 +863,152 @@ func TestGetWordRange_NonASCIICaseMapping(t *testing.T) {
 		t.Errorf("expected range %d-%d, got %+v", start, start+5, r)
 	}
 }
+
+// dottedTokenScript is issue #378's reproduction: every dotted literal and
+// operator, NIL, and two plain parameters.
+const dottedTokenScript = `:PROCEDURE Check;
+	:PARAMETERS bA, bB;
+	:IF bA .AND. .T.;
+		:RETURN .T.;
+	:ENDIF;
+	:IF .NOT. bB .OR. bA;
+		:RETURN NIL;
+	:ENDIF;
+	:RETURN .F.;
+:ENDPROC;`
+
+// [spec feature.rename/A25] — the letters between the dots of a literal or
+// operator are part of the token. Prepare-rename rejects every cursor
+// position on the token, and a rename there (prepare skipped) produces no
+// edits (issue #378).
+func TestRename_DottedLiteralsAndOperatorsRejected(t *testing.T) {
+	procedures, variables := parseText(dottedTokenScript)
+	lines := strings.Split(dottedTokenScript, "\n")
+
+	for _, tok := range []string{".T.", ".F.", ".AND.", ".OR.", ".NOT.", "NIL"} {
+		found := false
+		for i, lineText := range lines {
+			at := strings.Index(lineText, tok)
+			if at < 0 {
+				continue
+			}
+			found = true
+			// Every cursor position touching the token: before its first
+			// character through after its last (1-based columns).
+			for col := at + 1; col <= at+len(tok)+1; col++ {
+				if res := PrepareRename(dottedTokenScript, i+1, col, "file:///t.ssl", procedures, variables); res != nil {
+					t.Errorf("%s line %d col %d: prepare-rename must reject, got placeholder %q", tok, i+1, col, res.Placeholder)
+				}
+				if res := Rename(dottedTokenScript, i+1, col, "zNew", "file:///t.ssl", procedures, variables); res != nil {
+					t.Errorf("%s line %d col %d: rename must produce no edits, got %+v", tok, i+1, col, res.Changes)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("fixture lost its %s", tok)
+		}
+	}
+
+	// Lowercase spellings are the same tokens.
+	lower := ":PROCEDURE P;\n\t:PARAMETERS bA;\n\t:RETURN bA .and. .t.;\n:ENDPROC;"
+	procedures, variables = parseText(lower)
+	for _, col := range []int{14, 15, 16, 17, 20, 21} {
+		if res := PrepareRename(lower, 3, col, "file:///t.ssl", procedures, variables); res != nil {
+			t.Errorf("lowercase col %d: prepare-rename must reject, got placeholder %q", col, res.Placeholder)
+		}
+	}
+
+	// The neighbours still rename: bA on the same line as `.AND. .T.`.
+	procedures, variables = parseText(dottedTokenScript)
+	res := PrepareRename(dottedTokenScript, 3, 7, "file:///t.ssl", procedures, variables)
+	if res == nil || res.Placeholder != "bA" {
+		t.Fatalf("bA beside .AND. must stay renameable, got %+v", res)
+	}
+}
+
+// [spec feature.rename/A25] — a cursor at the end of `.NOT.` that is also
+// the start of an identifier written against it names the identifier.
+func TestRename_IdentifierAgainstDottedOperatorStillRenames(t *testing.T) {
+	text := ":PROCEDURE P;\n\t:PARAMETERS bDone, bA;\n\t:RETURN .NOT.bDone .AND.bA;\n:ENDPROC;"
+	procedures, variables := parseText(text)
+	line := strings.Split(text, "\n")[2]
+
+	// 1-based column of the `b` of bDone == the position just after `.NOT.`.
+	col := strings.Index(line, "bDone") + 1
+	res := PrepareRename(text, 3, col, "file:///t.ssl", procedures, variables)
+	if res == nil || res.Placeholder != "bDone" {
+		t.Fatalf("cursor between .NOT. and bDone must offer bDone, got %+v", res)
+	}
+	renamed := Rename(text, 3, col, "bFinished", "file:///t.ssl", procedures, variables)
+	if renamed == nil {
+		t.Fatal("expected edits for bDone")
+	}
+	got := applyEdits(text, renamed.Changes["file:///t.ssl"])
+	want := ":PROCEDURE P;\n\t:PARAMETERS bFinished, bA;\n\t:RETURN .NOT.bFinished .AND.bA;\n:ENDPROC;"
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// [spec feature.rename/A26] — a variable spelled like the letters of a
+// dotted token is renamed without touching the token: the shared reference
+// search drops a word match inside a keyword, literal or operator token
+// (issue #378).
+func TestRename_VariableSpelledLikeDottedToken(t *testing.T) {
+	text := `:PROCEDURE P;
+	:DECLARE t, f, and, or, not;
+	t := .T.;
+	f := .F.;
+	and := t .AND. f;
+	or := t .OR. f;
+	not := .NOT. t;
+	:RETURN and .AND. or .OR. .NOT. not;
+:ENDPROC;`
+	procedures, variables := parseText(text)
+
+	// Rename each from its assignment (lines 3-7, column 2), feeding the
+	// result of one rename into the next.
+	renames := []struct {
+		line    int
+		newName string
+	}{
+		{3, "bTrue"}, {4, "bFalse"}, {5, "bBoth"}, {6, "bEither"}, {7, "bNeither"},
+	}
+	for _, r := range renames {
+		res := Rename(text, r.line, 2, r.newName, "file:///t.ssl", procedures, variables)
+		if res == nil {
+			t.Fatalf("line %d: expected edits", r.line)
+		}
+		text = applyEdits(text, res.Changes["file:///t.ssl"])
+		procedures, variables = parseText(text)
+	}
+
+	want := `:PROCEDURE P;
+	:DECLARE bTrue, bFalse, bBoth, bEither, bNeither;
+	bTrue := .T.;
+	bFalse := .F.;
+	bBoth := bTrue .AND. bFalse;
+	bEither := bTrue .OR. bFalse;
+	bNeither := .NOT. bTrue;
+	:RETURN bBoth .AND. bEither .OR. .NOT. bNeither;
+:ENDPROC;`
+	if text != want {
+		t.Errorf("got:\n%s\nwant:\n%s", text, want)
+	}
+}
+
+// [spec feature.rename/A25] — the server takes the workspace-wide procedure
+// path when the cursor may name a procedure. The letters of `.T.` never do,
+// even in a file that declares a procedure spelled `T` (issue #378).
+func TestCursorMayNameProcedure_DottedTokenNeverDoes(t *testing.T) {
+	text := ":PROCEDURE T;\n\t:RETURN .T.;\n:ENDPROC;"
+	if !CursorMayNameProcedure(text, 1, 12) {
+		t.Error("the procedure header must still name the procedure")
+	}
+	// `.T.` on line 2: the dot is at 1-based column 10, the T at 11.
+	for _, col := range []int{11, 12} {
+		if CursorMayNameProcedure(text, 2, col) {
+			t.Errorf("col %d: the T of .T. must not name the procedure T", col)
+		}
+	}
+}

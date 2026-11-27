@@ -725,6 +725,47 @@ other := "prefix sName suffix";
 	}
 }
 
+// [spec feature.references/A20] — a word match inside a keyword, literal or
+// operator token is not an occurrence, and a cursor on such a token names no
+// symbol (issue #378).
+func TestFindReferences_SkipsDottedLiteralsAndOperators(t *testing.T) {
+	text := `:PROCEDURE Test;
+:DECLARE t, f;
+t := .T.;
+f := .NOT. t .AND. f;
+:RETURN t;
+:ENDPROC;`
+
+	procedures, variables := parseText(text)
+
+	locations := FindReferencesWithScope(text, 3, 1, "file:///test.ssl", true, procedures, variables)
+	got := map[[2]int]bool{}
+	for _, loc := range locations {
+		got[[2]int{loc.Range.Start.Line, loc.Range.Start.Character}] = true
+	}
+	// Declaration, the assignment target, the use beside .NOT., the :RETURN.
+	want := [][2]int{{1, 9}, {2, 0}, {3, 11}, {4, 8}}
+	if len(locations) != len(want) {
+		t.Errorf("expected %d references to t, got %d: %v", len(want), len(locations), got)
+	}
+	for _, w := range want {
+		if !got[w] {
+			t.Errorf("missing reference at line %d char %d (0-based); got %v", w[0], w[1], got)
+		}
+	}
+
+	// Cursor on the T of `.T.` (line 3, 1-based column 7 or 8): no symbol.
+	for _, col := range []int{7, 8} {
+		if locs := FindReferencesWithScope(text, 3, col, "file:///test.ssl", true, procedures, variables); len(locs) != 0 {
+			t.Errorf("col %d: a request on .T. must return nothing, got %v", col, locs)
+		}
+	}
+	// Cursor on the AND of `.AND.` (line 4): no symbol either.
+	if locs := FindReferencesWithScope(text, 4, 15, "file:///test.ssl", true, procedures, variables); len(locs) != 0 {
+		t.Errorf("a request on .AND. must return nothing, got %v", locs)
+	}
+}
+
 // TestFindReferences_NonDispatchStringWithProcName: a string mentioning a
 // procedure name only counts as a reference when it is the whole first
 // argument of DoProc/ExecFunction — the dispatch-target case; strings passed

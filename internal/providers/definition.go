@@ -148,6 +148,16 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 		return nil
 	}
 
+	// Tokenize once so each text match can be classified: matches inside
+	// comments and non-dispatch strings are not references (issue #43).
+	tokens := lexer.NewLexer(text).Tokenize()
+
+	// The letters of `.T.`, `.AND.` or `:IF` are part of their token, not
+	// an identifier: no symbol is under the cursor (issue #378).
+	if wordInKeywordOrOperatorToken(tokens, text, line, column) {
+		return nil
+	}
+
 	wordLower := strings.ToLower(word)
 	lines := strings.Split(text, "\n")
 
@@ -245,10 +255,6 @@ func FindReferencesWithScope(text string, line, column int, uri string, includeD
 		lineStartOffsets[i] = runeOffset
 		runeOffset += utf8.RuneCountInString(lineText) + 1 // +1 for the split '\n'
 	}
-
-	// Tokenize once so each text match can be classified: matches inside
-	// comments and non-dispatch strings are not references (issue #43).
-	tokens := lexer.NewLexer(text).Tokenize()
 
 	// Classify what each identifier occurrence *is* (issue #184). Word
 	// matching cannot separate a variable `sName` from the property in
@@ -381,7 +387,10 @@ func resolveDeclarationPosition(wordLower string, wordRegex *regexp.Regexp, line
 // comment tokens never are; matches inside string tokens only count when the
 // string is the first argument of DoProc/ExecFunction and the match spans the
 // entire string content — the dispatch-target case (feature.references/A7).
-// Matches in code (including code blocks) always count. (issue #43)
+// Matches inside a keyword, literal or operator token never are either: the
+// `T` of `.T.` and the `AND` of `.AND.` are not occurrences of a variable
+// spelled that way (issue #378). Other matches in code (including code
+// blocks) always count. (issue #43)
 func isReferenceMatch(tokens []lexer.Token, matchOffset, matchLen int) bool {
 	for i := range tokens {
 		tok := &tokens[i]
@@ -392,7 +401,7 @@ func isReferenceMatch(tokens []lexer.Token, matchOffset, matchLen int) bool {
 			continue
 		}
 		switch tok.Type {
-		case lexer.TokenComment:
+		case lexer.TokenComment, lexer.TokenKeyword, lexer.TokenOperator:
 			return false
 		case lexer.TokenString:
 			return isDispatchTargetMatch(tokens, i, matchOffset, matchLen)
@@ -401,6 +410,58 @@ func isReferenceMatch(tokens []lexer.Token, matchOffset, matchLen int) bool {
 		}
 	}
 	return true
+}
+
+// wordInKeywordOrOperatorToken reports whether the word at a 1-based
+// line/column (as lexer.GetWordAtPosition reads it) is the lettered part of
+// a keyword, literal or operator token: the `T` of `.T.`, the `AND` of
+// `.AND.`, the `IF` of `:IF`, or `NIL`. The word is taken without the
+// token's punctuation, so it looks like an identifier and is not one
+// (issue #378). A cursor that also touches an adjacent identifier — the end
+// of `.NOT.` in `.NOT.bDone` — reads that identifier as its word, and this
+// reports false for it.
+func wordInKeywordOrOperatorToken(tokens []lexer.Token, text string, line, column int) bool {
+	startCol, ok := wordStartColumn(text, line, column)
+	if !ok {
+		return false
+	}
+	for i := range tokens {
+		tok := &tokens[i]
+		if tok.Line > line || tok.Type == lexer.TokenEOF {
+			break
+		}
+		// Keyword and operator tokens never span lines.
+		if tok.Line != line || startCol < tok.Column || startCol >= tok.Column+utf8.RuneCountInString(tok.Text) {
+			continue
+		}
+		return tok.Type == lexer.TokenKeyword || tok.Type == lexer.TokenOperator
+	}
+	return false
+}
+
+// wordStartColumn returns the 1-based rune column where the word at a
+// 1-based line/column starts, using lexer.GetWordAtPosition's boundaries;
+// ok is false when no word is there.
+func wordStartColumn(text string, line, column int) (int, bool) {
+	lines := strings.Split(text, "\n")
+	if line < 1 || line > len(lines) {
+		return 0, false
+	}
+	runes := []rune(lines[line-1])
+	if column < 1 || column > len(runes)+1 {
+		return 0, false
+	}
+	start, end := column-1, column-1
+	for start > 0 && isIdentifierRune(runes[start-1]) {
+		start--
+	}
+	for end < len(runes) && isIdentifierRune(runes[end]) {
+		end++
+	}
+	if start == end {
+		return 0, false
+	}
+	return start + 1, true
 }
 
 // isDispatchTargetMatch reports whether the match inside the string token at
@@ -553,8 +614,13 @@ func symbolFamily(role parser.IdentifierRole) int {
 // callee, or a position the expression tree makes no claim about (a word
 // inside a DoProc/ExecFunction string is unclassified). A member name, a
 // variable, a declared name, or a class name never names the file's
-// procedure of the same spelling (issue #255).
+// procedure of the same spelling (issue #255). Neither do the letters of
+// a keyword, literal or operator token, which are unclassified only
+// because they are not an identifier at all (issue #378).
 func CursorMayNameProcedure(text string, line, column int) bool {
+	if wordInKeywordOrOperatorToken(lexer.NewLexer(text).Tokenize(), text, line, column) {
+		return false
+	}
 	switch roleAtTextPosition(text, line-1, column-1) {
 	case parser.RoleUnclassified, parser.RoleProcedureName, parser.RoleCall:
 		return true
