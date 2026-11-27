@@ -4531,6 +4531,61 @@ func TestGetSQLPlaceholderHoverFromToken_AfterNonASCII(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A27] — a placeholder hovers on whatever line of the
+// string it sits. Only the string's first line was searched, so a
+// placeholder on a later line hovered as null.
+func TestGetSQLPlaceholderHoverFromToken_MultiLineString(t *testing.T) {
+	// position returns the 1-based line and rune column of byte index i.
+	position := func(text string, i int) (int, int) {
+		lineStart := strings.LastIndexByte(text[:i], '\n') + 1
+		return strings.Count(text[:i], "\n") + 1, utf8.RuneCountInString(text[lineStart:i]) + 1
+	}
+
+	for _, text := range []string{
+		"aRows := SQLExecute(\"select c1\n  from t1 where c2 = ?sId?\");",
+		"aRows := SQLExecute(\"select c1\r\n  from t1\r\n where c2 = ?sId?\");",
+		"aRows := SQLExecute([select c1\n  from t1 where c2 = ?sId?]);",
+		"aRows := SQLExecute(\"select '°C → µg/L' as u\n  from t1 where c1 = '😀' and c2 = ?sId?\");",
+		"aRows := SQLExecute(\"select c1 from t1 where c2 = ?sId?\n  order by c1\");",
+	} {
+		tokens := lexer.NewLexer(text).Tokenize()
+		at := strings.Index(text, "?sId?")
+		line, start := position(text, at)
+
+		for k := 0; k < len("?sId?"); k++ {
+			hover := GetSQLPlaceholderHoverFromToken(tokens, line, start+k)
+			if hover == nil {
+				t.Errorf("%q: no hover on character %d of ?sId? (line %d)", text, k, line)
+				continue
+			}
+			if !strings.Contains(hover.Contents, "?sId?") {
+				t.Errorf("%q: character %d hovers something else: %s", text, k, hover.Contents)
+			}
+		}
+		if hover := GetSQLPlaceholderHoverFromToken(tokens, line, start-1); hover != nil {
+			t.Errorf("%q: hover on the character before ?sId?: %s", text, hover.Contents)
+		}
+		if hover := GetSQLPlaceholderHoverFromToken(tokens, line, start+len("?sId?")); hover != nil {
+			t.Errorf("%q: hover on the character after ?sId?: %s", text, hover.Contents)
+		}
+	}
+
+	// Positional placeholders are numbered across the whole string.
+	text := "RunSQL(\"update t1 set c1 = ?\n where c2 = ?\",, {sA, sB});"
+	tokens := lexer.NewLexer(text).Tokenize()
+	line, col := position(text, strings.LastIndex(text, "?"))
+	if hover := GetSQLPlaceholderHoverFromToken(tokens, line, col); hover == nil || !strings.Contains(hover.Contents, "#2") {
+		t.Errorf("positional placeholder on line 2: got %+v", hover)
+	}
+	// The end of a line inside the string, and past the closing quote.
+	if hover := GetSQLPlaceholderHoverFromToken(tokens, 1, utf8.RuneCountInString("RunSQL(\"update t1 set c1 = ?")+1); hover != nil {
+		t.Errorf("hover on the line break inside the string: %s", hover.Contents)
+	}
+	if hover := GetSQLPlaceholderHoverFromToken(tokens, 2, col+2); hover != nil {
+		t.Errorf("hover past the closing quote: %s", hover.Contents)
+	}
+}
+
 func TestGetOrdinal(t *testing.T) {
 	tests := []struct {
 		n        int

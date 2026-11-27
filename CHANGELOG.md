@@ -77,6 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([feature.completion](catalog/features/completion.md) A4, A15-A19).
   **Downstream:** a client needs no change; the items are ordinary
   `Field` and `Method` completions, methods as snippets.
+- **Hover on a SQL placeholder answers on every line of a multi-line
+  string.** Only the string's first line was searched, so in
+  `SQLExecute("select c1` continued on the next line by
+  `  from t1 where c2 = ?sId?")`, hovering `?sId?` returned null. A
+  placeholder now hovers on whichever line it sits, located by characters
+  as #379 requires, and positional `?` placeholders are numbered across
+  the whole string. A defect fix under D16
+  ([feature.hover](catalog/features/hover.md) A27).
 
 ## [0.33.0] - 2026-11-27
 

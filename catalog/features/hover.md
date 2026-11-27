@@ -108,6 +108,12 @@ history:
       non-ASCII character before a placeholder (`'°C → µg/L'`) moved the
       hover one position to the right of the placeholder: null on its
       first characters, and the hover on what follows it.
+  - date: 2026-11-27
+    ref: "follow-up to issue #379"
+    note: >-
+      SQL-placeholder hover answers on every line of a multi-line string
+      (A27). Only the string's first line was searched, so a placeholder
+      on the second or a later line hovered as null.
 issues: ["#252"]
 ---
 
@@ -159,8 +165,9 @@ issues: ["#252"]
   that resolve to a workspace data source, which show the data-source
   summary (identity and entry parameters). An unresolvable dispatch or
   RunDS target falls through to the normal string suppression (null).
-  A placeholder is located by characters: non-ASCII text earlier in the
-  string never moves where its hover answers.
+  A placeholder hovers on whichever line of a multi-line string it sits,
+  and is located by characters: non-ASCII text earlier in the string, on
+  its line or an earlier one, never moves where its hover answers.
 - In endpoint files (matched via `ssl.diagnostics.endpointPatterns` or a
   leading `Endpoint:` docblock marker), `Request` and `Response` MUST hover
   with their ambient documentation; in non-endpoint files they get no
@@ -211,6 +218,7 @@ issues: ["#252"]
 - A24: Given a hover on a keyword or operator (e.g. `:EXITCASE`, `=`, `!=`), when hover is requested, then the reference summary, syntax, caveats, and don't-list are shown: `:EXITCASE` warns that without it later `:CASE` expressions are still evaluated, `=` states prefix matching for strings, and `!=` states it negates strict (exact) equality, not `=`; `!=` is never described as prefix matching.
 - A25: Given a hover on `Me`, `Base`, or `Constructor`, when hover is requested, then the reference special-form summary, syntax, caveats, and don't-list are shown (e.g. `Me` names `Me:MethodName(args)` and that use outside a class method is a compile-time error).
 - A26: Given `SQLExecute("select * from RESULTS where UNITS = '°C → µg/L' and SAMPLE_ID = ?sId?")`, when the user hovers each of the five characters of `?sId?`, then the named-placeholder hover for `sId` is returned on all five, and the characters directly before and after the placeholder return null — the same answers as with `'ug/L'` in place of the non-ASCII text (issue #379).
+- A27: Given `aRows := SQLExecute("select c1` with the string continuing on the next line as `  from t1 where c2 = ?sId?");`, when the user hovers each of the five characters of `?sId?` on that second line, then the named-placeholder hover for `sId` is returned on all five, and the characters directly before and after the placeholder return null; the same holds for a placeholder on any later line, after non-ASCII text on earlier lines, and with CRLF line endings, and positional `?` placeholders are numbered across the whole string.
 
 ## Rationale
 

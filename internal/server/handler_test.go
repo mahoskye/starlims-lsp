@@ -1495,6 +1495,45 @@ func TestHandleHover_SQLPlaceholderAfterNonASCII(t *testing.T) {
 	}
 }
 
+// [spec feature.hover/A27] — over LSP, a placeholder on the second line of
+// a multi-line SQL string hovers, and so does one on the first line.
+func TestHandleHover_SQLPlaceholderOnLaterLineOfString(t *testing.T) {
+	s := newTestServerWithDocument(":PROCEDURE Main;\n\t:DECLARE sId, sCode, aRows;\n" +
+		"\taRows := SQLExecute(\"select c1 from t1 where c3 = ?sCode?\n\t\tand c2 = ?sId?\");\n:ENDPROC;")
+
+	hoverAt := func(line, char uint32) *protocol.Hover {
+		t.Helper()
+		hover, err := s.handleHover(nil, &protocol.HoverParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: line, Character: char},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		return hover
+	}
+	contains := func(hover *protocol.Hover, want string) bool {
+		content, ok := hover.Contents.(protocol.MarkupContent)
+		return ok && strings.Contains(content.Value, want)
+	}
+
+	// "\t\tand c2 = ?sId?": the placeholder starts at character 11.
+	for k := range uint32(5) {
+		if hover := hoverAt(3, 11+k); hover == nil || !contains(hover, "?sId?") {
+			t.Errorf("character %d of ?sId? on the string's second line: got %+v", k, hover)
+		}
+	}
+	if hover := hoverAt(3, 10); hover != nil {
+		t.Errorf("hover on the space before ?sId?: %+v", hover.Contents)
+	}
+	first := uint32(strings.Index("\taRows := SQLExecute(\"select c1 from t1 where c3 = ?sCode?", "?sCode?"))
+	if hover := hoverAt(2, first); hover == nil || !contains(hover, "?sCode?") {
+		t.Errorf("?sCode? on the string's first line: got %+v", hover)
+	}
+}
+
 // [spec feature.completion/A13] — the token before the cursor is found by
 // character count. Counted in bytes, a string earlier on the line whose
 // extra bytes outnumber the characters between it and the cursor reached

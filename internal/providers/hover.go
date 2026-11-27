@@ -885,57 +885,65 @@ func GetSQLPlaceholderHover(stringContent string, columnInString int) *Hover {
 }
 
 // GetSQLPlaceholderHoverFromToken returns hover for a SQL placeholder when the cursor is inside a string token.
-// line and column are 1-based positions in the document.
+// line and column are 1-based positions in the document, the column in runes.
+// A string may span lines: the placeholder answers on whichever line it sits.
 func GetSQLPlaceholderHoverFromToken(tokens []lexer.Token, line, column int) *Hover {
-	// Find the string token containing the cursor
 	for _, token := range tokens {
 		if token.Type != lexer.TokenString {
 			continue
 		}
-
-		// Check if position is within this token. Columns count runes, so
-		// the token's extent must too (issue #379).
-		tokenEnd := token.Column + token.RuneLen()
-		if token.Line == line && column >= token.Column && column < tokenEnd {
-			// Found the string token - extract content without quotes
-			content := token.Text
-			if len(content) >= 2 {
-				// Remove surrounding quotes
-				content = content[1 : len(content)-1]
-			}
-
-			// Calculate position within the string content
-			// column is 1-based, token.Column is 1-based
-			// We need to account for the opening quote
-			columnInString := column - token.Column - 1
-
-			// The cursor offset is in runes and the placeholder spans are
-			// byte offsets into the content: convert before comparing.
-			offset, ok := runeToByteOffset(content, columnInString)
-			if !ok {
-				return nil
-			}
-
-			return GetSQLPlaceholderHover(content, offset)
+		if token.Line > line {
+			break
 		}
+		offset, ok := stringTokenByteOffset(token, line, column)
+		if !ok {
+			continue
+		}
+
+		// Found the string token - extract content without quotes
+		content := token.Text
+		if len(content) >= 2 {
+			content = content[1 : len(content)-1]
+		}
+
+		// The placeholder spans are byte offsets into the content, which
+		// starts after the one-byte opening quote. The quotes themselves
+		// are no placeholder's.
+		offset--
+		if offset < 0 || offset >= len(content) {
+			return nil
+		}
+		return GetSQLPlaceholderHover(content, offset)
 	}
 
 	return nil
 }
 
-// runeToByteOffset converts a 0-based rune index into s to the byte offset
-// of that rune. ok is false when the index is negative or at or past the
-// end of s.
-func runeToByteOffset(s string, runeIndex int) (int, bool) {
-	if runeIndex < 0 {
+// stringTokenByteOffset returns the byte offset into token.Text of the
+// character at the 1-based line and rune column, walking the text line by
+// line as the lexer counts positions (a newline starts the next line at
+// column 1). ok is false when the position is not inside the token.
+func stringTokenByteOffset(token lexer.Token, line, column int) (int, bool) {
+	if line < token.Line || (line == token.Line && column < token.Column) {
 		return 0, false
 	}
-	n := 0
-	for offset := range s {
-		if n == runeIndex {
+	if strings.Count(token.Text, "\n") < line-token.Line {
+		return 0, false // the token ends on an earlier line
+	}
+	curLine, curCol := token.Line, token.Column
+	for offset, r := range token.Text {
+		if curLine == line && curCol == column {
 			return offset, true
 		}
-		n++
+		if curLine > line {
+			return 0, false
+		}
+		if r == '\n' {
+			curLine++
+			curCol = 1
+		} else {
+			curCol++
+		}
 	}
 	return 0, false
 }
