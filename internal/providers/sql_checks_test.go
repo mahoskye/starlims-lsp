@@ -3,6 +3,7 @@ package providers
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // Issue #255 regressions for the embedded-SQL checks: placeholder ranges
@@ -152,5 +153,82 @@ func TestUnicodeAndCollate_LexerBased(t *testing.T) {
 		if len(diagsWithCode(loud, c)) != 1 {
 			t.Errorf("%s did not fire on its target: %v", c, loud)
 		}
+	}
+}
+
+// [spec feature.diagnostics_pipeline/A34] — a finding on a placeholder
+// inside a string is ranged by characters. The placeholder's byte offset in
+// the string was added to a character column, so non-ASCII text earlier in
+// the string pushed the range to the right (issue #379).
+func TestSQLPlaceholderDiagnosticRanges_AfterNonASCII(t *testing.T) {
+	rangeOf := func(text, code string, opts DiagnosticOptions) Range {
+		t.Helper()
+		got := diagsWithCode(GetDiagnostics(text, opts), code)
+		if len(got) != 1 {
+			t.Fatalf("%s: want 1 diagnostic, got %d in:\n%s", code, len(got), text)
+		}
+		return got[0].Range
+	}
+	// span is where needle sits in text: 0-based line and rune columns.
+	span := func(text, needle string) Range {
+		before := text[:strings.Index(text, needle)]
+		line := strings.Count(before, "\n")
+		char := utf8.RuneCountInString(before[strings.LastIndex(before, "\n")+1:])
+		return Range{
+			Start: Position{Line: line, Character: char},
+			End:   Position{Line: line, Character: char + utf8.RuneCountInString(needle)},
+		}
+	}
+
+	sqlParams := DefaultDiagnosticOptions()
+	sqlParams.CheckSQLParams = true
+	withInfo := DefaultDiagnosticOptions()
+	withInfo.IncludeInfoDiagnostics = true
+	cases := []struct {
+		name, needle, code, text string
+		opts                     DiagnosticOptions
+	}{
+		{
+			"same line", "?oX:aIds?", CodeUdObjectArrayInClause,
+			`SQLExecute("select c1 from t1 where c2 = '%s' and c3 in (?oX:aIds?)");`,
+			DefaultDiagnosticOptions(),
+		},
+		{
+			"later line of a multi-line string", "?sA + sB?", CodeComplexSqlPlaceholder,
+			"SQLExecute(\"select c1 from t1\n    where c2 = '%s'\n      and c3 = '%s' and c4 = ?sA + sB?\n\");",
+			withInfo,
+		},
+		{
+			"opt-in parameter check", "?sMissing?", CodeInvalidSqlParam,
+			":DECLARE aRows;\naRows := SQLExecute(\"select c1 from t1 where c2 = '%s' and c3 = ?sMissing?\");",
+			sqlParams,
+		},
+	}
+	for _, tc := range cases {
+		for _, units := range []string{"ug/L", "µg/L", "°C → µg/L", "😀"} {
+			text := strings.ReplaceAll(tc.text, "%s", units)
+			if got, want := rangeOf(text, tc.code, tc.opts), span(text, tc.needle); got != want {
+				t.Errorf("%s, %q: range %+v, want %+v", tc.name, units, got, want)
+			}
+		}
+	}
+}
+
+// A `?name?` marker in a SQL data-source body holding non-ASCII text (a
+// quoted span) ends where its last character does (issue #379).
+func TestDataSourceQuestionPlaceholderRange_NonASCII(t *testing.T) {
+	body := "select c1 from t1 where c2 = ?'<<größe>>'? and c3 = 1"
+	diags := checkDataSourceQuestionPlaceholders(body, 0)
+	if len(diags) != 1 {
+		t.Fatalf("want 1 diagnostic, got %v", diags)
+	}
+	marker := "?'<<größe>>'?"
+	start := utf8.RuneCountInString(body[:strings.Index(body, marker)])
+	want := Range{
+		Start: Position{Line: 0, Character: start},
+		End:   Position{Line: 0, Character: start + utf8.RuneCountInString(marker)},
+	}
+	if diags[0].Range != want {
+		t.Errorf("range %+v, want %+v", diags[0].Range, want)
 	}
 }

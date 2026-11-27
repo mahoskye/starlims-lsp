@@ -4,6 +4,7 @@ package lexer
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/constants"
 )
@@ -71,6 +72,14 @@ type Token struct {
 	// without being closed (`[[a]`), so consumers must read this flag,
 	// not the token's last character.
 	Unterminated bool
+}
+
+// RuneLen returns the length of the token's text in runes, the unit Line,
+// Column and Offset count in. len(t.Text) counts UTF-8 bytes: for a string
+// or a comment holding non-ASCII text it is larger, and adding it to a
+// column puts the token's end past its real one (issue #379).
+func (t Token) RuneLen() int {
+	return utf8.RuneCountInString(t.Text)
 }
 
 // Lexer tokenizes SSL source code.

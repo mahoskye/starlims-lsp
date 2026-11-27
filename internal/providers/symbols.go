@@ -301,7 +301,7 @@ func procedureNameSelectionRange(tokens []lexer.Token, proc parser.ProcedureInfo
 			if next.Type == lexer.TokenIdentifier && strings.EqualFold(next.Text, proc.Name) {
 				return Range{
 					Start: Position{Line: next.Line - 1, Character: next.Column - 1},
-					End:   Position{Line: next.Line - 1, Character: next.Column - 1 + len(next.Text)},
+					End:   Position{Line: next.Line - 1, Character: next.Column - 1 + next.RuneLen()},
 				}
 			}
 			break

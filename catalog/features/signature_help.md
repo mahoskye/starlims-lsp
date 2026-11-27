@@ -41,6 +41,16 @@ history:
       parameter's type, optional status, and default in its
       documentation. `CreateUdObject` shows one signature per call form
       (A9).
+  - date: 2026-11-27
+    ref: "issue #379"
+    note: >-
+      The token under the cursor is found by character count (A11). Its
+      end was the start column plus the text's UTF-8 byte length, so a
+      string argument holding `°`, `µ`, `é` or `ß` reached one column
+      past its real end for each extra byte: the cursor after the comma
+      that follows it was still read as inside the string, the comma was
+      not counted, and `activeParameter` stayed on the first parameter
+      until more was typed.
 issues: ["#40", "#252"]
 ---
 
@@ -51,7 +61,9 @@ issues: ["#40", "#252"]
   functions and the dispatch helpers `DoProc` / `ExecFunction`.
 - `activeParameter` MUST reflect the argument under the cursor, counting
   top-level commas only: commas inside nested parentheses or string literals
-  MUST NOT advance it.
+  MUST NOT advance it. A string argument's extent is counted in characters,
+  the unit of the cursor column, so non-ASCII text in an argument never
+  hides the comma after it.
 - With the cursor inside nested calls, the innermost enclosing call's
   signature MUST be shown; after the inner call closes, the outer one.
 - Inside built-in class instantiation `ClassName{...}`, constructor signature
@@ -88,6 +100,7 @@ issues: ["#40", "#252"]
 - A8: Given the cursor inside `Email{`, when signature help is requested over LSP, then the Email constructor signatures are returned, one per documented constructor form.
 - A9: Given the cursor after `CreateUdObject("Cat.Cls", `, when signature help is invoked, then three signatures are returned (one per call form) and the active one is `CreateUdObject(sClassName, [aArgs])`.
 - A10: Given the cursor after `SQLExecute(sSQL, `, when signature help is invoked, then the label begins `SQLExecute(sCommandString, [sConnectionName], ` and ends `→ any`, and the second parameter is `sConnectionName` with documentation naming its default; every built-in's signature-help parameter labels are its reference parameter names.
+- A11: Given `Left("25 °C",` (or `"Grüße"`, or `"°C → µg/L"`) with the cursor directly after the comma, when signature help is invoked, then `activeParameter` is 1, exactly as for `Left("25 C",`, and it stays 1 at every position typed after it; with the cursor directly after the closing quote and before the comma it is 0 (issue #379).
 
 ## Rationale
 

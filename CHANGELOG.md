@@ -22,6 +22,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing. A defect fix under D16
   ([feature.rename](catalog/features/rename.md) A25, A26,
   [feature.references](catalog/features/references.md) A20).
+- **Non-ASCII text in a string no longer shifts where the cursor is read**
+  (#379). Several lookups took a token's end as its start column plus its
+  UTF-8 byte length, against a cursor column counted in characters, so a
+  string holding `°`, `µ`, `é` or `ß` reached past its real end by one
+  column for each extra byte. Not #307, which was about characters above
+  U+FFFF in positions the server sends. Fixed, each now counting
+  characters:
+  - Signature help: after `Left("25 °C",` the active parameter stayed on
+    the first one until more was typed
+    ([feature.signature_help](catalog/features/signature_help.md) A11).
+  - Hover on a SQL placeholder: after `'°C → µg/L'` in the same string,
+    the first four characters of `?sId?` answered null
+    ([feature.hover](catalog/features/hover.md) A26).
+  - Member completion: a string earlier on the line with more extra bytes
+    than there are characters between it and the cursor (a few words of
+    Cyrillic, Greek or CJK text) hid the `:`, and `oMail:` listed nothing.
+    The text typed so far in a `DoProc`/`ExecFunction` string was cut
+    short after a non-ASCII character
+    ([feature.completion](catalog/features/completion.md) A13, A14).
+  - Diagnostic ranges: `complex_sql_placeholder`,
+    `udobject_array_in_clause` and `invalid_sql_param` underlined a
+    placeholder to the right of where it is when non-ASCII text stood
+    before it in the string, and `datasource_sql_question_placeholder`
+    ended past a marker holding such text
+    ([feature.diagnostics_pipeline](catalog/features/diagnostics_pipeline.md)
+    A34).
+  - Go to definition on a UDObject property whose name holds non-ASCII
+    text: the target range ended past the name.
+
+  The other places the issue lists compare against identifier and
+  operator tokens, which are ASCII, and behaved correctly; they use the
+  same character count now. A defect fix under D16: no code is added and
+  no finding appears or disappears, only its columns move.
 
 ## [0.33.0] - 2026-11-27
 

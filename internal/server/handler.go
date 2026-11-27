@@ -254,7 +254,9 @@ func indexOfTokenBefore(tokens []lexer.Token, line, column int) int {
 		if tok.Type == lexer.TokenWhitespace || tok.Type == lexer.TokenComment || tok.Type == lexer.TokenEOF {
 			continue
 		}
-		endCol := tok.Column + len(tok.Text)
+		// Runes, like the column: a byte count overshoots a string holding
+		// non-ASCII text and hides every token after it (issue #379).
+		endCol := tok.Column + tok.RuneLen()
 		if tok.Line < line || (tok.Line == line && endCol <= column) {
 			best = i
 			continue
@@ -1094,10 +1096,13 @@ func dispatchStringPrefix(tokens []lexer.Token, line, column int) string {
 	if column <= start {
 		return ""
 	}
+	// The column counts runes, so the content is cut by runes: a byte
+	// index stopped short after a non-ASCII character, or split one
+	// (issue #379).
 	end := column - start
-	content := tok.Text[1:] // strip opening quote
+	content := []rune(tok.Text)[1:] // strip opening quote
 	if end > len(content) {
 		end = len(content)
 	}
-	return content[:end]
+	return string(content[:end])
 }

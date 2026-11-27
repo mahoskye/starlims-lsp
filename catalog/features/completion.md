@@ -10,6 +10,7 @@ tests:
   - internal/providers/providers_test.go
   - internal/providers/udobject_shapes_test.go
   - internal/server/handler_test.go
+  - internal/server/cross_file_test.go
 history:
   - date: 2026-05-06
     ref: "PR #10 (v0.7.4), issues #8/#9"
@@ -54,6 +55,17 @@ history:
       script-level and :PUBLIC declarations, one item per name
       case-insensitively (A12). Every declaration from every procedure
       was listed before, duplicates included.
+  - date: 2026-11-27
+    ref: "issue #379"
+    note: >-
+      The token before the cursor, and the text typed so far in a
+      dispatch string, are found by character count (A13, A14). Both used a
+      token's UTF-8 byte length against a character column. A string
+      earlier on the line whose extra bytes outnumbered the characters
+      between it and the cursor (Cyrillic, Greek or CJK text does it in
+      a few words) hid the `:` before the cursor, and member completion
+      answered nothing. A dispatch-string prefix was cut short after a
+      non-ASCII character.
 issues: []
 ---
 
@@ -125,6 +137,8 @@ trigger policy:
 - A10: Given `DoProc("Script.")` where `Script` matches a flat-layout script basename, when completion is requested, then that script's non-private procedures are offered.
 - A11: Given `aItems:` where aItems holds an SSL array, string, number, logical or date (no class, returns-object or CreateUdObject shape), when completion triggers, then no items are offered — in particular no SSL-object members (`GetProperty`, `IsProperty`, `AddProperty`, ...), which those values do not have, and no guessed .NET members, whose names are case-sensitive and unlisted (issue #267).
 - A12: Given two procedures each declaring locals (one name repeated with different casing) plus script-level and `:PUBLIC` declarations, when completion is requested inside the second procedure, then its locals, the script-level variables, and the publics are offered, the first procedure's own locals are not, and each name appears once.
+- A13: Given `sText := "Температура: " + oMail:` where `oMail := Email{};`, when completion triggers after the `:`, then the Email members are listed exactly as they are with an ASCII string of the same length in its place — a string's extent is counted in characters, never UTF-8 bytes, however much non-ASCII text it holds (issue #379).
+- A14: Given `ExecFunction("Größe.")` where `Größe` is a workspace category, when completion is requested before the closing quote, then that category's scripts are offered — the text typed so far is cut by characters, so a non-ASCII character in it neither shortens nor splits the prefix (issue #379).
 
 ## Rationale
 

@@ -849,7 +849,8 @@ func isSimpleNamedPlaceholder(name string) bool {
 }
 
 // GetSQLPlaceholderHover returns hover information for a SQL placeholder at the given position.
-// The column is relative to the start of the string content (after the opening quote).
+// The column is a byte offset from the start of the string content (after the
+// opening quote), the unit ParseSQLPlaceholders reports spans in.
 func GetSQLPlaceholderHover(stringContent string, columnInString int) *Hover {
 	placeholders := ParseSQLPlaceholders(stringContent)
 
@@ -892,8 +893,9 @@ func GetSQLPlaceholderHoverFromToken(tokens []lexer.Token, line, column int) *Ho
 			continue
 		}
 
-		// Check if position is within this token
-		tokenEnd := token.Column + len(token.Text)
+		// Check if position is within this token. Columns count runes, so
+		// the token's extent must too (issue #379).
+		tokenEnd := token.Column + token.RuneLen()
 		if token.Line == line && column >= token.Column && column < tokenEnd {
 			// Found the string token - extract content without quotes
 			content := token.Text
@@ -907,15 +909,35 @@ func GetSQLPlaceholderHoverFromToken(tokens []lexer.Token, line, column int) *Ho
 			// We need to account for the opening quote
 			columnInString := column - token.Column - 1
 
-			if columnInString < 0 || columnInString >= len(content) {
+			// The cursor offset is in runes and the placeholder spans are
+			// byte offsets into the content: convert before comparing.
+			offset, ok := runeToByteOffset(content, columnInString)
+			if !ok {
 				return nil
 			}
 
-			return GetSQLPlaceholderHover(content, columnInString)
+			return GetSQLPlaceholderHover(content, offset)
 		}
 	}
 
 	return nil
+}
+
+// runeToByteOffset converts a 0-based rune index into s to the byte offset
+// of that rune. ok is false when the index is negative or at or past the
+// end of s.
+func runeToByteOffset(s string, runeIndex int) (int, bool) {
+	if runeIndex < 0 {
+		return 0, false
+	}
+	n := 0
+	for offset := range s {
+		if n == runeIndex {
+			return offset, true
+		}
+		n++
+	}
+	return 0, false
 }
 
 // getOrdinal returns the ordinal string for a number (1st, 2nd, 3rd, etc.)

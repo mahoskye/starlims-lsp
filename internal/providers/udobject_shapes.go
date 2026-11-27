@@ -477,7 +477,7 @@ func MemberAccessAt(tokens []lexer.Token, line, column int) (string, string, boo
 		if token.Type != lexer.TokenIdentifier || token.Line != line {
 			continue
 		}
-		if column < token.Column || column > token.Column+len(token.Text) {
+		if column < token.Column || column > token.Column+token.RuneLen() {
 			continue
 		}
 		colonIdx := prevSignificantTokenIndex(tokens, i-1)

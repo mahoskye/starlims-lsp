@@ -362,7 +362,7 @@ func FindDefinitionCrossFile(text string, tokens []lexer.Token, line, column int
 					URI: uri,
 					Range: Range{
 						Start: Position{Line: prop.Line - 1, Character: prop.Column - 1},
-						End:   Position{Line: prop.Line - 1, Character: prop.Column - 1 + len(prop.Name)},
+						End:   Position{Line: prop.Line - 1, Character: prop.Column - 1 + utf8.RuneCountInString(prop.Name)},
 					},
 				}}
 			}

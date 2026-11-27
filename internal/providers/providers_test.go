@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"starlims-lsp/internal/lexer"
 	"starlims-lsp/internal/parser"
@@ -1321,6 +1322,39 @@ func TestGetSignatureHelp_TopLevelCommasOnly(t *testing.T) {
 	}
 	if help2.ActiveParameter != 1 {
 		t.Errorf("expected activeParameter to stay 1 mid-argument, got %d", help2.ActiveParameter)
+	}
+}
+
+// [spec feature.signature_help/A11] — a string argument's extent is counted
+// in characters. Its UTF-8 byte length reached past its real end, so the
+// comma after non-ASCII text was read as still inside the string and the
+// active parameter stayed 0 until more was typed (issue #379).
+func TestGetSignatureHelp_NonASCIIStringArgument(t *testing.T) {
+	args := []string{`"25 C"`, `"25 °C"`, `"Grüße"`, `"°C → µg/L"`, `"😀 ok"`, `'µ'`, `[ß]`}
+	typed := ", nLen"
+	for _, arg := range args {
+		head := "sText := Left(" + arg
+
+		// Directly after the closing quote, before any comma: parameter 0.
+		help := GetSignatureHelpFromTokens(tokenizeForSignatureHelp(t, head), 1, utf8.RuneCountInString(head)+1)
+		if help == nil {
+			t.Fatalf("%s: expected signature help for Left", arg)
+		}
+		if help.ActiveParameter != 0 {
+			t.Errorf("%s: before the comma, activeParameter = %d, want 0", arg, help.ActiveParameter)
+		}
+
+		// After the comma, and after each character typed behind it.
+		for n := 1; n <= len(typed); n++ {
+			text := head + typed[:n]
+			help := GetSignatureHelpFromTokens(tokenizeForSignatureHelp(t, text), 1, utf8.RuneCountInString(text)+1)
+			if help == nil {
+				t.Fatalf("%s + %q: expected signature help for Left", arg, typed[:n])
+			}
+			if help.ActiveParameter != 1 {
+				t.Errorf("%s + %q: activeParameter = %d, want 1", arg, typed[:n], help.ActiveParameter)
+			}
+		}
 	}
 }
 
@@ -4452,6 +4486,48 @@ func TestGetSQLPlaceholderHoverFromToken(t *testing.T) {
 
 	if !strings.Contains(hover.Contents, "userId") {
 		t.Errorf("expected hover to contain 'userId', got: %s", hover.Contents)
+	}
+}
+
+// [spec feature.hover/A26] — a placeholder is located by characters. The
+// cursor's character offset used to index the string's bytes, so non-ASCII
+// text before `?sId?` moved its hover to the right (issue #379).
+func TestGetSQLPlaceholderHoverFromToken_AfterNonASCII(t *testing.T) {
+	for _, units := range []string{"'ug/L'", "'µg/L'", "'°C → µg/L'", "'😀'"} {
+		text := `aRows := SQLExecute("select * from RESULTS where UNITS = ` + units + ` and SAMPLE_ID = ?sId?");`
+		tokens := lexer.NewLexer(text).Tokenize()
+		// 1-based rune column of the opening `?`.
+		start := utf8.RuneCountInString(text[:strings.Index(text, "?sId?")]) + 1
+
+		for k := 0; k < len("?sId?"); k++ {
+			hover := GetSQLPlaceholderHoverFromToken(tokens, 1, start+k)
+			if hover == nil {
+				t.Errorf("%s: no hover on character %d of ?sId?", units, k)
+				continue
+			}
+			if !strings.Contains(hover.Contents, "?sId?") {
+				t.Errorf("%s: character %d hovers something else: %s", units, k, hover.Contents)
+			}
+		}
+		// The space before the placeholder and the closing quote after it.
+		if hover := GetSQLPlaceholderHoverFromToken(tokens, 1, start-1); hover != nil {
+			t.Errorf("%s: hover on the character before ?sId?: %s", units, hover.Contents)
+		}
+		if hover := GetSQLPlaceholderHoverFromToken(tokens, 1, start+len("?sId?")); hover != nil {
+			t.Errorf("%s: hover on the character after ?sId?: %s", units, hover.Contents)
+		}
+	}
+
+	// A positional `?` after non-ASCII text keeps its place and its number.
+	text := `RunSQL("update T1 set C1 = '°C' where C2 = ? and C3 = ?",, {sA, sB});`
+	tokens := lexer.NewLexer(text).Tokenize()
+	second := utf8.RuneCountInString(text[:strings.LastIndex(text, "?")]) + 1
+	hover := GetSQLPlaceholderHoverFromToken(tokens, 1, second)
+	if hover == nil || !strings.Contains(hover.Contents, "#2") {
+		t.Errorf("second positional placeholder: got %+v", hover)
+	}
+	if hover := GetSQLPlaceholderHoverFromToken(tokens, 1, second+1); hover != nil {
+		t.Errorf("hover one character past the positional placeholder: %s", hover.Contents)
 	}
 }
 
