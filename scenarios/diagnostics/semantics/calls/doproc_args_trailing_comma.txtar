@@ -1,0 +1,46 @@
+The argument forms around diag.doproc_args_not_array_literal that were run
+on STARLIMS 12 (issue #372). A comma with no argument after it stops the
+script from compiling, like an array in a variable. An array literal in
+parentheses, a name built by an expression, a dotted name and ExecFunction
+all compile and run with the array in a variable, so each stays unreported.
+-- input.ssl --
+:PROCEDURE RunChecks;
+:PARAMETERS aArgs, sKind;
+:DECLARE aResult;
+aResult := DoProc("CheckEqual",);
+aResult := DoProc("CheckEqual", ({aArgs[1], aArgs[2]}));
+aResult := DoProc("Check" + sKind, aArgs);
+aResult := DoProc("Common.Checks.CheckEqual", aArgs);
+aResult := ExecFunction("Common.Checks.CheckEqual", aArgs);
+aResult := DoProc("CheckEqual");
+:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+:PARAMETERS vExpected, vActual;
+:RETURN vExpected == vActual;
+:ENDPROC;
+-- format --
+:PROCEDURE RunChecks;
+	:PARAMETERS aArgs, sKind;
+	:DECLARE aResult;
+
+	aResult := DoProc("CheckEqual",);
+	aResult := DoProc("CheckEqual", ({aArgs[1], aArgs[2]}));
+	aResult := DoProc("Check" + sKind, aArgs);
+	aResult := DoProc("Common.Checks.CheckEqual", aArgs);
+	aResult := ExecFunction("Common.Checks.CheckEqual", aArgs);
+	aResult := DoProc("CheckEqual");
+
+	:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS vExpected, vActual;
+
+	:RETURN vExpected == vActual;
+:ENDPROC;
+-- diagnostics --
+4:31-4:32 error doproc_args_not_array_literal: DoProc("CheckEqual",) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).
+-- diagnostics [--strict --info] --
+4:31-4:32 error doproc_args_not_array_literal: DoProc("CheckEqual",) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: write DoProc("CheckEqual") or DoProc("CheckEqual", {...}).

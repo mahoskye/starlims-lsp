@@ -30,6 +30,13 @@ history:
       parameter_skipping_style.trailing_params clause covers it. Call sites now
       come from the expression AST, and qualified member calls no longer flag
       (D10).
+  - date: 2026-11-27
+    ref: "issue #372"
+    note: >-
+      `DoProc("Name",)` no longer flags here. With a literal one-part
+      name that comma is a compile error (verified on STARLIMS 12), so
+      `doproc_args_not_array_literal` reports it, and this note's message,
+      which says the call works, was wrong for it.
 issues: []
 ---
 
@@ -56,7 +63,10 @@ It must NOT flag:
 - grouping parentheses (`(a + b)`) — not a call;
 - a qualified member call (`sValue:Substring(1,)`) — the NIL padding of
   trailing arguments is a property of SSL calls, not of whatever a member
-  call dispatches to (D10).
+  call dispatches to (D10);
+- the comma in `DoProc("Name",)`, a literal one-part name with nothing
+  after the comma: that call does not compile, so the comma is
+  `doproc_args_not_array_literal`'s error and not a style note.
 
 ## Examples
 
@@ -94,6 +104,21 @@ It must NOT flag:
 	:DECLARE sValue;
 	sValue := "abc";
 	sValue := sValue:Substring(1,);
+:ENDPROC;
+```
+
+### Does not flag
+
+This comma is a compile error, reported by `doproc_args_not_array_literal`.
+
+```ssl
+:PROCEDURE Main;
+	:DECLARE vOut;
+	vOut := DoProc("Helper",);
+:ENDPROC;
+
+:PROCEDURE Helper;
+	:RETURN 1;
 :ENDPROC;
 ```
 

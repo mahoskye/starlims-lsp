@@ -391,11 +391,16 @@ func collectDiagnostics(tokens []lexer.Token, ast *parser.Node, p *parser.Parser
 	diagnostics = append(diagnostics, checkOperatorOperandTypes(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkEqualsEmptyString(tokens, stmtExprs)...)
 	diagnostics = append(diagnostics, checkEmptyOptionalParamArrays(tokens)...)
+	// A trailing comma that doproc_args_not_array_literal reports is a
+	// compile error, not an unnecessary comma: the error owns it, and the
+	// style note, whose message says the call works, is dropped there.
+	doProcArgs := checkDoProcArgsNotArrayLiteral(tokens, calls)
 	trailingRuns := trailingSkipCommaRuns(tokens, calls)
-	diagnostics = append(diagnostics, checkTrailingSkipCommas(tokens, trailingRuns)...)
+	diagnostics = append(diagnostics, withoutStartsOf(checkTrailingSkipCommas(tokens, trailingRuns), doProcArgs)...)
 	diagnostics = append(diagnostics, checkSpacedSkipCommas(tokens, trailingRuns)...)
 	diagnostics = append(diagnostics, checkFormatArgNotArray(tokens, calls)...)
-	diagnostics = append(diagnostics, checkDoProcArgsNotArrayLiteral(tokens, calls)...)
+	diagnostics = append(diagnostics, doProcArgs...)
+	diagnostics = append(diagnostics, checkIIfGuardIneffective(tokens, calls)...)
 	diagnostics = append(diagnostics, checkBuiltinExcessArguments(tokens, calls)...)
 	diagnostics = append(diagnostics, checkPublicVariables(tokens)...)
 	procedures := p.ExtractProcedures(ast)
@@ -4406,8 +4411,9 @@ func checkDefaultPlacement(tokens []lexer.Token) []Diagnostic {
 // checkInheritQualifiedName reports an :INHERIT whose parent is a plain
 // class name (issue #269). The parent must be written as the full
 // Category.ClassName; a plain name fails when the class compiles with
-// "Specify the full name of the class in :INHERIT". A quoted parent is not
-// checked: its compile behavior is not documented (DECISIONS.md D10).
+// "Specify the full name of the class in :INHERIT". A parent written as a
+// string does not compile either (issue #372): the statement takes a name,
+// so the string is reported whole, with the unquoted statement to write.
 func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 	var diagnostics []Diagnostic
 	for i, token := range tokens {
@@ -4424,6 +4430,16 @@ func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 				continue
 			}
 			if t.Type == lexer.TokenPunctuation && t.Text == ";" {
+				break
+			}
+			if first == nil && t.Type == lexer.TokenString {
+				diagnostics = append(diagnostics, Diagnostic{
+					Severity: SeverityError,
+					Range:    tokenToRange(*t),
+					Message:  quotedInheritMessage(t.Text),
+					Source:   "ssl-lsp",
+					Code:     CodeInheritQualifiedName,
+				})
 				break
 			}
 			if first == nil && t.Type != lexer.TokenIdentifier {
@@ -4463,6 +4479,43 @@ func checkInheritQualifiedName(tokens []lexer.Token) []Diagnostic {
 		})
 	}
 	return diagnostics
+}
+
+// quotedInheritMessage words the finding for an :INHERIT parent written as
+// a string. When the text between the delimiters is a dotted name the
+// message gives the statement to write, so a client quick fix can replace
+// the string with it; otherwise it says what the name must look like.
+func quotedInheritMessage(quoted string) string {
+	name := quoted
+	if len(name) >= 2 {
+		name = name[1 : len(name)-1]
+	}
+	if isDottedName(name) {
+		return fmt.Sprintf("':INHERIT' takes the parent as a name, not a string, and a quoted parent does not compile: write ':INHERIT %s;'", name)
+	}
+	return "':INHERIT' takes the parent as a name, not a string, and a quoted parent does not compile: write the parent's full 'Category.ClassName' without quotes"
+}
+
+// isDottedName reports whether s is two or more identifiers joined by
+// dots (`Category.ClassName`), with nothing else in it.
+func isDottedName(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for i, r := range part {
+			letter := r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
+			digit := r >= '0' && r <= '9'
+			if !letter && !(digit && i > 0) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // checkInlineCodeNaming enforces the style-guide requirement that BEGININLINECODE
@@ -8596,6 +8649,25 @@ func checkCollateJustification(tokens []lexer.Token) []Diagnostic {
 	})
 
 	return diagnostics
+}
+
+// withoutStartsOf returns diags without the findings that start where one
+// of owners starts: the owner reports the same token for a stronger reason.
+func withoutStartsOf(diags, owners []Diagnostic) []Diagnostic {
+	if len(diags) == 0 || len(owners) == 0 {
+		return diags
+	}
+	owned := make(map[Position]bool, len(owners))
+	for _, o := range owners {
+		owned[o.Range.Start] = true
+	}
+	kept := diags[:0:0]
+	for _, d := range diags {
+		if !owned[d.Range.Start] {
+			kept = append(kept, d)
+		}
+	}
+	return kept
 }
 
 // skipCommaRun is an inclusive token-index span from the first to the last

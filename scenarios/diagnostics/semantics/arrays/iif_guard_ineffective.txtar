@@ -1,0 +1,77 @@
+A lookup that returns the first row's value or a default, written with IIf.
+IIf evaluates both value arguments, so the element is read when the query
+matched nothing too, and the call raises instead of returning the default
+(verified on STARLIMS 12, issue #372). diag.iif_guard_ineffective reports
+the read behind an Empty test, behind a Len test, and a member read behind
+a NIL test. The last procedure is the fix: the test as an :IF.
+-- input.ssl --
+:PROCEDURE GetOwnerName;
+:PARAMETERS sSampleId;
+:DECLARE aRows;
+aRows := SQLExecute("SELECT OwnerName FROM Samples WHERE SampleID = ?sSampleId?");
+:RETURN IIf(Empty(aRows), "", aRows[1, 1]);
+:ENDPROC;
+
+:PROCEDURE FirstTestCode;
+:PARAMETERS aTests;
+:RETURN IIf(Len(aTests) > 0, Upper(aTests[1]), "NONE");
+:ENDPROC;
+
+:PROCEDURE OwnerLabel;
+:PARAMETERS oOwner;
+:RETURN IIf(oOwner == NIL, "Unassigned", oOwner:displayName);
+:ENDPROC;
+
+:PROCEDURE GetOwnerNameSafely;
+:PARAMETERS sSampleId;
+:DECLARE aRows, sOwner;
+aRows := SQLExecute("SELECT OwnerName FROM Samples WHERE SampleID = ?sSampleId?");
+sOwner := "";
+:IF !Empty(aRows);
+sOwner := aRows[1, 1];
+:ENDIF;
+:RETURN sOwner;
+:ENDPROC;
+-- format --
+:PROCEDURE GetOwnerName;
+	:PARAMETERS sSampleId;
+	:DECLARE aRows;
+
+	aRows := SQLExecute("SELECT OwnerName FROM Samples WHERE SampleID = ?sSampleId?");
+
+	:RETURN IIf(Empty(aRows), "", aRows[1, 1]);
+:ENDPROC;
+
+:PROCEDURE FirstTestCode;
+	:PARAMETERS aTests;
+
+	:RETURN IIf(Len(aTests) > 0, Upper(aTests[1]), "NONE");
+:ENDPROC;
+
+:PROCEDURE OwnerLabel;
+	:PARAMETERS oOwner;
+
+	:RETURN IIf(oOwner == NIL, "Unassigned", oOwner:displayName);
+:ENDPROC;
+
+:PROCEDURE GetOwnerNameSafely;
+	:PARAMETERS sSampleId;
+	:DECLARE aRows, sOwner;
+
+	aRows := SQLExecute("SELECT OwnerName FROM Samples WHERE SampleID = ?sSampleId?");
+	sOwner := "";
+
+	:IF !Empty(aRows);
+		sOwner := aRows[1, 1];
+	:ENDIF;
+
+	:RETURN sOwner;
+:ENDPROC;
+-- diagnostics --
+5:31-5:42 warning iif_guard_ineffective: IIf evaluates both value arguments, so aRows[1, 1] is read even when aRows is empty, which raises an error. Make the test an :IF and read the value inside it.
+10:36-10:45 warning iif_guard_ineffective: IIf evaluates both value arguments, so aTests[1] is read even when aTests is empty, which raises an error. Make the test an :IF and read the value inside it.
+15:42-15:60 warning iif_guard_ineffective: IIf evaluates both value arguments, so oOwner:displayName is read even when oOwner is NIL, which raises an error. Make the test an :IF and read the value inside it.
+-- diagnostics [--strict --info] --
+5:31-5:42 warning iif_guard_ineffective: IIf evaluates both value arguments, so aRows[1, 1] is read even when aRows is empty, which raises an error. Make the test an :IF and read the value inside it.
+10:36-10:45 warning iif_guard_ineffective: IIf evaluates both value arguments, so aTests[1] is read even when aTests is empty, which raises an error. Make the test an :IF and read the value inside it.
+15:42-15:60 warning iif_guard_ineffective: IIf evaluates both value arguments, so oOwner:displayName is read even when oOwner is NIL, which raises an error. Make the test an :IF and read the value inside it.

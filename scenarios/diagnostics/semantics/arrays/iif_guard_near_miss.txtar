@@ -1,0 +1,34 @@
+IIf calls that look like diag.iif_guard_ineffective and are not. The
+condition tests the element itself; the read is in the argument the
+condition does not protect, where an :IF would read it too; an Empty test
+of a string does not make the string's members unsafe; the argument guards
+its own read with a short-circuit .AND.; and the condition proves nothing
+because it is joined with .OR.
+-- input.ssl --
+:PROCEDURE Describe;
+:PARAMETERS aRow, aRows, sName, bAny;
+:DECLARE aOut;
+aOut := {};
+AAdd(aOut, IIf(Empty(aRow[1]), "Unknown", aRow[1]));
+AAdd(aOut, IIf(Len(aRows) > 1, "Several", aRows[1]));
+AAdd(aOut, IIf(Empty(sName), "", sName:Trim()));
+AAdd(aOut, IIf(Len(aRows) > 0, Len(aRows) > 0 .AND. aRows[1] == 1, .F.));
+AAdd(aOut, IIf(Len(aRows) > 0 .OR. bAny, aRows[1], NIL));
+:RETURN aOut;
+:ENDPROC;
+-- format --
+:PROCEDURE Describe;
+	:PARAMETERS aRow, aRows, sName, bAny;
+	:DECLARE aOut;
+
+	aOut := {};
+	AAdd(aOut, IIf(Empty(aRow[1]), "Unknown", aRow[1]));
+	AAdd(aOut, IIf(Len(aRows) > 1, "Several", aRows[1]));
+	AAdd(aOut, IIf(Empty(sName), "", sName:Trim()));
+	AAdd(aOut, IIf(Len(aRows) > 0, Len(aRows) > 0 .AND. aRows[1] == 1, .F.));
+	AAdd(aOut, IIf(Len(aRows) > 0 .OR. bAny, aRows[1], NIL));
+
+	:RETURN aOut;
+:ENDPROC;
+-- diagnostics --
+-- diagnostics [--strict --info] --

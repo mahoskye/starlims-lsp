@@ -1,6 +1,7 @@
-A quoted :INHERIT parent. Its compile behavior is undocumented, so
-diag.inherit_qualified_name stays silent (DECISIONS.md D10). Records
-whatever else the tool says about the string in that position.
+A quoted :INHERIT parent. The statement takes a name, and a class with
+the parent written as a string does not compile (verified on STARLIMS 12,
+issue #372), so diag.inherit_qualified_name reports the string and gives
+the statement to write. The formatter leaves the string as written.
 -- input.ssl --
 :CLASS Counter;
 :INHERIT "Samples.BaseCounter";
@@ -18,4 +19,6 @@ whatever else the tool says about the string in that position.
 	Me:nCount := 0;
 :ENDPROC;
 -- diagnostics --
+2:10-2:31 error inherit_qualified_name: ':INHERIT' takes the parent as a name, not a string, and a quoted parent does not compile: write ':INHERIT Samples.BaseCounter;'
 -- diagnostics [--strict --info] --
+2:10-2:31 error inherit_qualified_name: ':INHERIT' takes the parent as a name, not a string, and a quoted parent does not compile: write ':INHERIT Samples.BaseCounter;'
