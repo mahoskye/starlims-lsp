@@ -82,6 +82,13 @@ history:
       rune columns, one unit early per emoji before the target on
       the same line. A cross-file target is converted against its
       own file's text.
+  - date: 2026-11-27
+    ref: "follow-up to issue #379"
+    note: >-
+      A UDObject property declared by an initializer key ranges over the
+      name inside the quotes (A21). The range started at the key's
+      opening quote, so `{{"Name", 1}}` selected `"Nam`. A property
+      learned from `oObj:Name := ...` was already right.
 issues: ["#41"]
 ---
 
@@ -133,6 +140,8 @@ issues: ["#41"]
   CreateUDObject-inferred shape (feature.completion's shape inference)
   navigates to the property's definition: the initializer literal's key
   or the first `:prop :=` augmentation, wherever the shape learned it.
+  The range covers exactly the property name: for a key, the name inside
+  its quotes (`"`, `'` or `[...]`), never the quotes.
   A shaped receiver whose shape lacks the member is null — never a
   fallback to an unrelated same-named symbol. A receiver holding a
   built-in class instance (`oMail := Email{}`) is never shaped, even
@@ -167,6 +176,7 @@ issues: ["#41"]
 - A18: Given `oMail := Email{};` followed by `oMail:Subject := "x";`, when go-to-definition is invoked on a later `oMail:Subject`, then the response is null — a built-in class instance is not a shaped UDObject.
 - A19: Given `:DECLARE sName;` and the word `sName` inside `"sName is bad"` or a comment, when go-to-definition is invoked on that word, then the response is null.
 - A20: Given a declaration preceded on its line by an emoji (one character, two UTF-16 code units), when go-to-definition is invoked on a use, then the returned range starts and ends at the declared name's UTF-16 offsets (issue #307).
+- A21: Given `oObj := CreateUDObject({{"Name", 1}});` followed by `oObj:Name := 2;`, when go-to-definition is invoked on `Name` in the second statement, then the range covers exactly `Name` inside the key's quotes, not the opening quote; the same holds for `'Name'` and `[Name]` keys and after non-ASCII text earlier on the key's line.
 
 ## Rationale
 

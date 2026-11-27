@@ -760,46 +760,15 @@ func TestHandleCompletion_BuiltinClassMemberContext(t *testing.T) {
 	}
 }
 
-// [spec feature.completion/A4]
-func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
-	// Inside :CLASS Email, typing `Me:` should suggest Email members.
-	s := newTestServerWithDocument(`:CLASS Email;
-:PROCEDURE Demo;
-    Me:
+// [spec feature.completion/A4] — outside a class file, class-context forms
+// are not suggested. The class half of A4 (what `Me:` lists) is
+// TestHandleCompletion_MeColonListsOwnClassMembers; the test that stood
+// here used `:CLASS Email`, a built-in class's name, and passed whether or
+// not the class's own members were listed (issue #380).
+func TestHandleCompletion_ClassFormsNotSuggestedOutsideClass(t *testing.T) {
+	s := newTestServerWithDocument(`:PROCEDURE Test;
 :ENDPROC;`)
-
 	result, err := s.handleCompletion(nil, &protocol.CompletionParams{
-		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
-			Position:     protocol.Position{Line: 2, Character: 7},
-		},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	items, ok := result.([]protocol.CompletionItem)
-	if !ok {
-		t.Fatalf("expected completion items, got %T", result)
-	}
-	if len(items) == 0 {
-		t.Fatal("expected Me: member completions inside :CLASS Email")
-	}
-	// Email has SendOutgoing or similar — confirm at least one method-kind item.
-	hasMethod := false
-	for _, item := range items {
-		if item.Kind != nil && *item.Kind == protocol.CompletionItemKindMethod {
-			hasMethod = true
-			break
-		}
-	}
-	if !hasMethod {
-		t.Error("expected at least one method-kind completion for Me:")
-	}
-
-	// Outside a :CLASS file, class-context forms must NOT be suggested.
-	s = newTestServerWithDocument(`:PROCEDURE Test;
-:ENDPROC;`)
-	result, err = s.handleCompletion(nil, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
 			Position:     protocol.Position{Line: 0, Character: 0},
@@ -808,7 +777,7 @@ func TestHandleCompletion_MeColonInsideClass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	items, ok = result.([]protocol.CompletionItem)
+	items, ok := result.([]protocol.CompletionItem)
 	if !ok {
 		t.Fatalf("expected completion items, got %T", result)
 	}
@@ -1442,5 +1411,167 @@ x := 1;
 	}
 	if dups != 1 {
 		t.Errorf("expected exactly one sDup item, got %d", dups)
+	}
+}
+
+// utf16Len is the length of s in UTF-16 code units, the unit of an LSP
+// character offset.
+func utf16Len(s string) uint32 {
+	n := uint32(0)
+	for _, r := range s {
+		n++
+		if r > 0xFFFF {
+			n++
+		}
+	}
+	return n
+}
+
+// [spec feature.signature_help/A11] — issue #379 over LSP: the comma after
+// a string argument holding non-ASCII text advances the active parameter
+// at once, whatever the text's UTF-8 or UTF-16 length.
+func TestHandleSignatureHelp_NonASCIIStringArgument(t *testing.T) {
+	for _, arg := range []string{`"25 C"`, `"25 °C"`, `"Grüße"`, `"°C → µg/L"`, `"😀 ok"`} {
+		line := "\tsText := Left(" + arg + ","
+		s := newTestServerWithDocument(":PROCEDURE Main;\n\t:DECLARE sText;\n" + line + "\n:ENDPROC;")
+
+		help, err := s.handleSignatureHelp(nil, &protocol.SignatureHelpParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: 2, Character: utf16Len(line)},
+			},
+		})
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", arg, err)
+		}
+		if help == nil || help.ActiveParameter == nil {
+			t.Fatalf("%s: expected signature help with an active parameter, got %+v", arg, help)
+		}
+		if *help.ActiveParameter != 1 {
+			t.Errorf("%s: activeParameter = %d after the comma, want 1", arg, *help.ActiveParameter)
+		}
+	}
+}
+
+// [spec feature.hover/A26] — issue #379 over LSP: every character of
+// `?sId?` hovers, and its neighbours do not, whatever stands before it in
+// the string.
+func TestHandleHover_SQLPlaceholderAfterNonASCII(t *testing.T) {
+	for _, units := range []string{"'ug/L'", "'µg/L'", "'°C → µg/L'", "'😀'"} {
+		line := "\taRows := SQLExecute(\"select * from RESULTS where UNITS = " + units + " and SAMPLE_ID = ?sId?\");"
+		s := newTestServerWithDocument(":PROCEDURE Main;\n\t:DECLARE sId, aRows;\n" + line + "\n:ENDPROC;")
+		start := utf16Len(line[:strings.Index(line, "?sId?")])
+
+		hoverAt := func(char uint32) *protocol.Hover {
+			t.Helper()
+			hover, err := s.handleHover(nil, &protocol.HoverParams{
+				TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+					TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+					Position:     protocol.Position{Line: 2, Character: char},
+				},
+			})
+			if err != nil {
+				t.Fatalf("%s: unexpected error: %v", units, err)
+			}
+			return hover
+		}
+
+		for k := uint32(0); k < 5; k++ {
+			hover := hoverAt(start + k)
+			if hover == nil {
+				t.Errorf("%s: no hover on character %d of ?sId?", units, k)
+				continue
+			}
+			if content, ok := hover.Contents.(protocol.MarkupContent); !ok || !strings.Contains(content.Value, "?sId?") {
+				t.Errorf("%s: character %d hovers something else: %+v", units, k, hover.Contents)
+			}
+		}
+		if hover := hoverAt(start - 1); hover != nil {
+			t.Errorf("%s: hover on the character before ?sId?: %+v", units, hover.Contents)
+		}
+		if hover := hoverAt(start + 5); hover != nil {
+			t.Errorf("%s: hover on the character after ?sId?: %+v", units, hover.Contents)
+		}
+	}
+}
+
+// [spec feature.hover/A27] — over LSP, a placeholder on the second line of
+// a multi-line SQL string hovers, and so does one on the first line.
+func TestHandleHover_SQLPlaceholderOnLaterLineOfString(t *testing.T) {
+	s := newTestServerWithDocument(":PROCEDURE Main;\n\t:DECLARE sId, sCode, aRows;\n" +
+		"\taRows := SQLExecute(\"select c1 from t1 where c3 = ?sCode?\n\t\tand c2 = ?sId?\");\n:ENDPROC;")
+
+	hoverAt := func(line, char uint32) *protocol.Hover {
+		t.Helper()
+		hover, err := s.handleHover(nil, &protocol.HoverParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: line, Character: char},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		return hover
+	}
+	contains := func(hover *protocol.Hover, want string) bool {
+		content, ok := hover.Contents.(protocol.MarkupContent)
+		return ok && strings.Contains(content.Value, want)
+	}
+
+	// "\t\tand c2 = ?sId?": the placeholder starts at character 11.
+	for k := range uint32(5) {
+		if hover := hoverAt(3, 11+k); hover == nil || !contains(hover, "?sId?") {
+			t.Errorf("character %d of ?sId? on the string's second line: got %+v", k, hover)
+		}
+	}
+	if hover := hoverAt(3, 10); hover != nil {
+		t.Errorf("hover on the space before ?sId?: %+v", hover.Contents)
+	}
+	first := uint32(strings.Index("\taRows := SQLExecute(\"select c1 from t1 where c3 = ?sCode?", "?sCode?"))
+	if hover := hoverAt(2, first); hover == nil || !contains(hover, "?sCode?") {
+		t.Errorf("?sCode? on the string's first line: got %+v", hover)
+	}
+}
+
+// [spec feature.completion/A13] — the token before the cursor is found by
+// character count. Counted in bytes, a string earlier on the line whose
+// extra bytes outnumber the characters between it and the cursor reached
+// past the `:`, and member completion was lost (issue #379).
+func TestHandleCompletion_MemberAfterNonASCIIString(t *testing.T) {
+	labelsFor := func(str string) []string {
+		t.Helper()
+		line := "\tsText := " + str + " + oMail:"
+		s := newTestServerWithDocument(":PROCEDURE Main;\n\t:DECLARE oMail, sText;\n\toMail := Email{};\n" + line + "\n:ENDPROC;")
+		result, err := s.handleCompletion(nil, &protocol.CompletionParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: 3, Character: utf16Len(line)},
+			},
+			Context: &protocol.CompletionContext{TriggerKind: protocol.CompletionTriggerKindTriggerCharacter},
+		})
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", str, err)
+		}
+		items, ok := result.([]protocol.CompletionItem)
+		if !ok {
+			t.Fatalf("%s: expected completion items, got %T", str, result)
+		}
+		labels := make([]string, 0, len(items))
+		for _, item := range items {
+			labels = append(labels, item.Label)
+		}
+		return labels
+	}
+
+	want := labelsFor(`"Temperature: "`)
+	if len(want) == 0 || !containsLabel(want, "Subject") {
+		t.Fatalf("baseline: expected the Email members after oMail:, got %v", want)
+	}
+	for _, str := range []string{`"Температура: "`, `"°°°°°°°°°°°°"`, `"温度超出范围"`, `"😀😀😀😀"`} {
+		got := labelsFor(str)
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: members after oMail: differ from the ASCII baseline\n got: %v\nwant: %v", str, got, want)
+		}
 	}
 }

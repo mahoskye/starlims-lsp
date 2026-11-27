@@ -69,6 +69,15 @@ history:
       on the same line shifted it; each location is now converted
       against its own document's text, including closed files
       reached cross-file.
+  - date: 2026-11-27
+    ref: "issue #378"
+    note: >-
+      A word match inside a keyword, literal or operator token is no
+      longer an occurrence, and a cursor on such a token names no symbol
+      (A20). The search matched the bare word, so the references of a
+      variable `t` listed the `T` of every `.T.`, and a request on `.T.`
+      listed the variable. Found through rename, which writes what this
+      search returns.
 issues: ["#42", "#43", "#125"]
 ---
 
@@ -135,6 +144,11 @@ issues: ["#42", "#43", "#125"]
   (case-insensitive) and the match spans the entire string content — the
   dispatch-target case. Code-context matches (including code blocks) are
   kept.
+- A match inside a keyword, literal or operator token MUST NOT be
+  returned: the `T` of `.T.`, the `AND` of `.AND.` and the `TO` of `:TO`
+  are part of their token, not an occurrence of a variable spelled that
+  way. A request with the cursor on such a token returns nothing, since
+  no symbol is there (issue #378).
 - Locations count characters in UTF-16 code units, the encoding the
   server advertises. Each location is converted against its own
   document's current text (the open buffer, or the file on disk for a
@@ -162,6 +176,7 @@ issues: ["#42", "#43", "#125"]
 - A17: Given a workspace index and the cursor on a member access (`oRec:CalcTotal`) spelled like a procedure of the file, when references are requested, then no procedure occurrence and no dispatch site in any file is returned; given the cursor inside a 1-part `DoProc("CalcTotal")` string, then the procedure's cross-file dispatch sites are still returned.
 - A18: Given a file-level `:DECLARE sX;` used as `sX := "é" + sX;` and a procedure declaring its own `:PARAMETERS sX;`, when references are requested on the file-level variable, then the procedure's occurrences are NOT returned and each location's column counts characters, not bytes.
 - A19: Given an emoji (one character, two UTF-16 code units) or an accented letter before an occurrence on the same line — in the current document, or in a closed caller file reached cross-file — when references are requested, then the location starts and ends at the occurrence's UTF-16 offsets (issue #307).
+- A20: Given a variable `t` assigned `.T.` and tested with `.NOT. t .AND. f`, when references are requested on the variable, then only its declaration and uses are returned — no location inside `.T.`, `.AND.` or `.NOT.`; when requested with the cursor on the `T` of `.T.`, then nothing is returned (issue #378).
 
 ## Rationale
 

@@ -193,7 +193,7 @@ func checkDataSourceQuestionPlaceholders(body string, lineOffset int) []Diagnost
 			Severity: SeverityError,
 			Range: Range{
 				Start: Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1},
-				End:   Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1 + len(t.Text)},
+				End:   Position{Line: lineOffset + t.Line - 1, Character: t.Column - 1 + utf8.RuneCountInString(t.Text)},
 			},
 			Message: fmt.Sprintf("A SQL data source references parameters as '@%s'; the '?%s?' marker is SQLExecute's and is not substituted here", name, name),
 			Source:  "ssl-lsp",

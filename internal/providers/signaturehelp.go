@@ -154,10 +154,13 @@ func GetSignatureHelpWithProcedures(tokens []lexer.Token, procedures []parser.Pr
 // index, and whether the context is a built-in class instantiation
 // (`Email{...}`) rather than a function call.
 func findFunctionContextFromTokens(tokens []lexer.Token, line, column int) (string, int, bool) {
-	// Find the token index at the current position
+	// Find the token index at the current position. The token's extent is
+	// counted in runes, like the column: a byte count overshoots a string
+	// holding non-ASCII text, and the comma after it was then missed
+	// (issue #379).
 	currentIdx := -1
 	for i, token := range tokens {
-		if token.Line == line && column >= token.Column && column <= token.Column+len(token.Text) {
+		if token.Line == line && column >= token.Column && column <= token.Column+token.RuneLen() {
 			currentIdx = i
 			break
 		}

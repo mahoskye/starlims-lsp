@@ -56,7 +56,8 @@ The server currently applies only lightweight filtering:
 |---------|----------|
 | Inside strings/comments | No completions returned |
 | `:` auto-trigger, no context match | Keyword completions only |
-| `Me:` / `Base:` (in `:CLASS` file) | Methods/properties of the enclosing class |
+| `Me:` (in `:CLASS` file) | The document's class: its own fields and methods, the procedures of scripts it `:INCLUDE`s, and what it inherits through `:INHERIT` |
+| `Base:` (in `:CLASS` file) | The inherited fields and methods only, including the parent `Constructor` |
 | `<BuiltInClass>:` | Methods/properties of that class |
 | `<shapedVar>:` | Inferred UDObject properties (see [UDObject Shape Inference](#26-udobject-shape-inference)) |
 | Inside `:CLASS` methods (explicit invocation) | Adds class-context forms; inserts procedure completions as `Me:MethodName(...)` |

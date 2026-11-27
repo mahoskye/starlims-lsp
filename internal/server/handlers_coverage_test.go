@@ -394,6 +394,40 @@ func TestHandlePrepareRename_RejectsKeywordAndComment(t *testing.T) {
 	}
 }
 
+// [spec feature.rename/A25] — issue #378 over LSP: prepareRename answers
+// null on `.T.` and `.AND.`, and rename answers no edit.
+func TestHandleRename_DottedLiteralAndOperatorRejected(t *testing.T) {
+	s := newTestServerWithDocument(":PROCEDURE Check;\n\t:PARAMETERS bA, bB;\n\t:IF bA .AND. .T.;\n\t\t:RETURN .T.;\n\t:ENDIF;\n:ENDPROC;")
+	cases := []struct {
+		name       string
+		line, char uint32
+	}{
+		{".AND. on the A", 2, 9},
+		{".AND. after the D", 2, 12},
+		{".T. on the T", 2, 15},
+		{".T. after the T", 2, 16},
+		{".T. on the next line", 3, 11},
+	}
+	for _, tc := range cases {
+		if got := prepareRenameAt(t, s, tc.line, tc.char); got != nil {
+			t.Errorf("%s: expected prepareRename to answer null, got %#v", tc.name, got)
+		}
+		edit, err := s.handleRename(nil, &protocol.RenameParams{
+			TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: testURI},
+				Position:     protocol.Position{Line: tc.line, Character: tc.char},
+			},
+			NewName: "Z",
+		})
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.name, err)
+		}
+		if edit != nil {
+			t.Errorf("%s: expected rename to answer no edit, got %#v", tc.name, edit)
+		}
+	}
+}
+
 func TestHandlePrepareRename_VariableReturnsRangeAndPlaceholder(t *testing.T) {
 	s := newTestServerWithDocument(":DECLARE sName;\nsName := \"x\";")
 	rp, ok := prepareRenameAt(t, s, 1, 2).(protocol.RangeWithPlaceholder)

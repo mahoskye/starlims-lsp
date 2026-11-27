@@ -64,6 +64,13 @@ func PrepareRename(text string, line, column int, uri string, procedures []parse
 		return nil
 	}
 
+	// The letters of `.T.`, `.F.`, `.AND.`, `.OR.` and `.NOT.` reach here
+	// as a bare word (`T`, `AND`) that looks like an identifier. The token
+	// decides: a keyword, literal or operator is never renamed (issue #378).
+	if wordInKeywordOrOperatorToken(tokens, text, line, column) {
+		return nil
+	}
+
 	// Check if this is a renameable symbol
 	if !isRenameableSymbol(word, line, column, text, procedures, variables) {
 		return nil
@@ -94,12 +101,17 @@ func Rename(text string, line, column int, newName string, uri string, procedure
 	}
 
 	// Rename repeats PrepareRename's guards — a client may skip prepare
-	// (issue #258): no edits from inside a comment or a string, and member
-	// names are never renamed.
-	if ctx := lexer.GetContextAtPosition(lexer.NewLexer(text).Tokenize(), line, column); ctx == lexer.ContextString || ctx == lexer.ContextComment {
+	// (issue #258): no edits from inside a comment or a string, member
+	// names are never renamed, and neither are the letters of a keyword,
+	// literal or operator token (issue #378).
+	tokens := lexer.NewLexer(text).Tokenize()
+	if ctx := lexer.GetContextAtPosition(tokens, line, column); ctx == lexer.ContextString || ctx == lexer.ContextComment {
 		return nil
 	}
 	if cursorOnMember(text, line, column) {
+		return nil
+	}
+	if wordInKeywordOrOperatorToken(tokens, text, line, column) {
 		return nil
 	}
 
@@ -154,13 +166,11 @@ func isRenameableSymbol(word string, line, column int, text string, procedures [
 		}
 	}
 
-	// Cannot rename literals
-	if wordLower == ".t." || wordLower == ".f." || wordLower == "nil" {
-		return false
-	}
-
-	// Cannot rename operators
-	if wordLower == ".and." || wordLower == ".or." || wordLower == ".not." {
+	// Cannot rename the NIL literal. The dotted literals and operators
+	// (`.T.`, `.AND.`) never arrive here whole — a word carries no dots —
+	// so PrepareRename and Rename reject them by token before this check
+	// (wordInKeywordOrOperatorToken, issue #378).
+	if wordLower == "nil" {
 		return false
 	}
 

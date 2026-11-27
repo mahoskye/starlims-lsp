@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Rename no longer accepts `.T.`, `.F.`, `.AND.`, `.OR.` or `.NOT.`**
+  (#378). `prepareRename` with the cursor on the letters of one of these
+  answered a range and the letters as the placeholder (`T`, `AND`), and
+  `rename` then rewrote every such token in the file: `.T.` became `.Z.`,
+  which does not compile. Both now answer null, as they always did for
+  `NIL` and as the catalog required. The cause was shared with the
+  reference search, so two more things change with it. Renaming a
+  variable spelled `t`, `f`, `and`, `or` or `not` used to rewrite the
+  dotted token of that spelling as well, and now edits the variable only.
+  Find references on such a variable no longer lists the dotted tokens,
+  and a request with the cursor on a keyword, literal or operator returns
+  nothing. A defect fix under D16
+  ([feature.rename](catalog/features/rename.md) A25, A26,
+  [feature.references](catalog/features/references.md) A20).
+- **Non-ASCII text in a string no longer shifts where the cursor is read**
+  (#379). Several lookups took a token's end as its start column plus its
+  UTF-8 byte length, against a cursor column counted in characters, so a
+  string holding `°`, `µ`, `é` or `ß` reached past its real end by one
+  column for each extra byte. Not #307, which was about characters above
+  U+FFFF in positions the server sends. Fixed, each now counting
+  characters:
+  - Signature help: after `Left("25 °C",` the active parameter stayed on
+    the first one until more was typed
+    ([feature.signature_help](catalog/features/signature_help.md) A11).
+  - Hover on a SQL placeholder: after `'°C → µg/L'` in the same string,
+    the first four characters of `?sId?` answered null
+    ([feature.hover](catalog/features/hover.md) A26).
+  - Member completion: a string earlier on the line with more extra bytes
+    than there are characters between it and the cursor (a few words of
+    Cyrillic, Greek or CJK text) hid the `:`, and `oMail:` listed nothing.
+    The text typed so far in a `DoProc`/`ExecFunction` string was cut
+    short after a non-ASCII character
+    ([feature.completion](catalog/features/completion.md) A13, A14).
+  - Diagnostic ranges: `complex_sql_placeholder`,
+    `udobject_array_in_clause` and `invalid_sql_param` underlined a
+    placeholder to the right of where it is when non-ASCII text stood
+    before it in the string, and `datasource_sql_question_placeholder`
+    ended past a marker holding such text
+    ([feature.diagnostics_pipeline](catalog/features/diagnostics_pipeline.md)
+    A34).
+  - Go to definition on a UDObject property whose name holds non-ASCII
+    text: the target range ended past the name.
+
+  The other places the issue lists compare against identifier and
+  operator tokens, which are ASCII, and behaved correctly; they use the
+  same character count now. A defect fix under D16: no code is added and
+  no finding appears or disappears, only its columns move.
+- **`Me:` and `Base:` complete the members of a class written in the
+  workspace** (#380). The class name was looked up among the built-in
+  classes only. In a class of your own, `Me:` listed nothing when the `:`
+  was typed and the whole inventory on explicit invocation, and a class
+  named like a built-in one (`:CLASS Email`) listed the built-in's
+  members. `Me:` now lists the class's own fields (names declared outside
+  every procedure) and methods, the procedures of scripts the class file
+  `:INCLUDE`s, and what it inherits up the `:INHERIT` chain; `Base:`
+  lists the inherited members, the parent `Constructor` among them. A
+  method inserts its call with its parameters as placeholders
+  (`Bump(${1:nBy})`). Inherited and included members come from the
+  workspace index, or from the open buffer when the file is open, and
+  only when the parent or the include resolves to exactly one file: an
+  accepted member the class does not have is a compile-time error. Not
+  offered, because the behavior has not been run: an included script's
+  `/*@private;` and `/*@protected;` procedures, what an included script
+  includes in turn, and what an ancestor includes. The test for this
+  criterion used `:CLASS Email` and passed either way; it is replaced. A
+  defect fix under D16
+  ([feature.completion](catalog/features/completion.md) A4, A15-A19).
+  **Downstream:** a client needs no change; the items are ordinary
+  `Field` and `Method` completions, methods as snippets.
+- **Hover on a SQL placeholder answers on every line of a multi-line
+  string.** Only the string's first line was searched, so in
+  `SQLExecute("select c1` continued on the next line by
+  `  from t1 where c2 = ?sId?")`, hovering `?sId?` returned null. A
+  placeholder now hovers on whichever line it sits, located by characters
+  as #379 requires, and positional `?` placeholders are numbered across
+  the whole string. A defect fix under D16
+  ([feature.hover](catalog/features/hover.md) A27).
+- **Go to definition on a UDObject property declared by a string key
+  ranges over the name, not its opening quote.** For
+  `oObj := CreateUDObject({{"Name", 1}});`, definition on a later
+  `oObj:Name` selected `"Nam`, one character left of the name, for `"`,
+  `'` and `[...]` keys alike. A property learned from `oObj:Name := ...`
+  was already right. A defect fix under D16
+  ([feature.definition](catalog/features/definition.md) A21).
+
 ## [0.33.0] - 2026-11-27
 
 The answers release (#372). The questions the last release left open were

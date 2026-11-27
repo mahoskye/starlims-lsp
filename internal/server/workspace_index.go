@@ -64,6 +64,11 @@ type FileSymbols struct {
 	// (spec feature.cross_file_resolution/A18-A19).
 	DeclaredVars   []string
 	IncludeTargets []string
+	// ClassFields are the fields a class file declares: the names declared
+	// outside every procedure. Empty for a file that is not a class. With
+	// Procedures they are the members `Me:` and `Base:` completion offer
+	// from a class that is not open (feature.completion, issue #380).
+	ClassFields []string
 	// CallSites are the file's dispatch/RunDS/:INCLUDE call sites
 	// (issue #125). Candidate discovery only: reference locations and
 	// rename edits are always recomputed from current content at request
@@ -385,11 +390,18 @@ func (wi *WorkspaceIndex) indexFile(uri string, gen uint64) error {
 
 	category, scriptName, anchored := deriveScriptIdentity(path)
 	entryParams, entryLine := p.ExtractTopLevelParameters(ast)
+	variables := p.ExtractVariables()
+	isClass := isClassFileFromTokens(tokens)
+	var classFields []string
+	if isClass {
+		classFields = providers.ClassFieldNames(procs, variables)
+	}
 
 	fs := &FileSymbols{
 		URI:             uri,
 		Procedures:      indexed,
-		IsClass:         isClassFileFromTokens(tokens),
+		IsClass:         isClass,
+		ClassFields:     classFields,
 		IsDataSource:    isDataSourceURI(uri),
 		ModTime:         info.ModTime(),
 		ScriptName:      scriptName,
@@ -397,7 +409,7 @@ func (wi *WorkspaceIndex) indexFile(uri string, gen uint64) error {
 		HasLayoutAnchor: anchored,
 		EntryParameters: entryParams,
 		EntryParamsLine: entryLine,
-		DeclaredVars:    dedupeVariableNames(p.ExtractVariables()),
+		DeclaredVars:    dedupeVariableNames(variables),
 		IncludeTargets:  providers.ExtractIncludeTargets(tokens),
 		CallSites:       indexedCallSites(providers.ExtractCallSites(tokens)),
 		ClassSites:      providers.ExtractClassSites(tokens),

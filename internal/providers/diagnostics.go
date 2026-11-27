@@ -1748,24 +1748,33 @@ func asciiUpper(s string) string {
 
 // stringContentRange returns the source range of the `length` bytes that
 // start at byte offset `start` of a string token's content (the text
-// between its delimiters). A multi-line string is handled: the line
-// advances past every newline before the offset, and the character
-// restarts from that line's first column (issue #255 — the range used to
-// stay on the token's first line, past its end).
+// between its delimiters). The offsets are bytes, as ParseSQLPlaceholders
+// reports them; the range is in rune columns like every other range, so
+// non-ASCII text earlier in the string does not move it (issue #379). A
+// multi-line string is handled: the line advances past every newline
+// before the offset, and the character restarts from that line's first
+// column (issue #255 — the range used to stay on the token's first line,
+// past its end).
 func stringContentRange(tok lexer.Token, start, length int) Range {
 	line := tok.Line - 1
-	// tok.Column is 1-based; +1 skips the opening delimiter.
-	char := tok.Column + start
-	if end := 1 + start; end <= len(tok.Text) {
-		before := tok.Text[1:end]
-		if nl := strings.LastIndexByte(before, '\n'); nl >= 0 {
-			line += strings.Count(before, "\n")
-			char = len(before) - nl - 1
-		}
+	// The content follows the one-byte opening delimiter.
+	content := ""
+	if len(tok.Text) > 0 {
+		content = tok.Text[1:]
+	}
+	start = max(0, min(start, len(content)))
+	end := max(start, min(start+length, len(content)))
+	before := content[:start]
+	// tok.Column is 1-based; as a 0-based character it lands one past the
+	// token start, on the first character of the content.
+	char := tok.Column + utf8.RuneCountInString(before)
+	if nl := strings.LastIndexByte(before, '\n'); nl >= 0 {
+		line += strings.Count(before, "\n")
+		char = utf8.RuneCountInString(before[nl+1:])
 	}
 	return Range{
 		Start: Position{Line: line, Character: char},
-		End:   Position{Line: line, Character: char + length},
+		End:   Position{Line: line, Character: char + utf8.RuneCountInString(content[start:end])},
 	}
 }
 
@@ -2128,7 +2137,7 @@ func checkMissingQuotesInExecFunction(tokens []lexer.Token) []Diagnostic {
 								Severity: SeverityError,
 								Range: Range{
 									Start: Position{Line: t.Line - 1, Character: t.Column - 1},
-									End:   Position{Line: tokens[last].Line - 1, Character: tokens[last].Column - 1 + len(tokens[last].Text)},
+									End:   Position{Line: tokens[last].Line - 1, Character: tokens[last].Column - 1 + tokens[last].RuneLen()},
 								},
 								Message: fmt.Sprintf("Namespace path must be quoted: %s(\"Module.Procedure\", ...) not %s(Module.Procedure, ...)", funcName, funcName),
 								Source:  "ssl-lsp",
@@ -3840,7 +3849,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 		// Check adjacent operator pairs for !== and ===
 		if i+1 < len(tokens) && tokens[i+1].Type == lexer.TokenOperator {
 			next := tokens[i+1]
-			if token.Offset+len(token.Text) == next.Offset {
+			if token.Offset+token.RuneLen() == next.Offset {
 				combined := token.Text + next.Text
 				for _, fix := range invalidPairs {
 					if combined == fix.combined {
@@ -3848,7 +3857,7 @@ func checkInvalidOperatorSequences(tokens []lexer.Token) []Diagnostic {
 							Severity: SeverityError,
 							Range: Range{
 								Start: Position{Line: token.Line - 1, Character: token.Column - 1},
-								End:   Position{Line: next.Line - 1, Character: next.Column - 1 + len(next.Text)},
+								End:   Position{Line: next.Line - 1, Character: next.Column - 1 + next.RuneLen()},
 							},
 							Message: fmt.Sprintf("%s. Use '%s' instead", fix.description, fix.suggestion),
 							Source:  "ssl-lsp",

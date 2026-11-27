@@ -11,6 +11,7 @@ config:
 tests:
   - internal/providers/providers_test.go
   - internal/providers/sql_mode_test.go
+  - internal/providers/sql_checks_test.go
   - internal/providers/region_body_test.go
   - internal/server/server_test.go
   - internal/server/utf16_output_test.go
@@ -203,6 +204,17 @@ history:
       Suppression comments may give a reason after `--`, `—` or `:`, which
       matching ignores (D3 amended). The documented form lost its closing
       `*/`: SSL comments end at `;`, so `; */` left code after the comment.
+  - date: 2026-11-27
+    ref: "issue #379"
+    note: >-
+      A finding on a `?name?` placeholder inside a string is ranged by
+      characters (A34). The placeholder's byte offset in the string was
+      added to the string's character column, so each non-ASCII character
+      earlier in the string moved the range of
+      `complex_sql_placeholder`, `udobject_array_in_clause` and
+      `invalid_sql_param` one column to the right for each extra byte.
+      The end of a `?name?` finding in a SQL data-source body is counted
+      in characters too.
 issues: []
 ---
 
@@ -227,7 +239,9 @@ rules (those are `diag.*` entries).
   columns; the server converts each range against the document's text when
   it publishes, so a character outside the Basic Multilingual Plane (two
   UTF-16 units) earlier on the line cannot shift a range (issue #307). The
-  `--validate` CLI reports 1-based rune columns.
+  `--validate` CLI reports 1-based rune columns. A range inside a string
+  token is located by characters as well: non-ASCII text earlier in the
+  string never moves it (issue #379).
 - Severity overrides: `ssl.diagnostics.rules` maps a Code slug to one of
   `off` (drop the diagnostic), `hint`, `info`, `warn`/`warning`, or
   `error` (remap severity). Keys and values are matched
@@ -361,6 +375,7 @@ rules (those are `diag.*` entries).
 - A31: Given a `.ds` document whose builder-directive / `:PARAMETERS` header is preceded by a banner written in SSL comment style (a `/*` run closed by `;` rather than `*/`), when the header is split, then the banner is masked to blanks like the terminated form and the header scan reaches the directives beneath it — so the body classifies on its own content and a SQL body stays in SQL mode. The leading-unterminated-comment signal decides only the headerless shapes: a comment-only stub and an SSL data source opening with an unterminated comment both still classify as SSL (issue #249, preserving A16/A22).
 - A32: Given a line holding an emoji (one character, two UTF-16 code units) before a flagged construct — an SSL finding such as `!==`, or an undeclared `@name` placeholder in a SQL data-source body — when diagnostics are published, then the range starts and ends at the construct's UTF-16 offsets, not one unit early; a line without such characters is unaffected (issue #307).
 - A33: Given a document producing more than 100 diagnostics, when they are published, then the published 100 are the most severe — errors first, then warnings, info, and hints, each severity in position order — so an error is never dropped while a less severe diagnostic is published, whatever order the checks emitted them in (issue #258).
+- A34: Given a finding located on a `?name?` placeholder after non-ASCII text in the same string — `?oX:aIds?` after `'°C → µg/L'` in a `SQLExecute` string, on the string's first line or on a later line of a multi-line string — when diagnostics are collected, then the range covers exactly the placeholder's characters, the same columns as with ASCII text of equal character length in its place (issue #379).
 
 ## Rationale
 

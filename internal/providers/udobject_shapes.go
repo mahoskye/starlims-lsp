@@ -25,11 +25,11 @@ type UDObjectProperty struct {
 	// "array", "object", "unknown") inferred from the initializer expression.
 	// Empty when the value couldn't be classified.
 	Type string
-	// Line/Column locate where the shape learned the property — the
-	// initializer literal's key or the first `:prop :=` augmentation
-	// (1-based token coordinates; 0 when unknown). Member hover and
-	// go-to-definition navigate here (feature.definition A14,
-	// feature.hover A15).
+	// Line/Column locate where the shape learned the property — the name
+	// inside the initializer literal's quoted key, or the first
+	// `:prop :=` augmentation (1-based, column in runes; 0 when unknown).
+	// Member hover and go-to-definition navigate here (feature.definition
+	// A14, A21; feature.hover A15).
 	Line   int
 	Column int
 }
@@ -410,7 +410,9 @@ func parseShapePair(tokens []lexer.Token, openIdx int) *UDObjectProperty {
 	if key == "" {
 		return nil
 	}
-	prop := &UDObjectProperty{Name: key, Line: tokens[keyIdx].Line, Column: tokens[keyIdx].Column}
+	// The name starts after the opening quote (`"`, `'` or `[`, one
+	// character each), not at the token's column.
+	prop := &UDObjectProperty{Name: key, Line: tokens[keyIdx].Line, Column: tokens[keyIdx].Column + 1}
 
 	commaIdx := nextSignificantTokenIndex(tokens, keyIdx+1)
 	if commaIdx >= 0 && tokens[commaIdx].Text == "," {
@@ -477,7 +479,7 @@ func MemberAccessAt(tokens []lexer.Token, line, column int) (string, string, boo
 		if token.Type != lexer.TokenIdentifier || token.Line != line {
 			continue
 		}
-		if column < token.Column || column > token.Column+len(token.Text) {
+		if column < token.Column || column > token.Column+token.RuneLen() {
 			continue
 		}
 		colonIdx := prevSignificantTokenIndex(tokens, i-1)

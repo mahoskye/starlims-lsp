@@ -792,6 +792,46 @@ func TestDispatchCompletion_LevelOne_CategoryScripts(t *testing.T) {
 	}
 }
 
+// [spec feature.completion/A14] — the text typed so far in a dispatch
+// string is cut by characters. Cut by bytes, `Größe.` lost its dot and the
+// category level was never reached (issue #379).
+func TestDispatchCompletion_NonASCIICategoryPrefix(t *testing.T) {
+	s := NewSSLServer()
+	wi, dir := newResolverIndex(t)
+	s.workspaceIndex = wi
+	writeAndIndex(t, wi, dir, "Server Scripts/Größe/HELPERS.srvscr", helperScript)
+	writeAndIndex(t, wi, dir, "Server Scripts/Größe/TASKS.srvscr", ":PROCEDURE Run;\n:ENDPROC;")
+
+	source := `result := ExecFunction("Größe.");`
+	// UTF-16 offset of the closing quote: every character here is one unit.
+	at := uint32(utf8.RuneCountInString(source[:strings.Index(source, `");`)]))
+	labels := dispatchCompletionLabels(t, s, source, at)
+
+	for _, want := range []string{"HELPERS", "TASKS"} {
+		if !containsLabel(labels, want) {
+			t.Errorf("expected script %s after the category dot, got %v", want, labels)
+		}
+	}
+}
+
+// The prefix helper itself: runes in, runes out, never half a character.
+func TestDispatchStringPrefix_NonASCII(t *testing.T) {
+	source := `ExecFunction("Größe.Skript.Berechne");`
+	tokens := lexer.NewLexer(source).Tokenize()
+	open := utf8.RuneCountInString(source[:strings.Index(source, `"`)]) + 1 // 1-based column of the opening quote
+	cases := []struct {
+		typed int // characters of content before the cursor
+		want  string
+	}{
+		{0, ""}, {2, "Gr"}, {3, "Grö"}, {5, "Größe"}, {6, "Größe."}, {13, "Größe.Skript."},
+	}
+	for _, tc := range cases {
+		if got := dispatchStringPrefix(tokens, 1, open+1+tc.typed); got != tc.want {
+			t.Errorf("after %d characters: prefix %q, want %q", tc.typed, got, tc.want)
+		}
+	}
+}
+
 // [spec feature.completion/A9]
 func TestDispatchCompletion_LevelTwo_ProceduresExcludePrivate(t *testing.T) {
 	s := NewSSLServer()
