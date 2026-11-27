@@ -123,6 +123,17 @@ history:
       Silent inside a statement that fails to parse on its first line, and
       inside comment text stranded by a `;`: one undeclared_variable per
       prose word was noise on top of the parse error.
+  - date: 2026-11-27
+    ref: "issue #372"
+    note: >-
+      The file-wide reading was checked on STARLIMS 12 for the case issue
+      #372 raised, a procedure entered by its three-part name. A name
+      declared inside one procedure is readable by a procedure it calls,
+      and a name the calling script declared is readable across scripts,
+      so a name declared anywhere up the call stack is in scope. The
+      procedure's own script-level declarations are not, when it is
+      entered by name. No behavior change. DECISIONS.md D22 records why no
+      rule reports that last case.
 issues: []
 ---
 
@@ -135,7 +146,9 @@ once per file. The check is file-wide, not per procedure, on purpose: SSL
 resolves a name through the scopes of the routines on the call stack
 (reference guides/variable-scope.md), so a procedure can read a variable
 its caller declared, and which procedure calls which is not known
-statically (DECISIONS.md D10).
+statically (DECISIONS.md D10). The same reasoning is why no rule reports
+a script-level variable read in a procedure that another script enters by
+name (DECISIONS.md D22).
 
 Declarations are read as statements — keyword through the terminating
 `;` — so layout never hides one: `:DECLARE sA, sB;`, a comma list broken

@@ -4,6 +4,44 @@ Decisions that shape the whole catalog rather than any single entry.
 Per-entry decisions live in that entry's `history:` field. Release history
 lives in CHANGELOG.md. Newest first.
 
+## D22 — No rule judges from one call site whether a variable is there (2026-11-27, issue #372)
+
+Issue #372 asked for a diagnostic when a procedure reads a script-level
+variable, its own script's or one an `:INCLUDE` brings in, and another
+script enters the procedure by its three-part name. Entered that way the
+script's top-level code has not run, so the variable was never created
+there, and the read raises `Variable [NAME] is undefined!` (verified on
+STARLIMS 12). The failure is real. No diagnostic is added for it, and none
+is to be built as a check of the call site.
+
+- **A name is resolved through the call stack**, not through the script
+  it is written in (reference guides/variable-scope.md): the current
+  scope, then the scope of every routine on the stack, then publics.
+  Verified on STARLIMS 12 for this case: a procedure entered by its
+  three-part name reads a variable the calling code declared, whether at
+  the caller's script level, inside the calling procedure, as one of its
+  parameters, two scripts up, or through the caller's own `:INCLUDE`. It
+  is the same variable, so an assignment in the called procedure changes
+  the caller's value.
+- **So whether the read fails depends on everything up the stack**, and a
+  call site shows one frame of it. Who calls the caller is not known
+  statically (D10), and an entry from outside SSL, a client script or a
+  scheduled job, is not in the workspace at all.
+- **Measured on the production corpus.** 42 procedures read a
+  script-level variable and are referenced somewhere by a three-part
+  name. In 26 every calling script declares the name. In the other 16, 14
+  read it only as an argument of `RaiseError` on a failure path, one only
+  under a debug flag, and one reads a variable the platform supplies. A
+  call-site rule would have reported those 16, and each report would have
+  been wrong or of no use.
+- **What stays.** `undeclared_variable` remains the opt-in, file-wide
+  advisory it is, for the reason given here. The remedy is in how the
+  procedure is written: one that other scripts enter by name takes what it
+  needs as parameters, or declares and sets it itself.
+
+A rule becomes possible only with a view of every entry point of a
+program. Adding that view is a new decision.
+
 ## D21 — Lexical facts are a custom request; semantic tokens stay names (2026-11-25, issue #375)
 
 A client that may not read SSL itself (D19) still has to tell code from a

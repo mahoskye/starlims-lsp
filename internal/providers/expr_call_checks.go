@@ -117,8 +117,11 @@ func checkFormatArgNotArray(tokens []lexer.Token, calls []parser.CallSite) []Dia
 // variable is resolved at run time and takes any array, so it is not
 // reported; nor is a dotted name, whose binding depends on how the server
 // compiles. Inside a class the call is already doproc_in_class, and one
-// finding per call is enough. A parenthesized or skipped argument, and one
-// the parser could not read, stay silent: unknown is not evidence (D17).
+// finding per call is enough. A comma with nothing after it
+// (`DoProc("Name",)`) fails the same way and is reported on the comma. An
+// array literal in parentheses compiles, so it is not reported; a skipped
+// slot with a third argument after it and an argument the parser could not
+// read stay silent: unknown is not evidence (D17).
 func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSite) []Diagnostic {
 	var diagnostics []Diagnostic
 
@@ -148,7 +151,23 @@ func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSit
 		}
 		args := call.Args[1]
 		switch args.Kind {
-		case parser.ExprArrayLiteral, parser.ExprSkipped, parser.ExprGroup, parser.ExprUnknown:
+		case parser.ExprArrayLiteral, parser.ExprGroup, parser.ExprUnknown:
+			continue
+		case parser.ExprSkipped:
+			// Only the shape that was verified: the comma is the last thing
+			// in the call. `DoProc("Name",, x)` is left alone.
+			rng, ok := trailingCommaRange(tokens, args)
+			if len(call.Args) != 2 || !ok {
+				continue
+			}
+			diagnostics = append(diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Range:    rng,
+				Message: fmt.Sprintf("DoProc(%s,) has a comma and no argument array after it, which is a compile-time error with a literal procedure name: "+
+					"write DoProc(%s) or DoProc(%s, {...}).", name.Text, name.Text, name.Text),
+				Source: "ssl-lsp",
+				Code:   CodeDoProcArgsNotArrayLiteral,
+			})
 			continue
 		}
 		rng, ok := exprRange(tokens, args)
@@ -166,6 +185,27 @@ func checkDoProcArgsNotArrayLiteral(tokens []lexer.Token, calls []parser.CallSit
 	}
 
 	return diagnostics
+}
+
+// trailingCommaRange returns the range of the comma that opens a skipped
+// last argument (`f(a,)`). The skipped slot has no token of its own: its
+// node sits on the closing parenthesis, so the comma is the significant
+// token before it.
+func trailingCommaRange(tokens []lexer.Token, skipped *parser.Expr) (Range, bool) {
+	if skipped == nil || skipped.Start <= 0 || skipped.Start > len(tokens) {
+		return Range{}, false
+	}
+	for i := skipped.Start - 1; i >= 0; i-- {
+		switch tokens[i].Type {
+		case lexer.TokenWhitespace, lexer.TokenComment:
+			continue
+		}
+		if tokens[i].Type == lexer.TokenPunctuation && tokens[i].Text == "," {
+			return tokenToRange(tokens[i]), true
+		}
+		return Range{}, false
+	}
+	return Range{}, false
 }
 
 // receiverDisplayName names a receiver for a message when it has a name of

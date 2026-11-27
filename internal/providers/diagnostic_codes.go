@@ -197,6 +197,9 @@ const (
 	// A literal DoProc target with arguments not written as an array
 	// literal (issue #372).
 	CodeDoProcArgsNotArrayLiteral = "doproc_args_not_array_literal"
+	// An IIf value argument that reads what the condition tests for
+	// (issue #372).
+	CodeIIfGuardIneffective = "iif_guard_ineffective"
 )
 
 // Pipeline-level codes: emitted by the diagnostics pipeline itself rather

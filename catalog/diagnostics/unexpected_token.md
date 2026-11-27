@@ -161,6 +161,18 @@ history:
       production code, a dotted name with a digit in a segment and a
       class named `Name[]`. On the production corpus the final rule adds
       one finding, in a file that already failed validation.
+  - date: 2026-11-27
+    ref: "issue #372"
+    note: >-
+      The shapes the two notes above added were run on STARLIMS 12, and
+      each one stops with a compile error: a word after `:NEXT`, `:ENDIF`,
+      `:ELSE` or `:ENDPROC`, an `:ENDIF` with no `;`, a second name or a
+      number in a `:PROCEDURE` header, a second name in a `:CLASS` header,
+      a declaration list with a missing comma, a number, a string, a
+      subscript, a trailing comma or no name, and `:INCLUDE` and `:REGION`
+      with no name or with two. No behavior change. A quoted `:INHERIT`
+      parent, which this entry had listed as unreported, failed in the
+      same run and is now `inherit_qualified_name`'s.
 issues: ["#240", "#244", "#246", "#291"]
 ---
 
@@ -251,9 +263,8 @@ The statements in scope are the ones the parser models:
   not judged: the lexer gives the rest of a dotted name as several
   tokens, and a name it cannot read whole (`:CLASS Name[];`) is left
   alone. A quoted `:INCLUDE` target is `include_quoted_target`'s, and
-  `:INHERIT` with an unqualified name is `inherit_qualified_name`'s. A
-  quoted `:INHERIT` parent is not reported: what the compiler makes of it
-  is not documented.
+  `:INHERIT` with an unqualified or a quoted name is
+  `inherit_qualified_name`'s.
 
 A required operand that is missing is unexpected at whatever token stands
 in its place, including the `;` itself (`nCount := ;`, `:IF;`). Where the

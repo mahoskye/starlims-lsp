@@ -75,12 +75,13 @@ per rule via `ssl.diagnostics.rules`; suppressible rules honor
 | `hungarian_type_mismatch` | Hungarian prefix disagrees with the assigned expression's type | warning | style_only | active | [diag.hungarian_type_mismatch](../../catalog/diagnostics/hungarian_type_mismatch.md) |
 | `identifier_too_long` | Identifier exceeds style-guide length limit | info | style_only | active | [diag.identifier_too_long](../../catalog/diagnostics/identifier_too_long.md) |
 | `identifier_too_short` | Identifier shorter than a minimum length (never implemented) | info | tool | removed | [diag.identifier_too_short](../../catalog/diagnostics/identifier_too_short.md) |
+| `iif_guard_ineffective` | IIf value argument reads what its condition tests for | warning | tool | active | [diag.iif_guard_ineffective](../../catalog/diagnostics/iif_guard_ineffective.md) |
 | `include_early` | :INCLUDE placed late in the file | info | advisory | active | [diag.include_early](../../catalog/diagnostics/include_early.md) |
 | `include_in_procedure` | :INCLUDE inside a procedure body | warning | tool | active | [diag.include_in_procedure](../../catalog/diagnostics/include_in_procedure.md) |
 | `include_quoted_target` | :INCLUDE target written as a string | error | authoritative | active | [diag.include_quoted_target](../../catalog/diagnostics/include_quoted_target.md) |
 | `increment_as_statement` | ++ or -- inside a larger expression | info | style_only | active | [diag.increment_as_statement](../../catalog/diagnostics/increment_as_statement.md) |
 | `inherit_position` | :INHERIT not directly after :CLASS | error | authoritative | active | [diag.inherit_position](../../catalog/diagnostics/inherit_position.md) |
-| `inherit_qualified_name` | :INHERIT parent written as a plain class name | error | authoritative | active | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
+| `inherit_qualified_name` | :INHERIT parent written as a plain class name or as a string | error | authoritative | active | [diag.inherit_qualified_name](../../catalog/diagnostics/inherit_qualified_name.md) |
 | `inline_code_naming` | :BEGININLINECODE requires a name | error | authoritative | active | [diag.inline_code_naming](../../catalog/diagnostics/inline_code_naming.md) |
 | `inline_default_outside_datasource` | Inline := default on :PARAMETERS outside a data source | error | authoritative | active | [diag.inline_default_outside_datasource](../../catalog/diagnostics/inline_default_outside_datasource.md) |
 | `internal_error` | Internal error during diagnostic collection | error | tool | active | [diag.internal_error](../../catalog/diagnostics/internal_error.md) |

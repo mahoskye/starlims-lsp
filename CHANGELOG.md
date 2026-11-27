@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`iif_guard_ineffective`: an `IIf` whose test guards nothing** (#372).
+  `IIf` evaluates both value arguments, so in
+  `IIf(Empty(aRows), 0, aRows[1, 1])` the element is read when `aRows` is
+  empty too, and the call raises instead of returning the default
+  (verified on STARLIMS 12, where a query that matches no rows returns an
+  empty array). The rule reports a read in the value argument that the
+  condition would protect if it were an `:IF`: an element read behind an
+  `Empty`, `Len` or NIL test of the same array, and a member read behind a
+  NIL test of the same object. A read in the other argument, a test of
+  the element itself, and a member read behind an `Empty` test of a
+  string are not reported. Warning, on by default: a behavior change
+  under D16, so a gate that requires zero findings can see it, and
+  `valid` cannot. Production corpus: 15 findings in 11 scripts, 4 of them
+  on an aggregate query's result, which is never empty
+  ([diag.iif_guard_ineffective](catalog/diagnostics/iif_guard_ineffective.md)).
+  **Downstream:** a consumer that lists the codes (a settings enum, a
+  rule table) gains one.
+
+### Changed
+- **Catalog: rules checked against a run on STARLIMS 12** (#372). Every
+  statement shape `unexpected_token` gained in 0.32.0 stops with a compile
+  error there. A bare `DoProc` in a method of a class that includes the
+  script defining the procedure is still a compile error, and
+  `Me:Name(...)` reaches the included procedure, so `doproc_in_class`
+  keeps no exemption. Each entry's history records it. No behavior change.
+- **Decision D22: no rule for a script-level variable read in a procedure
+  entered by name** (#372). The read fails when nothing up the call stack
+  declared the name, and a variable is resolved through the whole call
+  stack (verified on STARLIMS 12 across scripts), so one call site cannot
+  show whether it is there. On the production corpus a call-site rule
+  would have reported 16 procedures, each wrongly or to no use
+  ([DECISIONS.md](catalog/DECISIONS.md)).
+
+### Fixed
+- **`DoProc("Name",)` fails validation** (#372). A literal one-part name
+  followed by a comma and no argument array does not compile (verified on
+  STARLIMS 12), and it validated clean. `doproc_args_not_array_literal`
+  now reports the comma; the fix is `DoProc("Name")` or
+  `DoProc("Name", {...})`. The opt-in `trailing_skip_commas` note no longer
+  reports that comma, because its message says the call works. No new
+  code. The same run confirmed what the rule leaves alone: an array
+  literal in parentheses, a name built by an expression, a dotted name and
+  `ExecFunction` all compile with the array in a variable. Production
+  corpus: no findings
+  ([diag.doproc_args_not_array_literal](catalog/diagnostics/doproc_args_not_array_literal.md)).
+- **A quoted `:INHERIT` parent fails validation** (#372).
+  `:INHERIT "Category.Parent";` was left unreported because its compile
+  behavior was not documented. A class written that way does not compile
+  (verified on STARLIMS 12). `inherit_qualified_name` now reports the
+  string, in any quote style, and its message gives the statement to
+  write. No new code. Production corpus: no findings
+  ([diag.inherit_qualified_name](catalog/diagnostics/inherit_qualified_name.md)).
+
 ## [0.32.0] - 2026-11-25
 
 The clean-should-compile release (#372, #375). A project that passed

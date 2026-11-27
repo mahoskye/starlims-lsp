@@ -184,7 +184,7 @@ vOut := DoProc("Target",, aArgs);
 :ENDPROC;`
 
 	got := codesAt(t, CodeDoProcArgsNotArrayLiteral, script)
-	want := []int{3, 4, 5, 6, 7, 8, 9, 10, 11}
+	want := []int{3, 4, 5, 6, 7, 8, 9, 10, 11, 23}
 	if len(got) != len(want) {
 		t.Fatalf("expected lines %v, got %v", want, got)
 	}
@@ -214,6 +214,31 @@ func TestDoProcArgsNotArrayLiteralRangeAndMessage(t *testing.T) {
 		return
 	}
 	t.Fatal("expected a doproc_args_not_array_literal diagnostic")
+}
+
+// A comma with no argument after it is reported on the comma, with a
+// message of its own: there is no argument to point at.
+func TestDoProcArgsNotArrayLiteralTrailingComma(t *testing.T) {
+	script := ":PROCEDURE Target;\n:ENDPROC;\nDoProc(\"Target\" , /* none; );\nDoProc(\"Target\",, 1);\nDoProc(\"Target\", ({1}));"
+	var found []Diagnostic
+	for _, d := range GetDiagnostics(script, DefaultDiagnosticOptions()) {
+		if d.Code == CodeDoProcArgsNotArrayLiteral {
+			found = append(found, d)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("want one finding, on the trailing comma, got %d: %+v", len(found), found)
+	}
+	d := found[0]
+	if d.Severity != SeverityError {
+		t.Errorf("severity = %v, want error", d.Severity)
+	}
+	if d.Range.Start.Line != 2 || d.Range.Start.Character != 16 || d.Range.End.Character != 17 {
+		t.Errorf("range = %+v, want the comma (2:16-2:17)", d.Range)
+	}
+	if !strings.Contains(d.Message, `DoProc("Target")`) || !strings.Contains(d.Message, `DoProc("Target", {...})`) {
+		t.Errorf("message does not show both fixes: %s", d.Message)
+	}
 }
 
 // In a class file a one-part literal target is doproc_in_class, and the

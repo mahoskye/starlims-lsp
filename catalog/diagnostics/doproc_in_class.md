@@ -44,6 +44,17 @@ history:
       procedure, while a bare name is a compile-time error. Behavior and
       prose already match; the qualified Does-not-flag fence pins the
       silence, and a second one pins the reference's own shape.
+  - date: 2026-11-27
+    ref: "issue #372"
+    note: >-
+      Checked for a class that includes a script, which issue #372 asked
+      about: should a bare `DoProc` to an included procedure be exempt?
+      No. Verified on STARLIMS 12: a class may `:INCLUDE` a script, a
+      method that calls the included procedure with
+      `DoProc("Name", {...})` stops the class from compiling ("Invalid
+      procedure call inside a class method"), and `Me:Name(...)` reaches
+      the same procedure. No behavior change; a Flags fence pins the
+      included case.
 issues: ["ssl-style-guide#49"]
 ---
 
@@ -81,6 +92,20 @@ It must NOT flag:
 :CLASS MyClass;
 :PROCEDURE Run;
 	DoProc("Helper", {});
+:ENDPROC;
+```
+
+### Flags
+
+Including the script that defines the procedure does not make the call
+legal. The included procedure is reached as a method, `Me:FormatPair(1, 2)`.
+
+```ssl
+:CLASS PairPrinter;
+:INCLUDE Common.PairFormat;
+
+:PROCEDURE Print;
+	:RETURN DoProc("FormatPair", {1, 2});
 :ENDPROC;
 ```
 
@@ -157,3 +182,8 @@ provability precedent (zero_based_array_index, execfunction_class_target)
 in leaving non-literal targets alone. The be7a174 rewording (history)
 replaced a softer style suggestion with the compile-error statement so
 users do not assume the call would merely be unidiomatic.
+
+An `:INCLUDE` in the class changes nothing. The included procedures
+become methods of the class, so `Me:Name(...)` calls them, and a bare
+`DoProc("Name", {...})` to one is the same compile error as to any other
+method (verified on STARLIMS 12, issue #372).

@@ -24,6 +24,20 @@ history:
       all 5,797 one-part literal `DoProc` calls that pass arguments write
       them as `{...}`, so the rule reports nothing there. A new default-on
       error code, so a breaking change under D16.
+  - date: 2026-11-27
+    ref: "issue #372"
+    note: >-
+      Widened to a comma with no argument after it. The argument forms the
+      rule had left alone as unknown were run on STARLIMS 12.
+      `DoProc("Name",)` stops with the same compile-time error, so it is
+      reported now, on the comma. An array literal in parentheses compiles
+      and runs. So does the array in a variable when the name is built by
+      an expression, when it is a dotted literal, and with `ExecFunction`,
+      so those stay unreported. The same run confirmed the shapes already
+      reported: a bracket-quoted name, `NIL`, an element of an array, and
+      a procedure that comes from an `:INCLUDE`. The production corpus has
+      no call with the trailing comma, so the rule still reports nothing
+      there.
 issues: []
 ---
 
@@ -43,6 +57,11 @@ The fix is to write the array out, `DoProc("Name", {aArgs[1], aArgs[2]})`,
 or to call by a name held in a variable when the argument list really is
 built at run time.
 
+A comma with no argument after it (`DoProc("Name",)`) is flagged too. The
+comma opens the argument slot and leaves it empty, and the call stops with
+the same compile error. The range covers the comma, and the message gives
+both fixes: drop the comma, or write the array.
+
 It must NOT flag:
 
 - arguments written as an array literal, empty or not, on one line or
@@ -51,16 +70,22 @@ It must NOT flag:
 - a target that is not a string literal (`DoProc(sName, aArgs)`): the name
   is resolved at run time, and that path takes any array (reference
   functions/DoProc shows this form);
-- a dotted target (`DoProc("Category.Script.Procedure", aArgs)`): whether
-  it is bound when the script compiles depends on how the server compiles,
-  so the call is left alone (D17);
+- a target built by an expression (`DoProc("Check" + sKind, aArgs)`): it
+  is resolved at run time like a name in a variable;
+- a dotted target (`DoProc("Category.Script.Procedure", aArgs)`): it
+  compiled and ran on STARLIMS 12, and whether it is bound when the script
+  compiles depends on how the server compiles, so the call is left alone
+  (D17);
 - `ExecFunction(...)` in any form, for the same reason;
 - a call in a class file: a one-part literal target there is already
   `doproc_in_class`, and one finding per call is enough;
 - a member call `oObject:DoProc(...)`, which is not the built-in (D10);
-- a second argument in parentheses, a skipped one (`DoProc("Name",)`), or
-  one the parser could not read: what the compiler makes of these is not
-  known, and unknown is silence.
+- an array literal in parentheses (`DoProc("Name", ({1, 2}))`), which
+  compiles and runs;
+- anything else in parentheses, a skipped second argument with another
+  argument after it (`DoProc("Name",, vExtra)`), or an argument the parser
+  could not read: what the compiler makes of these is not known, and
+  unknown is silence.
 
 ## Examples
 
@@ -102,6 +127,24 @@ An expression that yields an array is not an array literal either.
 	:PARAMETERS sLabel, vExpected, vActual;
 
 	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+```
+
+### Flags
+
+A comma with nothing after it fails the same way.
+
+```ssl
+:PROCEDURE RunAll;
+	:DECLARE aResult;
+
+	aResult := DoProc("CheckAll",);
+
+	:RETURN aResult;
+:ENDPROC;
+
+:PROCEDURE CheckAll;
+	:RETURN {};
 :ENDPROC;
 ```
 
@@ -148,6 +191,43 @@ A name held in a variable is resolved at run time and takes any array.
 
 ### Does not flag
 
+An array literal in parentheses is still an array literal, and it compiles.
+
+```ssl
+:PROCEDURE RunCheck;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN DoProc("CheckEqual", ({sLabel, vExpected, vActual}));
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+```
+
+### Does not flag
+
+A name built by an expression is resolved at run time, like a name in a
+variable.
+
+```ssl
+:PROCEDURE CallKind;
+	:PARAMETERS sKind, aArgs;
+
+	:RETURN DoProc("Check" + sKind, aArgs);
+:ENDPROC;
+
+:PROCEDURE CheckEqual;
+	:PARAMETERS sLabel, vExpected, vActual;
+
+	:RETURN {sLabel, vExpected == vActual};
+:ENDPROC;
+```
+
+### Does not flag
+
 ```ssl
 :PROCEDURE Forward;
 	:PARAMETERS aArgs;
@@ -187,4 +267,6 @@ call of this shape among 5,797. The rule reports only what is certain.
 A dotted target and `ExecFunction` are bound at compile time only under a
 server setting the file does not show, and the shapes of argument the
 parser or the compiler may read differently are left alone, following
-D17: where the behavior is not confirmed, the server stays silent.
+D17: where the behavior is not confirmed, the server stays silent. Each
+shape the rule reports, and each it deliberately passes, was run on
+STARLIMS 12; the 2026-11-27 history note lists them.
