@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script defining the procedure is still a compile error, and
   `Me:Name(...)` reaches the included procedure, so `doproc_in_class`
   keeps no exemption. Each entry's history records it. No behavior change.
+- **Decision D22: no rule for a script-level variable read in a procedure
+  entered by name** (#372). The read fails when nothing up the call stack
+  declared the name, and a variable is resolved through the whole call
+  stack (verified on STARLIMS 12 across scripts), so one call site cannot
+  show whether it is there. On the production corpus a call-site rule
+  would have reported 16 procedures, each wrongly or to no use
+  ([DECISIONS.md](catalog/DECISIONS.md)).
 
 ### Fixed
 - **`DoProc("Name",)` fails validation** (#372). A literal one-part name
