@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-11-27
+
+The editor fixes release (#378, #379, #380). Five defects in the editor
+features, each against behavior the catalog already specified. Rename no
+longer rewrites `.T.` and the other dotted tokens. A token's extent is
+counted in characters, so non-ASCII text in a string no longer misplaces
+signature help, hover, completion or a finding's range. `Me:` and `Base:`
+list the members of a class written in the workspace. Nothing in the CLI
+contract changes: no diagnostic is added or removed, and on the production
+corpus every finding is identical.
+
 ### Fixed
 - **Rename no longer accepts `.T.`, `.F.`, `.AND.`, `.OR.` or `.NOT.`**
   (#378). `prepareRename` with the cursor on the letters of one of these
@@ -3453,7 +3464,8 @@ formatting, surfaced by user-reported fixtures:
 - `compact` - Minimal breaks, fits on fewer lines
 - `expanded` - Each column/condition on own line
 
-[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/mahoskye/starlims-lsp/compare/v0.33.1...HEAD
+[0.33.1]: https://github.com/mahoskye/starlims-lsp/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/mahoskye/starlims-lsp/compare/v0.30.0...v0.31.0
